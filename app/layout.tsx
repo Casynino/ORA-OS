@@ -11,16 +11,43 @@ const poppins = Poppins({
   display: "swap",
 });
 
+const SITE_NAME = "ORA-Pads";
+const SITE_TAGLINE = "ORA-Pads — Empowering Every Cycle";
+const SITE_DESCRIPTION =
+  "ORA-Pads stands for women's health and period dignity across Tanzania — menstrual education, community impact, and the confidence for every girl and woman to thrive through every cycle.";
+
 export const metadata: Metadata = {
+  applicationName: SITE_NAME,
   title: {
-    default: "Ora Pads — Empowering Every Cycle",
-    template: "%s · Ora Pads",
+    default: SITE_TAGLINE,
+    template: `%s · ${SITE_NAME}`,
   },
-  description:
-    "A futuristic impact platform for Ora Pads — controlled distribution, donations, education and real-time impact across Tanzania.",
+  description: SITE_DESCRIPTION,
+  keywords: [
+    "women's health",
+    "menstrual education",
+    "period dignity",
+    "menstrual health",
+    "girls empowerment",
+    "community impact",
+    "Tanzania",
+    "ORA-Pads",
+  ],
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   ),
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: SITE_TAGLINE,
+    description: SITE_DESCRIPTION,
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TAGLINE,
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export default function RootLayout({

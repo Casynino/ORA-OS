@@ -227,7 +227,7 @@ function NewPostModal({
             value={form.title}
             onChange={(e) => set("title", e.target.value)}
             className="mt-1.5"
-            placeholder="Ora Pads reaches 5,000 girls in Mwanza"
+            placeholder="ORA-Pads reaches 5,000 girls in Mwanza"
           />
         </div>
         <div>

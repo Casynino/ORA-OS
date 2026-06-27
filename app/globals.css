@@ -93,6 +93,9 @@
   html {
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
+    /* clip (not hidden) keeps position:sticky working while killing
+       any unexpected horizontal scroll across the whole app */
+    overflow-x: clip;
   }
   body {
     background-color: hsl(var(--background));
@@ -100,6 +103,17 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     transition: background-color 0.4s ease, color 0.4s ease;
+    overflow-x: clip;
+    max-width: 100%;
+    /* break long words / URLs instead of forcing the layout wider */
+    overflow-wrap: break-word;
+  }
+  /* media never overflows its container on small screens */
+  img,
+  svg,
+  video,
+  canvas {
+    max-width: 100%;
   }
 }
 

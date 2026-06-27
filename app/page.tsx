@@ -96,7 +96,7 @@ export default async function HomePage() {
           </Reveal>
           <Reveal delay={0.1}>
             <p className="mt-6 max-w-xl text-lg text-white/75">
-              Ora Pads is building a world where every girl can manage her period
+              ORA-Pads is building a world where every girl can manage her period
               with dignity, confidence and access. Together, we create healthier
               communities.
             </p>
@@ -132,7 +132,7 @@ export default async function HomePage() {
           <Reveal delay={0.34}>
             <p className="mt-5 flex items-center gap-2 text-sm text-white/55">
               <span className="size-2 animate-pulse rounded-full bg-success" />
-              Live updates from our impact dashboard
+              Live updates from communities we serve
             </p>
           </Reveal>
         </div>
@@ -365,7 +365,7 @@ export default async function HomePage() {
         </div>
         <div className="border-t border-white/10">
           <p className="container py-5 text-center text-xs text-white/50">
-            © {new Date().getFullYear()} Ora Pads. All rights reserved.
+            © {new Date().getFullYear()} ORA-Pads. All rights reserved.
           </p>
         </div>
       </footer>

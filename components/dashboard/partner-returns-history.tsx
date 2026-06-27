@@ -31,7 +31,42 @@ export type PartnerReturnRow = {
 export function PartnerReturnsHistory({ returns }: { returns: PartnerReturnRow[] }) {
   const router = useRouter();
   return (
-    <div className="overflow-x-auto">
+    <>
+      {/* Mobile: stacked cards */}
+      <div className="md:hidden">
+        {returns.map((r) => (
+          <button
+            key={r.id}
+            onClick={() => router.push(`/partner/returns/${r.id}`)}
+            className="flex w-full items-center gap-3 border-b border-border p-4 text-left transition-colors last:border-0 active:bg-muted/50"
+          >
+            <span className="relative size-11 shrink-0 overflow-hidden rounded-md bg-muted">
+              <Image
+                src={r.image}
+                alt={r.productName}
+                fill
+                className="object-cover"
+                sizes="44px"
+              />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold">{r.code}</span>
+                <StatusBadge status={r.status} />
+              </div>
+              <p className="truncate text-sm">{r.productName}</p>
+              <p className="text-xs text-muted-foreground">
+                {formatDate(r.dateISO)} · Qty {formatNumber(r.quantity)}
+                {r.reasonType ? ` · ${r.reasonType}` : ""}
+              </p>
+            </div>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </button>
+        ))}
+      </div>
+
+      {/* Desktop: full table */}
+      <div className="hidden md:block">
       <Table>
         <TableHeader>
           <TableRow>
@@ -90,6 +125,7 @@ export function PartnerReturnsHistory({ returns }: { returns: PartnerReturnRow[]
           ))}
         </TableBody>
       </Table>
-    </div>
+      </div>
+    </>
   );
 }

@@ -8,13 +8,13 @@ export function SiteFooter() {
         <div className="space-y-3">
           <Logo />
           <p className="max-w-xs text-sm text-muted-foreground">
-            Dignity in every cycle. A controlled distribution, education and
-            donation platform powering menstrual health.
+            Dignity in every cycle. Championing menstrual health, education and
+            period dignity for girls and women across Tanzania.
           </p>
         </div>
 
         <div>
-          <h4 className="text-sm font-semibold">Platform</h4>
+          <h4 className="text-sm font-semibold">Explore</h4>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
             <li>
               <Link href="/donate" className="hover:text-foreground">
@@ -66,7 +66,7 @@ export function SiteFooter() {
 
       <div className="border-t border-border">
         <div className="container flex flex-col items-center justify-between gap-2 py-5 text-xs text-muted-foreground sm:flex-row">
-          <p>© {new Date().getFullYear()} Ora Pads. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} ORA-Pads. All rights reserved.</p>
           <p>Empowering every cycle · made in Tanzania</p>
         </div>
       </div>

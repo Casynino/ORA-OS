@@ -10,7 +10,11 @@ const config: Config = {
   theme: {
     container: {
       center: true,
-      padding: "1.5rem",
+      padding: {
+        DEFAULT: "1rem",
+        sm: "1.5rem",
+        lg: "2rem",
+      },
       screens: { "2xl": "1280px" },
     },
     extend: {
@@ -91,11 +95,16 @@ const config: Config = {
           "70%": { boxShadow: "0 0 0 8px hsl(var(--primary) / 0)" },
           "100%": { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" },
         },
+        "slide-in-left": {
+          from: { transform: "translateX(-100%)" },
+          to: { transform: "translateX(0)" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.4s ease-out both",
         "slide-up": "slide-up 0.5s cubic-bezier(0.16,1,0.3,1) both",
         "pulse-ring": "pulse-ring 2s infinite",
+        "slide-in-left": "slide-in-left 0.28s cubic-bezier(0.16,1,0.3,1) both",
       },
     },
   },

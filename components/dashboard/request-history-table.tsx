@@ -122,7 +122,46 @@ export function RequestHistoryTable({
             description="Try adjusting your filters, or submit a new request."
           />
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            {/* Mobile: stacked cards */}
+            <div className="md:hidden">
+              {filtered.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => router.push(`/partner/requests/${r.id}`)}
+                  className="flex w-full flex-col gap-2 border-b border-border p-4 text-left transition-colors last:border-0 active:bg-muted/50"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold">{r.code}</span>
+                    <StatusBadge status={r.status} />
+                  </div>
+                  <p className="truncate text-sm" title={r.products}>
+                    {r.products}
+                  </p>
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
+                    <span className="text-muted-foreground">
+                      {r.dateLabel} · Qty {formatNumber(r.totalQty)} ·{" "}
+                      {r.warehouse}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <Badge
+                        variant={r.payment === "Credit" ? "accent" : "secondary"}
+                      >
+                        {r.payment}
+                      </Badge>
+                      <span className="font-semibold">
+                        {r.totalAmount != null
+                          ? formatCurrency(r.totalAmount)
+                          : "—"}
+                      </span>
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Desktop: full table */}
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -175,7 +214,8 @@ export function RequestHistoryTable({
                 ))}
               </TableBody>
             </Table>
-          </div>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

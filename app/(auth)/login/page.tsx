@@ -10,7 +10,7 @@ export default function LoginPage() {
         Welcome back
       </h1>
       <p className="mt-2 text-muted-foreground">
-        Sign in to your Ora Pads account.
+        Sign in to your ORA-Pads account.
       </p>
 
       <div className="mt-8">
