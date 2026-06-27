@@ -121,6 +121,80 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* ── Responsive table → stacked cards on mobile ─────────────────
+     Apply `table-stack` to a Table's wrapper. On < md the table
+     collapses: each row becomes a card and each cell shows its
+     header via `data-label`. Desktop is unaffected. */
+  @media (max-width: 767px) {
+    .table-stack table,
+    .table-stack thead,
+    .table-stack tbody,
+    .table-stack tr,
+    .table-stack th,
+    .table-stack td {
+      display: block;
+      width: 100%;
+    }
+    .table-stack thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .table-stack tr {
+      margin-bottom: 0.75rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      padding: 0.25rem 0.25rem;
+      background-color: hsl(var(--card));
+    }
+    .table-stack tr:last-child {
+      margin-bottom: 0;
+    }
+    .table-stack td {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      border: 0 !important;
+      padding: 0.5rem 0.75rem;
+      text-align: right;
+      min-height: 0;
+    }
+    .table-stack td::before {
+      content: attr(data-label);
+      flex: 0 0 auto;
+      margin-right: auto;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: hsl(var(--muted-foreground));
+      text-align: left;
+    }
+    /* cells flagged as the card title span full width, label hidden */
+    .table-stack td[data-label=""]::before {
+      content: none;
+    }
+    .table-stack td[data-cardtitle]::before {
+      content: none;
+    }
+    .table-stack td[data-cardtitle] {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.125rem;
+      justify-content: flex-start;
+      text-align: left;
+      font-weight: 600;
+      padding-bottom: 0.25rem;
+    }
+  }
   .bg-grid {
     background-image: linear-gradient(
         to right,

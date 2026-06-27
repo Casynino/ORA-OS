@@ -78,7 +78,7 @@ export function SalesTable({
         />
       ) : (
         <div className="overflow-x-auto">
-          <Table>
+          <Table wrapperClassName="table-stack">
             <TableHeader>
               <TableRow>
                 <TableHead>Sale</TableHead>
@@ -97,8 +97,8 @@ export function SalesTable({
                   onClick={() => router.push(`${detailBase}/${r.id}`)}
                   className="cursor-pointer transition-colors hover:bg-muted/40"
                 >
-                  <TableCell className="font-medium">{r.code}</TableCell>
-                  <TableCell>
+                  <TableCell data-cardtitle className="font-medium">{r.code}</TableCell>
+                  <TableCell data-label="Customer">
                     <span className="inline-flex items-center gap-2">
                       {r.buyer}
                       {r.isWalkin && (
@@ -108,23 +108,23 @@ export function SalesTable({
                       )}
                     </span>
                   </TableCell>
-                  <TableCell>
+                  <TableCell data-label="Payment">
                     <Badge
                       variant={r.paymentType === "CREDIT" ? "accent" : "secondary"}
                     >
                       {humanize(r.paymentType)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right font-medium">
+                  <TableCell data-label="Total" className="text-right font-medium">
                     {formatCurrency(r.total)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell data-label="Status">
                     <Badge variant="success">Fulfilled</Badge>
                   </TableCell>
-                  <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                  <TableCell data-label="Date" className="whitespace-nowrap text-sm text-muted-foreground">
                     {formatDate(r.dateISO)}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell data-label="" className="text-right">
                     <ChevronRight className="ml-auto size-4 text-muted-foreground" />
                   </TableCell>
                 </TableRow>

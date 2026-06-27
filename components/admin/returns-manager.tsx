@@ -162,7 +162,7 @@ export function ReturnsManager({
             />
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table wrapperClassName="table-stack">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Return</TableHead>
@@ -187,20 +187,20 @@ export function ReturnsManager({
                       }
                       className={detailBase ? "cursor-pointer transition-colors hover:bg-muted/40" : ""}
                     >
-                      <TableCell>
+                      <TableCell data-cardtitle>
                         <div className="font-medium">{r.code}</div>
                         <div className="text-xs text-muted-foreground">
                           {r.requesterName}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm">{r.productName}</TableCell>
-                      <TableCell className="text-right font-medium">
+                      <TableCell data-label="Product" className="text-sm">{r.productName}</TableCell>
+                      <TableCell data-label="Qty" className="text-right font-medium">
                         {formatNumber(r.quantity)}
                       </TableCell>
-                      <TableCell className="text-right text-sm">
+                      <TableCell data-label="Value" className="text-right text-sm">
                         {formatCurrency(r.value)}
                       </TableCell>
-                      <TableCell className="text-sm">
+                      <TableCell data-label="Reason" className="text-sm">
                         {r.reasonType ?? "—"}
                         {r.reason ? (
                           <span className="block text-xs text-muted-foreground">
@@ -208,16 +208,17 @@ export function ReturnsManager({
                           </span>
                         ) : null}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell data-label="Destination" className="text-sm text-muted-foreground">
                         {r.warehouseName ?? "—"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell data-label="Status">
                         <StatusBadge status={r.status} />
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                      <TableCell data-label="Date" className="whitespace-nowrap text-sm text-muted-foreground">
                         {formatDate(r.createdAt)}
                       </TableCell>
                       <TableCell
+                        data-label="Action"
                         className="text-right"
                         onClick={(e) => e.stopPropagation()}
                       >

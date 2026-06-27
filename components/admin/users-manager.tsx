@@ -102,7 +102,7 @@ export function UsersManager({
           <TabsContent key={t} value={t}>
             <Card>
               <CardContent className="p-0">
-                <Table>
+                <Table wrapperClassName="table-stack">
                   <TableHeader>
                     <TableRow>
                       <TableHead>User</TableHead>
@@ -115,29 +115,29 @@ export function UsersManager({
                   <TableBody>
                     {filtered(t).map((u) => (
                       <TableRow key={u.id}>
-                        <TableCell>
+                        <TableCell data-cardtitle>
                           <div className="font-medium">{u.name}</div>
                           <div className="text-xs text-muted-foreground">
                             {u.email}
                             {u.organization ? ` · ${u.organization}` : ""}
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell data-label="Role">
                           <Badge variant={roleVariant[u.role] ?? "secondary"}>
                             {humanize(u.role)}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell data-label="Status">
                           <StatusBadge status={u.status} />
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell data-label="Credit limit" className="text-sm">
                           {u.role === "PARTNER"
                             ? u.creditLimit != null
                               ? formatCurrency(u.creditLimit)
                               : "—"
                             : "n/a"}
                         </TableCell>
-                        <TableCell>
+                        <TableCell data-label="Actions">
                           <div className="flex justify-end gap-1.5">
                             {u.status === "PENDING" && (
                               <ActionButton

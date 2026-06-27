@@ -61,7 +61,7 @@ export function InventoryManager({ products }: { products: Product[] }) {
 
       <Card className="mt-4">
         <CardContent className="p-0">
-          <Table>
+          <Table wrapperClassName="table-stack">
             <TableHeader>
               <TableRow>
                 <TableHead>Product</TableHead>
@@ -77,23 +77,23 @@ export function InventoryManager({ products }: { products: Product[] }) {
                 const low = p.warehouseQty <= p.lowStockThreshold;
                 return (
                   <TableRow key={p.id}>
-                    <TableCell>
+                    <TableCell data-cardtitle>
                       <div className="font-medium">{p.name}</div>
                       <div className="text-xs text-muted-foreground">
                         {p.sku} · {humanize(p.category)}
                         {!p.isActive && " · inactive"}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right font-medium">
+                    <TableCell data-label="Warehouse" className="text-right font-medium">
                       {formatNumber(p.warehouseQty)}
                     </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
+                    <TableCell data-label="Assigned" className="text-right text-muted-foreground">
                       {formatNumber(p.assignedQty)}
                     </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
+                    <TableCell data-label="Distributed" className="text-right text-muted-foreground">
                       {formatNumber(p.distributedQty)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Status">
                       {low ? (
                         <Badge variant="destructive" className="gap-1">
                           <AlertTriangle className="size-3" />
@@ -103,7 +103,7 @@ export function InventoryManager({ products }: { products: Product[] }) {
                         <Badge variant="success">In stock</Badge>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Actions">
                       <div className="flex justify-end gap-1.5">
                         <Button
                           variant="outline"

@@ -29,7 +29,7 @@ export default async function AdminCustomersPage() {
           {partners.length === 0 ? (
             <EmptyState className="m-6" icon={Users} title="No partners yet" />
           ) : (
-            <Table>
+            <Table wrapperClassName="table-stack">
               <TableHeader>
                 <TableRow>
                   <TableHead>Partner</TableHead>
@@ -46,14 +46,14 @@ export default async function AdminCustomersPage() {
                     .reduce((s, c) => s + (c.principal - c.amountPaid), 0);
                   return (
                     <TableRow key={p.id}>
-                      <TableCell>
+                      <TableCell data-cardtitle>
                         <div className="font-medium">{p.name}</div>
                         <div className="text-xs text-muted-foreground">{p.organization ?? "—"} · {p.email}</div>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{p.location ?? "—"}</TableCell>
-                      <TableCell className="text-right">{p.creditLimit != null ? formatCurrency(p.creditLimit) : "—"}</TableCell>
-                      <TableCell className="text-right font-medium">{outstanding > 0 ? formatCurrency(outstanding) : "—"}</TableCell>
-                      <TableCell><StatusBadge status={p.status} /></TableCell>
+                      <TableCell data-label="Location" className="text-sm text-muted-foreground">{p.location ?? "—"}</TableCell>
+                      <TableCell data-label="Credit limit" className="text-right">{p.creditLimit != null ? formatCurrency(p.creditLimit) : "—"}</TableCell>
+                      <TableCell data-label="Outstanding" className="text-right font-medium">{outstanding > 0 ? formatCurrency(outstanding) : "—"}</TableCell>
+                      <TableCell data-label="Status"><StatusBadge status={p.status} /></TableCell>
                     </TableRow>
                   );
                 })}
