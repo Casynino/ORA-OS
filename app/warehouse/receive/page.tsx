@@ -98,7 +98,7 @@ export default async function WarehouseReceivePage() {
             {stock.length === 0 ? (
               <EmptyState className="m-6" icon={Boxes} title="No stock yet" description="Received deliveries will appear here." />
             ) : (
-              <Table>
+              <Table wrapperClassName="table-stack">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Product</TableHead>
@@ -111,12 +111,12 @@ export default async function WarehouseReceivePage() {
                     const low = r.onHand <= r.minLevel;
                     return (
                       <TableRow key={r.id}>
-                        <TableCell>
+                        <TableCell data-cardtitle>
                           <div className="font-medium">{r.product.name}</div>
                           <div className="text-xs text-muted-foreground">{r.product.sku}</div>
                         </TableCell>
-                        <TableCell className="text-right font-medium">{formatNumber(r.onHand)}</TableCell>
-                        <TableCell>
+                        <TableCell data-label="On hand" className="text-right font-medium">{formatNumber(r.onHand)}</TableCell>
+                        <TableCell data-label="Status">
                           {r.onHand <= 0 ? (
                             <Badge variant="destructive">Out</Badge>
                           ) : low ? (
@@ -146,8 +146,7 @@ export default async function WarehouseReceivePage() {
           {history.length === 0 ? (
             <EmptyState className="m-6" icon={PackagePlus} title="No receipts yet" description="Record a delivery to start the receipt log." />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <Table wrapperClassName="table-stack">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Product</TableHead>
@@ -160,20 +159,19 @@ export default async function WarehouseReceivePage() {
                 <TableBody>
                   {history.map((m) => (
                     <TableRow key={m.id}>
-                      <TableCell className="font-medium">{m.product.name}</TableCell>
-                      <TableCell className="text-right font-medium text-success">
+                      <TableCell data-cardtitle className="font-medium">{m.product.name}</TableCell>
+                      <TableCell data-label="Qty" className="text-right font-medium text-success">
                         +{formatNumber(m.quantity)}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{m.reference ?? "—"}</TableCell>
-                      <TableCell className="text-sm">{m.createdBy.name}</TableCell>
-                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                      <TableCell data-label="Reference" className="text-sm text-muted-foreground">{m.reference ?? "—"}</TableCell>
+                      <TableCell data-label="Received by" className="text-sm">{m.createdBy.name}</TableCell>
+                      <TableCell data-label="Date" className="whitespace-nowrap text-sm text-muted-foreground">
                         {formatDateTime(m.createdAt)}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </div>
           )}
         </CardContent>
       </Card>

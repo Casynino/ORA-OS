@@ -183,7 +183,7 @@ export default async function WarehouseOrderDetailPage({
           <CardTitle>Items to prepare</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
+          <Table wrapperClassName="table-stack">
             <TableHeader>
               <TableRow>
                 <TableHead>Product</TableHead>
@@ -195,7 +195,7 @@ export default async function WarehouseOrderDetailPage({
             <TableBody>
               {order.items.map((i) => (
                 <TableRow key={i.id}>
-                  <TableCell>
+                  <TableCell data-cardtitle>
                     <div className="flex items-center gap-2.5">
                       <span className="relative size-8 shrink-0 overflow-hidden rounded-md bg-muted">
                         <Image src={productMeta(i.product.sku).image} alt={i.product.name} fill className="object-cover" sizes="32px" />
@@ -203,9 +203,9 @@ export default async function WarehouseOrderDetailPage({
                       <span className="text-sm">{i.product.name}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right font-medium">{formatNumber(i.quantity)}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">{formatCurrency(i.unitPrice ?? 0)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(i.lineTotal ?? (i.unitPrice ?? 0) * i.quantity)}</TableCell>
+                  <TableCell data-label="Qty" className="text-right font-medium">{formatNumber(i.quantity)}</TableCell>
+                  <TableCell data-label="Unit price" className="text-right text-muted-foreground">{formatCurrency(i.unitPrice ?? 0)}</TableCell>
+                  <TableCell data-label="Line total" className="text-right">{formatCurrency(i.lineTotal ?? (i.unitPrice ?? 0) * i.quantity)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

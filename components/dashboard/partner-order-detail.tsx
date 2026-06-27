@@ -234,7 +234,7 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
               {editable ? "Edit quantities or lines" : "Read-only"}
             </span>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto table-stack">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -250,11 +250,11 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
                   const qty = Number(l.qty) || 0;
                   return (
                     <tr key={l.productId} className="border-b border-border last:border-0">
-                      <td className="px-5 py-3">
+                      <td data-cardtitle className="px-5 py-3">
                         <div className="font-medium">{l.name}</div>
                         <div className="text-xs text-muted-foreground">{l.sku}</div>
                       </td>
-                      <td className="px-3 py-3">
+                      <td data-label="Qty" className="px-3 py-3">
                         {editable ? (
                           <Input
                             type="number"
@@ -267,14 +267,14 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
                           <span>×{qty}</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-muted-foreground">
+                      <td data-label="Your price" className="px-3 py-3 text-muted-foreground">
                         {formatCurrency(l.price)}
                       </td>
-                      <td className="px-5 py-3 text-right font-medium">
+                      <td data-label="Line total" className="px-5 py-3 text-right font-medium">
                         {formatCurrency(qty * l.price)}
                       </td>
                       {editable && (
-                        <td className="px-2 py-3">
+                        <td data-label="" className="px-2 py-3">
                           <button
                             onClick={() => removeLine(l.productId)}
                             className="text-muted-foreground hover:text-destructive"

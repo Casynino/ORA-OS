@@ -181,12 +181,12 @@ export default async function PartnerOverviewPage() {
     <div className="space-y-8">
       {/* Header */}
       <Reveal>
-        <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-primary/15 via-card to-accent/10 p-6 shadow-soft sm:p-8">
+        <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-primary/15 via-card to-accent/10 p-5 shadow-soft sm:p-8">
           <div className="pointer-events-none absolute -right-10 -top-10 size-48 rounded-full bg-primary/20 blur-3xl" />
-          <div className="relative flex flex-wrap items-start justify-between gap-4">
-            <div>
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
               <p className="text-sm text-muted-foreground">Welcome back,</p>
-              <h1 className="font-display text-3xl font-bold tracking-tight">
+              <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
                 {me.name.split(" ")[0]} 👋
               </h1>
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -205,7 +205,7 @@ export default async function PartnerOverviewPage() {
             </div>
             <Link
               href="/partner/request"
-              className={cn(buttonVariants({ size: "lg" }), "rounded-full shadow-glow")}
+              className={cn(buttonVariants({ size: "lg" }), "w-full shrink-0 rounded-full shadow-glow sm:w-auto")}
             >
               <PlusCircle className="size-5" />
               Request stock
