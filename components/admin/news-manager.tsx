@@ -62,7 +62,7 @@ export function NewsManager({ posts }: { posts: Post[] }) {
               description="Publish your first news post or announcement."
             />
           ) : (
-            <Table>
+            <Table wrapperClassName="table-stack">
               <TableHeader>
                 <TableRow>
                   <TableHead>Post</TableHead>
@@ -75,7 +75,7 @@ export function NewsManager({ posts }: { posts: Post[] }) {
               <TableBody>
                 {posts.map((p) => (
                   <TableRow key={p.id}>
-                    <TableCell>
+                    <TableCell data-cardtitle>
                       <div className="flex items-center gap-3">
                         <div className="relative size-10 shrink-0 overflow-hidden rounded-lg bg-muted">
                           {p.coverImage && (
@@ -91,20 +91,20 @@ export function NewsManager({ posts }: { posts: Post[] }) {
                         <span className="font-medium">{p.title}</span>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Category">
                       <Badge variant="accent">{humanize(p.category)}</Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell data-label="Date" className="text-sm text-muted-foreground">
                       {p.publishedAt}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Status">
                       {p.published ? (
                         <Badge variant="success">Published</Badge>
                       ) : (
                         <Badge variant="secondary">Draft</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell data-label="Actions" className="text-right">
                       <div className="flex justify-end gap-2">
                         <ActionButton
                           size="sm"
