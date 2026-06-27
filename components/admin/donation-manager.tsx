@@ -57,7 +57,7 @@ export function DonationManager({ donations }: { donations: Donation[] }) {
     <>
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <Table wrapperClassName="table-stack">
             <TableHeader>
               <TableRow>
                 <TableHead>Donor</TableHead>
@@ -71,28 +71,28 @@ export function DonationManager({ donations }: { donations: Donation[] }) {
             <TableBody>
               {donations.map((d) => (
                 <TableRow key={d.id}>
-                  <TableCell>
+                  <TableCell data-cardtitle>
                     <div className="font-medium">{d.donorName}</div>
                     <div className="text-xs text-muted-foreground">
                       {d.code}
                       {d.donorEmail ? ` · ${d.donorEmail}` : ""}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell data-label="Gift">
                     {d.type === "MONEY"
                       ? formatCurrency(d.amount)
                       : `${formatNumber(d.quantity ?? 0)} pads`}
                   </TableCell>
-                  <TableCell>
+                  <TableCell data-label="Status">
                     <StatusBadge status={d.status} />
                   </TableCell>
-                  <TableCell className="max-w-[180px] truncate text-sm text-muted-foreground">
+                  <TableCell data-label="Allocation" className="max-w-[180px] truncate text-sm text-muted-foreground">
                     {d.distributedTo ?? "—"}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell data-label="Date" className="text-sm text-muted-foreground">
                     {formatDate(d.createdAt)}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell data-label="Manage" className="text-right">
                     <Button
                       variant="outline"
                       size="sm"

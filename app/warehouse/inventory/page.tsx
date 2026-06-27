@@ -74,8 +74,8 @@ export default async function WarehouseInventoryPage() {
           {stock.length === 0 ? (
             <EmptyState className="m-6" icon={Boxes} title="No stock" description="This warehouse holds no stock yet." />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <div>
+              <Table wrapperClassName="table-stack">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Product</TableHead>
@@ -96,7 +96,7 @@ export default async function WarehouseInventoryPage() {
                           : { label: "In stock", variant: "success" as const };
                     return (
                       <TableRow key={r.id}>
-                        <TableCell>
+                        <TableCell data-cardtitle>
                           <div className="flex items-center gap-2.5">
                             <span className="relative size-9 shrink-0 overflow-hidden rounded-md bg-muted">
                               <Image src={productMeta(r.product.sku).image} alt={r.product.name} fill className="object-cover" sizes="36px" />
@@ -104,13 +104,13 @@ export default async function WarehouseInventoryPage() {
                             <span className="text-sm font-medium">{r.product.name}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-medium">{formatNumber(r.onHand)}</TableCell>
-                        <TableCell className="text-right text-muted-foreground">{formatNumber(reservedByProduct.get(r.productId) ?? 0)}</TableCell>
-                        <TableCell className="text-right text-muted-foreground">{formatNumber(r.inTransit)}</TableCell>
-                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                        <TableCell data-label="Available" className="text-right font-medium">{formatNumber(r.onHand)}</TableCell>
+                        <TableCell data-label="Reserved" className="text-right text-muted-foreground">{formatNumber(reservedByProduct.get(r.productId) ?? 0)}</TableCell>
+                        <TableCell data-label="In transit" className="text-right text-muted-foreground">{formatNumber(r.inTransit)}</TableCell>
+                        <TableCell data-label="Last updated" className="whitespace-nowrap text-sm text-muted-foreground">
                           {r.lastMoveAt ? formatDate(r.lastMoveAt) : "—"}
                         </TableCell>
-                        <TableCell>
+                        <TableCell data-label="Status">
                           <Badge variant={status.variant}>{status.label}</Badge>
                         </TableCell>
                       </TableRow>

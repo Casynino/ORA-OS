@@ -34,7 +34,7 @@ export default async function WarehouseMovementsPage() {
       ) : (
         <Card className="glass-card">
           <CardContent className="p-0">
-            <Table>
+            <Table wrapperClassName="table-stack">
               <TableHeader>
                 <TableRow>
                   <TableHead>Type</TableHead>
@@ -48,20 +48,20 @@ export default async function WarehouseMovementsPage() {
               <TableBody>
                 {movements.map((m) => (
                   <TableRow key={m.id}>
-                    <TableCell>
+                    <TableCell data-label="Type">
                       <Badge variant="secondary">{humanize(m.type)}</Badge>
                     </TableCell>
-                    <TableCell className="font-medium">{m.product.name}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell data-cardtitle className="font-medium">{m.product.name}</TableCell>
+                    <TableCell data-label="Qty" className="text-right">
                       {formatNumber(m.quantity)}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell data-label="Reference" className="text-sm text-muted-foreground">
                       {m.reference ?? "—"}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell data-label="By" className="text-sm text-muted-foreground">
                       {m.createdBy.name}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell data-label="When" className="text-sm text-muted-foreground">
                       {formatDateTime(m.createdAt)}
                     </TableCell>
                   </TableRow>
