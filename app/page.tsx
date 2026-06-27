@@ -28,6 +28,9 @@ import { AuroraBackground } from "@/components/public/aurora-background";
 import { prisma } from "@/lib/db";
 import { getPublicImpactStats } from "@/lib/stats";
 
+// Refresh the public impact figures (incl. donations) every 5 minutes.
+export const revalidate = 300;
+
 export default async function HomePage() {
   const stats = await getPublicImpactStats();
 

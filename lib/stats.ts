@@ -6,7 +6,9 @@ import { getStockTotals } from "@/lib/services/inventory";
  * not just data created in this environment. Tune as real figures grow.
  */
 const IMPACT_BASELINE = {
-  money: 24_000_000,
+  // Money donated now reflects REAL donations only (no baseline) — live
+  // donation payments will be integrated soon.
+  money: 0,
   pads: 6_000,
   girls: 5_200,
   communities: 42,
