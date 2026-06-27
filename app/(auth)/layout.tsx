@@ -119,7 +119,7 @@ export default async function AuthLayout({
         </div>
 
         <p className="relative z-10 text-xs text-white/50">
-          © {new Date().getFullYear()} Ora Pads · Period dignity for all
+          © {new Date().getFullYear()} ORA-Pads · Period dignity for all
         </p>
       </div>
 

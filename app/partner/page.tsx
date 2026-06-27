@@ -237,7 +237,39 @@ export default async function PartnerOverviewPage() {
               {requests.length === 0 ? (
                 <p className="p-6 text-sm text-muted-foreground">No orders yet — request stock to get started.</p>
               ) : (
-                <div className="overflow-x-auto">
+                <>
+                  {/* Mobile: stacked cards */}
+                  <div className="sm:hidden">
+                    {requests.slice(0, 6).map((r) => (
+                      <Link
+                        key={r.id}
+                        href={`/partner/requests/${r.id}`}
+                        className="flex flex-col gap-2 border-b border-border p-4 transition-colors last:border-0 active:bg-muted/50"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold">{r.code}</span>
+                          <StatusBadge status={r.status} />
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
+                          <span className="text-muted-foreground">
+                            {r.items.reduce((a, i) => a + i.quantity, 0)} units ·{" "}
+                            {timeAgo(r.createdAt)}
+                          </span>
+                          <span className="flex items-center gap-2">
+                            <Badge variant={r.paymentType === "CREDIT" ? "accent" : "secondary"}>
+                              {humanize(r.paymentType)}
+                            </Badge>
+                            <span className="font-semibold">
+                              {r.totalAmount != null ? formatCurrency(r.totalAmount) : "—"}
+                            </span>
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+
+                  {/* Desktop: table */}
+                  <div className="hidden overflow-x-auto sm:block">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -279,7 +311,8 @@ export default async function PartnerOverviewPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                  </div>
+                </>
               )}
             </div>
           </Reveal>

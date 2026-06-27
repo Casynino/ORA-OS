@@ -120,7 +120,63 @@ export function MyRequests({ requests }: { requests: MyRequestDTO[] }) {
             description="Try a different status or search term."
           />
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            {/* Mobile: stacked cards */}
+            <div className="md:hidden">
+              {filtered.map((r) => {
+                const editable = ["PENDING", "PRICED"].includes(r.status);
+                const totalQty = r.items.reduce((s, i) => s + i.quantity, 0);
+                return (
+                  <button
+                    key={r.id}
+                    onClick={() => router.push(`/partner/requests/${r.id}`)}
+                    className="flex w-full flex-col gap-2 border-b border-border p-4 text-left transition-colors last:border-0 active:bg-muted/50"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2 font-semibold">
+                        {r.code}
+                        {editable && (
+                          <Pencil className="size-3.5 text-warning" />
+                        )}
+                      </span>
+                      <StatusBadge status={r.status} />
+                    </div>
+                    <p className="truncate text-sm">
+                      {r.items[0]?.name}
+                      {r.items.length > 1 && (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          +{r.items.length - 1} more
+                        </span>
+                      )}
+                    </p>
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
+                      <span className="text-muted-foreground">
+                        {formatDateTime(r.createdAt)} · Qty{" "}
+                        {formatNumber(totalQty)}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            r.paymentType === "CREDIT" ? "accent" : "secondary"
+                          }
+                        >
+                          {humanize(r.paymentType)}
+                        </Badge>
+                        <span className="font-semibold">
+                          {r.totalAmount != null
+                            ? formatCurrency(r.totalAmount)
+                            : "—"}
+                        </span>
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Desktop: full table */}
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -198,7 +254,8 @@ export function MyRequests({ requests }: { requests: MyRequestDTO[] }) {
                 })}
               </TableBody>
             </Table>
-          </div>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

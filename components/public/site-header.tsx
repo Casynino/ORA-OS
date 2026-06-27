@@ -30,7 +30,7 @@ export function SiteHeader({
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        <Link href="/" aria-label="Ora Pads home">
+        <Link href="/" aria-label="ORA-Pads home">
           <Logo />
         </Link>
 

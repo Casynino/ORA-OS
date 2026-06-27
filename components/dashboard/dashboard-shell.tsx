@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Menu,
@@ -99,6 +99,19 @@ export function DashboardShell({
   const [open, setOpen] = useState(false);
   const homeHref = nav[0]?.items[0]?.href ?? "/";
 
+  // Lock background scroll while the mobile drawer is open.
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  // Close the drawer automatically on route change.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
   const isActive = (href: string) =>
     pathname === href ||
     (href !== homeHref && pathname.startsWith(href + "/"));
@@ -182,15 +195,16 @@ export function DashboardShell({
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+            className="absolute inset-0 animate-fade-in bg-foreground/40 backdrop-blur-sm"
             onClick={() => setOpen(false)}
           />
-          <aside className="absolute inset-y-0 left-0 flex w-72 flex-col bg-card shadow-xl">
+          <aside className="absolute inset-y-0 left-0 flex w-[min(18rem,82vw)] animate-slide-in-left flex-col bg-card shadow-xl">
             <div className="flex h-16 items-center justify-between border-b border-border px-5">
               <Logo />
               <button
                 onClick={() => setOpen(false)}
-                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"
+                aria-label="Close menu"
+                className="-mr-1 rounded-md p-2 text-muted-foreground hover:bg-muted"
               >
                 <X className="size-5" />
               </button>
@@ -209,7 +223,7 @@ export function DashboardShell({
           <div className="flex items-center gap-3">
             <button
               onClick={() => setOpen(true)}
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted lg:hidden"
+              className="-ml-1 rounded-md p-2 text-muted-foreground hover:bg-muted lg:hidden"
               aria-label="Open menu"
             >
               <Menu className="size-5" />
