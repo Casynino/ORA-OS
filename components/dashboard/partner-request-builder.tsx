@@ -1,0 +1,562 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import {
+  Minus,
+  Plus,
+  Send,
+  Wallet,
+  CreditCard,
+  Truck,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+  PackageCheck,
+  ShieldAlert,
+} from "lucide-react";
+import { createRequest } from "@/lib/actions/requests";
+import { toast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { cn, formatCurrency, formatNumber } from "@/lib/utils";
+
+export type BuilderProduct = {
+  id: string;
+  name: string;
+  sku: string;
+  unitLabel: string;
+  price: number;
+  available: number;
+  reserved: number;
+  lowStock: boolean;
+  image: string;
+  size: string;
+  color: string;
+  use: string;
+  accent: string;
+};
+
+type Warehouse = { id: string; name: string; location: string | null };
+
+export function PartnerRequestBuilder({
+  products,
+  warehouses,
+  credit,
+  defaults,
+}: {
+  products: BuilderProduct[];
+  warehouses: Warehouse[];
+  credit: { limit: number; outstanding: number; available: number };
+  defaults?: {
+    name?: string | null;
+    phone?: string | null;
+    organization?: string | null;
+    location?: string | null;
+  };
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+
+  const [qty, setQty] = useState<Record<string, number>>({});
+  const [payment, setPayment] = useState<"IMMEDIATE" | "CREDIT">("IMMEDIATE");
+  const [warehouse, setWarehouse] = useState(warehouses[0]?.name ?? "");
+  const [deliverTo, setDeliverTo] = useState(defaults?.organization ?? "");
+  const [deliveryAddress, setDeliveryAddress] = useState(defaults?.location ?? "");
+  const [contactName, setContactName] = useState(defaults?.name ?? "");
+  const [contactPhone, setContactPhone] = useState(defaults?.phone ?? "");
+  const [deliverBy, setDeliverBy] = useState("");
+  const [note, setNote] = useState("");
+
+  const set = (id: string, v: number) =>
+    setQty((p) => ({ ...p, [id]: Math.max(0, Math.min(v, 100000)) }));
+
+  const lines = useMemo(
+    () => products.filter((p) => (qty[p.id] ?? 0) > 0),
+    [products, qty],
+  );
+  const totalQty = lines.reduce((s, p) => s + (qty[p.id] ?? 0), 0);
+  const estValue = lines.reduce((s, p) => s + (qty[p.id] ?? 0) * p.price, 0);
+  const stockIssues = lines.filter((p) => (qty[p.id] ?? 0) > p.available);
+  const creditRemaining = credit.available - estValue;
+  const creditExceeded = payment === "CREDIT" && estValue > credit.available;
+
+  const blocked =
+    lines.length === 0 || stockIssues.length > 0 || creditExceeded || pending;
+
+  function submit() {
+    if (lines.length === 0) {
+      toast({ variant: "error", title: "Add at least one product." });
+      return;
+    }
+    start(async () => {
+      const res = await createRequest({
+        items: lines.map((p) => ({ productId: p.id, quantity: qty[p.id] })),
+        paymentType: payment,
+        warehouseName: warehouse || undefined,
+        deliverTo: deliverTo || undefined,
+        deliveryAddress: deliveryAddress || undefined,
+        contactName: contactName || undefined,
+        contactPhone: contactPhone || undefined,
+        deliverBy: deliverBy || undefined,
+        note: note || undefined,
+      });
+      if (res.ok) {
+        toast({ variant: "success", title: res.message });
+        router.push("/partner/requests");
+        router.refresh();
+      } else {
+        toast({ variant: "error", title: res.error });
+      }
+    });
+  }
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
+      {/* LEFT — products + payment + delivery */}
+      <div className="space-y-6">
+        {/* Products */}
+        <section>
+          <SectionTitle
+            icon={PackageCheck}
+            title="Choose your products"
+            sub="Live stock — enter the quantity you need for each size."
+          />
+          <div className="mt-4 space-y-3">
+            {products.map((p) => {
+              const q = qty[p.id] ?? 0;
+              const over = q > p.available;
+              return (
+                <div
+                  key={p.id}
+                  className={cn(
+                    "rounded-2xl border bg-card p-4 transition-colors",
+                    over
+                      ? "border-destructive/60"
+                      : q > 0
+                        ? "border-primary/50"
+                        : "border-border",
+                  )}
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                    <div
+                      className="relative size-20 shrink-0 overflow-hidden rounded-xl ring-1 ring-border"
+                      style={{ background: `${p.accent}14` }}
+                    >
+                      <Image
+                        src={p.image}
+                        alt={p.name}
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                      />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold text-white"
+                          style={{ background: p.accent }}
+                        >
+                          {p.size}
+                        </span>
+                        <h3 className="font-semibold">{p.color}</h3>
+                        <span className="text-xs text-muted-foreground">
+                          {p.use}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {p.sku} · {p.unitLabel} · est. {formatCurrency(p.price)}/unit
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                        <span className="inline-flex items-center gap-1">
+                          <span className="size-1.5 rounded-full bg-success" />
+                          <span className="font-medium text-foreground">
+                            {formatNumber(p.available)}
+                          </span>
+                          <span className="text-muted-foreground">available</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                          <span className="size-1.5 rounded-full bg-warning" />
+                          {formatNumber(p.reserved)} reserved
+                        </span>
+                        {p.lowStock && (
+                          <Badge variant="warning" className="gap-1">
+                            <AlertTriangle className="size-3" />
+                            Low stock
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          className="size-9"
+                          onClick={() => set(p.id, q - 1)}
+                          disabled={q <= 0}
+                        >
+                          <Minus className="size-3.5" />
+                        </Button>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={q}
+                          onChange={(e) => set(p.id, Number(e.target.value))}
+                          className="h-9 w-20 text-center font-semibold"
+                        />
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          className="size-9"
+                          onClick={() => set(p.id, q + 1)}
+                        >
+                          <Plus className="size-3.5" />
+                        </Button>
+                      </div>
+                      {q > 0 && !over && (
+                        <span className="text-xs font-medium text-muted-foreground">
+                          = {formatCurrency(q * p.price)}
+                        </span>
+                      )}
+                      {over && (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive">
+                          <AlertTriangle className="size-3" />
+                          Only {formatNumber(p.available)} available
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Payment */}
+        <section>
+          <SectionTitle
+            icon={Wallet}
+            title="Payment method"
+            sub="How would you like to settle this order?"
+          />
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <PayOption
+              active={payment === "IMMEDIATE"}
+              onClick={() => setPayment("IMMEDIATE")}
+              icon={Wallet}
+              title="Cash"
+              sub="Pay on approval / delivery"
+            />
+            <PayOption
+              active={payment === "CREDIT"}
+              onClick={() => setPayment("CREDIT")}
+              icon={CreditCard}
+              title="Credit"
+              sub="Put it on your credit account"
+            />
+          </div>
+
+          {payment === "CREDIT" && (
+            <div
+              className={cn(
+                "mt-3 rounded-xl border p-4",
+                creditExceeded
+                  ? "border-destructive/50 bg-destructive/5"
+                  : "border-border bg-muted/30",
+              )}
+            >
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <MiniStat label="Credit limit" value={formatCurrency(credit.limit)} />
+                <MiniStat
+                  label="Outstanding"
+                  value={formatCurrency(credit.outstanding)}
+                />
+                <MiniStat
+                  label="Available credit"
+                  value={formatCurrency(credit.available)}
+                  accent="success"
+                />
+                <MiniStat label="This order (est.)" value={formatCurrency(estValue)} />
+                <MiniStat
+                  label="Remaining after"
+                  value={formatCurrency(creditRemaining)}
+                  accent={creditRemaining < 0 ? "destructive" : undefined}
+                />
+              </div>
+              {creditExceeded ? (
+                <p className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-destructive">
+                  <ShieldAlert className="size-4" />
+                  This order exceeds your available credit by{" "}
+                  {formatCurrency(Math.abs(creditRemaining))}.
+                </p>
+              ) : (
+                estValue > 0 && (
+                  <p className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-success">
+                    <CheckCircle2 className="size-4" />
+                    Within your available credit.
+                  </p>
+                )
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* Delivery */}
+        <section>
+          <SectionTitle
+            icon={Truck}
+            title="Delivery information"
+            sub="Where and when should we send it?"
+          />
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label>Fulfilling warehouse</Label>
+              <Select
+                value={warehouse}
+                onChange={(e) => setWarehouse(e.target.value)}
+                className="mt-1.5"
+              >
+                {warehouses.length === 0 && <option value="">—</option>}
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.name}>
+                    {w.name}
+                    {w.location ? ` · ${w.location}` : ""}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label>Preferred delivery date</Label>
+              <Input
+                type="date"
+                value={deliverBy}
+                onChange={(e) => setDeliverBy(e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Delivery destination</Label>
+              <Input
+                value={deliverTo}
+                onChange={(e) => setDeliverTo(e.target.value)}
+                placeholder="Shop / school / business name…"
+                className="mt-1.5"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Delivery address</Label>
+              <Input
+                value={deliveryAddress}
+                onChange={(e) => setDeliveryAddress(e.target.value)}
+                placeholder="Street, area, city / region…"
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label>Contact person</Label>
+              <Input
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                placeholder="Who receives the delivery"
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label>Contact phone</Label>
+              <Input
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="e.g. +255…"
+                className="mt-1.5"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Special instructions (optional)</Label>
+              <Textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Timing, contact person, handling notes…"
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* RIGHT — live order summary */}
+      <div className="lg:sticky lg:top-24">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
+          <div className="border-b border-border bg-muted/40 px-5 py-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-lg font-semibold">Order summary</h3>
+              <Badge variant="secondary">Draft</Badge>
+            </div>
+          </div>
+          <div className="space-y-4 p-5">
+            <div className="space-y-2">
+              {lines.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                  Add products to build your request.
+                </p>
+              ) : (
+                lines.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between gap-2 text-sm"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {p.size} {p.color}
+                    </span>
+                    <span className="text-muted-foreground">×{qty[p.id]}</span>
+                    <span className="w-24 text-right font-medium">
+                      {formatCurrency(qty[p.id] * p.price)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <dl className="space-y-2 border-t border-border pt-4 text-sm">
+              <Row label="Total quantity" value={`${formatNumber(totalQty)} units`} />
+              <Row
+                label="Payment"
+                value={payment === "CREDIT" ? "Credit" : "Cash"}
+              />
+              <Row label="Warehouse" value={warehouse || "—"} />
+              <div className="flex items-center justify-between border-t border-border pt-3">
+                <dt className="font-semibold">Estimated value</dt>
+                <dd className="font-display text-xl font-bold text-primary">
+                  {formatCurrency(estValue)}
+                </dd>
+              </div>
+            </dl>
+
+            {stockIssues.length > 0 && (
+              <p className="flex items-start gap-2 rounded-lg bg-destructive/10 p-3 text-xs text-destructive">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                Some quantities exceed available stock. Adjust them to continue.
+              </p>
+            )}
+
+            <p className="flex items-start gap-2 rounded-lg bg-info/10 p-3 text-xs text-info">
+              <Info className="mt-0.5 size-4 shrink-0" />
+              Final pricing is confirmed by the ORA team after review. This is
+              an estimate only.
+            </p>
+
+            <Button className="w-full" onClick={submit} disabled={blocked}>
+              <Send className="size-4" />
+              {pending ? "Submitting…" : "Submit request"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SectionTitle({
+  icon: Icon,
+  title,
+  sub,
+}: {
+  icon: typeof Wallet;
+  title: string;
+  sub: string;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <Icon className="size-5" />
+      </span>
+      <div>
+        <h2 className="font-display text-lg font-semibold">{title}</h2>
+        <p className="text-sm text-muted-foreground">{sub}</p>
+      </div>
+    </div>
+  );
+}
+
+function PayOption({
+  active,
+  onClick,
+  icon: Icon,
+  title,
+  sub,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: typeof Wallet;
+  title: string;
+  sub: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-3 rounded-xl border p-4 text-left transition-all",
+        active
+          ? "border-primary bg-primary/5 ring-2 ring-primary/30"
+          : "border-border hover:border-primary/40",
+      )}
+    >
+      <span
+        className={cn(
+          "flex size-10 items-center justify-center rounded-lg",
+          active ? "bg-primary text-white" : "bg-muted text-muted-foreground",
+        )}
+      >
+        <Icon className="size-5" />
+      </span>
+      <div>
+        <p className="font-semibold">{title}</p>
+        <p className="text-xs text-muted-foreground">{sub}</p>
+      </div>
+    </button>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent?: "success" | "destructive";
+}) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p
+        className={cn(
+          "font-semibold",
+          accent === "success" && "text-success",
+          accent === "destructive" && "text-destructive",
+        )}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="font-medium">{value}</dd>
+    </div>
+  );
+}
