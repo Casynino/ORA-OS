@@ -1,0 +1,656 @@
+// ───────────────────────────────────────────────────────────────────────────
+//  ORA PADS — Unified Control & Impact Platform
+//  Prisma schema · PostgreSQL
+//
+//  Design principles encoded here:
+//   • Products carry NO price column — pricing is per-request, admin-assigned.
+//   • Every stock change is an immutable StockMovement (no "invisible stock").
+//   • Requests (not carts) drive distribution: PENDING → PRICED → APPROVED.
+//   • Admin is the only financial authority (pricing, credit, returns).
+// ───────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // App runtime: Neon POOLED connection (…-pooler…). Local: your Postgres URL.
+  url       = env("DATABASE_URL")
+  // Migrations / db push: Neon DIRECT connection. Local: same as DATABASE_URL.
+  directUrl = env("DIRECT_URL")
+}
+
+// ── Enums ──────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  WAREHOUSE
+  PARTNER
+}
+
+enum UserStatus {
+  PENDING // awaiting admin approval (agents/partners start here)
+  ACTIVE
+  SUSPENDED
+}
+
+enum ProductCategory {
+  PADS
+  HYGIENE
+  ACCESSORY
+  OTHER
+}
+
+enum MovementType {
+  INBOUND // stock received into the warehouse
+  ASSIGNED // reserved/assigned to an agent or order
+  DISTRIBUTED // shipped out / fulfilled to the field
+  RETURNED // physically returned from agent/user
+  RESTOCKED // approved return placed back into the warehouse
+  ADJUSTMENT // manual correction by admin
+}
+
+enum RequestType {
+  AGENT_STOCK // bulk stock request from an agent/partner
+  USER_PRODUCT // product request from a general user
+}
+
+enum RequestStatus {
+  PENDING // submitted, awaiting admin review
+  PRICED // admin assigned prices, awaiting final approval
+  APPROVED // approved & invoiced; moves straight to IN_TRANSIT
+  IN_TRANSIT // dispatched — warehouse preparing / delivering
+  REJECTED
+  FULFILLED // delivered & confirmed — inventory now decremented
+  CANCELLED
+}
+
+enum PaymentType {
+  IMMEDIATE
+  CREDIT
+}
+
+enum PaymentStatus {
+  UNPAID // not yet due (pre-delivery)
+  PAID // cash order, settled on delivery
+  OUTSTANDING // credit order, balance owed
+}
+
+enum CreditStatus {
+  OUTSTANDING
+  PARTIAL
+  SETTLED
+  OVERDUE
+}
+
+enum ReturnStatus {
+  PENDING
+  IN_TRANSIT
+  COMPLETED
+  APPROVED
+  REJECTED
+}
+
+enum DonationType {
+  PADS
+  MONEY
+}
+
+enum DonationStatus {
+  PENDING // received request / pledge
+  RECEIVED // funds/goods confirmed
+  ALLOCATED // earmarked for a beneficiary group
+  DISTRIBUTED // delivered to the field
+  CANCELLED
+}
+
+enum ContentCategory {
+  MENSTRUAL_HEALTH
+  HYGIENE
+  MYTHS_FACTS
+  COMMUNITY_STORY
+  GENERAL
+}
+
+enum Language {
+  EN
+  SW
+}
+
+// ── Identity ───────────────────────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         Role       @default(PARTNER)
+  status       UserStatus @default(ACTIVE)
+  organization String? // business/partner name for partners
+  location     String?
+  creditLimit  Int? // admin-set credit ceiling (whole TSh) for partners
+  notes        String? // internal admin notes
+  applicationNote String? // applicant-facing: info the ORA team has requested
+  businessType     String? // Agent / Distributor / NGO / School / Retail chain
+  region           String?
+  expectedVolume   String? // expected monthly purchase volume
+  preferredPayment String? // Cash / Credit
+  businessLicense  String? // licence number
+  taxId            String? // TIN / tax number
+  paymentTerms     String? // admin-set terms, e.g. "Net 30"
+  warehouse    Warehouse? @relation("WarehouseStaff", fields: [warehouseId], references: [id])
+  warehouseId  String? // for WAREHOUSE staff — the warehouse they operate
+  position     String? // job title for warehouse staff, e.g. "Stock Controller"
+  // Operational permission flags for warehouse staff (admin-configured).
+  canRecordSales     Boolean @default(false)
+  canCreateTransfers Boolean @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  requestsMade      Request[]         @relation("RequestRequester")
+  requestsReviewed  Request[]         @relation("RequestReviewer")
+  movementsCreated  StockMovement[]   @relation("MovementCreator")
+  donationsMade     Donation[]        @relation("DonationDonor")
+  donationsHandled  Donation[]        @relation("DonationHandler")
+  returnsMade       ReturnRequest[]   @relation("ReturnRequester")
+  returnsReviewed   ReturnRequest[]   @relation("ReturnReviewer")
+  creditAccounts    CreditAccount[]   @relation("CreditAgent")
+  creditsApproved   CreditAccount[]   @relation("CreditApprover")
+  paymentsRecorded  Payment[]         @relation("PaymentRecorder")
+  cycleLogs         CycleLog[]
+  activityLogs      ActivityLog[]     @relation("ActivityActor")
+  educationAuthored EducationContent[] @relation("ContentAuthor")
+  newsAuthored      NewsPost[]         @relation("NewsAuthor")
+  partnerPrices     PartnerPrice[]     @relation("PartnerPrices")
+  transfersCreated  WarehouseTransfer[] @relation("TransferCreator")
+  settlementsSubmitted SettlementRequest[] @relation("SettlementPartner")
+  settlementsReviewed  SettlementRequest[] @relation("SettlementReviewer")
+  contactMessages   ContactMessage[]   @relation("ContactSender")
+
+  @@index([role])
+  @@index([status])
+}
+
+/// Per-partner negotiated price for a product (TSh per unit). Set by admin at
+/// approval and editable from the partner profile. Partners only ever see their own.
+model PartnerPrice {
+  id        String   @id @default(cuid())
+  partner   User     @relation("PartnerPrices", fields: [partnerId], references: [id], onDelete: Cascade)
+  partnerId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+  price     Int
+  updatedAt DateTime @updatedAt
+
+  @@unique([partnerId, productId])
+  @@index([partnerId])
+}
+
+/// Physical Ora warehouses. WAREHOUSE staff are assigned to one.
+enum WarehouseStatus {
+  ACTIVE
+  OFFLINE
+  MAINTENANCE
+}
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  IN_TRANSIT
+  COMPLETED
+  REJECTED
+}
+
+model Warehouse {
+  id        String          @id @default(cuid())
+  name      String
+  location  String?
+  isActive  Boolean         @default(true)
+  status    WarehouseStatus @default(ACTIVE)
+  capacity  Int? // total unit capacity for utilisation %
+  createdAt DateTime        @default(now())
+
+  staff        User[]              @relation("WarehouseStaff")
+  stock        WarehouseStock[]
+  transfersOut WarehouseTransfer[] @relation("TransferFrom")
+  transfersIn  WarehouseTransfer[] @relation("TransferTo")
+}
+
+// Per-warehouse location ledger. Seeded from current org-wide totals into the
+// Main warehouse; transfers move quantities between warehouses. The org-wide
+// Inventory snapshot remains the source of truth for fulfillment.
+model WarehouseStock {
+  id          String    @id @default(cuid())
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  warehouseId String
+  product     Product   @relation(fields: [productId], references: [id])
+  productId   String
+  onHand      Int       @default(0)
+  reserved    Int       @default(0)
+  inTransit   Int       @default(0)
+  minLevel    Int       @default(50)
+  lastMoveAt  DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([warehouseId, productId])
+  @@index([warehouseId])
+}
+
+model WarehouseTransfer {
+  id           String         @id @default(cuid())
+  code         String         @unique
+  from         Warehouse      @relation("TransferFrom", fields: [fromId], references: [id])
+  fromId       String
+  to           Warehouse      @relation("TransferTo", fields: [toId], references: [id])
+  toId         String
+  status       TransferStatus @default(PENDING)
+  note         String?
+  createdBy    User           @relation("TransferCreator", fields: [createdById], references: [id])
+  createdById  String
+  approvedById String?
+  dispatchedAt DateTime?
+  receivedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  items WarehouseTransferItem[]
+
+  @@index([status])
+}
+
+model WarehouseTransferItem {
+  id         String            @id @default(cuid())
+  transfer   WarehouseTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  transferId String
+  product    Product           @relation(fields: [productId], references: [id])
+  productId  String
+  quantity   Int
+}
+
+// ── Catalogue & inventory ──────────────────────────────────────────────────
+
+model Product {
+  id          String          @id @default(cuid())
+  sku         String          @unique
+  name        String
+  description String?
+  category    ProductCategory @default(PADS)
+  unitLabel   String          @default("pack") // e.g. "pack of 8"
+  iconKey     String          @default("pads") // maps to a UI icon, never an external image
+  costPrice   Int             @default(0) // internal cost per pack (TSh) — admin/profit only
+  price       Int             @default(0) // standard selling price per pack (TSh) — never public
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  inventory      Inventory?
+  movements      StockMovement[]
+  requestItems   RequestItem[]
+  returnRequests ReturnRequest[]
+  partnerPrices  PartnerPrice[]
+  warehouseStock WarehouseStock[]
+  transferItems  WarehouseTransferItem[]
+
+  @@index([category])
+  @@index([isActive])
+}
+
+/// Running snapshot of stock per product. Mutated only through StockMovements,
+/// so warehouse + assigned + distributed always reconciles with the ledger.
+model Inventory {
+  id                String   @id @default(cuid())
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId         String   @unique
+  warehouseQty      Int      @default(0) // available, unassigned stock
+  assignedQty       Int      @default(0) // committed to active orders, not yet distributed
+  distributedQty    Int      @default(0) // cumulative distributed to the field
+  lowStockThreshold Int      @default(50)
+  updatedAt         DateTime @updatedAt
+}
+
+/// Immutable ledger of every physical stock change.
+model StockMovement {
+  id          String       @id @default(cuid())
+  product     Product      @relation(fields: [productId], references: [id])
+  productId   String
+  type        MovementType
+  quantity    Int
+  reference   String? // free-text reference (e.g. delivery note)
+  request     Request?     @relation(fields: [requestId], references: [id])
+  requestId   String?
+  note        String?
+  createdBy   User         @relation("MovementCreator", fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime     @default(now())
+
+  @@index([productId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ── Request-based orders ───────────────────────────────────────────────────
+
+model Request {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  type         RequestType
+  status       RequestStatus @default(PENDING)
+  paymentType  PaymentType   @default(IMMEDIATE)
+  requester    User          @relation("RequestRequester", fields: [requesterId], references: [id])
+  requesterId  String
+  note          String? // requester message / special instructions
+  adminNote     String?
+  deliverTo       String? // delivery destination / recipient name
+  deliveryAddress String? // full delivery address
+  contactName     String? // person to contact on delivery
+  contactPhone    String? // contact phone number
+  deliverBy     DateTime? // preferred delivery date
+  warehouseName String? // fulfilling warehouse (denormalized label)
+  discount      Int           @default(0) // whole TSh off the order
+  deliveryCharge Int          @default(0) // whole TSh added for delivery
+  paymentStatus PaymentStatus @default(UNPAID)
+  invoiceNo     String? // generated on approval
+  deliveredAt   DateTime? // delivery confirmation
+  totalAmount  Int? // computed once priced (whole KES)
+  reviewedBy   User?         @relation("RequestReviewer", fields: [reviewedById], references: [id])
+  reviewedById String?
+  reviewedAt   DateTime?
+  fulfilledAt  DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  items          RequestItem[]
+  creditAccount  CreditAccount?
+  movements      StockMovement[]
+  returnRequests ReturnRequest[]
+
+  @@index([status])
+  @@index([requesterId])
+  @@index([type])
+}
+
+model RequestItem {
+  id        String  @id @default(cuid())
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId String
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+  quantity  Int
+  unitPrice Int? // admin-assigned; null until PRICED
+  lineTotal Int? // quantity * unitPrice
+
+  @@unique([requestId, productId])
+}
+
+// ── Credit ─────────────────────────────────────────────────────────────────
+
+model CreditAccount {
+  id           String       @id @default(cuid())
+  request      Request      @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId    String       @unique
+  agent        User         @relation("CreditAgent", fields: [agentId], references: [id])
+  agentId      String
+  principal    Int // total owed (whole KES)
+  amountPaid   Int          @default(0)
+  status       CreditStatus @default(OUTSTANDING)
+  dueDate      DateTime?
+  approvedBy   User?        @relation("CreditApprover", fields: [approvedById], references: [id])
+  approvedById String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  payments           Payment[]
+  settlementRequests SettlementRequest[]
+
+  @@index([status])
+  @@index([agentId])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  creditAccount   CreditAccount @relation(fields: [creditAccountId], references: [id], onDelete: Cascade)
+  creditAccountId String
+  amount          Int
+  method          String? // cash, mobile money, bank
+  note            String?
+  recordedBy      User          @relation("PaymentRecorder", fields: [recordedById], references: [id])
+  recordedById    String
+  createdAt       DateTime      @default(now())
+
+  @@index([creditAccountId])
+}
+
+enum SettlementStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+// A partner-submitted payment claim against a credit batch. The ORA team
+// confirms it (→ creates a Payment & reduces the balance) or rejects it.
+model SettlementRequest {
+  id              String           @id @default(cuid())
+  code            String           @unique
+  partner         User             @relation("SettlementPartner", fields: [partnerId], references: [id])
+  partnerId       String
+  creditAccount   CreditAccount    @relation(fields: [creditAccountId], references: [id], onDelete: Cascade)
+  creditAccountId String
+  amount          Int
+  method          String?
+  reference       String?
+  note            String?
+  status          SettlementStatus @default(PENDING)
+  reviewedBy      User?            @relation("SettlementReviewer", fields: [reviewedById], references: [id])
+  reviewedById    String?
+  reviewedAt      DateTime?
+  paymentId       String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([status])
+  @@index([partnerId])
+}
+
+enum ContactStatus {
+  OPEN
+  RESOLVED
+}
+
+// Partner → ORA team message thread (one message + optional reply).
+model ContactMessage {
+  id           String        @id @default(cuid())
+  sender       User          @relation("ContactSender", fields: [senderId], references: [id])
+  senderId     String
+  subject      String?
+  body         String
+  status       ContactStatus @default(OPEN)
+  reply        String?
+  repliedById  String?
+  repliedAt    DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([status])
+  @@index([senderId])
+}
+
+// ── Returns ────────────────────────────────────────────────────────────────
+
+model ReturnRequest {
+  id           String       @id @default(cuid())
+  code         String       @unique
+  request      Request?     @relation(fields: [requestId], references: [id])
+  requestId    String?
+  product      Product      @relation(fields: [productId], references: [id])
+  productId    String
+  requester    User         @relation("ReturnRequester", fields: [requesterId], references: [id])
+  requesterId  String
+  quantity     Int
+  reason       String?
+  reasonType   String?
+  warehouseName String?
+  status       ReturnStatus @default(PENDING)
+  reviewedBy   User?        @relation("ReturnReviewer", fields: [reviewedById], references: [id])
+  reviewedById String?
+  reviewedAt   DateTime?
+  receivedAt   DateTime?
+  adminNote    String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([status])
+  @@index([requesterId])
+}
+
+// ── Donations ──────────────────────────────────────────────────────────────
+
+model DonationPackage {
+  id           String       @id @default(cuid())
+  name         String
+  description  String?
+  type         DonationType
+  amount       Int? // preset money (whole KES)
+  padsQuantity Int? // preset pads count
+  isActive     Boolean      @default(true)
+  sortOrder    Int          @default(0)
+  createdAt    DateTime     @default(now())
+
+  donations Donation[]
+}
+
+model Donation {
+  id             String           @id @default(cuid())
+  code           String           @unique
+  type           DonationType
+  donorName      String
+  donorEmail     String?
+  donor          User?            @relation("DonationDonor", fields: [donorId], references: [id])
+  donorId        String? // null = guest donation
+  package        DonationPackage? @relation(fields: [packageId], references: [id])
+  packageId      String?
+  amount         Int? // for MONEY
+  quantity       Int? // for PADS
+  message        String?
+  status         DonationStatus   @default(PENDING)
+  allocationNote String?
+  distributedTo  String? // beneficiary group / region
+  handledBy      User?            @relation("DonationHandler", fields: [handledById], references: [id])
+  handledById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ── Education & impact ─────────────────────────────────────────────────────
+
+model EducationContent {
+  id          String          @id @default(cuid())
+  slug        String          @unique
+  title       String
+  excerpt     String
+  body        String // long-form (plain text / light markdown)
+  category    ContentCategory @default(MENSTRUAL_HEALTH)
+  language    Language        @default(EN)
+  readMinutes Int             @default(3)
+  published   Boolean         @default(true)
+  sortOrder   Int             @default(0)
+  author      User?           @relation("ContentAuthor", fields: [authorId], references: [id])
+  authorId    String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([category])
+  @@index([language])
+  @@index([published])
+}
+
+enum NewsCategory {
+  NEWS
+  ANNOUNCEMENT
+  EVENT
+  STORY
+}
+
+model NewsPost {
+  id          String       @id @default(cuid())
+  slug        String       @unique
+  title       String
+  excerpt     String
+  body        String // long-form (plain text / light markdown)
+  category    NewsCategory @default(NEWS)
+  coverImage  String? // /uploads/... or /ora/... path
+  published   Boolean      @default(true)
+  publishedAt DateTime     @default(now())
+  author      User?        @relation("NewsAuthor", fields: [authorId], references: [id])
+  authorId    String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([category])
+  @@index([published])
+  @@index([publishedAt])
+}
+
+model ImpactStory {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  title           String
+  personName      String?
+  location        String?
+  quote           String?
+  body            String
+  padsDistributed Int?
+  livesReached    Int?
+  published       Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([published])
+}
+
+// ── Period tracker (private, per user) ─────────────────────────────────────
+
+model CycleLog {
+  id             String   @id @default(cuid())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  lastPeriodDate DateTime
+  cycleLength    Int      @default(28)
+  periodLength   Int      @default(5)
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ── Governance ─────────────────────────────────────────────────────────────
+
+/// Append-only audit trail surfaced in the admin "full activity logs".
+model ActivityLog {
+  id        String   @id @default(cuid())
+  actor     User?    @relation("ActivityActor", fields: [actorId], references: [id])
+  actorId   String?
+  actorName String? // snapshot in case the user is later removed
+  action    String // machine code, e.g. REQUEST_APPROVED
+  entity    String // e.g. Request, Donation, Inventory
+  entityId  String?
+  summary   String // human-readable line
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entity])
+}
+
+/// Simple key/value store for admin-configurable settings (org info, baselines).
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

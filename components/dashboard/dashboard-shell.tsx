@@ -1,0 +1,232 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Menu,
+  X,
+  LogOut,
+  LayoutDashboard,
+  Package,
+  ClipboardList,
+  HeartHandshake,
+  CreditCard,
+  Undo2,
+  Users,
+  BookOpen,
+  Activity,
+  PlusCircle,
+  CalendarHeart,
+  Boxes,
+  Warehouse,
+  ArrowLeftRight,
+  Factory,
+  FileText,
+  Banknote,
+  Percent,
+  TrendingUp,
+  Contact,
+  UserPlus,
+  BarChart3,
+  Shield,
+  ScrollText,
+  ShoppingCart,
+  Ship,
+  PackagePlus,
+  Send,
+  ImageIcon,
+  Newspaper,
+  MessageSquare,
+} from "lucide-react";
+import { Logo } from "@/components/brand/logo";
+import { Avatar } from "@/components/ui/avatar";
+import { logoutAction } from "@/lib/actions/auth";
+import { cn } from "@/lib/utils";
+
+const ICONS: Record<string, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  inventory: Package,
+  catalogue: Boxes,
+  requests: ClipboardList,
+  newRequest: PlusCircle,
+  donations: HeartHandshake,
+  credit: CreditCard,
+  returns: Undo2,
+  users: Users,
+  education: BookOpen,
+  activity: Activity,
+  tracker: CalendarHeart,
+  products: Package,
+  warehouses: Warehouse,
+  transfers: ArrowLeftRight,
+  suppliers: Factory,
+  invoices: FileText,
+  settlements: Banknote,
+  commissions: Percent,
+  profit: TrendingUp,
+  customers: Contact,
+  profile: Contact,
+  applications: UserPlus,
+  reports: BarChart3,
+  roles: Shield,
+  audit: ScrollText,
+  sales: ShoppingCart,
+  imports: Ship,
+  receive: PackagePlus,
+  dispatch: Send,
+  activities: ImageIcon,
+  news: Newspaper,
+  messages: MessageSquare,
+};
+
+export type NavItem = { href: string; label: string; icon: string };
+export type NavGroup = { label?: string; items: NavItem[] };
+
+export function DashboardShell({
+  nav,
+  user,
+  areaLabel,
+  children,
+}: {
+  nav: NavGroup[];
+  user: { name?: string | null; email?: string | null; role?: string };
+  areaLabel: string;
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const homeHref = nav[0]?.items[0]?.href ?? "/";
+
+  const isActive = (href: string) =>
+    pathname === href ||
+    (href !== homeHref && pathname.startsWith(href + "/"));
+
+  const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
+    <nav className="flex flex-1 flex-col gap-4">
+      {nav.map((group, gi) => (
+        <div key={gi}>
+          {group.label && (
+            <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              {group.label}
+            </p>
+          )}
+          <div className="flex flex-col gap-0.5">
+            {group.items.map((item) => {
+              const Icon = ICONS[item.icon] ?? LayoutDashboard;
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-primary/12 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <Icon className="size-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </nav>
+  );
+
+  const UserCard = () => (
+    <div className="border-t border-border p-3">
+      <div className="flex items-center gap-3 rounded-lg px-2 py-2">
+        <Avatar name={user.name} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{user.name}</p>
+          <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+        </div>
+      </div>
+      <form action={logoutAction}>
+        <button
+          type="submit"
+          className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+        >
+          <LogOut className="size-4" />
+          Sign out
+        </button>
+      </form>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-secondary/40 via-background to-background">
+      {/* Desktop sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-border bg-card/60 backdrop-blur-xl lg:flex">
+        <div className="flex h-16 items-center border-b border-border px-5">
+          <Link href={homeHref}>
+            <Logo />
+          </Link>
+        </div>
+        <div className="flex flex-1 flex-col overflow-y-auto scrollbar-thin p-3">
+          <p className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-primary">
+            {areaLabel}
+          </p>
+          <NavLinks />
+        </div>
+        <UserCard />
+      </aside>
+
+      {/* Mobile drawer */}
+      {open && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div
+            className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+            onClick={() => setOpen(false)}
+          />
+          <aside className="absolute inset-y-0 left-0 flex w-72 flex-col bg-card shadow-xl">
+            <div className="flex h-16 items-center justify-between border-b border-border px-5">
+              <Logo />
+              <button
+                onClick={() => setOpen(false)}
+                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            <div className="flex flex-1 flex-col overflow-y-auto p-3">
+              <NavLinks onNavigate={() => setOpen(false)} />
+            </div>
+            <UserCard />
+          </aside>
+        </div>
+      )}
+
+      {/* Content */}
+      <div className="lg:pl-64">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur lg:px-8">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setOpen(true)}
+              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted lg:hidden"
+              aria-label="Open menu"
+            >
+              <Menu className="size-5" />
+            </button>
+            <span className="font-display font-semibold lg:hidden">
+              {areaLabel}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-sm text-muted-foreground sm:inline">
+              {user.name}
+            </span>
+            <Avatar name={user.name} className="size-8" />
+          </div>
+        </header>
+        <main className="p-4 lg:p-8">{children}</main>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,430 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  Save,
+  X,
+  Truck,
+  Lock,
+  Plus,
+  Trash2,
+  Send,
+  Search,
+  ClipboardCheck,
+  PackageCheck,
+  StickyNote,
+  Receipt,
+} from "lucide-react";
+import { partnerUpdateOrder, cancelRequest } from "@/lib/actions/requests";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { toast } from "@/components/ui/use-toast";
+import { cn, formatCurrency, formatDateTime, humanize } from "@/lib/utils";
+
+type Item = {
+  productId: string;
+  name: string;
+  sku: string;
+  quantity: number;
+  unitPrice: number | null;
+};
+type CatalogItem = { productId: string; name: string; sku: string; price: number };
+type Warehouse = { id: string; name: string; location: string | null };
+
+export type POrderDTO = {
+  id: string;
+  code: string;
+  status: string;
+  paymentType: string;
+  paymentStatus: string;
+  invoiceNo: string | null;
+  totalAmount: number | null;
+  note: string | null;
+  adminNote: string | null;
+  deliverTo: string | null;
+  deliverBy: string | null;
+  warehouseName: string | null;
+  reviewedByName: string | null;
+  createdAt: string;
+  items: Item[];
+  catalog: CatalogItem[];
+  warehouses: Warehouse[];
+};
+
+const STEPS = [
+  { icon: Send, label: "Submitted" },
+  { icon: Search, label: "ORA review" },
+  { icon: ClipboardCheck, label: "Approved" },
+  { icon: Truck, label: "In transit" },
+  { icon: PackageCheck, label: "Delivered" },
+];
+function stepIndex(s: string) {
+  return s === "PENDING" ? 0 : s === "PRICED" ? 1 : s === "APPROVED" ? 2 : s === "IN_TRANSIT" ? 3 : s === "FULFILLED" ? 4 : 0;
+}
+
+type Line = { productId: string; name: string; sku: string; qty: string; price: number };
+
+export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const editable = order.status === "PENDING" || order.status === "PRICED";
+
+  const catalogById = new Map(order.catalog.map((c) => [c.productId, c]));
+  const [lines, setLines] = useState<Line[]>(
+    order.items.map((i) => ({
+      productId: i.productId,
+      name: i.name,
+      sku: i.sku,
+      qty: String(i.quantity),
+      price: i.unitPrice ?? catalogById.get(i.productId)?.price ?? 0,
+    })),
+  );
+  const [warehouse, setWarehouse] = useState(order.warehouseName ?? "");
+  const [deliverTo, setDeliverTo] = useState(order.deliverTo ?? "");
+  const [deliverBy, setDeliverBy] = useState(
+    order.deliverBy ? order.deliverBy.slice(0, 10) : "",
+  );
+  const [note, setNote] = useState(order.note ?? "");
+  const [addId, setAddId] = useState("");
+
+  const setQty = (pid: string, v: string) =>
+    setLines((p) => p.map((l) => (l.productId === pid ? { ...l, qty: v } : l)));
+  const removeLine = (pid: string) =>
+    setLines((p) => p.filter((l) => l.productId !== pid));
+  const addLine = () => {
+    const c = catalogById.get(addId);
+    if (!c) return;
+    setLines((p) => [
+      ...p,
+      { productId: c.productId, name: c.name, sku: c.sku, qty: "1", price: c.price },
+    ]);
+    setAddId("");
+  };
+  const addable = order.catalog.filter(
+    (c) => !lines.some((l) => l.productId === c.productId),
+  );
+  const total = lines.reduce((s, l) => s + (Number(l.qty) || 0) * l.price, 0);
+
+  function save() {
+    if (lines.length === 0) {
+      toast({ variant: "error", title: "Keep at least one product." });
+      return;
+    }
+    start(async () => {
+      const res = await partnerUpdateOrder({
+        requestId: order.id,
+        items: lines.map((l) => ({
+          productId: l.productId,
+          quantity: Math.max(1, Math.round(Number(l.qty) || 1)),
+        })),
+        warehouseName: warehouse || undefined,
+        deliverTo: deliverTo || undefined,
+        deliverBy: deliverBy || undefined,
+        note: note || undefined,
+      });
+      if (res.ok) {
+        toast({ variant: "success", title: res.message });
+        router.refresh();
+      } else {
+        toast({ variant: "error", title: res.error });
+      }
+    });
+  }
+
+  function cancel() {
+    start(async () => {
+      const res = await cancelRequest(order.id);
+      if (res.ok) {
+        toast({ variant: "success", title: res.message });
+        router.push("/partner/requests");
+        router.refresh();
+      } else {
+        toast({ variant: "error", title: res.error });
+      }
+    });
+  }
+
+  const active = stepIndex(order.status);
+
+  return (
+    <div className="space-y-6">
+      <Link
+        href="/partner/requests"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" />
+        My orders
+      </Link>
+
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="font-display text-3xl font-bold tracking-tight">
+              {order.code}
+            </h1>
+            <StatusBadge status={order.status} />
+            <Badge variant={order.paymentType === "CREDIT" ? "accent" : "secondary"}>
+              {humanize(order.paymentType)}
+            </Badge>
+            {order.paymentStatus !== "UNPAID" && (
+              <StatusBadge status={order.paymentStatus} />
+            )}
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Placed {formatDateTime(order.createdAt)}
+            {order.invoiceNo ? ` · Invoice ${order.invoiceNo}` : ""}
+          </p>
+        </div>
+        {order.totalAmount != null && (
+          <div className="text-right">
+            <p className="text-xs text-muted-foreground">Order total</p>
+            <p className="font-display text-2xl font-bold text-primary">
+              {formatCurrency(order.totalAmount)}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Timeline */}
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+        <ol className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-2">
+          {STEPS.map((s, i) => (
+            <li key={s.label} className="flex items-center gap-3 sm:flex-1 sm:flex-col sm:text-center">
+              <span
+                className={cn(
+                  "flex size-10 shrink-0 items-center justify-center rounded-full",
+                  i <= active
+                    ? "bg-gradient-to-br from-primary to-accent text-white shadow-glow"
+                    : "bg-muted text-muted-foreground",
+                )}
+              >
+                <s.icon className="size-5" />
+              </span>
+              <span className={cn("text-sm font-medium sm:mt-1", i <= active ? "" : "text-muted-foreground")}>
+                {s.label}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {!editable && (
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 p-4 text-sm">
+          <Lock className="size-4 text-muted-foreground" />
+          This order is now with the ORA team and can no longer be edited.
+          Contact us if something needs to change.
+        </div>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
+        {/* Order */}
+        <section className="rounded-2xl border border-border bg-card shadow-soft">
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <h2 className="font-display text-lg font-semibold">Order items</h2>
+            <span className="text-xs text-muted-foreground">
+              {editable ? "Edit quantities or lines" : "Read-only"}
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="px-5 py-3 font-medium">Product</th>
+                  <th className="px-3 py-3 font-medium">Qty</th>
+                  <th className="px-3 py-3 font-medium">Your price</th>
+                  <th className="px-5 py-3 text-right font-medium">Line total</th>
+                  {editable && <th className="px-2 py-3" />}
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((l) => {
+                  const qty = Number(l.qty) || 0;
+                  return (
+                    <tr key={l.productId} className="border-b border-border last:border-0">
+                      <td className="px-5 py-3">
+                        <div className="font-medium">{l.name}</div>
+                        <div className="text-xs text-muted-foreground">{l.sku}</div>
+                      </td>
+                      <td className="px-3 py-3">
+                        {editable ? (
+                          <Input
+                            type="number"
+                            min={1}
+                            value={l.qty}
+                            onChange={(e) => setQty(l.productId, e.target.value)}
+                            className="h-9 w-20"
+                          />
+                        ) : (
+                          <span>×{qty}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-muted-foreground">
+                        {formatCurrency(l.price)}
+                      </td>
+                      <td className="px-5 py-3 text-right font-medium">
+                        {formatCurrency(qty * l.price)}
+                      </td>
+                      {editable && (
+                        <td className="px-2 py-3">
+                          <button
+                            onClick={() => removeLine(l.productId)}
+                            className="text-muted-foreground hover:text-destructive"
+                            title="Remove"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {editable && addable.length > 0 && (
+            <div className="flex items-center gap-2 border-t border-border px-5 py-3">
+              <Select
+                value={addId}
+                onChange={(e) => setAddId(e.target.value)}
+                className="h-9 max-w-xs"
+              >
+                <option value="">Add a product…</option>
+                {addable.map((c) => (
+                  <option key={c.productId} value={c.productId}>
+                    {c.name} · {formatCurrency(c.price)}
+                  </option>
+                ))}
+              </Select>
+              <Button variant="outline" size="sm" onClick={addLine} disabled={!addId}>
+                <Plus className="size-4" />
+                Add
+              </Button>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between border-t border-border px-5 py-4">
+            <span className="text-sm text-muted-foreground">
+              {editable ? "Estimated total" : "Order total"}
+            </span>
+            <span className="font-display text-xl font-bold text-primary">
+              {formatCurrency(editable ? total : order.totalAmount ?? 0)}
+            </span>
+          </div>
+
+          {order.adminNote && (
+            <div className="border-t border-border px-5 py-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <StickyNote className="size-4 text-muted-foreground" />
+                Note from the ORA team
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">{order.adminNote}</p>
+            </div>
+          )}
+        </section>
+
+        {/* Delivery + actions */}
+        <div className="space-y-6 lg:sticky lg:top-24">
+          <section className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Truck className="size-4 text-muted-foreground" />
+              Delivery
+            </div>
+            <div className="mt-3 space-y-3">
+              <div>
+                <Label className="text-xs">Warehouse</Label>
+                <Select
+                  value={warehouse}
+                  onChange={(e) => setWarehouse(e.target.value)}
+                  disabled={!editable}
+                  className="mt-1"
+                >
+                  <option value="">—</option>
+                  {order.warehouses.map((w) => (
+                    <option key={w.id} value={w.name}>
+                      {w.name}
+                      {w.location ? ` · ${w.location}` : ""}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Preferred date</Label>
+                <Input
+                  type="date"
+                  value={deliverBy}
+                  onChange={(e) => setDeliverBy(e.target.value)}
+                  disabled={!editable}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Destination</Label>
+                <Input
+                  value={deliverTo}
+                  onChange={(e) => setDeliverTo(e.target.value)}
+                  disabled={!editable}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Special instructions</Label>
+                <Textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  disabled={!editable}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Receipt className="size-4 text-muted-foreground" />
+              Payment
+            </div>
+            <div className="mt-2 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Method</span>
+              <span className="font-medium">{humanize(order.paymentType)}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Status</span>
+              <StatusBadge status={order.paymentStatus} />
+            </div>
+          </section>
+
+          {editable && (
+            <div className="space-y-2">
+              <Button onClick={save} disabled={pending} className="w-full">
+                <Save className="size-4" />
+                {pending ? "Saving…" : "Save changes"}
+              </Button>
+              <Button
+                onClick={cancel}
+                disabled={pending}
+                variant="outline"
+                className="w-full text-destructive hover:bg-destructive/10"
+              >
+                <X className="size-4" />
+                Cancel order
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Editing resubmits your order for ORA team review.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
