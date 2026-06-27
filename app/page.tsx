@@ -10,10 +10,8 @@ import {
   ShieldCheck,
   GraduationCap,
   CalendarHeart,
-  Instagram,
-  Facebook,
-  Twitter,
-  Youtube,
+  Phone,
+  Mail,
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,6 +23,8 @@ import { LandingHeader } from "@/components/public/landing-header";
 import { ProductShowcase } from "@/components/public/product-showcase";
 import { CampaignMarquee } from "@/components/public/campaign-marquee";
 import { AuroraBackground } from "@/components/public/aurora-background";
+import { SocialLinks } from "@/components/public/social-links";
+import { ORA_CONTACT } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { getPublicImpactStats } from "@/lib/stats";
 
@@ -316,39 +316,57 @@ export default async function HomePage() {
             <p className="mt-4 max-w-xs text-sm text-white/60">
               Empowering every cycle. Building healthier communities.
             </p>
-            <div className="mt-5 flex gap-3">
-              {[
-                { Icon: Instagram, href: "https://instagram.com/orapads" },
-                { Icon: Facebook, href: "https://facebook.com/orapads" },
-                { Icon: Twitter, href: "https://x.com/orapads" },
-                { Icon: Youtube, href: "https://youtube.com/@orapads" },
-              ].map(({ Icon, href }, i) => (
-                <a key={i} href={href} target="_blank" rel="noopener noreferrer" className="flex size-9 items-center justify-center rounded-lg bg-white/10 text-white/80 transition-colors hover:bg-primary hover:text-white">
-                  <Icon className="size-4" />
-                </a>
-              ))}
-            </div>
+            <SocialLinks
+              className="mt-5"
+              itemClassName="bg-white/10 text-white/80 hover:bg-primary hover:text-white"
+              iconClassName="size-4"
+            />
           </div>
 
           <div>
-            <h4 className="font-semibold">Stay Connected</h4>
-            <p className="mt-3 text-sm text-white/60">Subscribe to get updates on our impact, stories and events.</p>
-            <form className="mt-4 flex gap-2">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="h-10 w-full rounded-full border border-white/15 bg-white/5 px-4 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-              <button type="button" className={cn(buttonVariants({ size: "sm" }), "rounded-full")}>
-                Subscribe
-              </button>
-            </form>
+            <h4 className="font-semibold">Get in touch</h4>
+            <ul className="mt-3 space-y-3 text-sm text-white/60">
+              <li>
+                <a
+                  href={ORA_CONTACT.phoneHref}
+                  aria-label="Call ORA customer care"
+                  className="flex items-start gap-2.5 transition-colors hover:text-primary"
+                >
+                  <Phone className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <span>
+                    <span className="block text-xs uppercase tracking-wide text-white/40">
+                      Customer Care
+                    </span>
+                    <span className="font-medium text-white">
+                      {ORA_CONTACT.phoneDisplay}
+                    </span>
+                  </span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href={ORA_CONTACT.emailHref}
+                  aria-label="Email ORA"
+                  className="flex items-start gap-2.5 transition-colors hover:text-primary"
+                >
+                  <Mail className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <span>
+                    <span className="block text-xs uppercase tracking-wide text-white/40">
+                      Email
+                    </span>
+                    <span className="font-medium text-white">
+                      {ORA_CONTACT.email}
+                    </span>
+                  </span>
+                </a>
+              </li>
+            </ul>
           </div>
 
           <div>
             <h4 className="font-semibold">Quick Links</h4>
             <ul className="mt-3 space-y-2 text-sm text-white/60">
-              {[["Home", "/"], ["Impact", "/impact"], ["Products", "#products"], ["Education", "/education"]].map(([l, h]) => (
+              {[["Home", "/"], ["Impact", "/impact"], ["Products", "#products"], ["Education", "/education"], ["Contact", "/contact"]].map(([l, h]) => (
                 <li key={l}><Link href={h} className="hover:text-primary">{l}</Link></li>
               ))}
             </ul>

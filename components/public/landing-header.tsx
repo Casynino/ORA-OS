@@ -6,6 +6,7 @@ import { Menu, X, Heart } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { buttonVariants } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { SocialLinks } from "@/components/public/social-links";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -16,6 +17,7 @@ const nav = [
   { name: "Impact", href: "/impact" },
   { name: "News", href: "/news" },
   { name: "Activities", href: "#activities" },
+  { name: "Contact", href: "/contact" },
   { name: "Join Us", href: "/request-access" },
 ];
 
@@ -96,6 +98,13 @@ export function LandingHeader() {
               <div className="mt-2 flex items-center justify-between px-3">
                 <span className="text-sm text-white/60">Theme</span>
                 <ThemeToggle className="border-white/15 bg-white/10" />
+              </div>
+              <div className="mt-1 flex items-center justify-between px-3">
+                <span className="text-sm text-white/60">Follow ORA</span>
+                <SocialLinks
+                  itemClassName="size-8 bg-white/10 text-white/80 hover:bg-primary hover:text-white"
+                  iconClassName="size-4"
+                />
               </div>
             </div>
           </div>

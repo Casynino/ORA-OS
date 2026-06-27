@@ -1,16 +1,23 @@
 import Link from "next/link";
+import { Phone, Mail } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
+import { SocialLinks } from "@/components/public/social-links";
+import { ORA_CONTACT } from "@/lib/constants";
 
 export function SiteFooter() {
   return (
     <footer className="border-t border-border bg-muted/30">
       <div className="container grid gap-8 py-12 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="space-y-3">
+        <div className="space-y-4">
           <Logo />
           <p className="max-w-xs text-sm text-muted-foreground">
             Dignity in every cycle. Championing menstrual health, education and
             period dignity for girls and women across Tanzania.
           </p>
+          <SocialLinks
+            itemClassName="bg-background text-muted-foreground hover:bg-primary hover:text-primary-foreground"
+            iconClassName="size-4"
+          />
         </div>
 
         <div>
@@ -29,6 +36,11 @@ export function SiteFooter() {
             <li>
               <Link href="/impact" className="hover:text-foreground">
                 Impact stories
+              </Link>
+            </li>
+            <li>
+              <Link href="/contact" className="hover:text-foreground">
+                Contact
               </Link>
             </li>
             <li>
@@ -56,11 +68,53 @@ export function SiteFooter() {
         </div>
 
         <div>
-          <h4 className="text-sm font-semibold">About</h4>
-          <p className="mt-3 text-sm text-muted-foreground">
-            A movement for menstrual dignity — putting pads, education and
-            confidence into the hands of girls across Tanzania.
-          </p>
+          <h4 className="text-sm font-semibold">Get in touch</h4>
+          <ul className="mt-3 space-y-3 text-sm text-muted-foreground">
+            <li>
+              <a
+                href={ORA_CONTACT.phoneHref}
+                aria-label="Call ORA customer care"
+                className="flex items-start gap-2.5 hover:text-foreground"
+              >
+                <Phone className="mt-0.5 size-4 shrink-0 text-primary" />
+                <span>
+                  <span className="block text-xs uppercase tracking-wide">
+                    Customer Care
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {ORA_CONTACT.phoneDisplay}
+                  </span>
+                </span>
+              </a>
+            </li>
+            <li>
+              <a
+                href={ORA_CONTACT.emailHref}
+                aria-label="Email ORA"
+                className="flex items-start gap-2.5 hover:text-foreground"
+              >
+                <Mail className="mt-0.5 size-4 shrink-0 text-primary" />
+                <span>
+                  <span className="block text-xs uppercase tracking-wide">
+                    Email
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {ORA_CONTACT.email}
+                  </span>
+                </span>
+              </a>
+            </li>
+            <li className="pt-1">
+              <span className="block text-xs uppercase tracking-wide">
+                Follow ORA
+              </span>
+              <SocialLinks
+                className="mt-2"
+                itemClassName="bg-background text-muted-foreground hover:bg-primary hover:text-primary-foreground"
+                iconClassName="size-4"
+              />
+            </li>
+          </ul>
         </div>
       </div>
 

@@ -19,7 +19,10 @@ import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { RequestCreditIncrease } from "@/components/dashboard/request-credit-increase";
 import { ContactOra } from "@/components/dashboard/contact-ora";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { SocialLinks } from "@/components/public/social-links";
+import { buttonVariants } from "@/components/ui/button";
+import { ORA_CONTACT } from "@/lib/constants";
+import { cn, formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 
 export default async function PartnerProfilePage() {
   const session = await requireRole("PARTNER");
@@ -61,6 +64,37 @@ export default async function PartnerProfilePage() {
         Your profile is read-only. The ORA team keeps these records — reach out to
         them to change any detail or raise your credit limit.
       </div>
+
+      {/* Direct support */}
+      <Card>
+        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-medium">Need a hand?</p>
+            <p className="text-sm text-muted-foreground">
+              Reach the ORA team directly for orders, credit or returns.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={ORA_CONTACT.phoneHref}
+              aria-label="Call ORA customer care"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              <Phone className="size-4" />
+              {ORA_CONTACT.phoneDisplay}
+            </a>
+            <a
+              href={ORA_CONTACT.emailHref}
+              aria-label="Email ORA"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              <Mail className="size-4" />
+              Email
+            </a>
+            <SocialLinks itemClassName="bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground" />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Credit summary */}
       <div className="grid gap-4 sm:grid-cols-3">
