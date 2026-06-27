@@ -5,12 +5,14 @@ import { useState } from "react";
 import { Menu, X, LayoutDashboard } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { buttonVariants } from "@/components/ui/button";
+import { SocialLinks } from "@/components/public/social-links";
 import { cn } from "@/lib/utils";
 
 const nav = [
   { href: "/impact", label: "Impact" },
   { href: "/education", label: "Education" },
   { href: "/donate", label: "Donate" },
+  { href: "/contact", label: "Contact" },
   { href: "/request-access", label: "Join Us" },
 ];
 
@@ -122,6 +124,13 @@ export function SiteHeader({
                   </Link>
                 </>
               )}
+            </div>
+            <div className="mt-3 flex items-center justify-between border-t border-border px-3 pt-3">
+              <span className="text-sm text-muted-foreground">Follow ORA</span>
+              <SocialLinks
+                itemClassName="size-8 bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground"
+                iconClassName="size-4"
+              />
             </div>
           </div>
         </div>

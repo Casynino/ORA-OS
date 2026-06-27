@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Reveal } from "@/components/ui/reveal";
 import { buttonVariants } from "@/components/ui/button";
 import { productMeta } from "@/lib/product-meta";
+import { ORA_CONTACT } from "@/lib/constants";
 import {
   cn,
   formatCurrency,
@@ -170,7 +171,7 @@ export default async function PartnerOverviewPage() {
     { label: "My orders", href: "/partner/requests", icon: FileText },
     { label: "Debt & payments", href: "/partner/credit", icon: CreditCard },
     { label: "Request a return", href: "/partner/returns", icon: Undo2 },
-    { label: "Contact ORA", href: "mailto:hello@orapads.tz", icon: LifeBuoy },
+    { label: "Contact ORA", href: ORA_CONTACT.emailHref, icon: LifeBuoy },
   ];
 
   const statusVariant =
