@@ -30,7 +30,7 @@ export default async function AdminInvoicesPage() {
           {orders.length === 0 ? (
             <EmptyState className="m-6" icon={FileText} title="No invoices yet" description="Approving an order generates its invoice." />
           ) : (
-            <Table>
+            <Table wrapperClassName="table-stack">
               <TableHeader>
                 <TableRow>
                   <TableHead>Invoice</TableHead>
@@ -50,14 +50,14 @@ export default async function AdminInvoicesPage() {
                   const paid = balance <= 0;
                   return (
                     <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.code.replace("REQ", "INV")}</TableCell>
-                      <TableCell>{r.requester.name}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(total)}</TableCell>
-                      <TableCell className="text-right">{balance > 0 ? formatCurrency(balance) : "—"}</TableCell>
-                      <TableCell>
+                      <TableCell data-cardtitle className="font-medium">{r.code.replace("REQ", "INV")}</TableCell>
+                      <TableCell data-label="Partner">{r.requester.name}</TableCell>
+                      <TableCell data-label="Total" className="text-right font-medium">{formatCurrency(total)}</TableCell>
+                      <TableCell data-label="Balance" className="text-right">{balance > 0 ? formatCurrency(balance) : "—"}</TableCell>
+                      <TableCell data-label="Status">
                         {paid ? <Badge variant="success">Paid</Badge> : <Badge variant="warning">Balance due</Badge>}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{formatDate(r.createdAt)}</TableCell>
+                      <TableCell data-label="Date" className="text-sm text-muted-foreground">{formatDate(r.createdAt)}</TableCell>
                     </TableRow>
                   );
                 })}

@@ -57,7 +57,7 @@ export function EducationManager({ content }: { content: Content[] }) {
               description="Publish your first education article."
             />
           ) : (
-            <Table>
+            <Table wrapperClassName="table-stack">
               <TableHeader>
                 <TableRow>
                   <TableHead>Title</TableHead>
@@ -70,21 +70,21 @@ export function EducationManager({ content }: { content: Content[] }) {
               <TableBody>
                 {content.map((c) => (
                   <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.title}</TableCell>
-                    <TableCell>
+                    <TableCell data-cardtitle className="font-medium">{c.title}</TableCell>
+                    <TableCell data-label="Category">
                       <Badge variant="accent">{humanize(c.category)}</Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell data-label="Language" className="text-sm text-muted-foreground">
                       {c.language === "SW" ? "Kiswahili" : "English"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="Status">
                       {c.published ? (
                         <Badge variant="success">Published</Badge>
                       ) : (
                         <Badge variant="secondary">Draft</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell data-label="Actions" className="text-right">
                       <ActionButton
                         size="sm"
                         variant="outline"

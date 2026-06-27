@@ -117,7 +117,7 @@ export function AdminRequestsList({ requests }: { requests: RequestDTO[] }) {
             description="No requests match this view."
           />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto table-stack">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -140,8 +140,8 @@ export function AdminRequestsList({ requests }: { requests: RequestDTO[] }) {
                       onClick={() => router.push(`/admin/requests/${r.id}`)}
                       className="cursor-pointer border-b border-border/70 transition-colors last:border-0 hover:bg-muted/40"
                     >
-                      <td className="px-4 py-3 font-semibold">{r.code}</td>
-                      <td className="px-4 py-3">
+                      <td data-cardtitle className="px-4 py-3 font-semibold">{r.code}</td>
+                      <td data-label="Partner" className="px-4 py-3">
                         <div className="font-medium">{r.requesterName}</div>
                         {r.requesterOrg && (
                           <div className="text-xs text-muted-foreground">
@@ -149,11 +149,11 @@ export function AdminRequestsList({ requests }: { requests: RequestDTO[] }) {
                           </div>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                      <td data-label="Items" className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                         {units} units · {r.items.length} line
                         {r.items.length === 1 ? "" : "s"}
                       </td>
-                      <td className="px-4 py-3">
+                      <td data-label="Payment" className="px-4 py-3">
                         <Badge
                           variant={
                             r.paymentType === "CREDIT" ? "accent" : "secondary"
@@ -162,18 +162,18 @@ export function AdminRequestsList({ requests }: { requests: RequestDTO[] }) {
                           {humanize(r.paymentType)}
                         </Badge>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-medium">
+                      <td data-label="Total" className="whitespace-nowrap px-4 py-3 text-right font-medium">
                         {r.totalAmount != null
                           ? formatCurrency(r.totalAmount)
                           : "—"}
                       </td>
-                      <td className="px-4 py-3">
+                      <td data-label="Status" className="px-4 py-3">
                         <StatusBadge status={r.status} />
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
+                      <td data-label="Date" className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                         {formatDateTime(r.createdAt)}
                       </td>
-                      <td className="px-2 py-3 text-muted-foreground">
+                      <td data-label="" className="px-2 py-3 text-muted-foreground">
                         <ChevronRight className="size-4" />
                       </td>
                     </tr>

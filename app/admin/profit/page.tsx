@@ -122,7 +122,7 @@ export default async function AdminProfitPage({
           {topProducts.length === 0 ? (
             <EmptyState className="m-6" icon={TrendingUp} title="No sales in this period" />
           ) : (
-            <Table>
+            <Table wrapperClassName="table-stack">
               <TableHeader>
                 <TableRow>
                   <TableHead>Product</TableHead>
@@ -135,11 +135,11 @@ export default async function AdminProfitPage({
               <TableBody>
                 {topProducts.map((p) => (
                   <TableRow key={p.name}>
-                    <TableCell className="font-medium">{p.name}</TableCell>
-                    <TableCell className="text-right">{formatNumber(p.units)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(p.revenue)}</TableCell>
-                    <TableCell className="text-right font-medium text-success">{formatCurrency(p.profit)}</TableCell>
-                    <TableCell className="text-right">{p.margin.toFixed(0)}%</TableCell>
+                    <TableCell data-cardtitle className="font-medium">{p.name}</TableCell>
+                    <TableCell data-label="Packs" className="text-right">{formatNumber(p.units)}</TableCell>
+                    <TableCell data-label="Revenue" className="text-right">{formatCurrency(p.revenue)}</TableCell>
+                    <TableCell data-label="Profit" className="text-right font-medium text-success">{formatCurrency(p.profit)}</TableCell>
+                    <TableCell data-label="Margin" className="text-right">{p.margin.toFixed(0)}%</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

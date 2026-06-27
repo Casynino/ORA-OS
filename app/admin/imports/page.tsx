@@ -29,7 +29,7 @@ export default async function AdminImportsPage() {
           {imports.length === 0 ? (
             <EmptyState className="m-6" icon={Ship} title="No imports recorded yet" />
           ) : (
-            <Table>
+            <Table wrapperClassName="table-stack">
               <TableHeader>
                 <TableRow>
                   <TableHead>Product</TableHead>
@@ -42,11 +42,11 @@ export default async function AdminImportsPage() {
               <TableBody>
                 {imports.map((m) => (
                   <TableRow key={m.id}>
-                    <TableCell className="font-medium">{m.product.name}</TableCell>
-                    <TableCell className="text-right"><Badge variant="success">+{formatNumber(m.quantity)}</Badge></TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{m.reference ?? "—"}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{m.createdBy.name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{formatDateTime(m.createdAt)}</TableCell>
+                    <TableCell data-cardtitle className="font-medium">{m.product.name}</TableCell>
+                    <TableCell data-label="Quantity" className="text-right"><Badge variant="success">+{formatNumber(m.quantity)}</Badge></TableCell>
+                    <TableCell data-label="Reference" className="text-sm text-muted-foreground">{m.reference ?? "—"}</TableCell>
+                    <TableCell data-label="Received by" className="text-sm text-muted-foreground">{m.createdBy.name}</TableCell>
+                    <TableCell data-label="Date" className="text-sm text-muted-foreground">{formatDateTime(m.createdAt)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
