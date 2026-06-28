@@ -1,6 +1,9 @@
 import { Clock, Coins, Banknote } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
+
+// The payment queue must always reflect the live order state.
+export const dynamic = "force-dynamic";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { PaymentQueue } from "@/components/admin/payment-queue";
