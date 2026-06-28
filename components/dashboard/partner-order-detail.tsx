@@ -194,6 +194,29 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
         )}
       </div>
 
+      {/* Payment gate notice */}
+      {order.status === "APPROVED" &&
+        order.paymentType === "IMMEDIATE" &&
+        order.paymentStatus === "UNPAID" && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
+            <span className="mt-1.5 size-2 shrink-0 animate-pulse rounded-full bg-warning" />
+            <p>
+              <span className="font-semibold">Awaiting payment confirmation.</span>{" "}
+              Pay {order.totalAmount != null ? formatCurrency(order.totalAmount) : "the invoice"} and the ORA team
+              will confirm it — your order then moves to the warehouse for dispatch.
+            </p>
+          </div>
+        )}
+      {order.paymentStatus === "PAID" && order.status !== "FULFILLED" && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-success/30 bg-success/10 p-3 text-sm text-success">
+          <span className="mt-1.5 size-2 shrink-0 rounded-full bg-success" />
+          <p>
+            <span className="font-semibold">Payment confirmed.</span> Your order has
+            been released to the warehouse for dispatch.
+          </p>
+        </div>
+      )}
+
       {/* Timeline */}
       <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
         <ol className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-2">

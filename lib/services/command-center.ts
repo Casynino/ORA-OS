@@ -60,6 +60,7 @@ export async function getCommandCenter() {
     inTransitOrders,
     pendingReturns,
     transfersInProgress,
+    pendingPayments,
     activePartners,
     inventoryRows,
     returnsByProduct,
@@ -137,6 +138,9 @@ export async function getCommandCenter() {
     prisma.returnRequest.count({ where: { status: "PENDING" } }),
     prisma.warehouseTransfer.count({
       where: { status: { in: [...ACTIVE_TRANSFER] } },
+    }),
+    prisma.request.count({
+      where: { status: "APPROVED", paymentType: "IMMEDIATE", paymentStatus: "UNPAID" },
     }),
     prisma.user.count({ where: { role: "PARTNER", status: "ACTIVE" } }),
     prisma.inventory.findMany({
@@ -335,6 +339,8 @@ export async function getCommandCenter() {
   const alerts: { tone: "warning" | "info" | "danger"; text: string; href: string }[] = [];
   if (pendingApprovals > 0)
     alerts.push({ tone: "warning", text: `${pendingApprovals} order${pendingApprovals === 1 ? "" : "s"} awaiting approval`, href: "/admin/requests" });
+  if (pendingPayments > 0)
+    alerts.push({ tone: "warning", text: `${pendingPayments} payment${pendingPayments === 1 ? "" : "s"} to confirm`, href: "/admin/payments" });
   if (pendingApplications > 0)
     alerts.push({ tone: "info", text: `${pendingApplications} new partner application${pendingApplications === 1 ? "" : "s"}`, href: "/admin/users" });
   if (overdueCount > 0)
@@ -379,6 +385,7 @@ export async function getCommandCenter() {
     operations: {
       pendingApplications,
       pendingApprovals,
+      pendingPayments,
       readyForFulfillment,
       inTransitOrders,
       pendingReturns,

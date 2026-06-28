@@ -30,6 +30,7 @@ import {
   FileBarChart,
   Banknote,
   Bell,
+  Receipt,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
@@ -250,9 +251,10 @@ export default async function AdminCommandCenter() {
       {/* ── Operations ───────────────────────────────────────── */}
       <section>
         <SectionLabel>Operations · needs action</SectionLabel>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
           <OpTile icon={UserPlus} label="Applications" value={d.operations.pendingApplications} href="/admin/users" />
           <OpTile icon={Clock} label="Order approvals" value={d.operations.pendingApprovals} href="/admin/requests" />
+          <OpTile icon={Receipt} label="Payments to confirm" value={d.operations.pendingPayments} href="/admin/payments" />
           <OpTile icon={PackagePlus} label="Ready to fulfil" value={d.operations.readyForFulfillment} href="/admin/requests" />
           <OpTile icon={Truck} label="In transit" value={d.operations.inTransitOrders} href="/admin/requests" />
           <OpTile icon={Undo2} label="Pending returns" value={d.operations.pendingReturns} href="/admin/returns" />
