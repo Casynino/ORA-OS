@@ -16,6 +16,7 @@ export type PaymentRow = {
   amount: number;
   warehouse: string | null;
   whenISO: string;
+  claimedISO: string | null;
 };
 
 export function PaymentQueue({ orders }: { orders: PaymentRow[] }) {
@@ -44,9 +45,15 @@ export function PaymentQueue({ orders }: { orders: PaymentRow[] }) {
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold">{o.code}</span>
               <Badge variant="secondary">Cash</Badge>
-              <Badge variant="warning" className="gap-1">
-                <Clock className="size-3" /> Awaiting confirmation
-              </Badge>
+              {o.claimedISO ? (
+                <Badge variant="success" className="gap-1">
+                  <CheckCircle2 className="size-3" /> Customer marked paid
+                </Badge>
+              ) : (
+                <Badge variant="warning" className="gap-1">
+                  <Clock className="size-3" /> Awaiting customer payment
+                </Badge>
+              )}
             </div>
             <p className="mt-1 text-sm">
               {o.customer}
@@ -54,7 +61,9 @@ export function PaymentQueue({ orders }: { orders: PaymentRow[] }) {
             </p>
             <p className="text-xs text-muted-foreground">
               Expected {formatCurrency(o.amount)} · {o.warehouse ?? "warehouse TBD"} ·{" "}
-              {formatDateTime(o.whenISO)}
+              {o.claimedISO
+                ? `customer confirmed ${formatDateTime(o.claimedISO)}`
+                : `approved ${formatDateTime(o.whenISO)}`}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">

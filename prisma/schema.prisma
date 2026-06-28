@@ -351,6 +351,7 @@ model Request {
   discount      Int           @default(0) // whole TSh off the order
   deliveryCharge Int          @default(0) // whole TSh added for delivery
   paymentStatus PaymentStatus @default(UNPAID)
+  paymentClaimedAt DateTime? // customer pressed "I have made payment" — awaiting admin verification
   invoiceNo     String? // generated on approval
   deliveredAt   DateTime? // delivery confirmation
   totalAmount  Int? // computed once priced (whole KES)
