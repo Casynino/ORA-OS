@@ -144,7 +144,7 @@ export default async function AdminCommandCenter() {
               {greeting}.
             </h1>
             <p className="mt-1.5 text-sm text-white/90 sm:text-base">
-              The whole business at a glance — everything ORA, right now.
+              Welcome back. Here&apos;s what&apos;s happening across ORA today.
             </p>
             <div className="mt-5 grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:gap-8">
               <HeroStat label="Cash collected today" value={formatCurrency(d.finance.cashToday)} />
