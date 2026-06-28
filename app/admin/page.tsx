@@ -138,7 +138,7 @@ export default async function AdminCommandCenter() {
           <div className="relative min-w-0">
             <p className="flex items-center gap-2 text-xs text-white/80 sm:text-sm">
               <span className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-white" />
-              <span className="min-w-0 truncate">{dateLabel} · Command center</span>
+              <span className="min-w-0 truncate">{dateLabel}</span>
             </p>
             <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight sm:text-4xl">
               {greeting}.
@@ -151,6 +151,7 @@ export default async function AdminCommandCenter() {
               <HeroStat label="Revenue today" value={formatCurrency(d.sales.today.revenue)} />
               <HeroStat label="Revenue this month" value={formatCurrency(d.sales.month.revenue)} />
               <HeroStat label="Outstanding credit" value={formatCurrency(d.finance.outstandingCredit)} />
+              <HeroStat label="Total donated" value={formatCurrency(d.sales.donations)} />
             </div>
           </div>
         </div>
