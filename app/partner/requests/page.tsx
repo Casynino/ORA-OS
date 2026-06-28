@@ -19,6 +19,8 @@ export default async function AgentRequestsPage() {
     code: r.code,
     status: r.status,
     paymentType: r.paymentType,
+    paymentStatus: r.paymentStatus,
+    paymentClaimedAt: r.paymentClaimedAt ? r.paymentClaimedAt.toISOString() : null,
     note: r.note,
     adminNote: r.adminNote,
     totalAmount: r.totalAmount,

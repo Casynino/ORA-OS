@@ -119,12 +119,20 @@ export async function createRequest(
       }
     }
 
+    // Prices are pre-agreed per partner, so there's no pricing/approval stage:
+    //  • a CASH order is invoiced immediately and goes straight to "awaiting
+    //    payment" (APPROVED + UNPAID) — it shows the payment panel at once.
+    //  • a CREDIT order goes to "awaiting credit approval" (PENDING) for the
+    //    admin to verify the limit, then it's released.
+    const isCredit = paymentType === "CREDIT";
     const request = await prisma.request.create({
       data: {
         code: refCode("REQ"),
         type: "AGENT_STOCK",
-        status: "PENDING",
+        status: isCredit ? "PENDING" : "APPROVED",
         paymentType,
+        paymentStatus: "UNPAID",
+        invoiceNo: refCode("INV"),
         requesterId: actor.id,
         note: parsed.data.note?.trim() || null,
         deliverTo: parsed.data.deliverTo?.trim() || null,
@@ -146,11 +154,17 @@ export async function createRequest(
       action: "REQUEST_SUBMITTED",
       entity: "Request",
       entityId: request.id,
-      summary: `${actor.name} submitted request ${request.code} (${merged.size} item${merged.size > 1 ? "s" : ""}).`,
+      summary: `${actor.name} submitted order ${request.code} (${merged.size} item${merged.size > 1 ? "s" : ""}, ${isCredit ? "credit" : "cash"}).`,
     });
 
     revalidateAll();
-    return ok({ code: request.code, id: request.id }, "Request submitted for admin review.");
+    revalidatePath("/admin/payments");
+    return ok(
+      { code: request.code, id: request.id },
+      isCredit
+        ? "Order submitted — under credit review."
+        : "Order submitted — please complete payment.",
+    );
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -366,11 +380,14 @@ export async function approveRequest(
       include: { items: { include: { product: true } }, requester: true },
     });
     if (!request) return fail("Request not found.");
-    if (request.status !== "PRICED") {
-      return fail("Only priced requests can be approved.");
+    // Prices are pre-agreed, so an order can be approved straight from
+    // submission (PENDING) — this is the credit-approval step. PRICED is kept
+    // for any legacy orders.
+    if (request.status !== "PENDING" && request.status !== "PRICED") {
+      return fail("This order can no longer be approved.");
     }
     if (request.items.some((i) => i.unitPrice == null)) {
-      return fail("Assign a price to every item before approving.");
+      return fail("This order has no prices — check the partner's pricing profile.");
     }
 
     // Verify warehouse availability — no invisible stock.
@@ -395,7 +412,7 @@ export async function approveRequest(
     // a CASH order stays UNPAID and is held back until an admin confirms payment
     // — only then does it become visible to warehouse staff.
     const isCredit = request.paymentType === "CREDIT";
-    const invoiceNo = refCode("INV");
+    const invoiceNo = request.invoiceNo ?? refCode("INV");
     await prisma.request.update({
       where: { id: request.id },
       data: {
