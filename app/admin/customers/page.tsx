@@ -1,4 +1,5 @@
-import { Users } from "lucide-react";
+import Link from "next/link";
+import { Users, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,7 +24,7 @@ export default async function AdminCustomersPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Customers" description="Partners — agents, distributors, NGOs and schools, with credit status." />
+      <PageHeader title="Customers" description="Partners — agents, distributors, NGOs and schools. Open a profile to manage the full relationship." />
       <Card className="glass-card">
         <CardContent className="p-0">
           {partners.length === 0 ? (
@@ -37,6 +38,7 @@ export default async function AdminCustomersPage() {
                   <TableHead className="text-right">Credit limit</TableHead>
                   <TableHead className="text-right">Outstanding</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -47,13 +49,20 @@ export default async function AdminCustomersPage() {
                   return (
                     <TableRow key={p.id}>
                       <TableCell data-cardtitle>
-                        <div className="font-medium">{p.name}</div>
-                        <div className="text-xs text-muted-foreground">{p.organization ?? "—"} · {p.email}</div>
+                        <Link href={`/admin/customers/${p.id}`} className="font-medium hover:text-primary">
+                          {p.organization ?? p.name}
+                        </Link>
+                        <div className="text-xs text-muted-foreground">{p.name} · {p.email}</div>
                       </TableCell>
                       <TableCell data-label="Location" className="text-sm text-muted-foreground">{p.location ?? "—"}</TableCell>
                       <TableCell data-label="Credit limit" className="text-right">{p.creditLimit != null ? formatCurrency(p.creditLimit) : "—"}</TableCell>
                       <TableCell data-label="Outstanding" className="text-right font-medium">{outstanding > 0 ? formatCurrency(outstanding) : "—"}</TableCell>
                       <TableCell data-label="Status"><StatusBadge status={p.status} /></TableCell>
+                      <TableCell data-label="" className="text-right">
+                        <Link href={`/admin/customers/${p.id}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+                          Open <ChevronRight className="size-4" />
+                        </Link>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
