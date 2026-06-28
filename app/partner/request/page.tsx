@@ -226,17 +226,13 @@ export default async function PartnerRequestPage() {
       {/* Builder */}
       <PartnerRequestBuilder
         products={builderProducts}
-        warehouses={warehouses.map((w) => ({
-          id: w.id,
-          name: w.name,
-          location: w.location,
-        }))}
         credit={{ limit, outstanding, available }}
-        defaults={{
+        customer={{
           name: me.name,
           phone: me.phone,
           organization: me.organization,
           location: me.location,
+          preferredPayment: me.preferredPayment,
         }}
       />
 

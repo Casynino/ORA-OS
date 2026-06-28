@@ -18,6 +18,8 @@ import {
   CalendarClock,
   PackageCheck,
   Plus,
+  Clock,
+  ExternalLink,
 } from "lucide-react";
 import {
   recordPayment,
@@ -87,6 +89,7 @@ export type CreditAccountDTO = {
 export type SettlementDTO = {
   id: string;
   code: string;
+  accountId: string;
   partner: string;
   batchCode: string;
   amount: number;
@@ -202,6 +205,12 @@ export function CreditLedger({
         <Kpi icon={Users} label="Partners on credit" value={String(kpi.partners)} />
       </div>
 
+      {/* Pending payments — the action queue, always on top */}
+      <PendingPayments
+        settlements={settlements.filter((s) => s.status === "PENDING")}
+        onRefresh={() => router.refresh()}
+      />
+
       {/* Tabs */}
       <div className="flex flex-wrap gap-1.5">
         {[
@@ -297,6 +306,98 @@ function Kpi({
   );
 }
 
+// ── Pending payments (top action queue) ───────────────────────────────────
+function PendingPayments({
+  settlements,
+  onRefresh,
+}: {
+  settlements: SettlementDTO[];
+  onRefresh: () => void;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+
+  function reject(id: string) {
+    const note = window.prompt("Reason for rejecting (optional)") ?? undefined;
+    start(async () => {
+      const res = await rejectSettlement(id, note);
+      if (res.ok) toast({ variant: "success", title: res.message });
+      else toast({ variant: "error", title: res.error });
+      onRefresh();
+    });
+  }
+
+  if (settlements.length === 0) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+        <CheckCircle2 className="size-4 text-success" />
+        No payments awaiting confirmation — every submitted credit payment is reviewed.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-warning/40 bg-warning/5">
+      <div className="flex items-center gap-2 border-b border-warning/30 px-4 py-3">
+        <Clock className="size-4 text-warning" />
+        <h2 className="text-sm font-semibold">
+          Pending payments — confirm or reject
+        </h2>
+        <Badge variant="warning" className="ml-1">
+          {settlements.length}
+        </Badge>
+      </div>
+      <div className="divide-y divide-border">
+        {settlements.map((s) => (
+          <div
+            key={s.id}
+            className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold">{formatCurrency(s.amount)}</span>
+                <span className="text-sm text-muted-foreground">
+                  {s.partner}
+                </span>
+                <button
+                  onClick={() => router.push(`/admin/credit/${s.accountId}`)}
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  {s.batchCode} <ExternalLink className="size-3" />
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {s.method ?? "—"}
+                {s.reference ? ` · ${s.reference}` : ""} · {formatDateTime(s.createdAt)} · {s.code}
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-1.5">
+              <ActionButton
+                size="sm"
+                variant="success"
+                action={() => confirmSettlement(s.id)}
+                onDone={onRefresh}
+                pendingText="…"
+              >
+                <Check className="size-3.5" /> Confirm
+              </ActionButton>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-destructive hover:bg-destructive/10"
+                disabled={pending}
+                onClick={() => reject(s.id)}
+              >
+                <XCircle className="size-3.5" /> Reject
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Credits table ─────────────────────────────────────────────────────────
 function CreditsTable({
   accounts,
@@ -309,6 +410,7 @@ function CreditsTable({
   onTerms: (a: CreditAccountDTO) => void;
   onRefresh: () => void;
 }) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
@@ -485,18 +587,31 @@ function CreditsTable({
                           : "—"}
                       </TableCell>
                       <TableCell className="text-right">
-                        {!settled && (
+                        <div className="flex justify-end gap-1.5">
+                          {!settled && (
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onPay(a);
+                              }}
+                            >
+                              <Plus className="size-3.5" />
+                              Payment
+                            </Button>
+                          )}
                           <Button
                             size="sm"
+                            variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onPay(a);
+                              router.push(`/admin/credit/${a.id}`);
                             }}
                           >
-                            <Plus className="size-3.5" />
-                            Payment
+                            <ExternalLink className="size-3.5" />
+                            Open
                           </Button>
-                        )}
+                        </div>
                       </TableCell>
                     </TableRow>
                     {isOpen && (

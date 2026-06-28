@@ -414,6 +414,7 @@ const updateCustomerSchema = z.object({
   region: z.string().max(120).optional().or(z.literal("")),
   preferredPayment: z.string().max(40).optional().or(z.literal("")),
   paymentTerms: z.string().max(60).optional().or(z.literal("")),
+  assignedWarehouse: z.string().max(120).optional().or(z.literal("")),
   notes: z.string().max(2000).optional().or(z.literal("")),
 });
 
@@ -456,6 +457,7 @@ export async function updateCustomer(
         region: blank(parsed.data.region),
         preferredPayment: blank(parsed.data.preferredPayment),
         paymentTerms: blank(parsed.data.paymentTerms),
+        assignedWarehouse: blank(parsed.data.assignedWarehouse),
         notes: blank(parsed.data.notes),
       },
     });

@@ -7,6 +7,8 @@ import {
   type SettlementDTO,
 } from "@/components/admin/credit-ledger";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminCreditPage() {
   const settlementRows = await prisma.settlementRequest.findMany({
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
@@ -18,6 +20,7 @@ export default async function AdminCreditPage() {
   const settlements: SettlementDTO[] = settlementRows.map((s) => ({
     id: s.id,
     code: s.code,
+    accountId: s.creditAccountId,
     partner: s.partner.name,
     batchCode: s.creditAccount.request.code,
     amount: s.amount,

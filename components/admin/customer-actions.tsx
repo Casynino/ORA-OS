@@ -38,6 +38,7 @@ export type CustomerDTO = {
   region: string | null;
   preferredPayment: string | null;
   paymentTerms: string | null;
+  assignedWarehouse: string | null;
   notes: string | null;
   creditLimit: number | null;
   status: string;
@@ -45,7 +46,13 @@ export type CustomerDTO = {
 
 type ModalKind = "edit" | "credit" | "password" | null;
 
-export function CustomerActions({ customer }: { customer: CustomerDTO }) {
+export function CustomerActions({
+  customer,
+  warehouses,
+}: {
+  customer: CustomerDTO;
+  warehouses: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const [modal, setModal] = useState<ModalKind>(null);
   const refresh = () => router.refresh();
@@ -102,7 +109,7 @@ export function CustomerActions({ customer }: { customer: CustomerDTO }) {
       </div>
 
       {modal === "edit" && (
-        <EditModal customer={customer} onClose={close} onDone={() => { close(); refresh(); }} />
+        <EditModal customer={customer} warehouses={warehouses} onClose={close} onDone={() => { close(); refresh(); }} />
       )}
       {modal === "credit" && (
         <CreditModal customer={customer} onClose={close} onDone={() => { close(); refresh(); }} />
@@ -114,7 +121,7 @@ export function CustomerActions({ customer }: { customer: CustomerDTO }) {
   );
 }
 
-function EditModal({ customer, onClose, onDone }: { customer: CustomerDTO; onClose: () => void; onDone: () => void }) {
+function EditModal({ customer, warehouses, onClose, onDone }: { customer: CustomerDTO; warehouses: { id: string; name: string }[]; onClose: () => void; onDone: () => void }) {
   const [pending, start] = useTransition();
   const [f, setF] = useState({
     name: customer.name,
@@ -126,6 +133,7 @@ function EditModal({ customer, onClose, onDone }: { customer: CustomerDTO; onClo
     region: customer.region ?? "",
     preferredPayment: customer.preferredPayment ?? "",
     paymentTerms: customer.paymentTerms ?? "",
+    assignedWarehouse: customer.assignedWarehouse ?? "",
     notes: customer.notes ?? "",
   });
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
@@ -170,7 +178,17 @@ function EditModal({ customer, onClose, onDone }: { customer: CustomerDTO; onClo
           <Field label="Location"><Input value={f.location} onChange={(e) => set("location", e.target.value)} /></Field>
           <Field label="Region"><Input value={f.region} onChange={(e) => set("region", e.target.value)} /></Field>
         </div>
-        <Field label="Payment terms"><Input value={f.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} placeholder="e.g. Net 30" /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Payment terms"><Input value={f.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} placeholder="e.g. Net 30" /></Field>
+          <Field label="Fulfilling warehouse">
+            <Select value={f.assignedWarehouse} onChange={(e) => set("assignedWarehouse", e.target.value)}>
+              <option value="">Main warehouse (default)</option>
+              {warehouses.map((w) => (
+                <option key={w.id} value={w.name}>{w.name}</option>
+              ))}
+            </Select>
+          </Field>
+        </div>
         <Field label="Internal notes"><Textarea value={f.notes} onChange={(e) => set("notes", e.target.value)} /></Field>
         <Button className="w-full" onClick={submit} disabled={pending}>{pending ? "Saving…" : "Save changes"}</Button>
       </div>
