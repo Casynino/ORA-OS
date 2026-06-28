@@ -389,8 +389,11 @@ export async function approveRequest(
       return fail(`Not enough warehouse stock for: ${names}. Add stock first.`);
     }
 
-    // Approve & invoice — NO inventory movement yet. The order is now assigned
-    // to its warehouse; warehouse staff accept, dispatch and confirm delivery.
+    // Approve & invoice — NO inventory movement yet. Payment gate: a CREDIT
+    // order is released to the warehouse on approval (credit IS the approval);
+    // a CASH order stays UNPAID and is held back until an admin confirms payment
+    // — only then does it become visible to warehouse staff.
+    const isCredit = request.paymentType === "CREDIT";
     const invoiceNo = refCode("INV");
     await prisma.request.update({
       where: { id: request.id },
@@ -399,6 +402,7 @@ export async function approveRequest(
         invoiceNo,
         reviewedById: admin.id,
         reviewedAt: new Date(),
+        paymentStatus: isCredit ? "OUTSTANDING" : "UNPAID",
       },
     });
 
@@ -408,11 +412,18 @@ export async function approveRequest(
       action: "REQUEST_APPROVED",
       entity: "Request",
       entityId: request.id,
-      summary: `Request ${request.code} approved & invoiced (${invoiceNo}) for ${request.requester.name} — assigned to ${request.warehouseName ?? "warehouse"}.`,
+      summary: isCredit
+        ? `Request ${request.code} approved on credit & invoiced (${invoiceNo}) for ${request.requester.name} — released to ${request.warehouseName ?? "warehouse"}.`
+        : `Request ${request.code} approved & invoiced (${invoiceNo}) for ${request.requester.name} — awaiting payment confirmation.`,
     });
 
     revalidateAll();
-    return ok(undefined, `Approved & invoiced (${invoiceNo}). Assigned to the warehouse for dispatch.`);
+    return ok(
+      undefined,
+      isCredit
+        ? `Approved on credit & invoiced (${invoiceNo}). Released to the warehouse for dispatch.`
+        : `Approved & invoiced (${invoiceNo}). Awaiting payment confirmation before it reaches the warehouse.`,
+    );
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -485,6 +496,11 @@ export async function dispatchOrder(requestId: string): Promise<ActionResult> {
     if (denied) return fail(denied);
     if (request.status !== "APPROVED") {
       return fail("Only approved orders can be dispatched.");
+    }
+    // Payment gate: nothing leaves the warehouse until cash payment is
+    // confirmed (PAID) or the order is on approved credit (OUTSTANDING).
+    if (request.paymentStatus === "UNPAID") {
+      return fail("Payment must be confirmed before this order can be dispatched.");
     }
     await prisma.request.update({
       where: { id: requestId },
@@ -634,6 +650,10 @@ export async function fulfillRequest(
     if (!request) return fail("Request not found.");
     if (request.status !== "IN_TRANSIT" && request.status !== "APPROVED") {
       return fail("Only in-transit orders can be marked delivered.");
+    }
+    // Payment gate: stock never moves on an unpaid cash order.
+    if (request.paymentStatus === "UNPAID") {
+      return fail("Payment must be confirmed before this order can be delivered.");
     }
 
     // Re-verify physical stock at the moment of delivery.
@@ -878,6 +898,89 @@ export async function partnerUpdateOrder(
     });
     revalidateAll();
     return ok(undefined, "Order updated and resubmitted for review.");
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+// ── Payment confirmation (ADMIN) ────────────────────────────────────────────
+
+// Confirm a CASH order's payment ("cash collected" / bank / mobile money).
+// This releases the order to the warehouse — it's the only way an unpaid cash
+// order becomes visible to warehouse staff.
+export async function confirmOrderPayment(
+  requestId: string,
+  method?: string,
+): Promise<ActionResult> {
+  try {
+    const admin = await requireActor(["ADMIN"]);
+    const request = await prisma.request.findUnique({
+      where: { id: requestId },
+      include: { requester: { select: { name: true } } },
+    });
+    if (!request) return fail("Order not found.");
+    if (request.paymentType === "CREDIT") {
+      return fail("Credit orders are released on approval, not payment confirmation.");
+    }
+    if (request.status !== "APPROVED" || request.paymentStatus !== "UNPAID") {
+      return fail("This order is not awaiting payment confirmation.");
+    }
+
+    await prisma.request.update({
+      where: { id: request.id },
+      data: { paymentStatus: "PAID" },
+    });
+    await logActivity({
+      actorId: admin.id,
+      actorName: admin.name,
+      action: "PAYMENT_CONFIRMED",
+      entity: "Request",
+      entityId: request.id,
+      summary: `Payment confirmed for ${request.code} (${request.requester.name})${method ? ` · ${method}` : ""} — released to ${request.warehouseName ?? "warehouse"}.`,
+    });
+    revalidateAll();
+    revalidatePath("/admin/payments");
+    return ok(undefined, `Payment confirmed — ${request.code} released to the warehouse.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+// Reject a cash payment — sends the order back to PRICED for review so it
+// leaves the warehouse-eligible pool until payment is sorted out.
+export async function rejectOrderPayment(
+  requestId: string,
+  reason?: string,
+): Promise<ActionResult> {
+  try {
+    const admin = await requireActor(["ADMIN"]);
+    const request = await prisma.request.findUnique({
+      where: { id: requestId },
+      include: { requester: { select: { name: true } } },
+    });
+    if (!request) return fail("Order not found.");
+    if (request.status !== "APPROVED" || request.paymentStatus !== "UNPAID") {
+      return fail("This order is not awaiting payment confirmation.");
+    }
+
+    await prisma.request.update({
+      where: { id: request.id },
+      data: {
+        status: "PRICED",
+        adminNote: reason?.trim() || "Payment not received / rejected.",
+      },
+    });
+    await logActivity({
+      actorId: admin.id,
+      actorName: admin.name,
+      action: "PAYMENT_REJECTED",
+      entity: "Request",
+      entityId: request.id,
+      summary: `Payment rejected for ${request.code} (${request.requester.name})${reason ? ` · ${reason.trim()}` : ""} — returned for review.`,
+    });
+    revalidateAll();
+    revalidatePath("/admin/payments");
+    return ok(undefined, `Payment rejected — ${request.code} returned for review.`);
   } catch (e) {
     return fail(errorMessage(e));
   }

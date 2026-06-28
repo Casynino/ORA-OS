@@ -68,6 +68,8 @@ export default async function WarehouseOverviewPage() {
         where: {
           warehouseName: whName,
           status: { in: ["APPROVED", "IN_TRANSIT", "FULFILLED"] },
+          // Only payment-cleared orders ever reach the warehouse view.
+          paymentStatus: { in: ["PAID", "OUTSTANDING"] },
         },
         select: { id: true, status: true, fulfilledAt: true },
       }),

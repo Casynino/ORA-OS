@@ -22,6 +22,9 @@ export default async function WarehouseOrdersPage() {
     where: {
       warehouseName: me.warehouse.name,
       status: { in: ["APPROVED", "IN_TRANSIT", "FULFILLED"] },
+      // Payment gate: warehouse only ever sees orders whose cash payment is
+      // confirmed (PAID) or that are on approved credit (OUTSTANDING).
+      paymentStatus: { in: ["PAID", "OUTSTANDING"] },
     },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     take: 100,

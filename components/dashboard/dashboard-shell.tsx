@@ -39,6 +39,7 @@ import {
   ImageIcon,
   Newspaper,
   MessageSquare,
+  Receipt,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Avatar } from "@/components/ui/avatar";
@@ -79,6 +80,7 @@ const ICONS: Record<string, LucideIcon> = {
   activities: ImageIcon,
   news: Newspaper,
   messages: MessageSquare,
+  payments: Receipt,
 };
 
 export type NavItem = { href: string; label: string; icon: string };
