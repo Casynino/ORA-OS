@@ -8,6 +8,9 @@ import {
   type WhOrderDTO,
 } from "@/components/warehouse/warehouse-orders";
 
+// Released orders must appear the instant payment is confirmed.
+export const dynamic = "force-dynamic";
+
 export default async function WarehouseOrdersPage() {
   const session = await requireRole("WAREHOUSE");
   const me = await prisma.user.findUnique({
