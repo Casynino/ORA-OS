@@ -60,7 +60,8 @@ export async function getCommandCenter() {
     inTransitOrders,
     pendingReturns,
     transfersInProgress,
-    pendingPayments,
+    pendingCashPayments,
+    pendingSettlements,
     activePartners,
     inventoryRows,
     returnsByProduct,
@@ -142,6 +143,7 @@ export async function getCommandCenter() {
     prisma.request.count({
       where: { status: "APPROVED", paymentType: "IMMEDIATE", paymentStatus: "UNPAID" },
     }),
+    prisma.settlementRequest.count({ where: { status: "PENDING" } }),
     prisma.user.count({ where: { role: "PARTNER", status: "ACTIVE" } }),
     prisma.inventory.findMany({
       include: { product: { select: { name: true, sku: true } } },
@@ -191,6 +193,9 @@ export async function getCommandCenter() {
       take: 6,
     }),
   ]);
+
+  // Everything awaiting a money confirmation lives on /admin/payments.
+  const pendingPayments = pendingCashPayments + pendingSettlements;
 
   // ── Inventory location ─────────────────────────────────────────
   const warehouseUnits = inventoryAgg._sum.warehouseQty ?? 0;
