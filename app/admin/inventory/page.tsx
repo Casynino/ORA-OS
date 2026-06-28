@@ -7,13 +7,28 @@ import { InventoryManager } from "@/components/admin/inventory-manager";
 import { formatNumber } from "@/lib/utils";
 
 export default async function AdminInventoryPage() {
-  const [products, totals] = await Promise.all([
+  const [products, totals, warehouses, stock] = await Promise.all([
     prisma.product.findMany({
       orderBy: { name: "asc" },
       include: { inventory: true },
     }),
     getStockTotals(),
+    prisma.warehouse.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.warehouseStock.findMany({
+      select: { warehouseId: true, productId: true, onHand: true },
+    }),
   ]);
+
+  // productId -> { warehouseId -> onHand }, so the Add/Adjust modals can show
+  // (and validate against) the stock that physically sits in each warehouse.
+  const stockByWarehouse: Record<string, Record<string, number>> = {};
+  for (const s of stock) {
+    (stockByWarehouse[s.productId] ??= {})[s.warehouseId] = s.onHand;
+  }
 
   const dto = products.map((p) => ({
     id: p.id,
@@ -53,7 +68,11 @@ export default async function AdminInventoryPage() {
           accent="success"
         />
       </div>
-      <InventoryManager products={dto} />
+      <InventoryManager
+        products={dto}
+        warehouses={warehouses}
+        stockByWarehouse={stockByWarehouse}
+      />
     </div>
   );
 }

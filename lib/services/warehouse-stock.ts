@@ -39,9 +39,32 @@ export async function deductWarehouseStock(
     productId,
     quantity,
     preferWarehouseName,
-  }: { productId: string; quantity: number; preferWarehouseName?: string | null },
+    warehouseId,
+  }: {
+    productId: string;
+    quantity: number;
+    preferWarehouseName?: string | null;
+    warehouseId?: string | null;
+  },
 ): Promise<void> {
   if (quantity <= 0) return;
+
+  // Exact-warehouse deduction (used by targeted admin adjustments).
+  if (warehouseId) {
+    const row = await tx.warehouseStock.findUnique({
+      where: { warehouseId_productId: { warehouseId, productId } },
+    });
+    if (!row) return;
+    const take = Math.min(row.onHand, quantity);
+    if (take > 0) {
+      await tx.warehouseStock.update({
+        where: { id: row.id },
+        data: { onHand: { decrement: take }, lastMoveAt: new Date() },
+      });
+    }
+    return;
+  }
+
   const rows = await tx.warehouseStock.findMany({ where: { productId } });
   if (rows.length === 0) return;
 
@@ -79,10 +102,16 @@ export async function addWarehouseStock(
     productId,
     quantity,
     warehouseName,
-  }: { productId: string; quantity: number; warehouseName?: string | null },
+    warehouseId,
+  }: {
+    productId: string;
+    quantity: number;
+    warehouseName?: string | null;
+    warehouseId?: string | null;
+  },
 ): Promise<void> {
   if (quantity <= 0) return;
-  const wid = await resolveWarehouseId(tx, warehouseName);
+  const wid = warehouseId ?? (await resolveWarehouseId(tx, warehouseName));
   if (!wid) return;
   await tx.warehouseStock.upsert({
     where: { warehouseId_productId: { warehouseId: wid, productId } },

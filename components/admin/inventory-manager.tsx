@@ -40,13 +40,23 @@ type Product = {
   lowStockThreshold: number;
 };
 
+type Warehouse = { id: string; name: string };
+
 type ModalState =
   | { type: "product" }
   | { type: "add"; product: Product }
   | { type: "adjust"; product: Product }
   | null;
 
-export function InventoryManager({ products }: { products: Product[] }) {
+export function InventoryManager({
+  products,
+  warehouses,
+  stockByWarehouse,
+}: {
+  products: Product[];
+  warehouses: Warehouse[];
+  stockByWarehouse: Record<string, Record<string, number>>;
+}) {
   const router = useRouter();
   const [modal, setModal] = useState<ModalState>(null);
 
@@ -142,6 +152,8 @@ export function InventoryManager({ products }: { products: Product[] }) {
       {modal?.type === "add" && (
         <AddStockModal
           product={modal.product}
+          warehouses={warehouses}
+          stockByWarehouse={stockByWarehouse}
           onClose={() => setModal(null)}
           onDone={() => {
             setModal(null);
@@ -152,6 +164,8 @@ export function InventoryManager({ products }: { products: Product[] }) {
       {modal?.type === "adjust" && (
         <AdjustStockModal
           product={modal.product}
+          warehouses={warehouses}
+          stockByWarehouse={stockByWarehouse}
           onClose={() => setModal(null)}
           onDone={() => {
             setModal(null);
@@ -275,22 +289,36 @@ function ProductModal({
 
 function AddStockModal({
   product,
+  warehouses,
+  stockByWarehouse,
   onClose,
   onDone,
 }: {
   product: Product;
+  warehouses: Warehouse[];
+  stockByWarehouse: Record<string, Record<string, number>>;
   onClose: () => void;
   onDone: () => void;
 }) {
   const [pending, start] = useTransition();
+  const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? "");
   const [quantity, setQuantity] = useState("100");
   const [reference, setReference] = useState("");
 
+  const qty = Math.max(0, Number(quantity) || 0);
+  const current = stockByWarehouse[product.id]?.[warehouseId] ?? 0;
+  const whName = warehouses.find((w) => w.id === warehouseId)?.name ?? "warehouse";
+
   function submit() {
+    if (!warehouseId) {
+      toast({ variant: "error", title: "Pick a warehouse first." });
+      return;
+    }
     start(async () => {
       const res = await addStock({
         productId: product.id,
-        quantity: Number(quantity),
+        quantity: qty,
+        warehouseId,
         reference: reference || undefined,
       });
       if (res.ok) {
@@ -303,13 +331,22 @@ function AddStockModal({
   }
 
   return (
-    <Modal
-      open
-      onClose={onClose}
-      title={`Add stock · ${product.name}`}
-      description={`Current warehouse: ${formatNumber(product.warehouseQty)}`}
-    >
+    <Modal open onClose={onClose} title={`Receive stock · ${product.name}`}>
       <div className="space-y-4">
+        <div>
+          <Label>Into which warehouse?</Label>
+          <Select
+            value={warehouseId}
+            onChange={(e) => setWarehouseId(e.target.value)}
+            className="mt-1.5"
+          >
+            {warehouses.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name} — {formatNumber(stockByWarehouse[product.id]?.[w.id] ?? 0)} on hand
+              </option>
+            ))}
+          </Select>
+        </div>
         <div>
           <Label>Quantity received</Label>
           <Input
@@ -329,8 +366,14 @@ function AddStockModal({
             className="mt-1.5"
           />
         </div>
-        <Button className="w-full" onClick={submit} disabled={pending}>
-          {pending ? "Adding…" : "Add to warehouse"}
+        <div className="rounded-xl bg-muted/40 p-3 text-sm">
+          <span className="text-muted-foreground">{whName}: </span>
+          <span className="font-medium">{formatNumber(current)}</span>
+          <span className="text-muted-foreground"> → </span>
+          <span className="font-semibold text-success">{formatNumber(current + qty)}</span>
+        </div>
+        <Button className="w-full" onClick={submit} disabled={pending || qty < 1}>
+          {pending ? "Adding…" : `Add ${formatNumber(qty)} to ${whName}`}
         </Button>
       </div>
     </Modal>
@@ -339,22 +382,39 @@ function AddStockModal({
 
 function AdjustStockModal({
   product,
+  warehouses,
+  stockByWarehouse,
   onClose,
   onDone,
 }: {
   product: Product;
+  warehouses: Warehouse[];
+  stockByWarehouse: Record<string, Record<string, number>>;
   onClose: () => void;
   onDone: () => void;
 }) {
   const [pending, start] = useTransition();
-  const [quantity, setQuantity] = useState("-1");
+  const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? "");
+  const [mode, setMode] = useState<"add" | "remove">("remove");
+  const [amount, setAmount] = useState("1");
   const [note, setNote] = useState("");
 
+  const qty = Math.max(0, Number(amount) || 0);
+  const current = stockByWarehouse[product.id]?.[warehouseId] ?? 0;
+  const whName = warehouses.find((w) => w.id === warehouseId)?.name ?? "warehouse";
+  const next = mode === "add" ? current + qty : current - qty;
+  const tooMany = mode === "remove" && qty > current;
+
   function submit() {
+    if (!warehouseId) {
+      toast({ variant: "error", title: "Pick a warehouse first." });
+      return;
+    }
     start(async () => {
       const res = await adjustStock({
         productId: product.id,
-        quantity: Number(quantity),
+        quantity: mode === "add" ? qty : -qty,
+        warehouseId,
         note: note || undefined,
       });
       if (res.ok) {
@@ -371,29 +431,84 @@ function AdjustStockModal({
       open
       onClose={onClose}
       title={`Adjust stock · ${product.name}`}
-      description="Use a negative number to remove (damage, loss). Logged for audit."
+      description="Correct a count (recount, damage, loss). Logged for audit."
     >
       <div className="space-y-4">
         <div>
-          <Label>Adjustment (+/-)</Label>
+          <Label>Which warehouse?</Label>
+          <Select
+            value={warehouseId}
+            onChange={(e) => setWarehouseId(e.target.value)}
+            className="mt-1.5"
+          >
+            {warehouses.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name} — {formatNumber(stockByWarehouse[product.id]?.[w.id] ?? 0)} on hand
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted p-1">
+          {(["remove", "add"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={`rounded-lg py-2 text-sm font-medium capitalize transition-colors ${
+                mode === m
+                  ? m === "remove"
+                    ? "bg-destructive text-destructive-foreground shadow-sm"
+                    : "bg-success text-success-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {m === "remove" ? "Remove" : "Add"}
+            </button>
+          ))}
+        </div>
+
+        <div>
+          <Label>How many units?</Label>
           <Input
             type="number"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
+            min={1}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
             className="mt-1.5"
           />
         </div>
+
         <div>
           <Label>Reason</Label>
           <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Damaged in transit…"
+            placeholder={mode === "remove" ? "Damaged, lost, recount…" : "Found, recount…"}
             className="mt-1.5"
           />
         </div>
-        <Button className="w-full" onClick={submit} disabled={pending}>
-          {pending ? "Saving…" : "Apply adjustment"}
+
+        <div className="rounded-xl bg-muted/40 p-3 text-sm">
+          <span className="text-muted-foreground">{whName}: </span>
+          <span className="font-medium">{formatNumber(current)}</span>
+          <span className="text-muted-foreground"> → </span>
+          <span className={`font-semibold ${tooMany ? "text-destructive" : mode === "add" ? "text-success" : "text-warning"}`}>
+            {formatNumber(Math.max(0, next))}
+          </span>
+          {tooMany && (
+            <p className="mt-1 text-xs text-destructive">
+              Only {formatNumber(current)} on hand in {whName}.
+            </p>
+          )}
+        </div>
+
+        <Button className="w-full" onClick={submit} disabled={pending || qty < 1 || tooMany}>
+          {pending
+            ? "Saving…"
+            : mode === "add"
+              ? `Add ${formatNumber(qty)} to ${whName}`
+              : `Remove ${formatNumber(qty)} from ${whName}`}
         </Button>
       </div>
     </Modal>
