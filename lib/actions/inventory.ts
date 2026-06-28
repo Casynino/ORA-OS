@@ -6,7 +6,10 @@ import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { applyMovement } from "@/lib/services/inventory";
-import { addWarehouseStock } from "@/lib/services/warehouse-stock";
+import {
+  addWarehouseStock,
+  deductWarehouseStock,
+} from "@/lib/services/warehouse-stock";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 const addSchema = z.object({
@@ -99,6 +102,16 @@ export async function adjustStock(
       return fail("Adjustment would take warehouse stock below zero.");
     }
 
+    // A warehouse user adjusts their own location; an admin adjusts Main.
+    let warehouseName: string | null = null;
+    if (admin.role === "WAREHOUSE") {
+      const wu = await prisma.user.findUnique({
+        where: { id: admin.id },
+        select: { warehouse: { select: { name: true } } },
+      });
+      warehouseName = wu?.warehouse?.name ?? null;
+    }
+
     await prisma.$transaction(async (tx) => {
       await applyMovement(tx, {
         productId: parsed.data.productId,
@@ -107,6 +120,21 @@ export async function adjustStock(
         createdById: admin.id,
         note: parsed.data.note?.trim() || "Manual adjustment",
       });
+      // Keep the per-warehouse location ledger in lock-step so the two never
+      // drift (invariant: Σ WarehouseStock.onHand == Inventory.warehouseQty).
+      if (parsed.data.quantity > 0) {
+        await addWarehouseStock(tx, {
+          productId: parsed.data.productId,
+          quantity: parsed.data.quantity,
+          warehouseName,
+        });
+      } else {
+        await deductWarehouseStock(tx, {
+          productId: parsed.data.productId,
+          quantity: -parsed.data.quantity,
+          preferWarehouseName: warehouseName,
+        });
+      }
     });
 
     await logActivity({
@@ -119,6 +147,10 @@ export async function adjustStock(
     });
 
     revalidatePath("/admin/inventory");
+    revalidatePath("/admin");
+    revalidatePath("/admin/warehouses");
+    revalidatePath("/warehouse");
+    revalidatePath("/warehouse/inventory");
     return ok(undefined, "Stock adjusted.");
   } catch (e) {
     return fail(errorMessage(e));

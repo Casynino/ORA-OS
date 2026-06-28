@@ -137,6 +137,25 @@ async function main() {
   await prisma.inventory.update({ where: { productId: P("ORA-PURPLE-360") }, data: { warehouseQty: { decrement: 25 }, distributedQty: { increment: 25 } } });
   await prisma.stockMovement.create({ data: { productId: P("ORA-PURPLE-360"), type: "DISTRIBUTED", quantity: 25, requestId: fulfilled.id, reference: fulfilled.code, createdById: admin.id } });
 
+  // Mirror opening stock into the per-warehouse location ledger so the
+  // invariant holds from the start: Σ WarehouseStock.onHand == Inventory.warehouseQty
+  // (and reserved == assignedQty). All opening stock lands in the Main warehouse.
+  for (const pr of products) {
+    const i = await prisma.inventory.findUnique({ where: { productId: pr.id } });
+    if (!i) continue;
+    await prisma.warehouseStock.create({
+      data: {
+        warehouseId: mainWarehouse.id,
+        productId: pr.id,
+        onHand: i.warehouseQty,
+        reserved: i.assignedQty,
+        inTransit: 0,
+        minLevel: 40,
+        lastMoveAt: new Date(),
+      },
+    });
+  }
+
   await prisma.returnRequest.create({ data: { code: "RET-1001", productId: P("ORA-LINER-180"), requesterId: partner.id, quantity: 8, reason: "Surplus from a cancelled outreach.", status: "PENDING" } });
 
   await prisma.activityLog.createMany({
