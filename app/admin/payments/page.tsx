@@ -19,7 +19,8 @@ export default async function AdminPaymentsPage() {
     // Cash orders approved but awaiting payment confirmation (held from warehouse).
     prisma.request.findMany({
       where: { status: "APPROVED", paymentType: "IMMEDIATE", paymentStatus: "UNPAID" },
-      orderBy: { reviewedAt: "desc" },
+      // Customer-confirmed payments first (they need verifying), then by recency.
+      orderBy: [{ paymentClaimedAt: "desc" }, { reviewedAt: "desc" }],
       include: { requester: { select: { name: true, organization: true } } },
     }),
     // Partner-submitted credit repayments awaiting confirmation.
@@ -41,6 +42,7 @@ export default async function AdminPaymentsPage() {
     amount: o.totalAmount ?? 0,
     warehouse: o.warehouseName,
     whenISO: (o.reviewedAt ?? o.createdAt).toISOString(),
+    claimedISO: o.paymentClaimedAt ? o.paymentClaimedAt.toISOString() : null,
   }));
   const settlements = settlementRows.map((s) => ({
     id: s.id,

@@ -19,3 +19,22 @@ export const ORA_CONTACT = {
     "https://www.instagram.com/orapads.tz?igsh=MTNsZXlxNnJ2OWRzOQ%3D%3D&utm_source=qr",
   tiktok: "https://www.tiktok.com/@ora.sanitary.pads?_r=1&_t=ZS-97Z3mAfMBJk",
 } as const;
+
+/**
+ * Where partners send order payments. Shown on the order confirmation page.
+ * Sample details for now — replace with the real ORA accounts when ready.
+ */
+export const ORA_PAYMENT = {
+  mobileMoney: {
+    label: "Mobile money (M-Pesa / Tigo Pesa / Airtel Money)",
+    name: "ORA-Pads",
+    number: "+255 750 849 736",
+  },
+  bank: {
+    label: "Bank transfer",
+    bank: "CRDB Bank",
+    name: "ORA-Pads Ltd",
+    account: "0150 123 4567 00",
+  },
+  note: "Use your order number (e.g. REQ-XXXX) as the payment reference.",
+} as const;

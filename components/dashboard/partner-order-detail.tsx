@@ -17,8 +17,17 @@ import {
   PackageCheck,
   StickyNote,
   Receipt,
+  Smartphone,
+  Building2,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
-import { partnerUpdateOrder, cancelRequest } from "@/lib/actions/requests";
+import {
+  partnerUpdateOrder,
+  cancelRequest,
+  claimOrderPayment,
+} from "@/lib/actions/requests";
+import { ORA_PAYMENT } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +54,7 @@ export type POrderDTO = {
   status: string;
   paymentType: string;
   paymentStatus: string;
+  paymentClaimedAt: string | null;
   invoiceNo: string | null;
   totalAmount: number | null;
   note: string | null;
@@ -194,22 +204,13 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
         )}
       </div>
 
-      {/* Payment gate notice */}
+      {/* Payment panel (cash orders awaiting / under / confirmed payment) */}
       {order.status === "APPROVED" &&
         order.paymentType === "IMMEDIATE" &&
-        order.paymentStatus === "UNPAID" && (
-          <div className="flex items-start gap-2.5 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
-            <span className="mt-1.5 size-2 shrink-0 animate-pulse rounded-full bg-warning" />
-            <p>
-              <span className="font-semibold">Awaiting payment confirmation.</span>{" "}
-              Pay {order.totalAmount != null ? formatCurrency(order.totalAmount) : "the invoice"} and the ORA team
-              will confirm it — your order then moves to the warehouse for dispatch.
-            </p>
-          </div>
-        )}
+        order.paymentStatus === "UNPAID" && <PaymentPanel order={order} />}
       {order.paymentStatus === "PAID" && order.status !== "FULFILLED" && (
         <div className="flex items-start gap-2.5 rounded-xl border border-success/30 bg-success/10 p-3 text-sm text-success">
-          <span className="mt-1.5 size-2 shrink-0 rounded-full bg-success" />
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
           <p>
             <span className="font-semibold">Payment confirmed.</span> Your order has
             been released to the warehouse for dispatch.
@@ -448,6 +449,108 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Order confirmation + payment panel for an approved cash order. */
+function PaymentPanel({ order }: { order: POrderDTO }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const claimed = !!order.paymentClaimedAt;
+  const amount =
+    order.totalAmount != null ? formatCurrency(order.totalAmount) : "the invoice total";
+
+  function claim() {
+    start(async () => {
+      const res = await claimOrderPayment(order.id);
+      if (res.ok) {
+        toast({ variant: "success", title: res.message });
+        router.refresh();
+      } else {
+        toast({ variant: "error", title: res.error });
+      }
+    });
+  }
+
+  return (
+    <div
+      className={cn(
+        "rounded-2xl border p-5 shadow-soft",
+        claimed
+          ? "border-info/30 bg-info/5"
+          : "border-warning/30 bg-warning/5",
+      )}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Receipt className="size-5 text-primary" />
+          <h2 className="font-display text-lg font-semibold">
+            {claimed ? "Payment under review" : "Complete your payment"}
+          </h2>
+        </div>
+        {order.totalAmount != null && (
+          <span className="font-display text-xl font-bold text-primary">
+            {formatCurrency(order.totalAmount)}
+          </span>
+        )}
+      </div>
+
+      {claimed ? (
+        <p className="mt-2 flex items-center gap-2 text-sm text-info">
+          <Clock className="size-4 shrink-0" />
+          We&apos;ve received your confirmation — the ORA team is verifying your
+          payment. Once confirmed, your order is released to the warehouse.
+        </p>
+      ) : (
+        <>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Pay {amount} using any option below, then tap{" "}
+            <span className="font-medium text-foreground">
+              &ldquo;I have made payment&rdquo;
+            </span>
+            . The ORA team confirms it and your order moves to the warehouse.
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-border bg-card p-3.5">
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                <Smartphone className="size-4 text-primary" /> Mobile money
+              </p>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {ORA_PAYMENT.mobileMoney.label}
+              </p>
+              <p className="mt-1 text-sm">
+                {ORA_PAYMENT.mobileMoney.name} ·{" "}
+                <span className="font-medium">
+                  {ORA_PAYMENT.mobileMoney.number}
+                </span>
+              </p>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-3.5">
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                <Building2 className="size-4 text-primary" /> Bank transfer
+              </p>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {ORA_PAYMENT.bank.bank}
+              </p>
+              <p className="mt-1 text-sm">
+                {ORA_PAYMENT.bank.name} ·{" "}
+                <span className="font-medium">{ORA_PAYMENT.bank.account}</span>
+              </p>
+            </div>
+          </div>
+
+          <p className="mt-3 text-xs text-muted-foreground">
+            {ORA_PAYMENT.note.replace("REQ-XXXX", order.code)}
+          </p>
+
+          <Button className="mt-4 w-full" onClick={claim} disabled={pending}>
+            <CheckCircle2 className="size-4" />
+            {pending ? "Submitting…" : "I have made payment"}
+          </Button>
+        </>
+      )}
     </div>
   );
 }

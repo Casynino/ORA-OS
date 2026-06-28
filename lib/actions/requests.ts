@@ -48,7 +48,7 @@ const createSchema = z.object({
 
 export async function createRequest(
   input: z.infer<typeof createSchema>,
-): Promise<ActionResult<{ code: string }>> {
+): Promise<ActionResult<{ code: string; id: string }>> {
   try {
     const actor = await requireActor(["PARTNER"]);
     const parsed = createSchema.safeParse(input);
@@ -150,7 +150,7 @@ export async function createRequest(
     });
 
     revalidateAll();
-    return ok({ code: request.code }, "Request submitted for admin review.");
+    return ok({ code: request.code, id: request.id }, "Request submitted for admin review.");
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -982,6 +982,47 @@ export async function rejectOrderPayment(
     revalidateAll();
     revalidatePath("/admin/payments");
     return ok(undefined, `Payment rejected — ${request.code} returned for review.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+// Partner presses "I have made payment" on an approved cash order. This records
+// the claim (awaiting admin verification) — it does NOT release the order; an
+// admin must still confirm the payment.
+export async function claimOrderPayment(
+  requestId: string,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["PARTNER"]);
+    const request = await prisma.request.findUnique({
+      where: { id: requestId },
+    });
+    if (!request || request.requesterId !== actor.id) {
+      return fail("Order not found.");
+    }
+    if (request.paymentType !== "IMMEDIATE") {
+      return fail("This is a credit order — no payment is due upfront.");
+    }
+    if (request.status !== "APPROVED" || request.paymentStatus !== "UNPAID") {
+      return fail("This order isn't awaiting your payment right now.");
+    }
+
+    await prisma.request.update({
+      where: { id: request.id },
+      data: { paymentClaimedAt: new Date() },
+    });
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "PAYMENT_CLAIMED",
+      entity: "Request",
+      entityId: request.id,
+      summary: `${actor.name} marked ${request.code} as paid — awaiting ORA verification.`,
+    });
+    revalidateAll();
+    revalidatePath("/admin/payments");
+    return ok(undefined, "Thanks — we'll confirm your payment shortly.");
   } catch (e) {
     return fail(errorMessage(e));
   }

@@ -119,7 +119,10 @@ export function PartnerCatalogue({
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
-        router.push("/partner/requests");
+        // Land on the order's confirmation page (with payment instructions).
+        router.push(
+          res.data ? `/partner/requests/${res.data.id}` : "/partner/requests",
+        );
         router.refresh();
       } else {
         toast({ variant: "error", title: res.error });

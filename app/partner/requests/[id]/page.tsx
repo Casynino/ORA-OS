@@ -45,6 +45,7 @@ export default async function PartnerOrderPage({
     status: r.status,
     paymentType: r.paymentType,
     paymentStatus: r.paymentStatus,
+    paymentClaimedAt: r.paymentClaimedAt ? r.paymentClaimedAt.toISOString() : null,
     invoiceNo: r.invoiceNo,
     totalAmount: r.totalAmount,
     note: r.note,
