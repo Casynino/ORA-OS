@@ -12,13 +12,13 @@ import {
   Plus,
   Trash2,
   Send,
-  Search,
   ClipboardCheck,
   PackageCheck,
   StickyNote,
   Receipt,
   Smartphone,
   Building2,
+  CreditCard,
   CheckCircle2,
   Clock,
 } from "lucide-react";
@@ -69,17 +69,6 @@ export type POrderDTO = {
   catalog: CatalogItem[];
   warehouses: Warehouse[];
 };
-
-const STEPS = [
-  { icon: Send, label: "Submitted" },
-  { icon: Search, label: "ORA review" },
-  { icon: ClipboardCheck, label: "Approved" },
-  { icon: Truck, label: "In transit" },
-  { icon: PackageCheck, label: "Delivered" },
-];
-function stepIndex(s: string) {
-  return s === "PENDING" ? 0 : s === "PRICED" ? 1 : s === "APPROVED" ? 2 : s === "IN_TRANSIT" ? 3 : s === "FULFILLED" ? 4 : 0;
-}
 
 const TONE_VARIANT: Record<
   CustomerTone,
@@ -174,7 +163,6 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
     });
   }
 
-  const active = stepIndex(order.status);
   const cs = customerOrderStatus(order);
   // The payment panel carries its own messaging for awaiting/verifying cash.
   const showStatusMessage = !(
@@ -182,6 +170,35 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
     order.paymentType === "IMMEDIATE" &&
     order.paymentStatus === "UNPAID"
   );
+
+  // Customer journey — only stages that are actually complete are filled in.
+  const isCredit = order.paymentType === "CREDIT";
+  const journey = [
+    { icon: Send, label: "Submitted" },
+    {
+      icon: isCredit ? CreditCard : Receipt,
+      label: isCredit ? "Credit approval" : "Payment",
+    },
+    { icon: ClipboardCheck, label: "Confirmed" },
+    { icon: Truck, label: "In transit" },
+    { icon: PackageCheck, label: "Delivered" },
+  ];
+  // How far the order has genuinely progressed (last *completed* stage).
+  const doneThrough =
+    cs.key === "delivered"
+      ? 4
+      : cs.key === "transit"
+        ? 3
+        : cs.key === "confirmed"
+          ? 2
+          : 0; // submitted / awaiting payment / awaiting credit → only "Submitted"
+  // The stage currently in progress (pulses); -1 when nothing is pending.
+  const currentStage =
+    cs.key === "awaiting_payment" ||
+    cs.key === "verifying" ||
+    cs.key === "credit_review"
+      ? 1
+      : -1;
 
   return (
     <div className="space-y-6">
@@ -246,26 +263,37 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
         </div>
       )}
 
-      {/* Timeline */}
+      {/* Timeline — only completed stages are filled; the pending one pulses */}
       <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
         <ol className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-2">
-          {STEPS.map((s, i) => (
-            <li key={s.label} className="flex items-center gap-3 sm:flex-1 sm:flex-col sm:text-center">
-              <span
-                className={cn(
-                  "flex size-10 shrink-0 items-center justify-center rounded-full",
-                  i <= active
-                    ? "bg-gradient-to-br from-primary to-accent text-white shadow-glow"
-                    : "bg-muted text-muted-foreground",
-                )}
-              >
-                <s.icon className="size-5" />
-              </span>
-              <span className={cn("text-sm font-medium sm:mt-1", i <= active ? "" : "text-muted-foreground")}>
-                {s.label}
-              </span>
-            </li>
-          ))}
+          {journey.map((s, i) => {
+            const done = i <= doneThrough;
+            const current = i === currentStage;
+            return (
+              <li key={s.label} className="flex items-center gap-3 sm:flex-1 sm:flex-col sm:text-center">
+                <span
+                  className={cn(
+                    "flex size-10 shrink-0 items-center justify-center rounded-full",
+                    done
+                      ? "bg-gradient-to-br from-primary to-accent text-white shadow-glow"
+                      : current
+                        ? "animate-pulse bg-warning/15 text-warning ring-2 ring-warning/40"
+                        : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  <s.icon className="size-5" />
+                </span>
+                <span
+                  className={cn(
+                    "text-sm font-medium sm:mt-1",
+                    done ? "" : current ? "text-warning" : "text-muted-foreground",
+                  )}
+                >
+                  {s.label}
+                </span>
+              </li>
+            );
+          })}
         </ol>
       </div>
 

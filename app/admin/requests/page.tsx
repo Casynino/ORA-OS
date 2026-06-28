@@ -44,6 +44,8 @@ export default async function AdminRequestsPage() {
     type: r.type,
     status: r.status,
     paymentType: r.paymentType,
+    paymentStatus: r.paymentStatus,
+    paymentClaimedAt: r.paymentClaimedAt ? r.paymentClaimedAt.toISOString() : null,
     requesterName: r.requester.name,
     requesterOrg: r.requester.organization,
     requesterRole: r.requester.role,

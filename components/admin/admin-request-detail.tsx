@@ -29,6 +29,8 @@ import {
   rejectRequest,
   fulfillRequest,
   dispatchOrder,
+  confirmOrderPayment,
+  rejectOrderPayment,
 } from "@/lib/actions/requests";
 import { ActionButton } from "@/components/dashboard/action-button";
 import { Button } from "@/components/ui/button";
@@ -56,6 +58,7 @@ export type DetailDTO = {
   status: string;
   paymentType: string;
   paymentStatus: string;
+  paymentClaimedAt: string | null;
   invoiceNo: string | null;
   deliveredAt: string | null;
   discount: number;
@@ -120,10 +123,20 @@ export function AdminRequestDetail({ request }: { request: DetailDTO }) {
   const [pending, start] = useTransition();
 
   const editable = request.status === "PENDING" || request.status === "PRICED";
-  // Prices are pre-agreed, so an order can be approved straight from submission.
-  const canApprove = request.status === "PENDING" || request.status === "PRICED";
+  const isCredit = request.paymentType === "CREDIT";
+  // Credit orders are approved here (credit-approval step); prices are pre-agreed.
+  const canApprove =
+    (request.status === "PENDING" || request.status === "PRICED") && isCredit;
   const canReject = ["PENDING", "PRICED"].includes(request.status);
-  const canDispatch = request.status === "APPROVED";
+  // Cash order awaiting the admin's payment confirmation — confirmed right here.
+  const canConfirmPayment =
+    request.status === "APPROVED" &&
+    request.paymentType === "IMMEDIATE" &&
+    request.paymentStatus === "UNPAID";
+  const customerClaimedPayment = !!request.paymentClaimedAt;
+  // Dispatch only once payment is cleared (cash PAID or credit OUTSTANDING).
+  const canDispatch =
+    request.status === "APPROVED" && request.paymentStatus !== "UNPAID";
   const canDeliver = request.status === "IN_TRANSIT";
 
   const catalogById = useMemo(
@@ -523,10 +536,65 @@ export function AdminRequestDetail({ request }: { request: DetailDTO }) {
           </section>
 
           {/* Actions */}
-          {(canApprove || canReject || canDispatch || canDeliver) && (
+          {(canApprove || canReject || canConfirmPayment || canDispatch || canDeliver) && (
             <section className="rounded-2xl border border-border bg-card p-5 shadow-soft">
               <h2 className="font-semibold">Actions</h2>
+
+              {canConfirmPayment && (
+                <div
+                  className={cn(
+                    "mt-3 flex items-start gap-2.5 rounded-xl border p-3 text-sm",
+                    customerClaimedPayment
+                      ? "border-success/30 bg-success/10 text-success"
+                      : "border-warning/30 bg-warning/10 text-warning",
+                  )}
+                >
+                  <Receipt className="mt-0.5 size-4 shrink-0" />
+                  <p>
+                    {customerClaimedPayment ? (
+                      <>
+                        <span className="font-semibold">Customer marked this paid</span>{" "}
+                        {request.paymentClaimedAt
+                          ? `on ${formatDateTime(request.paymentClaimedAt)}`
+                          : ""}{" "}
+                        — verify and confirm to release it to the warehouse.
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-semibold">Awaiting the customer&apos;s payment.</span>{" "}
+                        You can still confirm here once you&apos;ve received it.
+                      </>
+                    )}
+                  </p>
+                </div>
+              )}
+
               <div className="mt-3 space-y-2">
+                {canConfirmPayment && (
+                  <>
+                    <ActionButton
+                      className="w-full"
+                      variant="success"
+                      action={() => confirmOrderPayment(request.id, "Cash collected")}
+                      onDone={(res) => res.ok && router.refresh()}
+                      pendingText="Confirming…"
+                    >
+                      <Check className="size-4" />
+                      Confirm payment
+                    </ActionButton>
+                    <ActionButton
+                      className="w-full text-destructive hover:bg-destructive/10"
+                      variant="outline"
+                      confirm={`Reject payment for ${request.code}? It returns to review.`}
+                      action={() => rejectOrderPayment(request.id)}
+                      onDone={(res) => res.ok && router.refresh()}
+                      pendingText="Rejecting…"
+                    >
+                      <X className="size-4" />
+                      Reject payment
+                    </ActionButton>
+                  </>
+                )}
                 {canApprove && (
                   <ActionButton
                     className="w-full"
@@ -536,7 +604,7 @@ export function AdminRequestDetail({ request }: { request: DetailDTO }) {
                     pendingText="Approving…"
                   >
                     <Check className="size-4" />
-                    Approve & invoice
+                    Approve credit &amp; release
                   </ActionButton>
                 )}
                 {canDispatch && (
@@ -570,18 +638,20 @@ export function AdminRequestDetail({ request }: { request: DetailDTO }) {
                     className="w-full text-destructive hover:bg-destructive/10"
                   >
                     <X className="size-4" />
-                    Reject request
+                    Reject order
                   </Button>
                 )}
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
-                {canApprove
-                  ? "Approving locks pricing, generates an invoice and assigns the order to its warehouse — no stock moves yet."
-                  : canDispatch
-                    ? "The assigned warehouse normally accepts & dispatches; you can dispatch here too. No stock moves until delivery."
-                    : canDeliver
-                      ? "Confirming delivery deducts stock and records payment (cash = paid, credit = outstanding)."
-                      : ""}
+                {canConfirmPayment
+                  ? "Confirming payment releases this order to the warehouse for dispatch — no stock moves until delivery."
+                  : canApprove
+                    ? "Approving the credit releases this order to the warehouse — no stock moves yet."
+                    : canDispatch
+                      ? "The assigned warehouse normally accepts & dispatches; you can dispatch here too. No stock moves until delivery."
+                      : canDeliver
+                        ? "Confirming delivery deducts stock and records payment (cash = paid, credit = outstanding)."
+                        : ""}
               </p>
             </section>
           )}

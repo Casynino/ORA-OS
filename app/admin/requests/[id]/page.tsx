@@ -61,6 +61,7 @@ export default async function AdminRequestDetailPage({
     status: r.status,
     paymentType: r.paymentType,
     paymentStatus: r.paymentStatus,
+    paymentClaimedAt: r.paymentClaimedAt ? r.paymentClaimedAt.toISOString() : null,
     invoiceNo: r.invoiceNo,
     deliveredAt: r.deliveredAt ? r.deliveredAt.toISOString() : null,
     discount: r.discount,

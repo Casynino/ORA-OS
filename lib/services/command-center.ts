@@ -194,8 +194,9 @@ export async function getCommandCenter() {
     }),
   ]);
 
-  // Everything awaiting a money confirmation lives on /admin/payments.
-  const pendingPayments = pendingCashPayments + pendingSettlements;
+  // Cash orders awaiting the admin's payment confirmation (handled inside the
+  // order). Credit repayments are confirmed on the Settlements page.
+  const pendingPayments = pendingCashPayments;
 
   // ── Inventory location ─────────────────────────────────────────
   const warehouseUnits = inventoryAgg._sum.warehouseQty ?? 0;
@@ -345,7 +346,9 @@ export async function getCommandCenter() {
   if (pendingApprovals > 0)
     alerts.push({ tone: "warning", text: `${pendingApprovals} order${pendingApprovals === 1 ? "" : "s"} awaiting approval`, href: "/admin/requests" });
   if (pendingPayments > 0)
-    alerts.push({ tone: "warning", text: `${pendingPayments} payment${pendingPayments === 1 ? "" : "s"} to confirm`, href: "/admin/payments" });
+    alerts.push({ tone: "warning", text: `${pendingPayments} order payment${pendingPayments === 1 ? "" : "s"} to confirm`, href: "/admin/requests" });
+  if (pendingSettlements > 0)
+    alerts.push({ tone: "info", text: `${pendingSettlements} credit repayment${pendingSettlements === 1 ? "" : "s"} to confirm`, href: "/admin/credit" });
   if (pendingApplications > 0)
     alerts.push({ tone: "info", text: `${pendingApplications} new partner application${pendingApplications === 1 ? "" : "s"}`, href: "/admin/users" });
   if (overdueCount > 0)

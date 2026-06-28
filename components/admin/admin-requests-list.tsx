@@ -5,9 +5,20 @@ import { useRouter } from "next/navigation";
 import { Search, ChevronRight, Inbox } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { customerOrderStatus, type CustomerTone } from "@/lib/order-status";
 import { cn, formatCurrency, formatDateTime, humanize } from "@/lib/utils";
+
+const TONE_VARIANT: Record<
+  CustomerTone,
+  "success" | "warning" | "destructive" | "accent" | "secondary"
+> = {
+  success: "success",
+  warning: "warning",
+  danger: "destructive",
+  info: "accent",
+  muted: "secondary",
+};
 
 type Item = {
   id: string;
@@ -23,6 +34,8 @@ export type RequestDTO = {
   type: string;
   status: string;
   paymentType: string;
+  paymentStatus: string;
+  paymentClaimedAt: string | null;
   requesterName: string;
   requesterOrg: string | null;
   requesterRole: string;
@@ -168,7 +181,7 @@ export function AdminRequestsList({ requests }: { requests: RequestDTO[] }) {
                           : "—"}
                       </td>
                       <td data-label="Status" className="px-4 py-3">
-                        <StatusBadge status={r.status} />
+                        {(() => { const cs = customerOrderStatus(r); return <Badge variant={TONE_VARIANT[cs.tone]}>{cs.label}</Badge>; })()}
                       </td>
                       <td data-label="Date" className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                         {formatDateTime(r.createdAt)}
