@@ -12,6 +12,7 @@ import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 function revalidateSettlements() {
   revalidatePath("/partner/credit");
   revalidatePath("/admin/credit");
+  revalidatePath("/admin/payments");
   revalidatePath("/admin");
 }
 
