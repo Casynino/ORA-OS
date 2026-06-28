@@ -140,6 +140,7 @@ model User {
   businessLicense  String? // licence number
   taxId            String? // TIN / tax number
   paymentTerms     String? // admin-set terms, e.g. "Net 30"
+  assignedWarehouse String? // partner's fulfilling warehouse (admin-set, denormalised name); orders default here, hidden from the customer
   warehouse    Warehouse? @relation("WarehouseStaff", fields: [warehouseId], references: [id])
   warehouseId  String? // for WAREHOUSE staff — the warehouse they operate
   position     String? // job title for warehouse staff, e.g. "Stock Controller"

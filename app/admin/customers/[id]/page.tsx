@@ -47,7 +47,7 @@ export default async function CustomerProfilePage({
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user || user.role !== "PARTNER") notFound();
 
-  const [creditAccounts, requests, returns, messages, activity] =
+  const [creditAccounts, requests, returns, messages, activity, warehouses] =
     await Promise.all([
       prisma.creditAccount.findMany({
         where: { agentId: id },
@@ -75,6 +75,11 @@ export default async function CustomerProfilePage({
         where: { OR: [{ entityId: id }, { actorId: id }] },
         orderBy: { createdAt: "desc" },
         take: 40,
+      }),
+      prisma.warehouse.findMany({
+        where: { isActive: true },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
       }),
     ]);
 
@@ -188,6 +193,7 @@ export default async function CustomerProfilePage({
           </p>
         </div>
         <CustomerActions
+          warehouses={warehouses}
           customer={{
             id: user.id,
             name: user.name,
@@ -199,6 +205,7 @@ export default async function CustomerProfilePage({
             region: user.region,
             preferredPayment: user.preferredPayment,
             paymentTerms: user.paymentTerms,
+            assignedWarehouse: user.assignedWarehouse,
             notes: user.notes,
             creditLimit: user.creditLimit,
             status: user.status,
@@ -234,6 +241,7 @@ export default async function CustomerProfilePage({
               <Row icon={MapPin} label="Address / location" value={user.location ?? "—"} />
               <Row icon={MapPin} label="Region" value={user.region ?? "—"} />
               <Row icon={Building2} label="Partner type" value={user.businessType ?? "—"} />
+              <Row icon={Package} label="Fulfilling warehouse" value={user.assignedWarehouse ?? "Main warehouse (default)"} />
               <Row icon={CalendarDays} label="Registered" value={formatDate(user.createdAt)} />
               <Row icon={ActivityIcon} label="Status" value={humanize(user.status)} />
             </dl>

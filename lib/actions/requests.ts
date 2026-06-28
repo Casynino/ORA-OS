@@ -43,7 +43,9 @@ const createSchema = z.object({
   contactName: z.string().max(120).optional(),
   contactPhone: z.string().max(40).optional(),
   deliverBy: z.string().max(40).optional(), // ISO date string
-  warehouseName: z.string().max(120).optional(),
+  // Save the edited delivery address/phone back to the partner's profile.
+  saveDelivery: z.boolean().optional(),
+  // (warehouse is resolved server-side — the customer never chooses one)
 });
 
 export async function createRequest(
@@ -87,20 +89,20 @@ export async function createRequest(
     });
     const totalAmount = itemData.reduce((s, i) => s + i.lineTotal, 0);
 
+    // Fetch the partner once — their assigned (fulfilling) warehouse + credit ceiling.
+    const me = await prisma.user.findUnique({
+      where: { id: actor.id },
+      select: { creditLimit: true, assignedWarehouse: true },
+    });
+
     // ── Credit-control rule: pay-later is a controlled loan tied to stock. ──
     // A partner cannot take new credit while a balance is overdue, and the new
     // order must fit inside their remaining credit availability.
     if (paymentType === "CREDIT") {
-      const [me, openAccounts] = await Promise.all([
-        prisma.user.findUnique({
-          where: { id: actor.id },
-          select: { creditLimit: true },
-        }),
-        prisma.creditAccount.findMany({
-          where: { agentId: actor.id, status: { not: "SETTLED" } },
-          select: { principal: true, amountPaid: true, status: true },
-        }),
-      ]);
+      const openAccounts = await prisma.creditAccount.findMany({
+        where: { agentId: actor.id, status: { not: "SETTLED" } },
+        select: { principal: true, amountPaid: true, status: true },
+      });
       // One active credit at a time: a partner must finish (settle) their
       // current credit cycle before a new pay-later order is allowed.
       if (openAccounts.length > 0) {
@@ -117,6 +119,41 @@ export async function createRequest(
           `This pay-later order (${formatCurrency(totalAmount)}) is over your credit limit of ${formatCurrency(available)}. Pay down to a lower amount or choose immediate payment.`,
         );
       }
+    }
+
+    // Resolve the fulfilling warehouse server-side — customers never choose one.
+    // Use the partner's assigned warehouse, else the Main warehouse, else any.
+    let warehouseName = me?.assignedWarehouse?.trim() || null;
+    if (!warehouseName) {
+      const main =
+        (await prisma.warehouse.findFirst({
+          where: { name: { contains: "Main" } },
+          orderBy: { createdAt: "asc" },
+          select: { name: true },
+        })) ??
+        (await prisma.warehouse.findFirst({
+          orderBy: { createdAt: "asc" },
+          select: { name: true },
+        }));
+      warehouseName = main?.name ?? null;
+    }
+
+    // Optionally save the edited delivery details back to the partner's profile.
+    if (
+      parsed.data.saveDelivery &&
+      (parsed.data.deliveryAddress || parsed.data.contactPhone)
+    ) {
+      await prisma.user.update({
+        where: { id: actor.id },
+        data: {
+          ...(parsed.data.deliveryAddress
+            ? { location: parsed.data.deliveryAddress.trim() }
+            : {}),
+          ...(parsed.data.contactPhone
+            ? { phone: parsed.data.contactPhone.trim() }
+            : {}),
+        },
+      });
     }
 
     // Prices are pre-agreed per partner, so there's no pricing/approval stage:
@@ -140,7 +177,7 @@ export async function createRequest(
         contactName: parsed.data.contactName?.trim() || null,
         contactPhone: parsed.data.contactPhone?.trim() || null,
         deliverBy: parsed.data.deliverBy ? new Date(parsed.data.deliverBy) : null,
-        warehouseName: parsed.data.warehouseName?.trim() || null,
+        warehouseName,
         totalAmount,
         items: {
           create: itemData,
