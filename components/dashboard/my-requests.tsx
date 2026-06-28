@@ -6,7 +6,7 @@ import { ClipboardList, Pencil, Search, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { customerOrderStatus, type CustomerTone } from "@/lib/order-status";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
@@ -17,6 +17,17 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { formatCurrency, formatDateTime, formatNumber, humanize } from "@/lib/utils";
+
+const TONE_VARIANT: Record<
+  CustomerTone,
+  "success" | "warning" | "destructive" | "accent" | "secondary"
+> = {
+  success: "success",
+  warning: "warning",
+  danger: "destructive",
+  info: "accent",
+  muted: "secondary",
+};
 
 type Item = {
   name: string;
@@ -29,6 +40,8 @@ export type MyRequestDTO = {
   code: string;
   status: string;
   paymentType: string;
+  paymentStatus: string;
+  paymentClaimedAt: string | null;
   note: string | null;
   adminNote: string | null;
   totalAmount: number | null;
@@ -139,7 +152,7 @@ export function MyRequests({ requests }: { requests: MyRequestDTO[] }) {
                           <Pencil className="size-3.5 text-warning" />
                         )}
                       </span>
-                      <StatusBadge status={r.status} />
+                      {(() => { const cs = customerOrderStatus(r); return <Badge variant={TONE_VARIANT[cs.tone]}>{cs.label}</Badge>; })()}
                     </div>
                     <p className="truncate text-sm">
                       {r.items[0]?.name}
@@ -244,7 +257,7 @@ export function MyRequests({ requests }: { requests: MyRequestDTO[] }) {
                           : "—"}
                       </TableCell>
                       <TableCell>
-                        <StatusBadge status={r.status} />
+                        {(() => { const cs = customerOrderStatus(r); return <Badge variant={TONE_VARIANT[cs.tone]}>{cs.label}</Badge>; })()}
                       </TableCell>
                       <TableCell className="text-right">
                         <ChevronRight className="ml-auto size-4 text-muted-foreground" />

@@ -28,6 +28,7 @@ import {
   claimOrderPayment,
 } from "@/lib/actions/requests";
 import { ORA_PAYMENT } from "@/lib/constants";
+import { customerOrderStatus, type CustomerTone } from "@/lib/order-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,6 +80,17 @@ const STEPS = [
 function stepIndex(s: string) {
   return s === "PENDING" ? 0 : s === "PRICED" ? 1 : s === "APPROVED" ? 2 : s === "IN_TRANSIT" ? 3 : s === "FULFILLED" ? 4 : 0;
 }
+
+const TONE_VARIANT: Record<
+  CustomerTone,
+  "success" | "warning" | "destructive" | "accent" | "secondary"
+> = {
+  success: "success",
+  warning: "warning",
+  danger: "destructive",
+  info: "accent",
+  muted: "secondary",
+};
 
 type Line = { productId: string; name: string; sku: string; qty: string; price: number };
 
@@ -163,6 +175,13 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
   }
 
   const active = stepIndex(order.status);
+  const cs = customerOrderStatus(order);
+  // The payment panel carries its own messaging for awaiting/verifying cash.
+  const showStatusMessage = !(
+    order.status === "APPROVED" &&
+    order.paymentType === "IMMEDIATE" &&
+    order.paymentStatus === "UNPAID"
+  );
 
   return (
     <div className="space-y-6">
@@ -181,13 +200,10 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
             <h1 className="font-display text-3xl font-bold tracking-tight">
               {order.code}
             </h1>
-            <StatusBadge status={order.status} />
+            <Badge variant={TONE_VARIANT[cs.tone]}>{cs.label}</Badge>
             <Badge variant={order.paymentType === "CREDIT" ? "accent" : "secondary"}>
               {humanize(order.paymentType)}
             </Badge>
-            {order.paymentStatus !== "UNPAID" && (
-              <StatusBadge status={order.paymentStatus} />
-            )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             Placed {formatDateTime(order.createdAt)}
@@ -204,17 +220,29 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
         )}
       </div>
 
-      {/* Payment panel (cash orders awaiting / under / confirmed payment) */}
+      {/* Payment panel (cash orders awaiting / under payment) */}
       {order.status === "APPROVED" &&
         order.paymentType === "IMMEDIATE" &&
         order.paymentStatus === "UNPAID" && <PaymentPanel order={order} />}
-      {order.paymentStatus === "PAID" && order.status !== "FULFILLED" && (
-        <div className="flex items-start gap-2.5 rounded-xl border border-success/30 bg-success/10 p-3 text-sm text-success">
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-          <p>
-            <span className="font-semibold">Payment confirmed.</span> Your order has
-            been released to the warehouse for dispatch.
-          </p>
+
+      {/* Friendly status message for every other stage */}
+      {showStatusMessage && (
+        <div
+          className={cn(
+            "flex items-start gap-2.5 rounded-xl border p-3 text-sm",
+            cs.tone === "success" && "border-success/30 bg-success/10 text-success",
+            cs.tone === "warning" && "border-warning/30 bg-warning/10 text-warning",
+            cs.tone === "danger" && "border-destructive/30 bg-destructive/10 text-destructive",
+            cs.tone === "info" && "border-accent/30 bg-accent/10 text-accent",
+            cs.tone === "muted" && "border-border bg-muted/40 text-muted-foreground",
+          )}
+        >
+          {cs.tone === "success" ? (
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+          ) : (
+            <Clock className="mt-0.5 size-4 shrink-0" />
+          )}
+          <p>{cs.message}</p>
         </div>
       )}
 

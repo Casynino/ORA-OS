@@ -120,7 +120,8 @@ export function AdminRequestDetail({ request }: { request: DetailDTO }) {
   const [pending, start] = useTransition();
 
   const editable = request.status === "PENDING" || request.status === "PRICED";
-  const canApprove = request.status === "PRICED";
+  // Prices are pre-agreed, so an order can be approved straight from submission.
+  const canApprove = request.status === "PENDING" || request.status === "PRICED";
   const canReject = ["PENDING", "PRICED"].includes(request.status);
   const canDispatch = request.status === "APPROVED";
   const canDeliver = request.status === "IN_TRANSIT";
