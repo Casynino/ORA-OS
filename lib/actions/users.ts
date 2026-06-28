@@ -400,3 +400,118 @@ export async function requestApplicationInfo(
     return fail(errorMessage(e));
   }
 }
+
+// ── Customer profile management ─────────────────────────────────────────────
+
+const updateCustomerSchema = z.object({
+  userId: z.string().min(1),
+  name: z.string().min(2).max(120),
+  email: z.string().email(),
+  phone: z.string().max(40).optional().or(z.literal("")),
+  organization: z.string().max(160).optional().or(z.literal("")),
+  businessType: z.string().max(60).optional().or(z.literal("")),
+  location: z.string().max(160).optional().or(z.literal("")),
+  region: z.string().max(120).optional().or(z.literal("")),
+  preferredPayment: z.string().max(40).optional().or(z.literal("")),
+  paymentTerms: z.string().max(60).optional().or(z.literal("")),
+  notes: z.string().max(2000).optional().or(z.literal("")),
+});
+
+/** Edit a customer/partner's business profile fields. */
+export async function updateCustomer(
+  input: z.infer<typeof updateCustomerSchema>,
+): Promise<ActionResult> {
+  try {
+    const admin = await requireActor(["ADMIN"]);
+    const parsed = updateCustomerSchema.safeParse(input);
+    if (!parsed.success) {
+      return fail(parsed.error.issues[0]?.message ?? "Invalid details.");
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: parsed.data.userId },
+    });
+    if (!user) return fail("Customer not found.");
+
+    // Guard against email collisions with another account.
+    if (parsed.data.email.toLowerCase() !== user.email.toLowerCase()) {
+      const clash = await prisma.user.findUnique({
+        where: { email: parsed.data.email.toLowerCase() },
+        select: { id: true },
+      });
+      if (clash && clash.id !== user.id) {
+        return fail("That email is already in use by another account.");
+      }
+    }
+
+    const blank = (v?: string) => (v && v.trim() ? v.trim() : null);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        name: parsed.data.name.trim(),
+        email: parsed.data.email.toLowerCase().trim(),
+        phone: blank(parsed.data.phone),
+        organization: blank(parsed.data.organization),
+        businessType: blank(parsed.data.businessType),
+        location: blank(parsed.data.location),
+        region: blank(parsed.data.region),
+        preferredPayment: blank(parsed.data.preferredPayment),
+        paymentTerms: blank(parsed.data.paymentTerms),
+        notes: blank(parsed.data.notes),
+      },
+    });
+    await logActivity({
+      actorId: admin.id,
+      actorName: admin.name,
+      action: "CUSTOMER_UPDATED",
+      entity: "User",
+      entityId: user.id,
+      summary: `${admin.name} updated ${parsed.data.name.trim()}'s profile.`,
+    });
+    revalidatePath("/admin/customers");
+    revalidatePath(`/admin/customers/${user.id}`);
+    revalidatePath("/admin/users");
+    return ok(undefined, "Customer profile updated.");
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+const resetPwSchema = z.object({
+  userId: z.string().min(1),
+  password: z.string().min(8, "Password must be at least 8 characters."),
+});
+
+/** Set a new password for a customer/partner account. */
+export async function resetPartnerPassword(
+  input: z.infer<typeof resetPwSchema>,
+): Promise<ActionResult> {
+  try {
+    const admin = await requireActor(["ADMIN"]);
+    const parsed = resetPwSchema.safeParse(input);
+    if (!parsed.success) {
+      return fail(parsed.error.issues[0]?.message ?? "Invalid password.");
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: parsed.data.userId },
+      select: { id: true, name: true },
+    });
+    if (!user) return fail("Customer not found.");
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: bcrypt.hashSync(parsed.data.password, 10) },
+    });
+    await logActivity({
+      actorId: admin.id,
+      actorName: admin.name,
+      action: "PASSWORD_RESET",
+      entity: "User",
+      entityId: user.id,
+      summary: `${admin.name} reset the password for ${user.name}.`,
+    });
+    revalidatePath(`/admin/customers/${user.id}`);
+    return ok(undefined, `Password updated for ${user.name}.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
