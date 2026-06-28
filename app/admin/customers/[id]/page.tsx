@@ -100,7 +100,17 @@ export default async function CustomerProfilePage({
   );
   const totalPaid = allPayments.reduce((s, p) => s + p.amount, 0);
   const fulfilled = requests.filter((r) => r.status === "FULFILLED");
-  const totalPurchased = fulfilled.reduce((s, r) => s + (r.totalAmount ?? 0), 0);
+  // Purchases = every priced, committed order (approved → delivered), so the
+  // figure reconciles with paid + outstanding for credit partners.
+  const purchasedOrders = requests.filter(
+    (r) =>
+      ["APPROVED", "IN_TRANSIT", "FULFILLED"].includes(r.status) &&
+      r.totalAmount != null,
+  );
+  const totalPurchased = purchasedOrders.reduce(
+    (s, r) => s + (r.totalAmount ?? 0),
+    0,
+  );
   const overdue = activeCredits.filter(
     (c) =>
       (c.status === "OVERDUE" || (c.dueDate ? c.dueDate < now : false)) &&
@@ -203,7 +213,7 @@ export default async function CustomerProfilePage({
           <Tile icon={CreditCard} accent="info" label="Credit limit" value={formatCurrency(creditLimit)} hint={user.preferredPayment ?? "—"} />
           <Tile icon={Wallet} accent="success" label="Available credit" value={formatCurrency(availableCredit)} />
           <Tile icon={AlertTriangle} accent={outstanding > 0 ? "warning" : "success"} label="Outstanding" value={formatCurrency(outstanding)} />
-          <Tile icon={TrendingUp} accent="primary" label="Total purchased" value={formatCurrency(totalPurchased)} hint={`${fulfilled.length} delivered`} />
+          <Tile icon={TrendingUp} accent="primary" label="Total purchased" value={formatCurrency(totalPurchased)} hint={`${purchasedOrders.length} orders · ${fulfilled.length} delivered`} />
           <Tile icon={Banknote} accent="success" label="Total paid" value={formatCurrency(totalPaid)} hint={`${allPayments.length} payments`} />
           <Tile icon={CalendarDays} accent="info" label="Next payment due" value={nextDue ? formatDate(nextDue) : "—"} />
           <Tile icon={ActivityIcon} accent="accent" label="Payment performance" value={performance.label} valueClass={performance.tone} hint={`${paidPct}% of credit repaid`} />
