@@ -18,7 +18,6 @@ export default async function PartnerCataloguePage() {
     await Promise.all([
       prisma.product.findMany({
         where: { isActive: true },
-        include: { inventory: true },
         orderBy: { price: "desc" },
       }),
       prisma.partnerPrice.findMany({ where: { partnerId: me.id } }),
@@ -47,8 +46,6 @@ export default async function PartnerCataloguePage() {
   const dto: CatalogProduct[] = products.map((p) => {
     const m = productMeta(p.sku);
     const rich = getProductBySku(p.sku);
-    const avail = p.inventory?.warehouseQty ?? 0;
-    const threshold = p.inventory?.lowStockThreshold ?? 50;
     return {
       id: p.id,
       sku: p.sku,
@@ -61,9 +58,6 @@ export default async function PartnerCataloguePage() {
       use: m.use,
       accent: m.accent,
       price: ppMap.get(p.id) ?? p.price,
-      available: avail,
-      reserved: p.inventory?.assignedQty ?? 0,
-      status: avail <= 0 ? "OUT" : avail <= threshold ? "LIMITED" : "IN",
       features: rich?.features ?? [],
       packsPerCarton: rich?.packsPerCarton ?? 0,
       moq: rich?.moq ?? 1,
