@@ -34,6 +34,8 @@ export default async function ApplicationDetailPage({
     status: user.status,
     businessType: user.businessType,
     region: user.region,
+    district: user.district,
+    street: user.street,
     expectedVolume: user.expectedVolume,
     preferredPayment: user.preferredPayment,
     businessLicense: user.businessLicense,

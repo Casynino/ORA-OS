@@ -98,6 +98,8 @@ export async function approveApplication(
     });
     revalidatePath("/admin/applications");
     revalidatePath("/admin/users");
+    revalidatePath("/admin/customers");
+    revalidatePath(`/admin/customers/${user.id}`);
     return ok(undefined, `${user.name} approved and activated.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -410,8 +412,13 @@ const updateCustomerSchema = z.object({
   phone: z.string().max(40).optional().or(z.literal("")),
   organization: z.string().max(160).optional().or(z.literal("")),
   businessType: z.string().max(60).optional().or(z.literal("")),
-  location: z.string().max(160).optional().or(z.literal("")),
+  location: z.string().max(200).optional().or(z.literal("")),
   region: z.string().max(120).optional().or(z.literal("")),
+  district: z.string().max(120).optional().or(z.literal("")),
+  street: z.string().max(200).optional().or(z.literal("")),
+  expectedVolume: z.string().max(120).optional().or(z.literal("")),
+  taxId: z.string().max(60).optional().or(z.literal("")),
+  businessLicense: z.string().max(80).optional().or(z.literal("")),
   preferredPayment: z.string().max(40).optional().or(z.literal("")),
   paymentTerms: z.string().max(60).optional().or(z.literal("")),
   assignedWarehouse: z.string().max(120).optional().or(z.literal("")),
@@ -455,6 +462,11 @@ export async function updateCustomer(
         businessType: blank(parsed.data.businessType),
         location: blank(parsed.data.location),
         region: blank(parsed.data.region),
+        district: blank(parsed.data.district),
+        street: blank(parsed.data.street),
+        expectedVolume: blank(parsed.data.expectedVolume),
+        taxId: blank(parsed.data.taxId),
+        businessLicense: blank(parsed.data.businessLicense),
         preferredPayment: blank(parsed.data.preferredPayment),
         paymentTerms: blank(parsed.data.paymentTerms),
         assignedWarehouse: blank(parsed.data.assignedWarehouse),

@@ -24,6 +24,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { ORA_CONTACT } from "@/lib/constants";
 import { cn, formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 export default async function PartnerProfilePage() {
   const session = await requireRole("PARTNER");
   const me = await prisma.user.findUnique({ where: { id: session.id } });
@@ -152,7 +154,8 @@ export default async function PartnerProfilePage() {
             <Field icon={Building2} label="Organization" value={me.organization ?? "—"} />
             <Field icon={Building2} label="Business type" value={me.businessType ?? "—"} />
             <Field icon={MapPin} label="Region" value={me.region ?? "—"} />
-            <Field icon={MapPin} label="Location" value={me.location ?? "—"} />
+            <Field icon={MapPin} label="District" value={me.district ?? "—"} />
+            <Field icon={MapPin} label="Full address" value={me.location ?? "—"} />
             <Field icon={Building2} label="Expected volume" value={me.expectedVolume ?? "—"} />
             <Field icon={CreditCard} label="Preferred payment" value={me.preferredPayment ?? "—"} />
             <Field icon={Building2} label="Business licence" value={me.businessLicense ?? "—"} />

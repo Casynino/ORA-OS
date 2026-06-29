@@ -36,6 +36,11 @@ export type CustomerDTO = {
   businessType: string | null;
   location: string | null;
   region: string | null;
+  district: string | null;
+  street: string | null;
+  expectedVolume: string | null;
+  taxId: string | null;
+  businessLicense: string | null;
   preferredPayment: string | null;
   paymentTerms: string | null;
   assignedWarehouse: string | null;
@@ -131,6 +136,11 @@ function EditModal({ customer, warehouses, onClose, onDone }: { customer: Custom
     businessType: customer.businessType ?? "",
     location: customer.location ?? "",
     region: customer.region ?? "",
+    district: customer.district ?? "",
+    street: customer.street ?? "",
+    expectedVolume: customer.expectedVolume ?? "",
+    taxId: customer.taxId ?? "",
+    businessLicense: customer.businessLicense ?? "",
     preferredPayment: customer.preferredPayment ?? "",
     paymentTerms: customer.paymentTerms ?? "",
     assignedWarehouse: customer.assignedWarehouse ?? "",
@@ -174,10 +184,17 @@ function EditModal({ customer, warehouses, onClose, onDone }: { customer: Custom
             </Select>
           </Field>
         </div>
+        <Field label="Full delivery address"><Input value={f.location} onChange={(e) => set("location", e.target.value)} placeholder="Street, district, region" /></Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Location"><Input value={f.location} onChange={(e) => set("location", e.target.value)} /></Field>
           <Field label="Region"><Input value={f.region} onChange={(e) => set("region", e.target.value)} /></Field>
+          <Field label="District"><Input value={f.district} onChange={(e) => set("district", e.target.value)} /></Field>
         </div>
+        <Field label="Street / physical address"><Input value={f.street} onChange={(e) => set("street", e.target.value)} /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="TIN number"><Input value={f.taxId} onChange={(e) => set("taxId", e.target.value)} /></Field>
+          <Field label="Business registration no."><Input value={f.businessLicense} onChange={(e) => set("businessLicense", e.target.value)} /></Field>
+        </div>
+        <Field label="Expected monthly volume"><Input value={f.expectedVolume} onChange={(e) => set("expectedVolume", e.target.value)} placeholder="e.g. 500 packs" /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Payment terms"><Input value={f.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} placeholder="e.g. Net 30" /></Field>
           <Field label="Fulfilling warehouse">

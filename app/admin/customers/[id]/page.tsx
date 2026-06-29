@@ -18,6 +18,8 @@ import {
   Activity as ActivityIcon,
   MessageSquare,
   Package,
+  Hash,
+  FileText,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
@@ -35,6 +37,8 @@ import {
   humanize,
   timeAgo,
 } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
 
 export default async function CustomerProfilePage({
   params,
@@ -203,6 +207,11 @@ export default async function CustomerProfilePage({
             businessType: user.businessType,
             location: user.location,
             region: user.region,
+            district: user.district,
+            street: user.street,
+            expectedVolume: user.expectedVolume,
+            taxId: user.taxId,
+            businessLicense: user.businessLicense,
             preferredPayment: user.preferredPayment,
             paymentTerms: user.paymentTerms,
             assignedWarehouse: user.assignedWarehouse,
@@ -238,9 +247,14 @@ export default async function CustomerProfilePage({
               <Row icon={UserIcon} label="Contact person" value={user.name} />
               <Row icon={Phone} label="Phone" value={user.phone ?? "—"} />
               <Row icon={Mail} label="Email" value={user.email} />
-              <Row icon={MapPin} label="Address / location" value={user.location ?? "—"} />
+              <Row icon={MapPin} label="Full address" value={user.location ?? "—"} />
               <Row icon={MapPin} label="Region" value={user.region ?? "—"} />
+              <Row icon={MapPin} label="District" value={user.district ?? "—"} />
+              <Row icon={MapPin} label="Street" value={user.street ?? "—"} />
               <Row icon={Building2} label="Partner type" value={user.businessType ?? "—"} />
+              <Row icon={Hash} label="TIN number" value={user.taxId ?? "—"} />
+              <Row icon={FileText} label="Business reg. no." value={user.businessLicense ?? "—"} />
+              <Row icon={TrendingUp} label="Expected volume" value={user.expectedVolume ?? "—"} />
               <Row icon={Package} label="Fulfilling warehouse" value={user.assignedWarehouse ?? "Main warehouse (default)"} />
               <Row icon={CalendarDays} label="Registered" value={formatDate(user.createdAt)} />
               <Row icon={ActivityIcon} label="Status" value={humanize(user.status)} />

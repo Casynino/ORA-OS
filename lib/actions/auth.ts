@@ -70,9 +70,10 @@ const registerSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters."),
   phone: z.string().optional(),
   organization: z.string().optional(),
-  location: z.string().optional(),
-  businessType: z.string().optional(),
   region: z.string().optional(),
+  district: z.string().optional(),
+  street: z.string().optional(),
+  businessType: z.string().optional(),
   expectedVolume: z.string().optional(),
   preferredPayment: z.string().optional(),
   businessLicense: z.string().optional(),
@@ -105,6 +106,12 @@ export async function registerAction(
     return fail("An account with this email already exists.");
   }
 
+  const region = data.region?.trim() || null;
+  const district = data.district?.trim() || null;
+  const street = data.street?.trim() || null;
+  // The address provided at registration becomes the default delivery address.
+  const location = [street, district, region].filter(Boolean).join(", ") || null;
+
   const user = await prisma.user.create({
     data: {
       name: data.name.trim(),
@@ -114,9 +121,11 @@ export async function registerAction(
       role: "PARTNER",
       status: "PENDING",
       organization: data.organization?.trim() || null,
-      location: data.location?.trim() || null,
+      region,
+      district,
+      street,
+      location,
       businessType: data.businessType?.trim() || null,
-      region: data.region?.trim() || null,
       expectedVolume: data.expectedVolume?.trim() || null,
       preferredPayment: data.preferredPayment?.trim() || null,
       businessLicense: data.businessLicense?.trim() || null,
