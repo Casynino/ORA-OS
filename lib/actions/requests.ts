@@ -207,6 +207,37 @@ export async function createRequest(
   }
 }
 
+// ── Save default delivery details (PARTNER) ─────────────────────────────────
+const deliverySchema = z.object({
+  deliveryAddress: z.string().max(300).optional(),
+  contactPhone: z.string().max(40).optional(),
+});
+
+// Persist the partner's delivery address + phone to their profile so all
+// future orders use it — independent of placing an order.
+export async function saveDeliveryDetails(
+  input: z.infer<typeof deliverySchema>,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["PARTNER"]);
+    const parsed = deliverySchema.safeParse(input);
+    if (!parsed.success) return fail("Enter a valid address and phone.");
+    await prisma.user.update({
+      where: { id: actor.id },
+      data: {
+        location: parsed.data.deliveryAddress?.trim() || null,
+        phone: parsed.data.contactPhone?.trim() || null,
+      },
+    });
+    revalidatePath("/partner/request");
+    revalidatePath("/partner/profile");
+    revalidatePath("/partner");
+    return ok(undefined, "Delivery details saved.");
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
 // ── Price (ADMIN) ──────────────────────────────────────────────────────────
 
 const priceSchema = z.object({
