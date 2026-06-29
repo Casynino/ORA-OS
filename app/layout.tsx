@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
@@ -15,6 +15,14 @@ const SITE_NAME = "ORA-Pads";
 const SITE_TAGLINE = "ORA-Pads — Empowering Every Cycle";
 const SITE_DESCRIPTION =
   "ORA-Pads stands for women's health and period dignity across Tanzania — menstrual education, community impact, and the confidence for every girl and woman to thrive through every cycle.";
+
+// Explicit, mobile-correct viewport — fits device width, no forced zoom,
+// and users keep the ability to pinch-zoom for accessibility.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   applicationName: SITE_NAME,
