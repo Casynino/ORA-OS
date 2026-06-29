@@ -63,7 +63,6 @@ export default async function PartnerRequestPage() {
     await Promise.all([
       prisma.product.findMany({
         where: { isActive: true },
-        include: { inventory: true },
         orderBy: { price: "desc" },
       }),
       prisma.creditAccount.findMany({
@@ -103,16 +102,12 @@ export default async function PartnerRequestPage() {
 
   const builderProducts: BuilderProduct[] = products.map((p) => {
     const m = productMeta(p.sku);
-    const avail = p.inventory?.warehouseQty ?? 0;
     return {
       id: p.id,
       name: p.name,
       sku: p.sku,
       unitLabel: p.unitLabel,
       price: partnerPriceMap.get(p.id) ?? p.price,
-      available: avail,
-      reserved: p.inventory?.assignedQty ?? 0,
-      lowStock: avail <= (p.inventory?.lowStockThreshold ?? 50),
       image: m.image,
       size: m.size,
       color: m.color,

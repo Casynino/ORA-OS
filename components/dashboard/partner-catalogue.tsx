@@ -11,7 +11,6 @@ import {
   Star,
   History,
   Info,
-  AlertTriangle,
   Layers,
   Package,
   Truck,
@@ -39,9 +38,6 @@ export type CatalogProduct = {
   use: string;
   accent: string;
   price: number;
-  available: number;
-  reserved: number;
-  status: "IN" | "LIMITED" | "OUT";
   features: string[];
   packsPerCarton: number;
   moq: number;
@@ -59,15 +55,7 @@ const FILTERS = [
   { key: "NIGHT", label: "Night" },
   { key: "DAY", label: "Day" },
   { key: "LINER", label: "Liners" },
-  { key: "INSTOCK", label: "In stock" },
-  { key: "LOW", label: "Low stock" },
 ] as const;
-
-const STATUS = {
-  IN: { label: "In stock", variant: "success" as const },
-  LIMITED: { label: "Limited", variant: "warning" as const },
-  OUT: { label: "Out of stock", variant: "destructive" as const },
-};
 
 export function PartnerCatalogue({
   products,
@@ -91,8 +79,6 @@ export function PartnerCatalogue({
       if (filter === "NIGHT" && !/night/i.test(p.use)) return false;
       if (filter === "DAY" && !/day/i.test(p.use)) return false;
       if (filter === "LINER" && !/liner|daily/i.test(p.use)) return false;
-      if (filter === "INSTOCK" && p.status === "OUT") return false;
-      if (filter === "LOW" && p.status !== "LIMITED") return false;
       if (!term) return true;
       return (
         p.name.toLowerCase().includes(term) ||
@@ -163,7 +149,6 @@ export function PartnerCatalogue({
       <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((p) => {
           const q = qty[p.id] ?? 0;
-          const st = STATUS[p.status];
           return (
             <div
               key={p.id}
@@ -183,7 +168,6 @@ export function PartnerCatalogue({
                   className="object-cover transition-transform duration-700 group-hover:scale-105"
                 />
                 <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
-                  <Badge variant={st.variant}>{st.label}</Badge>
                   {p.bestSeller && (
                     <Badge variant="accent" className="gap-1">
                       <Star className="size-3" />
@@ -217,19 +201,6 @@ export function PartnerCatalogue({
                   {p.description}
                 </p>
 
-                <div className="mt-3 flex items-center justify-between text-xs">
-                  <span className="inline-flex items-center gap-1 text-muted-foreground">
-                    <span className="size-1.5 rounded-full bg-success" />
-                    {formatNumber(p.available)} available
-                  </span>
-                  {p.status === "LIMITED" && (
-                    <span className="inline-flex items-center gap-1 text-warning">
-                      <AlertTriangle className="size-3" />
-                      Low
-                    </span>
-                  )}
-                </div>
-
                 <div className="mt-3 flex items-end justify-between">
                   <div>
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -253,7 +224,7 @@ export function PartnerCatalogue({
                     variant="outline"
                     className="size-9"
                     onClick={() => setQ(p.id, q - 1)}
-                    disabled={q <= 0 || p.status === "OUT"}
+                    disabled={q <= 0}
                   >
                     <Minus className="size-3.5" />
                   </Button>
@@ -262,7 +233,6 @@ export function PartnerCatalogue({
                     min={0}
                     value={q}
                     onChange={(e) => setQ(p.id, Number(e.target.value))}
-                    disabled={p.status === "OUT"}
                     className="h-9 flex-1 text-center font-semibold"
                   />
                   <Button
@@ -271,7 +241,6 @@ export function PartnerCatalogue({
                     variant="outline"
                     className="size-9"
                     onClick={() => setQ(p.id, q > 0 ? q + 1 : p.moq)}
-                    disabled={p.status === "OUT"}
                   >
                     <Plus className="size-3.5" />
                   </Button>
@@ -348,12 +317,6 @@ export function PartnerCatalogue({
                 sizes="500px"
                 className="object-cover"
               />
-              <Badge
-                variant={STATUS[detail.status].variant}
-                className="absolute left-3 top-3"
-              >
-                {STATUS[detail.status].label}
-              </Badge>
             </div>
 
             <div>
@@ -410,7 +373,6 @@ export function PartnerCatalogue({
                   variant="outline"
                   className="size-9"
                   onClick={() => setQ(detail.id, (qty[detail.id] ?? 0) + 1)}
-                  disabled={detail.status === "OUT"}
                 >
                   <Plus className="size-3.5" />
                 </Button>

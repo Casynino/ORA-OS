@@ -10,7 +10,6 @@ import {
   Wallet,
   CreditCard,
   Truck,
-  AlertTriangle,
   CheckCircle2,
   Info,
   PackageCheck,
@@ -34,9 +33,6 @@ export type BuilderProduct = {
   sku: string;
   unitLabel: string;
   price: number;
-  available: number;
-  reserved: number;
-  lowStock: boolean;
   image: string;
   size: string;
   color: string;
@@ -89,11 +85,9 @@ export function PartnerRequestBuilder({
   );
   const totalQty = lines.reduce((s, p) => s + (qty[p.id] ?? 0), 0);
   const estValue = lines.reduce((s, p) => s + (qty[p.id] ?? 0) * p.price, 0);
-  const stockIssues = lines.filter((p) => (qty[p.id] ?? 0) > p.available);
   const creditRemaining = credit.available - estValue;
   const creditExceeded = isCredit && estValue > credit.available;
-  const blocked =
-    lines.length === 0 || stockIssues.length > 0 || creditExceeded || pending;
+  const blocked = lines.length === 0 || creditExceeded || pending;
 
   function submit() {
     if (lines.length === 0) {
@@ -132,22 +126,17 @@ export function PartnerRequestBuilder({
           <SectionTitle
             icon={PackageCheck}
             title="Choose your products"
-            sub="Live stock — enter the quantity you need for each size."
+            sub="Enter the quantity you need for each size."
           />
           <div className="mt-4 space-y-3">
             {products.map((p) => {
               const q = qty[p.id] ?? 0;
-              const over = q > p.available;
               return (
                 <div
                   key={p.id}
                   className={cn(
                     "rounded-2xl border bg-card p-4 transition-colors",
-                    over
-                      ? "border-destructive/60"
-                      : q > 0
-                        ? "border-primary/50"
-                        : "border-border",
+                    q > 0 ? "border-primary/50" : "border-border",
                   )}
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -171,19 +160,6 @@ export function PartnerRequestBuilder({
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         {p.unitLabel} · {formatCurrency(p.price)}/unit
                       </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                        <span className="inline-flex items-center gap-1">
-                          <span className="size-1.5 rounded-full bg-success" />
-                          <span className="font-medium text-foreground">{formatNumber(p.available)}</span>
-                          <span className="text-muted-foreground">available</span>
-                        </span>
-                        {p.lowStock && (
-                          <Badge variant="warning" className="gap-1">
-                            <AlertTriangle className="size-3" />
-                            Low stock
-                          </Badge>
-                        )}
-                      </div>
                     </div>
                     <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
                       <div className="flex items-center gap-1.5">
@@ -201,14 +177,8 @@ export function PartnerRequestBuilder({
                           <Plus className="size-3.5" />
                         </Button>
                       </div>
-                      {q > 0 && !over && (
+                      {q > 0 && (
                         <span className="text-xs font-medium text-muted-foreground">= {formatCurrency(q * p.price)}</span>
-                      )}
-                      {over && (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive">
-                          <AlertTriangle className="size-3" />
-                          Only {formatNumber(p.available)} available
-                        </span>
                       )}
                     </div>
                   </div>
@@ -375,13 +345,6 @@ export function PartnerRequestBuilder({
                 <dd className="font-display text-xl font-bold text-primary">{formatCurrency(estValue)}</dd>
               </div>
             </dl>
-
-            {stockIssues.length > 0 && (
-              <p className="flex items-start gap-2 rounded-lg bg-destructive/10 p-3 text-xs text-destructive">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                Some quantities exceed available stock. Adjust them to continue.
-              </p>
-            )}
 
             <Button className="w-full" onClick={submit} disabled={blocked}>
               <Send className="size-4" />
