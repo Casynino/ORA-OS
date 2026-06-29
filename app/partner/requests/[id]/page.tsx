@@ -23,12 +23,7 @@ export default async function PartnerOrderPage({
   });
   if (!r || r.requesterId !== user.id) notFound();
 
-  const [warehouses, partnerPrices, products] = await Promise.all([
-    prisma.warehouse.findMany({
-      where: { isActive: true },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, location: true },
-    }),
+  const [partnerPrices, products] = await Promise.all([
     prisma.partnerPrice.findMany({ where: { partnerId: user.id } }),
     prisma.product.findMany({
       where: { isActive: true },
@@ -50,9 +45,8 @@ export default async function PartnerOrderPage({
     totalAmount: r.totalAmount,
     note: r.note,
     adminNote: r.adminNote,
-    deliverTo: r.deliverTo,
-    deliverBy: r.deliverBy ? r.deliverBy.toISOString() : null,
-    warehouseName: r.warehouseName,
+    deliveryAddress: r.deliveryAddress,
+    contactPhone: r.contactPhone,
     reviewedByName: r.reviewedBy?.name ?? null,
     createdAt: r.createdAt.toISOString(),
     items: r.items.map((i) => ({
@@ -68,7 +62,6 @@ export default async function PartnerOrderPage({
       sku: p.sku,
       price: ppMap.get(p.id) ?? p.price,
     })),
-    warehouses,
   };
 
   return <PartnerOrderDetail key={r.status} order={dto} />;

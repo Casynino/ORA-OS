@@ -44,7 +44,7 @@ export function customerOrderStatus(o: {
     return {
       key: "transit",
       label: "In transit",
-      message: "Your order has left our warehouse and is on its way.",
+      message: "Your order is on its way.",
       tone: "info",
     };
 
@@ -54,7 +54,7 @@ export function customerOrderStatus(o: {
         key: "confirmed",
         label: "Confirmed",
         message:
-          "Great news! Your order is confirmed and our warehouse team is preparing it for dispatch.",
+          "Great news! Your order is confirmed and the ORA team is preparing it for dispatch.",
         tone: "success",
       };
     if (o.paymentStatus === "PAID")
@@ -62,7 +62,7 @@ export function customerOrderStatus(o: {
         key: "confirmed",
         label: "Confirmed",
         message:
-          "Great news! Your payment is confirmed and our warehouse team is preparing your order for dispatch.",
+          "Great news! Your payment is confirmed and the ORA team is preparing your order for dispatch.",
         tone: "success",
       };
     if (o.paymentClaimedAt)

@@ -14,7 +14,7 @@ export default async function PartnerCataloguePage() {
   const me = await prisma.user.findUnique({ where: { id: session.id } });
   if (!me) notFound();
 
-  const [products, partnerPrices, recent, fulfilledItems, warehouse] =
+  const [products, partnerPrices, recent, fulfilledItems] =
     await Promise.all([
       prisma.product.findMany({
         where: { isActive: true },
@@ -31,11 +31,6 @@ export default async function PartnerCataloguePage() {
       prisma.requestItem.findMany({
         where: { request: { requesterId: me.id, status: "FULFILLED" } },
         select: { productId: true, quantity: true },
-      }),
-      prisma.warehouse.findFirst({
-        where: { isActive: true },
-        orderBy: { name: "asc" },
-        select: { name: true },
       }),
     ]);
 
@@ -88,10 +83,7 @@ export default async function PartnerCataloguePage() {
         title="Catalogue"
         description="Browse the ORA range, see your agreed prices, and request stock in one place."
       />
-      <PartnerCatalogue
-        products={dto}
-        warehouse={warehouse?.name ?? "Main warehouse"}
-      />
+      <PartnerCatalogue products={dto} />
     </div>
   );
 }

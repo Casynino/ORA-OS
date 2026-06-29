@@ -122,19 +122,17 @@ export default async function PartnerOverviewPage() {
   type Held = {
     units: number;
     last: Date | null;
-    warehouse: string | null;
     credit: number;
   };
   const held = new Map<string, Held>();
   for (const r of fulfilled) {
     for (const it of r.items) {
-      const cur = held.get(it.productId) ?? { units: 0, last: null, warehouse: null, credit: 0 };
+      const cur = held.get(it.productId) ?? { units: 0, last: null, credit: 0 };
       cur.units += it.quantity;
       if (r.paymentType === "CREDIT") cur.credit += it.quantity;
       const d = r.deliveredAt ?? r.fulfilledAt ?? r.createdAt;
       if (!cur.last || d > cur.last) {
         cur.last = d;
-        cur.warehouse = r.warehouseName;
       }
       held.set(it.productId, cur);
     }
@@ -428,7 +426,6 @@ export default async function PartnerOverviewPage() {
                     <p className="text-xs text-muted-foreground">units held</p>
                     <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
                       {h?.credit ? <span>{h.credit} on credit</span> : null}
-                      {h?.warehouse ? <span>· {h.warehouse}</span> : null}
                       {h?.last ? <span>· restocked {timeAgo(h.last)}</span> : <span>none yet</span>}
                     </div>
                   </div>
