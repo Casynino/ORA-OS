@@ -32,7 +32,7 @@ const TIMELINE = [
   { icon: Send, label: "Request submitted" },
   { icon: Search, label: "ORA team review" },
   { icon: ClipboardCheck, label: "Approval / rejection" },
-  { icon: PackageCheck, label: "Warehouse processing" },
+  { icon: PackageCheck, label: "Order processing" },
   { icon: Truck, label: "Dispatch" },
   { icon: CheckCircle2, label: "Partner confirmation" },
 ];
@@ -59,16 +59,12 @@ export default async function PartnerRequestPage() {
   const me = await prisma.user.findUnique({ where: { id: session.id } });
   if (!me) notFound();
 
-  const [products, warehouses, credits, fulfilled, lastReq, history, partnerPrices] =
+  const [products, credits, fulfilled, lastReq, history, partnerPrices] =
     await Promise.all([
       prisma.product.findMany({
         where: { isActive: true },
         include: { inventory: true },
         orderBy: { price: "desc" },
-      }),
-      prisma.warehouse.findMany({
-        where: { isActive: true },
-        orderBy: { name: "asc" },
       }),
       prisma.creditAccount.findMany({
         where: { agentId: me.id, status: { not: "SETTLED" } },
@@ -138,7 +134,6 @@ export default async function PartnerRequestPage() {
     totalQty: r.items.reduce((s, i) => s + i.quantity, 0),
     totalAmount: r.totalAmount,
     payment: r.paymentType === "CREDIT" ? "Credit" : "Cash",
-    warehouse: r.warehouseName ?? "—",
     status: r.status,
     approvedBy: r.reviewedBy?.name ?? "—",
     dispatch: dispatchOf(r.status),
@@ -274,10 +269,7 @@ export default async function PartnerRequestPage() {
             Every request you&apos;ve made, with status and dispatch tracking.
           </p>
         </div>
-        <RequestHistoryTable
-          rows={historyRows}
-          warehouses={warehouses.map((w) => w.name)}
-        />
+        <RequestHistoryTable rows={historyRows} />
       </section>
     </div>
   );

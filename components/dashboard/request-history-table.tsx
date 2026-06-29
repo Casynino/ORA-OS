@@ -30,7 +30,6 @@ export type HistoryRow = {
   totalQty: number;
   totalAmount: number | null;
   payment: "Cash" | "Credit";
-  warehouse: string;
   status: string;
   approvedBy: string;
   dispatch: string;
@@ -38,16 +37,9 @@ export type HistoryRow = {
 
 const STATUSES = ["PENDING", "PRICED", "APPROVED", "IN_TRANSIT", "FULFILLED", "REJECTED"];
 
-export function RequestHistoryTable({
-  rows,
-  warehouses,
-}: {
-  rows: HistoryRow[];
-  warehouses: string[];
-}) {
+export function RequestHistoryTable({ rows }: { rows: HistoryRow[] }) {
   const router = useRouter();
   const [status, setStatus] = useState("ALL");
-  const [warehouse, setWarehouse] = useState("ALL");
   const [payment, setPayment] = useState("ALL");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -56,13 +48,12 @@ export function RequestHistoryTable({
     () =>
       rows.filter((r) => {
         if (status !== "ALL" && r.status !== status) return false;
-        if (warehouse !== "ALL" && r.warehouse !== warehouse) return false;
         if (payment !== "ALL" && r.payment !== payment) return false;
         if (from && r.dateISO < from) return false;
         if (to && r.dateISO > to) return false;
         return true;
       }),
-    [rows, status, warehouse, payment, from, to],
+    [rows, status, payment, from, to],
   );
 
   return (
@@ -81,17 +72,6 @@ export function RequestHistoryTable({
               {STATUSES.map((s) => (
                 <option key={s} value={s}>
                   {s.charAt(0) + s.slice(1).toLowerCase()}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="w-44">
-            <Label className="text-xs">Warehouse</Label>
-            <Select value={warehouse} onChange={(e) => setWarehouse(e.target.value)} className="mt-1 h-9">
-              <option value="ALL">All</option>
-              {warehouses.map((w) => (
-                <option key={w} value={w}>
-                  {w}
                 </option>
               ))}
             </Select>
@@ -140,8 +120,7 @@ export function RequestHistoryTable({
                   </p>
                   <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
                     <span className="text-muted-foreground">
-                      {r.dateLabel} · Qty {formatNumber(r.totalQty)} ·{" "}
-                      {r.warehouse}
+                      {r.dateLabel} · Qty {formatNumber(r.totalQty)}
                     </span>
                     <span className="flex items-center gap-2">
                       <Badge
@@ -171,7 +150,6 @@ export function RequestHistoryTable({
                   <TableHead className="text-right">Qty</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead>Payment</TableHead>
-                  <TableHead>Warehouse</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Approved by</TableHead>
                   <TableHead>Dispatch</TableHead>
@@ -200,7 +178,6 @@ export function RequestHistoryTable({
                         {r.payment}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm">{r.warehouse}</TableCell>
                     <TableCell>
                       <StatusBadge status={r.status} />
                     </TableCell>

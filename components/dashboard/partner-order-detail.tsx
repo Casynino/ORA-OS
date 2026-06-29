@@ -31,9 +31,7 @@ import { ORA_PAYMENT } from "@/lib/constants";
 import { customerOrderStatus, type CustomerTone } from "@/lib/order-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { toast } from "@/components/ui/use-toast";
@@ -47,7 +45,6 @@ type Item = {
   unitPrice: number | null;
 };
 type CatalogItem = { productId: string; name: string; sku: string; price: number };
-type Warehouse = { id: string; name: string; location: string | null };
 
 export type POrderDTO = {
   id: string;
@@ -60,14 +57,12 @@ export type POrderDTO = {
   totalAmount: number | null;
   note: string | null;
   adminNote: string | null;
-  deliverTo: string | null;
-  deliverBy: string | null;
-  warehouseName: string | null;
+  deliveryAddress: string | null;
+  contactPhone: string | null;
   reviewedByName: string | null;
   createdAt: string;
   items: Item[];
   catalog: CatalogItem[];
-  warehouses: Warehouse[];
 };
 
 const TONE_VARIANT: Record<
@@ -98,12 +93,6 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
       price: i.unitPrice ?? catalogById.get(i.productId)?.price ?? 0,
     })),
   );
-  const [warehouse, setWarehouse] = useState(order.warehouseName ?? "");
-  const [deliverTo, setDeliverTo] = useState(order.deliverTo ?? "");
-  const [deliverBy, setDeliverBy] = useState(
-    order.deliverBy ? order.deliverBy.slice(0, 10) : "",
-  );
-  const [note, setNote] = useState(order.note ?? "");
   const [addId, setAddId] = useState("");
 
   const setQty = (pid: string, v: string) =>
@@ -136,10 +125,6 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
           productId: l.productId,
           quantity: Math.max(1, Math.round(Number(l.qty) || 1)),
         })),
-        warehouseName: warehouse || undefined,
-        deliverTo: deliverTo || undefined,
-        deliverBy: deliverBy || undefined,
-        note: note || undefined,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
@@ -417,55 +402,37 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
           <section className="rounded-2xl border border-border bg-card p-5 shadow-soft">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <Truck className="size-4 text-muted-foreground" />
-              Delivery
+              Delivery details
             </div>
-            <div className="mt-3 space-y-3">
+            <dl className="mt-3 space-y-3 text-sm">
               <div>
-                <Label className="text-xs">Warehouse</Label>
-                <Select
-                  value={warehouse}
-                  onChange={(e) => setWarehouse(e.target.value)}
-                  disabled={!editable}
-                  className="mt-1"
-                >
-                  <option value="">—</option>
-                  {order.warehouses.map((w) => (
-                    <option key={w.id} value={w.name}>
-                      {w.name}
-                      {w.location ? ` · ${w.location}` : ""}
-                    </option>
-                  ))}
-                </Select>
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Delivery address
+                </dt>
+                <dd className="mt-0.5 font-medium">
+                  {order.deliveryAddress || "On file with the ORA team"}
+                </dd>
               </div>
-              <div>
-                <Label className="text-xs">Preferred date</Label>
-                <Input
-                  type="date"
-                  value={deliverBy}
-                  onChange={(e) => setDeliverBy(e.target.value)}
-                  disabled={!editable}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Destination</Label>
-                <Input
-                  value={deliverTo}
-                  onChange={(e) => setDeliverTo(e.target.value)}
-                  disabled={!editable}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Special instructions</Label>
-                <Textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  disabled={!editable}
-                  className="mt-1"
-                />
-              </div>
-            </div>
+              {order.contactPhone && (
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Contact phone
+                  </dt>
+                  <dd className="mt-0.5 font-medium">{order.contactPhone}</dd>
+                </div>
+              )}
+              {order.note && (
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Your note
+                  </dt>
+                  <dd className="mt-0.5 text-muted-foreground">{order.note}</dd>
+                </div>
+              )}
+            </dl>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Need to change your delivery details? Contact the ORA team.
+            </p>
           </section>
 
           <section className="rounded-2xl border border-border bg-card p-5 shadow-soft">
@@ -556,7 +523,7 @@ function PaymentPanel({ order }: { order: POrderDTO }) {
         <p className="mt-2 flex items-center gap-2 text-sm text-info">
           <Clock className="size-4 shrink-0" />
           We&apos;ve received your confirmation — the ORA team is verifying your
-          payment. Once confirmed, your order is released to the warehouse.
+          payment. Once confirmed, your order is released for fulfilment.
         </p>
       ) : (
         <>
@@ -565,7 +532,7 @@ function PaymentPanel({ order }: { order: POrderDTO }) {
             <span className="font-medium text-foreground">
               &ldquo;I have made payment&rdquo;
             </span>
-            . The ORA team confirms it and your order moves to the warehouse.
+            . The ORA team confirms it and your order moves into fulfilment.
           </p>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">

@@ -71,10 +71,8 @@ const STATUS = {
 
 export function PartnerCatalogue({
   products,
-  warehouse,
 }: {
   products: CatalogProduct[];
-  warehouse: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -378,7 +376,7 @@ export function PartnerCatalogue({
               <Spec icon={Package} label="Packs / carton" value={`${detail.packsPerCarton}`} />
               <Spec icon={Layers} label="Min order" value={`${detail.moq} packs`} />
               <Spec icon={Truck} label="Lead time" value={detail.leadTime} />
-              <Spec icon={ShieldCheck} label="From" value={warehouse} />
+              <Spec icon={ShieldCheck} label="Supplied by" value="ORA-Pads" />
             </div>
 
             <div className="flex items-center justify-between rounded-xl border border-border p-4">
