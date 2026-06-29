@@ -13,35 +13,51 @@ import { getWarehouseSummaries } from "@/lib/warehouse-data";
 const ACTIVE_CREDIT = ["OUTSTANDING", "PARTIAL", "OVERDUE"] as const;
 const ACTIVE_TRANSFER = ["PENDING", "APPROVED", "IN_TRANSIT"] as const;
 
+// ORA operates in Tanzania (East Africa Time, UTC+3, no daylight saving). The
+// server (Vercel) runs in UTC, so all "today / this week / this month" windows
+// are computed against Tanzania-local day boundaries — not the server's UTC day.
+const EAT_OFFSET_MS = 3 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** A clock shifted into EAT, so getUTC* parts read as Tanzania-local parts. */
+function eatParts(now: Date) {
+  const eat = new Date(now.getTime() + EAT_OFFSET_MS);
+  return { y: eat.getUTCFullYear(), m: eat.getUTCMonth(), d: eat.getUTCDate(), dow: eat.getUTCDay() };
+}
+/** UTC instant of Tanzania-local midnight for the given EAT y/m/d. */
+const eatMidnightUTC = (y: number, m: number, d: number) =>
+  new Date(Date.UTC(y, m, d) - EAT_OFFSET_MS);
+
 type Bucket = { key: string; label: string; value: number };
 
-function monthBuckets(n = 6): Bucket[] {
-  const now = new Date();
+// Six monthly buckets ending at the given EAT year/month (keys in EAT months).
+function monthBuckets(year: number, month: number, n = 6): Bucket[] {
   const out: Bucket[] = [];
   for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const d = new Date(Date.UTC(year, month - i, 1));
     out.push({
-      key: `${d.getFullYear()}-${d.getMonth()}`,
-      label: d.toLocaleString("en-US", { month: "short" }),
+      key: `${d.getUTCFullYear()}-${d.getUTCMonth()}`,
+      label: d.toLocaleString("en-US", { month: "short", timeZone: "UTC" }),
       value: 0,
     });
   }
   return out;
 }
+// Bucket key for a timestamp, by its EAT month.
 const mKey = (date: Date) => {
-  const d = new Date(date);
-  return `${d.getFullYear()}-${d.getMonth()}`;
+  const d = new Date(date.getTime() + EAT_OFFSET_MS);
+  return `${d.getUTCFullYear()}-${d.getUTCMonth()}`;
 };
 
 export async function getCommandCenter() {
-  // ── Time boundaries (server time) ──────────────────────────────
+  // ── Time boundaries (Tanzania local time, EAT) ─────────────────
   const now = new Date();
-  const startToday = new Date(now);
-  startToday.setHours(0, 0, 0, 0);
-  const startWeek = new Date(startToday);
-  startWeek.setDate(startWeek.getDate() - ((startWeek.getDay() + 6) % 7)); // Monday
-  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  const eat = eatParts(now);
+  const startToday = eatMidnightUTC(eat.y, eat.m, eat.d);
+  // Week starts Monday (EAT). dow: 0=Sun … 6=Sat → days since Monday.
+  const daysSinceMonday = (eat.dow + 6) % 7;
+  const startWeek = new Date(startToday.getTime() - daysSinceMonday * DAY_MS);
+  const startMonth = eatMidnightUTC(eat.y, eat.m, 1);
+  const sixMonthsAgo = eatMidnightUTC(eat.y, eat.m - 5, 1);
 
   const [
     inventoryAgg,
@@ -316,22 +332,22 @@ export async function getCommandCenter() {
   const networkLowStock = warehouseSummaries.reduce((s, w) => s + w.lowStock, 0);
 
   // ── 6-month trends ─────────────────────────────────────────────
-  const salesTrend = monthBuckets();
+  const salesTrend = monthBuckets(eat.y, eat.m);
   for (const r of fulfilledHistory) {
     if (!r.fulfilledAt) continue;
     const b = salesTrend.find((x) => x.key === mKey(r.fulfilledAt!));
     if (b) b.value += r.totalAmount ?? 0;
   }
-  const collectionsTrend = monthBuckets();
+  const collectionsTrend = monthBuckets(eat.y, eat.m);
   for (const p of paymentHistory) {
     const b = collectionsTrend.find((x) => x.key === mKey(p.createdAt));
     if (b) b.value += p.amount;
   }
   // Cumulative partner growth
-  const partnerTrend = monthBuckets();
+  const partnerTrend = monthBuckets(eat.y, eat.m);
   for (const b of partnerTrend) {
     const [y, m] = b.key.split("-").map(Number);
-    const end = new Date(y, m + 1, 1);
+    const end = eatMidnightUTC(y, m + 1, 1);
     b.value = partnerHistory.filter((u) => u.createdAt < end).length;
   }
 
