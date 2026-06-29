@@ -46,6 +46,8 @@ export type AppDTO = {
   status: string;
   businessType: string | null;
   region: string | null;
+  district: string | null;
+  street: string | null;
   expectedVolume: string | null;
   preferredPayment: string | null;
   businessLicense: string | null;
@@ -120,7 +122,8 @@ export function ApplicationReview({ app }: { app: AppDTO }) {
 
   const details = [
     { icon: Briefcase, label: "Business type", value: app.businessType },
-    { icon: Globe, label: "Region", value: app.region ?? app.location },
+    { icon: Globe, label: "Region", value: app.region },
+    { icon: MapPin, label: "District", value: app.district },
     { icon: TrendingUp, label: "Expected monthly volume", value: app.expectedVolume },
     { icon: Wallet, label: "Preferred payment", value: app.preferredPayment },
     { icon: FileText, label: "Business licence", value: app.businessLicense },

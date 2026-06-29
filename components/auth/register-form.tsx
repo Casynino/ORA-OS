@@ -72,13 +72,6 @@ export function RegisterForm() {
           <Input id="organization" name="organization" className="mt-1.5" />
         </div>
         <div>
-          <Label htmlFor="location">Location</Label>
-          <Input id="location" name="location" className="mt-1.5" />
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
           <Label htmlFor="businessType">Business type</Label>
           <Select id="businessType" name="businessType" defaultValue="Agent" className="mt-1.5">
             <option>Agent</option>
@@ -89,10 +82,25 @@ export function RegisterForm() {
             <option>Other</option>
           </Select>
         </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <Label htmlFor="region">Region</Label>
-          <Input id="region" name="region" className="mt-1.5" />
+          <Input id="region" name="region" placeholder="e.g. Dar es Salaam" className="mt-1.5" />
         </div>
+        <div>
+          <Label htmlFor="district">District</Label>
+          <Input id="district" name="district" placeholder="e.g. Kinondoni" className="mt-1.5" />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="street">Street / physical address</Label>
+        <Input id="street" name="street" placeholder="Street, building, area" className="mt-1.5" />
+        <p className="mt-1 text-xs text-muted-foreground">
+          This becomes your default delivery address.
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

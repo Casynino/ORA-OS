@@ -42,13 +42,36 @@ async function main() {
     data: { name: "Juma Warehouse", email: "warehouse@orapads.org", passwordHash: hash("Warehouse@123"), role: "WAREHOUSE", status: "ACTIVE", warehouseId: mainWarehouse.id },
   });
   const partner = await prisma.user.create({
-    data: { name: "Brian Otieno", email: "partner@orapads.org", passwordHash: hash("Partner@123"), role: "PARTNER", status: "ACTIVE", organization: "Otieno Distributors", location: "Kisumu", creditLimit: 200000 },
+    data: {
+      name: "Brian Otieno", email: "partner@orapads.org", passwordHash: hash("Partner@123"),
+      role: "PARTNER", status: "ACTIVE", organization: "Otieno Distributors",
+      businessType: "Distributor", phone: "+255 712 445 901",
+      region: "Dar es Salaam", district: "Kinondoni", street: "Plot 14, Nyerere Road, Kariakoo",
+      location: "Plot 14, Nyerere Road, Kariakoo, Kinondoni, Dar es Salaam",
+      taxId: "112-233-445", businessLicense: "BRELA-2021-00891", expectedVolume: "800 packs",
+      preferredPayment: "Credit", paymentTerms: "Net 30", creditLimit: 200000,
+    },
   });
   const partner2 = await prisma.user.create({
-    data: { name: "Grace Mwangi", email: "grace@orapads.org", passwordHash: hash("Partner@123"), role: "PARTNER", status: "ACTIVE", organization: "Mwangi Health Supplies", location: "Nakuru", creditLimit: 150000 },
+    data: {
+      name: "Grace Mwangi", email: "grace@orapads.org", passwordHash: hash("Partner@123"),
+      role: "PARTNER", status: "ACTIVE", organization: "Mwangi Health Supplies",
+      businessType: "Retailer", phone: "+255 755 112 233",
+      region: "Mwanza", district: "Nyamagana", street: "Plot 9, Kenyatta Road",
+      location: "Plot 9, Kenyatta Road, Nyamagana, Mwanza",
+      taxId: "223-344-556", businessLicense: "BRELA-2022-01337", expectedVolume: "400 packs",
+      preferredPayment: "Credit", paymentTerms: "Net 14", creditLimit: 150000,
+    },
   });
   await prisma.user.create({
-    data: { name: "Peter Kamau", email: "applicant@orapads.org", passwordHash: hash("Partner@123"), role: "PARTNER", status: "PENDING", organization: "Kamau Ventures", location: "Eldoret" },
+    data: {
+      name: "Peter Kamau", email: "applicant@orapads.org", passwordHash: hash("Partner@123"),
+      role: "PARTNER", status: "PENDING", organization: "Kamau Ventures",
+      businessType: "Agent", phone: "+255 689 770 540",
+      region: "Arusha", district: "Arusha Urban", street: "Sokoine Road, Kati",
+      location: "Sokoine Road, Kati, Arusha Urban, Arusha",
+      taxId: "334-455-667", expectedVolume: "300 packs", preferredPayment: "Credit",
+    },
   });
 
   // ── The ONLY 3 real Ora products (system-locked) ───────────────────────────

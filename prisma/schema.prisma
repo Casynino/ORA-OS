@@ -135,6 +135,8 @@ model User {
   applicationNote String? // applicant-facing: info the ORA team has requested
   businessType     String? // Agent / Distributor / NGO / School / Retail chain
   region           String?
+  district         String? // administrative district within the region
+  street           String? // street / physical address line
   expectedVolume   String? // expected monthly purchase volume
   preferredPayment String? // Cash / Credit
   businessLicense  String? // licence number

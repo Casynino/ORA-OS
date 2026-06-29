@@ -28,6 +28,8 @@ import {
 import { productMeta } from "@/lib/product-meta";
 import { formatCurrency, humanize } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 const TIMELINE = [
   { icon: Send, label: "Request submitted" },
   { icon: Search, label: "ORA team review" },
