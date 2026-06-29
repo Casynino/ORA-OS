@@ -7,6 +7,7 @@ import {
   Minus,
   Plus,
   Send,
+  Save,
   Wallet,
   CreditCard,
   Truck,
@@ -18,7 +19,7 @@ import {
   MapPin,
   Phone,
 } from "lucide-react";
-import { createRequest } from "@/lib/actions/requests";
+import { createRequest, saveDeliveryDetails } from "@/lib/actions/requests";
 import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,13 +72,29 @@ export function PartnerRequestBuilder({
 
   const [qty, setQty] = useState<Record<string, number>>({});
   const [editDelivery, setEditDelivery] = useState(false);
+  const [savingDelivery, startSaveDelivery] = useTransition();
   const [address, setAddress] = useState(customer.location ?? "");
   const [phone, setPhone] = useState(customer.phone ?? "");
-  const [saveDefault, setSaveDefault] = useState(true);
   const [note, setNote] = useState("");
 
   const set = (id: string, v: number) =>
     setQty((p) => ({ ...p, [id]: Math.max(0, Math.min(v, 100000)) }));
+
+  function saveDelivery() {
+    startSaveDelivery(async () => {
+      const res = await saveDeliveryDetails({
+        deliveryAddress: address.trim() || undefined,
+        contactPhone: phone.trim() || undefined,
+      });
+      if (res.ok) {
+        toast({ variant: "success", title: res.message });
+        setEditDelivery(false);
+        router.refresh();
+      } else {
+        toast({ variant: "error", title: res.error });
+      }
+    });
+  }
 
   const lines = useMemo(
     () => products.filter((p) => (qty[p.id] ?? 0) > 0),
@@ -103,7 +120,8 @@ export function PartnerRequestBuilder({
         contactName: customer.name || undefined,
         deliverTo: customer.organization || undefined,
         note: note || undefined,
-        saveDelivery: editDelivery && saveDefault,
+        // The address used for an order also becomes the saved default.
+        saveDelivery: true,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
@@ -209,10 +227,27 @@ export function PartnerRequestBuilder({
                   <Label>Contact phone</Label>
                   <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. +255…" className="mt-1.5" />
                 </div>
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <input type="checkbox" checked={saveDefault} onChange={(e) => setSaveDefault(e.target.checked)} className="size-4 rounded border-input" />
-                  Save these as my default delivery details
-                </label>
+                <p className="text-xs text-muted-foreground">
+                  Saved as your default — all future orders use this address.
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={saveDelivery} disabled={savingDelivery}>
+                    <Save className="size-3.5" />
+                    {savingDelivery ? "Saving…" : "Save"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={savingDelivery}
+                    onClick={() => {
+                      setAddress(customer.location ?? "");
+                      setPhone(customer.phone ?? "");
+                      setEditDelivery(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="space-y-2.5 text-sm">
