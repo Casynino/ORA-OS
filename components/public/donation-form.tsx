@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { HeartHandshake, Check, Droplets, Coins, PartyPopper } from "lucide-react";
+import { HeartHandshake, Check, Droplets, Coins, PartyPopper, Smartphone } from "lucide-react";
 import { createDonation } from "@/lib/actions/donations";
 import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -21,9 +21,14 @@ type Pkg = {
   padsQuantity: number | null;
 };
 
+// What one pad costs to fund (TSh) — mirrors PER_PAD_TZS on the server.
+const PER_PAD_TZS = 500;
+
+type DoneInfo = { code: string; paymentInitiated: boolean; instructions?: string };
+
 export function DonationForm({ packages }: { packages: Pkg[] }) {
   const [pending, startTransition] = useTransition();
-  const [done, setDone] = useState<string | null>(null);
+  const [done, setDone] = useState<DoneInfo | null>(null);
 
   const [packageId, setPackageId] = useState<string | "custom">(
     packages[0]?.id ?? "custom",
@@ -33,13 +38,30 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
   const [quantity, setQuantity] = useState("50");
   const [donorName, setDonorName] = useState("");
   const [donorEmail, setDonorEmail] = useState("");
+  const [donorPhone, setDonorPhone] = useState("");
   const [message, setMessage] = useState("");
 
   const isCustom = packageId === "custom";
+  const selectedPkg = packages.find((p) => p.id === packageId);
+
+  // The money that will be charged to the donor's phone (TSh).
+  const charge = isCustom
+    ? type === "MONEY"
+      ? Number(amount) || 0
+      : (Number(quantity) || 0) * PER_PAD_TZS
+    : selectedPkg
+      ? selectedPkg.type === "MONEY"
+        ? selectedPkg.amount ?? 0
+        : selectedPkg.amount ?? (selectedPkg.padsQuantity ?? 0) * PER_PAD_TZS
+      : 0;
 
   function submit() {
     if (!donorName.trim()) {
       toast({ variant: "error", title: "Please enter your name." });
+      return;
+    }
+    if (!donorPhone.trim()) {
+      toast({ variant: "error", title: "Enter your mobile number to pay." });
       return;
     }
     const input = isCustom
@@ -47,6 +69,7 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
           type,
           donorName,
           donorEmail: donorEmail || undefined,
+          donorPhone,
           message: message || undefined,
           amount: type === "MONEY" ? Number(amount) : undefined,
           quantity: type === "PADS" ? Number(quantity) : undefined,
@@ -55,6 +78,7 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
           type: "MONEY" as const, // overridden server-side by package
           donorName,
           donorEmail: donorEmail || undefined,
+          donorPhone,
           message: message || undefined,
           packageId,
         };
@@ -62,7 +86,11 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
     startTransition(async () => {
       const res = await createDonation(input);
       if (res.ok) {
-        setDone(res.data?.code ?? "");
+        setDone({
+          code: res.data?.code ?? "",
+          paymentInitiated: res.data?.paymentInitiated ?? false,
+          instructions: res.data?.instructions,
+        });
         toast({ variant: "success", title: res.message });
       } else {
         toast({ variant: "error", title: res.error });
@@ -75,14 +103,32 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
       <Card className="shadow-glow">
         <CardContent className="flex flex-col items-center p-10 text-center">
           <span className="flex size-14 items-center justify-center rounded-full bg-success/15 text-success">
-            <PartyPopper className="size-7" />
+            {done.paymentInitiated ? (
+              <Smartphone className="size-7" />
+            ) : (
+              <PartyPopper className="size-7" />
+            )}
           </span>
           <h3 className="mt-4 font-display text-xl font-semibold">
-            Thank you, {donorName.split(" ")[0]}!
+            {done.paymentInitiated
+              ? "Approve the payment on your phone"
+              : `Thank you, ${donorName.split(" ")[0]}!`}
           </h3>
           <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-            Your donation has been recorded{done ? ` as ${done}` : ""}. Our team
-            will confirm and allocate it to the communities that need it most.
+            {done.paymentInitiated ? (
+              <>
+                {done.instructions ??
+                  "Check your phone for the mobile money prompt and enter your PIN to approve."}{" "}
+                Your gift{done.code ? ` (${done.code})` : ""} is confirmed the
+                moment payment clears.
+              </>
+            ) : (
+              <>
+                Your donation has been recorded{done.code ? ` as ${done.code}` : ""}.
+                Our team will confirm and allocate it to the communities that
+                need it most.
+              </>
+            )}
           </p>
           <Button
             variant="outline"
@@ -221,16 +267,32 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
           />
         </div>
         <div>
-          <Label htmlFor="donorEmail">Email (optional)</Label>
+          <Label htmlFor="donorPhone">Mobile number</Label>
           <Input
-            id="donorEmail"
-            type="email"
-            value={donorEmail}
-            onChange={(e) => setDonorEmail(e.target.value)}
-            placeholder="you@example.com"
+            id="donorPhone"
+            type="tel"
+            inputMode="tel"
+            value={donorPhone}
+            onChange={(e) => setDonorPhone(e.target.value)}
+            placeholder="0752 000 000"
             className="mt-1.5"
           />
+          <p className="mt-1 text-xs text-muted-foreground">
+            We&apos;ll send a mobile money prompt to this number.
+          </p>
         </div>
+      </div>
+
+      <div>
+        <Label htmlFor="donorEmail">Email (optional)</Label>
+        <Input
+          id="donorEmail"
+          type="email"
+          value={donorEmail}
+          onChange={(e) => setDonorEmail(e.target.value)}
+          placeholder="you@example.com"
+          className="mt-1.5"
+        />
       </div>
 
       <div>
@@ -252,11 +314,16 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
         disabled={pending}
       >
         <HeartHandshake className="size-5" />
-        {pending ? "Recording your gift…" : "Complete donation"}
+        {pending
+          ? "Sending payment request…"
+          : charge > 0
+            ? `Donate TSh ${formatNumber(charge)}`
+            : "Complete donation"}
       </Button>
-      <p className="text-center text-xs text-muted-foreground">
-        No payment is collected here — our team will reach out to confirm and
-        receive your donation securely.
+      <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+        <Smartphone className="size-3.5" />
+        Pay securely by mobile money — approve the prompt on your phone. Funds go
+        straight to ORA.
       </p>
     </div>
   );
