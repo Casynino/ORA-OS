@@ -18,13 +18,18 @@ import { Badge } from "@/components/ui/badge";
 import { Reveal } from "@/components/ui/reveal";
 import { CountUp } from "@/components/ui/count-up";
 import { PhotoGallery } from "@/components/public/photo-gallery";
+import { HomeLivePulse } from "@/components/public/home-live-pulse";
 import { getPublicImpactStats } from "@/lib/stats";
+import { getDonationFeed } from "@/lib/services/donation-feed";
 
 export const metadata: Metadata = {
   title: "Impact",
   description:
     "ORA is a movement to end period poverty in Tanzania — not a shop. See the change we're making, in lives, schools and communities.",
 };
+
+// Live money raised + the live donation pulse must always be current.
+export const dynamic = "force-dynamic";
 
 const story = [
   {
@@ -56,19 +61,20 @@ const galleryPhotos = [
 ].map((e) => `/ora/event/${e}.jpg`);
 
 export default async function ImpactPage() {
-  const [stories, stats] = await Promise.all([
+  const [stories, stats, feed] = await Promise.all([
     prisma.impactStory.findMany({
       where: { published: true },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     }),
     getPublicImpactStats(),
+    getDonationFeed(),
   ]);
 
   const headline = [
-    { label: "Pads distributed", value: stats.padsDistributed, suffix: "+" },
-    { label: "Girls reached", value: stats.livesReached, suffix: "+" },
-    { label: "Communities reached", value: stats.communities, suffix: "+" },
-    { label: "Active partners", value: stats.partners, suffix: "" },
+    { label: "Total donated", value: stats.moneyDonated, prefix: "TZS ", suffix: "" },
+    { label: "Pads distributed", value: stats.padsDistributed, prefix: "", suffix: "+" },
+    { label: "Girls reached", value: stats.livesReached, prefix: "", suffix: "+" },
+    { label: "Communities reached", value: stats.communities, prefix: "", suffix: "+" },
   ];
 
   return (
@@ -109,6 +115,9 @@ export default async function ImpactPage() {
                 <ArrowRight className="size-4" />
               </Link>
             </div>
+
+            {/* live donations — same simple cycling line as the home page */}
+            <HomeLivePulse initial={feed} tone="theme" className="mt-7" />
           </Reveal>
 
           <Reveal delay={0.1}>
@@ -142,7 +151,7 @@ export default async function ImpactPage() {
             <Reveal key={h.label} delay={i * 0.08}>
               <div className="glass-card h-full rounded-2xl p-6 text-center">
                 <div className="font-display text-4xl font-bold text-primary">
-                  <CountUp value={h.value} suffix={h.suffix} />
+                  <CountUp value={h.value} prefix={h.prefix} suffix={h.suffix} />
                 </div>
                 <div className="mt-1 text-sm text-muted-foreground">
                   {h.label}
