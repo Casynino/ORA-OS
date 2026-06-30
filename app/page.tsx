@@ -28,7 +28,7 @@ import { ORA_CONTACT } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { getPublicImpactStats } from "@/lib/stats";
 import { getDonationFeed } from "@/lib/services/donation-feed";
-import { LiveDonationFeed } from "@/components/public/live-donation-feed";
+import { HomeLiveActivity } from "@/components/public/home-live-activity";
 
 // Always render the public impact figures live from the database (never a
 // build-time snapshot), so donations & stats are always current.
@@ -141,10 +141,10 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Subtle live pulse — small floating activity feed */}
-      <section className="container relative z-10 -mt-6 pb-2">
-        <Reveal className="mx-auto max-w-xs sm:ml-auto sm:mr-0">
-          <LiveDonationFeed initial={donationFeed} compact />
+      {/* Subtle live pulse — small floating love notes */}
+      <section className="container relative z-10 -mt-4 pb-4">
+        <Reveal className="ml-auto max-w-xs">
+          <HomeLiveActivity initial={donationFeed} />
         </Reveal>
       </section>
 
