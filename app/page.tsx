@@ -28,7 +28,7 @@ import { ORA_CONTACT } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { getPublicImpactStats } from "@/lib/stats";
 import { getDonationFeed } from "@/lib/services/donation-feed";
-import { HomeLiveActivity } from "@/components/public/home-live-activity";
+import { HomeLivePulse } from "@/components/public/home-live-pulse";
 
 // Always render the public impact figures live from the database (never a
 // build-time snapshot), so donations & stats are always current.
@@ -133,19 +133,9 @@ export default async function HomePage() {
             </div>
           </Reveal>
           <Reveal delay={0.34}>
-            <p className="mt-5 flex items-center gap-2 text-sm text-white/55">
-              <span className="size-2 animate-pulse rounded-full bg-success" />
-              Live updates from communities we serve
-            </p>
+            <HomeLivePulse initial={donationFeed} className="mt-5" />
           </Reveal>
         </div>
-      </section>
-
-      {/* Subtle live pulse — small floating love notes */}
-      <section className="container relative z-10 -mt-4 pb-4">
-        <Reveal className="ml-auto max-w-xs">
-          <HomeLiveActivity initial={donationFeed} />
-        </Reveal>
       </section>
 
       {/* Why Ora Exists */}
