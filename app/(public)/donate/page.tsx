@@ -14,7 +14,8 @@ import { prisma } from "@/lib/db";
 import { getDonationFeed } from "@/lib/services/donation-feed";
 import { DonationForm } from "@/components/public/donation-form";
 import { LiveDonationFeed } from "@/components/public/live-donation-feed";
-import { AmbientDonations, LiveImpactNumbers } from "@/components/public/donate-ambient";
+import { LiveImpactNumbers } from "@/components/public/donate-ambient";
+import { HomeLivePulse } from "@/components/public/home-live-pulse";
 import { Reveal } from "@/components/ui/reveal";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -109,11 +110,11 @@ export default async function DonatePage() {
                 <ArrowDown className="size-4" />
               </Link>
             </div>
+
+            {/* live donations — plain cycling line, like the home page */}
+            <HomeLivePulse initial={feed} className="mt-7" />
           </Reveal>
         </div>
-
-        {/* ambient floating donation pill */}
-        <AmbientDonations initial={feed} />
 
         {/* scroll cue */}
         <Link
