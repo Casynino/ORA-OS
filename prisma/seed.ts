@@ -97,22 +97,14 @@ async function main() {
   }
   const P = (sku: string) => products.find((x) => x.sku === sku)!.id;
 
-  // ── Donation packages + guest donations ────────────────────────────────────
+  // ── Donation packages (pad-sponsorship tiers) ──────────────────────────────
+  // Real donations only — collected live via the NTZS mobile-money rail.
   await prisma.donationPackage.createMany({
     data: [
-      { name: "School Pack", description: "A full term of dignity for one girl.", type: "PADS", padsQuantity: 50, sortOrder: 1 },
-      { name: "Classroom Pack", description: "Keep a whole classroom in school.", type: "PADS", padsQuantity: 200, sortOrder: 2 },
-      { name: "Supporter", description: "Fund pads where they're needed most.", type: "MONEY", amount: 1000, sortOrder: 3 },
-      { name: "Champion", description: "Power dignity at scale.", type: "MONEY", amount: 5000, sortOrder: 4 },
-    ],
-  });
-  await prisma.donation.createMany({
-    data: [
-      { code: "DON-1001", type: "MONEY", donorName: "Sarah Njoroge", donorEmail: "sarah@example.com", amount: 5000, status: "DISTRIBUTED", distributedTo: "Kibera Girls School", message: "Keep up the great work!" },
-      { code: "DON-1002", type: "PADS", donorName: "Daniel Kiptoo", quantity: 200, status: "ALLOCATED", distributedTo: "Mathare Community" },
-      { code: "DON-1003", type: "MONEY", donorName: "Jane Wanjiru", amount: 1000, status: "RECEIVED" },
-      { code: "DON-1004", type: "PADS", donorName: "Anonymous", quantity: 50, status: "PENDING" },
-      { code: "DON-1005", type: "MONEY", donorName: "Lydia Achieng", amount: 2500, status: "DISTRIBUTED", distributedTo: "Turkana Outreach" },
+      { name: "Sponsor 10 Pads",  description: "Protect one girl this month.",       type: "PADS", padsQuantity: 10,  sortOrder: 1 },
+      { name: "Sponsor 25 Pads",  description: "Keep a girl in school all term.",     type: "PADS", padsQuantity: 25,  sortOrder: 2 },
+      { name: "Sponsor 50 Pads",  description: "A full term of dignity for one girl.", type: "PADS", padsQuantity: 50,  sortOrder: 3 },
+      { name: "Sponsor 100 Pads", description: "Reach a whole classroom of girls.",    type: "PADS", padsQuantity: 100, sortOrder: 4 },
     ],
   });
 

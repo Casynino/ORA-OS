@@ -15,6 +15,8 @@ export const metadata: Metadata = {
     "Donate pads or funds to power menstrual dignity. Guest donations welcome — no account needed.",
 };
 
+export const dynamic = "force-dynamic";
+
 const benefits = [
   {
     icon: HeartHandshake,

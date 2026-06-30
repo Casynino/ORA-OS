@@ -181,7 +181,9 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
                 </p>
                 <Badge variant="secondary" className="mt-3">
                   {p.type === "PADS"
-                    ? `${formatNumber(p.padsQuantity ?? 0)} pads`
+                    ? `${formatNumber(p.padsQuantity ?? 0)} pads · TSh ${formatNumber(
+                        p.amount ?? (p.padsQuantity ?? 0) * PER_PAD_TZS,
+                      )}`
                     : `TSh ${formatNumber(p.amount ?? 0)}`}
                 </Badge>
               </button>
@@ -314,16 +316,13 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
         disabled={pending}
       >
         <HeartHandshake className="size-5" />
-        {pending
-          ? "Sending payment request…"
-          : charge > 0
-            ? `Donate TSh ${formatNumber(charge)}`
-            : "Complete donation"}
+        {pending ? "Sending payment request…" : "Donate Now"}
       </Button>
       <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
         <Smartphone className="size-3.5" />
-        Pay securely by mobile money — approve the prompt on your phone. Funds go
-        straight to ORA.
+        {charge > 0
+          ? `You'll pay TSh ${formatNumber(charge)} by mobile money — approve the prompt on your phone.`
+          : "Pay securely by mobile money — funds go straight to ORA."}
       </p>
     </div>
   );
