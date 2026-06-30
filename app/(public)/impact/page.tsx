@@ -66,7 +66,7 @@ export default async function ImpactPage() {
 
   const headline = [
     { label: "Pads distributed", value: stats.padsDistributed, suffix: "+" },
-    { label: "Lives reached", value: stats.livesReached, suffix: "+" },
+    { label: "Girls reached", value: stats.livesReached, suffix: "+" },
     { label: "Communities reached", value: stats.communities, suffix: "+" },
     { label: "Active partners", value: stats.partners, suffix: "" },
   ];
