@@ -396,6 +396,36 @@
   animation: float-slow 11s ease-in-out infinite reverse;
 }
 
+/* Live donation wall */
+@keyframes live-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+.live-shimmer {
+  background-size: 200% 100%;
+  animation: live-shimmer 3s linear infinite;
+}
+@keyframes donation-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.97);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(0) scale(1.015);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+.donation-pop {
+  animation: donation-pop 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .aurora-blob,
   .text-gradient,
@@ -404,6 +434,8 @@
   .animate-marquee-reverse,
   .animate-float-slow,
   .animate-float-slow-rev,
+  .live-shimmer,
+  .donation-pop,
   .star,
   .shooting-star {
     animation: none;
