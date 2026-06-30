@@ -1,15 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { HeartHandshake, Check, Droplets, Coins, PartyPopper, Smartphone } from "lucide-react";
+import { Check, Heart, PartyPopper, Smartphone, ShieldCheck, Pencil } from "lucide-react";
 import { createDonation } from "@/lib/actions/donations";
 import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { cn, formatNumber } from "@/lib/utils";
 
 type Pkg = {
@@ -26,6 +23,12 @@ const PER_PAD_TZS = 500;
 
 type DoneInfo = { code: string; paymentInitiated: boolean; instructions?: string };
 
+function priceOf(p: Pkg) {
+  return p.type === "MONEY"
+    ? p.amount ?? 0
+    : p.amount ?? (p.padsQuantity ?? 0) * PER_PAD_TZS;
+}
+
 export function DonationForm({ packages }: { packages: Pkg[] }) {
   const [pending, startTransition] = useTransition();
   const [done, setDone] = useState<DoneInfo | null>(null);
@@ -33,9 +36,7 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
   const [packageId, setPackageId] = useState<string | "custom">(
     packages[0]?.id ?? "custom",
   );
-  const [type, setType] = useState<"PADS" | "MONEY">("MONEY");
-  const [amount, setAmount] = useState("1000");
-  const [quantity, setQuantity] = useState("50");
+  const [amount, setAmount] = useState("5000");
   const [donorName, setDonorName] = useState("");
   const [donorEmail, setDonorEmail] = useState("");
   const [donorPhone, setDonorPhone] = useState("");
@@ -43,36 +44,22 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
 
   const isCustom = packageId === "custom";
   const selectedPkg = packages.find((p) => p.id === packageId);
-
-  // The money that will be charged to the donor's phone (TSh).
-  const charge = isCustom
-    ? type === "MONEY"
-      ? Number(amount) || 0
-      : (Number(quantity) || 0) * PER_PAD_TZS
-    : selectedPkg
-      ? selectedPkg.type === "MONEY"
-        ? selectedPkg.amount ?? 0
-        : selectedPkg.amount ?? (selectedPkg.padsQuantity ?? 0) * PER_PAD_TZS
-      : 0;
+  const charge = isCustom ? Number(amount) || 0 : selectedPkg ? priceOf(selectedPkg) : 0;
 
   function submit() {
-    if (!donorName.trim()) {
-      toast({ variant: "error", title: "Please enter your name." });
-      return;
-    }
-    if (!donorPhone.trim()) {
-      toast({ variant: "error", title: "Enter your mobile number to pay." });
-      return;
-    }
+    if (!donorName.trim())
+      return toast({ variant: "error", title: "Please enter your name." });
+    if (!donorPhone.trim())
+      return toast({ variant: "error", title: "Enter your mobile number to pay." });
+
     const input = isCustom
       ? {
-          type,
+          type: "MONEY" as const,
           donorName,
           donorEmail: donorEmail || undefined,
           donorPhone,
           message: message || undefined,
-          amount: type === "MONEY" ? Number(amount) : undefined,
-          quantity: type === "PADS" ? Number(quantity) : undefined,
+          amount: Number(amount),
         }
       : {
           type: "MONEY" as const, // overridden server-side by package
@@ -100,55 +87,65 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
 
   if (done) {
     return (
-      <Card className="shadow-glow">
-        <CardContent className="flex flex-col items-center p-10 text-center">
-          <span className="flex size-14 items-center justify-center rounded-full bg-success/15 text-success">
-            {done.paymentInitiated ? (
-              <Smartphone className="size-7" />
-            ) : (
-              <PartyPopper className="size-7" />
-            )}
-          </span>
-          <h3 className="mt-4 font-display text-xl font-semibold">
-            {done.paymentInitiated
-              ? "Approve the payment on your phone"
-              : `Thank you, ${donorName.split(" ")[0]}!`}
-          </h3>
-          <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-            {done.paymentInitiated ? (
-              <>
-                {done.instructions ??
-                  "Check your phone for the mobile money prompt and enter your PIN to approve."}{" "}
-                Your gift{done.code ? ` (${done.code})` : ""} is confirmed the
-                moment payment clears.
-              </>
-            ) : (
-              <>
-                Your donation has been recorded{done.code ? ` as ${done.code}` : ""}.
-                Our team will confirm and allocate it to the communities that
-                need it most.
-              </>
-            )}
-          </p>
-          <Button
-            variant="outline"
-            className="mt-6"
-            onClick={() => {
-              setDone(null);
-              setMessage("");
-            }}
-          >
-            Make another donation
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center px-2 py-6 text-center sm:py-8">
+        <span className="relative flex size-16 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-white shadow-glow">
+          {[0, 1, 2, 3].map((i) => (
+            <span
+              key={i}
+              className="float-heart absolute text-primary"
+              style={{ left: `${44 + (i - 1.5) * 12}%`, animationDelay: `${i * 0.1}s` }}
+            >
+              <Heart className="size-3.5 fill-primary" />
+            </span>
+          ))}
+          {done.paymentInitiated ? (
+            <Smartphone className="size-7" />
+          ) : (
+            <PartyPopper className="size-7" />
+          )}
+        </span>
+        <h3 className="mt-4 font-display text-xl font-bold tracking-tight">
+          {done.paymentInitiated
+            ? "Approve it on your phone 📲"
+            : `Thank you, ${donorName.split(" ")[0]}!`}
+        </h3>
+        <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+          {done.paymentInitiated ? (
+            <>
+              {done.instructions ??
+                "Check your phone for the mobile-money prompt and enter your PIN."}{" "}
+              Your gift{done.code ? ` (${done.code})` : ""} confirms the moment it clears
+              — watch it appear in the live feed.
+            </>
+          ) : (
+            <>
+              Your donation has been recorded{done.code ? ` as ${done.code}` : ""}. Our
+              team will confirm and allocate it where it&apos;s needed most.
+            </>
+          )}
+        </p>
+        <Button
+          variant="outline"
+          className="mt-6 rounded-full"
+          onClick={() => {
+            setDone(null);
+            setMessage("");
+          }}
+        >
+          Make another gift
+        </Button>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {packages.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2">
+    <div className="space-y-5">
+      {/* Impact tiers */}
+      <div>
+        <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Choose your impact
+        </p>
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
           {packages.map((p) => {
             const selected = packageId === p.id;
             return (
@@ -157,173 +154,148 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
                 type="button"
                 onClick={() => setPackageId(p.id)}
                 className={cn(
-                  "relative rounded-xl border p-4 text-left transition-all",
+                  "group relative flex flex-col items-start rounded-2xl border p-3 text-left transition-all duration-200 hover:-translate-y-0.5",
                   selected
-                    ? "border-primary bg-primary/5 ring-2 ring-primary/30"
+                    ? "border-primary bg-primary/[0.07] shadow-glow ring-1 ring-primary/40"
                     : "border-border hover:border-primary/40",
                 )}
               >
+                <span
+                  className={cn(
+                    "flex size-7 items-center justify-center rounded-lg transition-colors",
+                    selected
+                      ? "bg-gradient-to-br from-primary to-accent text-white"
+                      : "bg-primary/10 text-primary group-hover:bg-primary/20",
+                  )}
+                >
+                  <Heart className="size-3.5" />
+                </span>
+                <span className="mt-2 font-display text-lg font-bold leading-none">
+                  {formatNumber(p.padsQuantity ?? 0)}
+                  <span className="ml-1 text-[11px] font-medium text-muted-foreground">
+                    packs
+                  </span>
+                </span>
+                <span className="mt-1 text-sm font-bold text-primary">
+                  TSh {formatNumber(priceOf(p))}
+                </span>
                 {selected && (
-                  <span className="absolute right-3 top-3 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                    <Check className="size-3" />
+                  <span className="absolute right-2 top-2 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <Check className="size-2.5" />
                   </span>
                 )}
-                <div className="flex items-center gap-2">
-                  {p.type === "PADS" ? (
-                    <Droplets className="size-4 text-accent" />
-                  ) : (
-                    <Coins className="size-4 text-primary" />
-                  )}
-                  <span className="font-semibold">{p.name}</span>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {p.description}
-                </p>
-                <Badge variant="secondary" className="mt-3">
-                  {p.type === "PADS"
-                    ? `${formatNumber(p.padsQuantity ?? 0)} pads · TSh ${formatNumber(
-                        p.amount ?? (p.padsQuantity ?? 0) * PER_PAD_TZS,
-                      )}`
-                    : `TSh ${formatNumber(p.amount ?? 0)}`}
-                </Badge>
               </button>
             );
           })}
-          <button
-            type="button"
-            onClick={() => setPackageId("custom")}
-            className={cn(
-              "rounded-xl border border-dashed p-4 text-left transition-all",
-              isCustom
-                ? "border-primary bg-primary/5 ring-2 ring-primary/30"
-                : "border-border hover:border-primary/40",
-            )}
-          >
-            <span className="font-semibold">Custom donation</span>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Choose your own amount or number of pads.
-            </p>
-          </button>
         </div>
-      )}
 
-      {isCustom && (
-        <div className="grid gap-4 rounded-xl border border-border bg-muted/30 p-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <Label>Donation type</Label>
-            <div className="mt-2 inline-flex rounded-lg bg-muted p-1">
-              {(["MONEY", "PADS"] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setType(t)}
-                  className={cn(
-                    "rounded-md px-4 py-1.5 text-sm font-medium transition-all",
-                    type === t
-                      ? "bg-card shadow-sm"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {t === "MONEY" ? "Money" : "Pads"}
-                </button>
-              ))}
-            </div>
-          </div>
-          {type === "MONEY" ? (
-            <div>
-              <Label htmlFor="amount">Amount (TSh)</Label>
+        {/* Custom amount */}
+        <button
+          type="button"
+          onClick={() => setPackageId("custom")}
+          className={cn(
+            "mt-2.5 flex w-full items-center gap-3 rounded-2xl border border-dashed p-3 text-left transition-all",
+            isCustom
+              ? "border-primary bg-primary/[0.07] ring-1 ring-primary/40"
+              : "border-border hover:border-primary/40",
+          )}
+        >
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Pencil className="size-3.5" />
+          </span>
+          {isCustom ? (
+            <div className="flex flex-1 items-center gap-2">
+              <span className="text-sm font-medium text-muted-foreground">TSh</span>
               <Input
-                id="amount"
                 type="number"
-                min={1}
+                min={500}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="mt-1.5"
+                onClick={(e) => e.stopPropagation()}
+                className="h-9 flex-1"
+                placeholder="Enter amount"
               />
             </div>
           ) : (
-            <div>
-              <Label htmlFor="quantity">Number of pads</Label>
-              <Input
-                id="quantity"
-                type="number"
-                min={1}
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                className="mt-1.5"
-              />
-            </div>
+            <span className="text-sm font-medium">Enter a custom amount</span>
           )}
-        </div>
-      )}
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="donorName">Your name</Label>
-          <Input
-            id="donorName"
-            value={donorName}
-            onChange={(e) => setDonorName(e.target.value)}
-            placeholder="Jane Wanjiru"
-            className="mt-1.5"
-          />
-        </div>
-        <div>
-          <Label htmlFor="donorPhone">Mobile number</Label>
-          <Input
-            id="donorPhone"
-            type="tel"
-            inputMode="tel"
-            value={donorPhone}
-            onChange={(e) => setDonorPhone(e.target.value)}
-            placeholder="0752 000 000"
-            className="mt-1.5"
-          />
-          <p className="mt-1 text-xs text-muted-foreground">
-            We&apos;ll send a mobile money prompt to this number.
-          </p>
-        </div>
+        </button>
       </div>
 
-      <div>
-        <Label htmlFor="donorEmail">Email (optional)</Label>
-        <Input
-          id="donorEmail"
-          type="email"
-          value={donorEmail}
-          onChange={(e) => setDonorEmail(e.target.value)}
-          placeholder="you@example.com"
-          className="mt-1.5"
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="message">Message (optional)</Label>
-        <Textarea
-          id="message"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Add a note of support…"
-          className="mt-1.5"
-        />
+      {/* Donor details */}
+      <div className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Your name">
+            <Input
+              value={donorName}
+              onChange={(e) => setDonorName(e.target.value)}
+              placeholder="Jane Wanjiru"
+            />
+          </Field>
+          <Field label="Mobile number" hint="We'll send a mobile-money prompt here.">
+            <Input
+              type="tel"
+              inputMode="tel"
+              value={donorPhone}
+              onChange={(e) => setDonorPhone(e.target.value)}
+              placeholder="0752 000 000"
+            />
+          </Field>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Email (optional)">
+            <Input
+              type="email"
+              value={donorEmail}
+              onChange={(e) => setDonorEmail(e.target.value)}
+              placeholder="you@example.com"
+            />
+          </Field>
+          <Field label="Message (optional)">
+            <Input
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="A note of support…"
+            />
+          </Field>
+        </div>
       </div>
 
       <Button
-        variant="accent"
         size="lg"
-        className="w-full"
+        className="group h-12 w-full rounded-full bg-gradient-to-r from-primary to-accent text-base shadow-glow transition-transform hover:scale-[1.01]"
         onClick={submit}
         disabled={pending}
       >
-        <HeartHandshake className="size-5" />
-        {pending ? "Sending payment request…" : "Donate Now"}
+        <Heart className="size-5 transition-transform group-hover:scale-110" />
+        {pending
+          ? "Sending…"
+          : charge > 0
+            ? `Donate TSh ${formatNumber(charge)}`
+            : "Donate Now"}
       </Button>
       <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
-        <Smartphone className="size-3.5" />
-        {charge > 0
-          ? `You'll pay TSh ${formatNumber(charge)} by mobile money — approve the prompt on your phone.`
-          : "Pay securely by mobile money — funds go straight to ORA."}
+        <ShieldCheck className="size-3.5 text-success" />
+        Secure mobile-money payment — funds go straight to ORA.
       </p>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+      <div className="mt-1.5">{children}</div>
+      {hint && <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }

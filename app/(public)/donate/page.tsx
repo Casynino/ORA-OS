@@ -1,130 +1,228 @@
 import type { Metadata } from "next";
-import Image from "next/image";
-import { Truck, HeartHandshake, GraduationCap, Sparkles } from "lucide-react";
+import Link from "next/link";
+import {
+  Sparkles,
+  ShieldCheck,
+  Heart,
+  Coins,
+  Droplets,
+  Users,
+  Smartphone,
+  Send,
+  PackageCheck,
+  ChevronDown,
+} from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getPublicImpactStats } from "@/lib/stats";
 import { getDonationFeed } from "@/lib/services/donation-feed";
 import { DonationForm } from "@/components/public/donation-form";
 import { LiveDonationFeed } from "@/components/public/live-donation-feed";
+import { AuroraBackground } from "@/components/public/aurora-background";
 import { Badge } from "@/components/ui/badge";
 import { Reveal } from "@/components/ui/reveal";
 import { CountUp } from "@/components/ui/count-up";
-import { formatNumber } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Donate",
   description:
-    "Donate pads or funds to power menstrual dignity. Guest donations welcome — no account needed.",
+    "Power menstrual dignity across Tanzania. Give securely by mobile money — no account needed, funds go straight to ORA.",
 };
 
 export const dynamic = "force-dynamic";
 
-const benefits = [
+const faqs = [
   {
-    icon: HeartHandshake,
-    title: "Straight to girls who need it",
-    body: "Your gift reaches schools and villages across Tanzania.",
+    q: "Is my payment secure?",
+    a: "Yes. Payments are collected by NTZS mobile money and settle straight to ORA's treasury. You approve with your own PIN on your phone — we never see it.",
   },
   {
-    icon: GraduationCap,
-    title: "Keep girls in school",
-    body: "From one pack to a whole classroom, every gift protects a girl's education.",
+    q: "How does it work?",
+    a: "Pick a pack amount, enter your mobile number, and approve the prompt that pops up on your phone. The whole thing takes a few seconds.",
   },
   {
-    icon: Truck,
-    title: "Pads or funds",
-    body: "Give pads or money — both become real protection, in real hands.",
+    q: "Do I need an account?",
+    a: "No. Giving is open to everyone — just your name and mobile number. No sign-up, no app to download.",
+  },
+  {
+    q: "Where does my money go?",
+    a: "Every shilling funds ORA pads delivered to girls in schools and villages across Tanzania. You can watch gifts arrive in the live feed.",
   },
 ];
 
 export default async function DonatePage() {
   const [packages, stats, feed] = await Promise.all([
-    prisma.donationPackage.findMany({
-      where: { isActive: true },
-      orderBy: { sortOrder: "asc" },
-    }),
+    prisma.donationPackage.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } }),
     getPublicImpactStats(),
     getDonationFeed(),
   ]);
 
+  const heroStats = [
+    { icon: Coins, label: "Raised", value: feed.counters.moneyRaised, prefix: "TSh " },
+    { icon: Droplets, label: "Pads sponsored", value: feed.counters.padsSponsored },
+    { icon: Heart, label: "Girls reached", value: stats.girlsReached },
+    { icon: Users, label: "Donors", value: feed.counters.donors },
+  ];
+
+  const steps = [
+    { icon: Heart, title: "Pick an amount", body: "Sponsor packs or give a custom amount." },
+    { icon: Smartphone, title: "Approve on your phone", body: "A mobile-money prompt pops up instantly." },
+    { icon: PackageCheck, title: "Reach a girl", body: "Your gift becomes real pads in real hands." },
+  ];
+
   return (
-    <div className="container py-16">
-      <Reveal className="mx-auto max-w-2xl text-center">
-        <Badge variant="accent" className="mx-auto gap-1.5">
-          <Sparkles className="size-3.5" />
-          Every gift counts
-        </Badge>
-        <h1 className="mt-4 font-display text-4xl font-bold tracking-tight sm:text-5xl">
-          Power dignity with <span className="text-gradient">your donation</span>
-        </h1>
-        <p className="mt-3 text-lg text-muted-foreground">
-          Choose a package or give a custom amount — every gift turns into real
-          pads in the hands of girls who need them most.
-        </p>
-      </Reveal>
+    <div className="relative">
+      <AuroraBackground />
 
-      {/* One live number */}
-      <Reveal className="mx-auto mt-10 max-w-md">
-        <div className="glass-card rounded-3xl p-7 text-center">
-          <p className="text-sm font-medium text-muted-foreground">
-            Raised so far
+      <div className="container relative py-12 sm:py-16">
+        {/* ── Hero ── */}
+        <Reveal className="mx-auto max-w-3xl text-center">
+          <Badge variant="accent" className="mx-auto gap-1.5">
+            <Sparkles className="size-3.5" />
+            Secure mobile-money giving
+          </Badge>
+          <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+            Keep a girl in <span className="text-gradient">school</span>
+          </h1>
+          <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground sm:text-lg">
+            A single pack of pads can be the difference between a missed week and a
+            full term. Give in seconds — straight from your phone.
           </p>
-          <div className="mt-1 font-display text-5xl font-bold tracking-tight text-gradient">
-            <CountUp value={stats.moneyDonated} prefix="TSh " />
+
+          {/* live impact counters */}
+          <div className="mx-auto mt-8 grid max-w-2xl grid-cols-2 gap-2.5 sm:grid-cols-4">
+            {heroStats.map((s) => (
+              <div
+                key={s.label}
+                className="rounded-2xl border border-border/60 bg-card/50 p-3 backdrop-blur-md"
+              >
+                <s.icon className="mx-auto size-4 text-primary" />
+                <div className="mt-1.5 font-display text-xl font-bold tracking-tight">
+                  <CountUp value={s.value} prefix={s.prefix ?? ""} />
+                </div>
+                <div className="text-[11px] text-muted-foreground">{s.label}</div>
+              </div>
+            ))}
           </div>
-          <p className="mt-3 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-            <span className="size-1.5 animate-pulse rounded-full bg-success" />
-            Live · {formatNumber(stats.girlsReached)} girls reached and counting
-          </p>
-        </div>
-      </Reveal>
 
-      {/* Live donation feed — gifts pop in as they arrive */}
-      <Reveal className="mx-auto mt-8 max-w-3xl">
-        <LiveDonationFeed initial={feed} showCounters />
-      </Reveal>
-
-      <div className="mt-12 grid gap-8 lg:grid-cols-[1fr_1.2fr]">
-        <Reveal className="space-y-6">
-          <div className="relative aspect-[4/3] overflow-hidden rounded-3xl shadow-soft ring-1 ring-border">
-            <Image
-              src="/ora/event/e40.jpg"
-              alt="ORA reaching girls in Tanzania"
-              fill
-              sizes="(max-width:1024px) 100vw, 40vw"
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent" />
-            <p className="absolute inset-x-4 bottom-3 font-medium text-white">
-              Your gift, in real hands.
+          <div className="mt-8 flex flex-col items-center gap-3">
+            <Link
+              href="#give"
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "h-12 rounded-full bg-gradient-to-r from-primary to-accent px-8 text-base shadow-glow transition-transform hover:scale-[1.02]",
+              )}
+            >
+              <Heart className="size-5" />
+              Donate now
+            </Link>
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ShieldCheck className="size-3.5 text-success" />
+              No account needed · funds go straight to ORA
             </p>
           </div>
-
-          {benefits.map((b) => (
-            <div key={b.title} className="flex gap-4">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <b.icon className="size-5" />
-              </span>
-              <div>
-                <h3 className="font-semibold">{b.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{b.body}</p>
-              </div>
-            </div>
-          ))}
         </Reveal>
 
-        <Reveal delay={0.1}>
-          <div className="glass-card rounded-3xl p-6 sm:p-8">
-            <DonationForm
-              packages={packages.map((p) => ({
-                id: p.id,
-                name: p.name,
-                description: p.description,
-                type: p.type,
-                amount: p.amount,
-                padsQuantity: p.padsQuantity,
-              }))}
-            />
+        {/* ── Give ── */}
+        <div
+          id="give"
+          className="mx-auto mt-14 grid max-w-5xl scroll-mt-24 gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-start"
+        >
+          <Reveal>
+            <div className="glass-card rounded-3xl p-5 sm:p-7">
+              <h2 className="font-display text-xl font-bold tracking-tight">Make your gift</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                100% goes to ORA pads. It takes about 20 seconds.
+              </p>
+              <div className="mt-5">
+                <DonationForm
+                  packages={packages.map((p) => ({
+                    id: p.id,
+                    name: p.name,
+                    description: p.description,
+                    type: p.type,
+                    amount: p.amount,
+                    padsQuantity: p.padsQuantity,
+                  }))}
+                />
+              </div>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.1} className="space-y-5 lg:sticky lg:top-24">
+            <LiveDonationFeed initial={feed} showCounters />
+
+            {/* how it works */}
+            <div className="glass-card rounded-3xl p-5 sm:p-6">
+              <h3 className="font-display text-base font-semibold">How it works</h3>
+              <ol className="mt-4 space-y-4">
+                {steps.map((s, i) => (
+                  <li key={s.title} className="flex items-start gap-3">
+                    <span className="relative flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <s.icon className="size-4" />
+                      <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-[9px] font-bold text-white">
+                        {i + 1}
+                      </span>
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold">{s.title}</p>
+                      <p className="text-xs text-muted-foreground">{s.body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </Reveal>
+        </div>
+
+        {/* ── FAQ ── */}
+        <div className="mx-auto mt-20 max-w-2xl">
+          <Reveal className="text-center">
+            <div className="mx-auto flex items-center justify-center gap-2 text-primary">
+              <span className="h-px w-7 bg-primary/60" />
+              <Send className="size-4" />
+              <span className="h-px w-7 bg-primary/60" />
+            </div>
+            <h2 className="mt-3 font-display text-3xl font-bold tracking-tight">
+              Questions, answered
+            </h2>
+          </Reveal>
+          <div className="mt-7 space-y-2.5">
+            {faqs.map((f, i) => (
+              <Reveal key={f.q} delay={i * 0.05}>
+                <details className="group rounded-2xl border border-border bg-card/50 px-4 backdrop-blur-md transition-colors open:border-primary/40 open:bg-primary/[0.04]">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-4 text-sm font-semibold">
+                    {f.q}
+                    <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                  </summary>
+                  <p className="pb-4 text-sm text-muted-foreground">{f.a}</p>
+                </details>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Final CTA ── */}
+        <Reveal className="mx-auto mt-20 max-w-4xl">
+          <div className="glow-hover relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary/80 to-accent p-8 text-center sm:p-12">
+            <div className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full bg-white/20 blur-3xl" />
+            <h2 className="relative font-display text-2xl font-bold tracking-tight text-white sm:text-4xl">
+              TSh 5,000 keeps one girl in school all term.
+            </h2>
+            <p className="relative mx-auto mt-3 max-w-md text-sm text-white/85">
+              Join the donors already powering dignity across Tanzania.
+            </p>
+            <Link
+              href="#give"
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "relative mt-6 h-12 rounded-full bg-white px-8 text-base text-primary hover:bg-white/90",
+              )}
+            >
+              <Heart className="size-5" />
+              Donate now
+            </Link>
           </div>
         </Reveal>
       </div>
