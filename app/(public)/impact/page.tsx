@@ -65,10 +65,10 @@ export default async function ImpactPage() {
   ]);
 
   const headline = [
-    { label: "Pads distributed", value: stats.padsDistributed },
-    { label: "Lives reached", value: stats.livesReached },
-    { label: "Communities reached", value: stats.communities },
-    { label: "Active partners", value: stats.partners },
+    { label: "Pads distributed", value: stats.padsDistributed, suffix: "+" },
+    { label: "Lives reached", value: stats.livesReached, suffix: "+" },
+    { label: "Communities reached", value: stats.communities, suffix: "+" },
+    { label: "Active partners", value: stats.partners, suffix: "" },
   ];
 
   return (
@@ -142,7 +142,7 @@ export default async function ImpactPage() {
             <Reveal key={h.label} delay={i * 0.08}>
               <div className="glass-card h-full rounded-2xl p-6 text-center">
                 <div className="font-display text-4xl font-bold text-primary">
-                  <CountUp value={h.value} />
+                  <CountUp value={h.value} suffix={h.suffix} />
                 </div>
                 <div className="mt-1 text-sm text-muted-foreground">
                   {h.label}

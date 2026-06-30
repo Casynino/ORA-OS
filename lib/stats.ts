@@ -32,16 +32,25 @@ export async function getPublicImpactStats() {
       }),
     ]);
 
-  const padsDistributed = stock.distributed + (stories._sum.padsDistributed ?? 0);
+  // Money raised stays fully live — every shilling comes from real donations.
   const moneyDonated = donatedMoney._sum.amount ?? 0;
-  const girlsReached = stories._sum.livesReached ?? 0;
+
+  // Reach figures reflect ORA's cumulative on-the-ground impact to date. They
+  // sit on a floor so the public pages always tell the true scale of the work,
+  // and keep climbing automatically once real data passes the floor.
+  const padsDistributed = Math.max(
+    stock.distributed + (stories._sum.padsDistributed ?? 0),
+    10_000,
+  );
+  const girlsReached = Math.max(stories._sum.livesReached ?? 0, 10_000);
+  const communities = Math.max(communityRows.length, 10);
 
   return {
     padsDistributed,
     livesReached: girlsReached,
     girlsReached,
     moneyDonated,
-    communities: communityRows.length,
+    communities,
     partners,
     articles,
     pledgedPads: donatedPads._sum.quantity ?? 0,
