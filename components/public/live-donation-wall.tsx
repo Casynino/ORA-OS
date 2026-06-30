@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { HeartHandshake, Coins, Droplets, Users, Sparkles } from "lucide-react";
-import { cn, formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
+import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 
 type Feed = {
   counters: { moneyRaised: number; padsSponsored: number; donations: number; donors: number };
@@ -33,10 +33,9 @@ function Tally({ value, prefix = "" }: { value: number; prefix?: string }) {
     const to = value;
     prev.current = value;
     const start = performance.now();
-    const dur = 900;
     let raf = 0;
     const tick = (t: number) => {
-      const p = Math.min((t - start) / dur, 1);
+      const p = Math.min((t - start) / 900, 1);
       const e = 1 - Math.pow(1 - p, 3);
       setDisplay(Math.round(from + (to - from) * e));
       if (p < 1) raf = requestAnimationFrame(tick);
@@ -52,9 +51,28 @@ function Tally({ value, prefix = "" }: { value: number; prefix?: string }) {
   );
 }
 
+function Pill({ d }: { d: Feed["recent"][number] }) {
+  return (
+    <span className="mr-3 inline-flex shrink-0 items-center gap-2.5 rounded-full border border-border/70 bg-card/80 py-1.5 pl-1.5 pr-4">
+      <span
+        className="flex size-7 items-center justify-center rounded-full text-xs font-bold text-white"
+        style={{ backgroundImage: gradientFor(d.name) }}
+      >
+        {(d.name || "?").charAt(0).toUpperCase()}
+      </span>
+      <span className="whitespace-nowrap text-sm">
+        <span className="font-semibold">{d.name}</span>{" "}
+        <span className="text-muted-foreground">donated</span>{" "}
+        <span className="font-semibold text-primary">
+          {d.amount != null ? formatCurrency(d.amount) : `${formatNumber(d.pads ?? 0)} pads`}
+        </span>
+      </span>
+    </span>
+  );
+}
+
 export function LiveDonationWall({ initial }: { initial: Feed }) {
   const [feed, setFeed] = useState<Feed>(initial);
-  const [newId, setNewId] = useState<string | null>(null);
   const [pulse, setPulse] = useState(false);
   const topId = useRef(initial.recent[0]?.id ?? null);
 
@@ -69,10 +87,8 @@ export function LiveDonationWall({ initial }: { initial: Feed }) {
         const top = next.recent[0]?.id ?? null;
         if (top && top !== topId.current) {
           topId.current = top;
-          setNewId(top);
           setPulse(true);
-          setTimeout(() => alive && setNewId(null), 6000);
-          setTimeout(() => alive && setPulse(false), 1200);
+          setTimeout(() => alive && setPulse(false), 1600);
         }
         setFeed(next);
       } catch {
@@ -94,11 +110,18 @@ export function LiveDonationWall({ initial }: { initial: Feed }) {
     { icon: Users, label: "Donors", value: feed.counters.donors },
   ];
 
+  // Build a wide "base" (repeat the feed until it can fill the bar), then
+  // duplicate it once so the marquee (translateX -50%) loops seamlessly.
+  const items = feed.recent;
+  const base = items.length
+    ? Array.from({ length: Math.max(items.length, 6) }, (_, i) => items[i % items.length])
+    : [];
+  const loop = base.length ? [...base, ...base] : [];
+  const duration = `${Math.max(22, base.length * 5)}s`;
+
   return (
     <div className="relative overflow-hidden rounded-3xl border border-border bg-card/70 p-6 shadow-soft backdrop-blur-xl sm:p-7">
-      {/* animated top accent line */}
       <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent live-shimmer" />
-      {/* ambient glow that breathes when a gift lands */}
       <span
         className={cn(
           "pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-primary/20 blur-3xl transition-opacity duration-700",
@@ -123,7 +146,7 @@ export function LiveDonationWall({ initial }: { initial: Feed }) {
           <div
             key={s.label}
             className={cn(
-              "group rounded-2xl border border-border/70 bg-muted/30 p-3.5 transition-all",
+              "rounded-2xl border border-border/70 bg-muted/30 p-3.5 transition-all",
               pulse && "border-primary/40",
             )}
           >
@@ -148,62 +171,33 @@ export function LiveDonationWall({ initial }: { initial: Feed }) {
         ))}
       </div>
 
-      {/* feed */}
-      <div className="relative mt-5 space-y-2">
-        {feed.recent.length === 0 ? (
-          <p className="flex items-center gap-2 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+      {/* scrolling live ticker — donations glide across, coming and going */}
+      <div className="marquee-row relative mt-5 overflow-hidden rounded-2xl border border-border/70 bg-muted/20 py-2.5">
+        {/* LIVE badge + left fade */}
+        <span className="absolute left-0 top-0 z-20 flex h-full items-center gap-1.5 bg-gradient-to-r from-card via-card/95 to-transparent pl-3 pr-10 text-xs font-bold uppercase tracking-wide text-success">
+          <span className="relative flex size-2">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-75" />
+            <span className="relative inline-flex size-2 rounded-full bg-success" />
+          </span>
+          Live
+        </span>
+        {/* right fade */}
+        <span className="pointer-events-none absolute right-0 top-0 z-20 h-full w-12 bg-gradient-to-l from-card to-transparent" />
+
+        {loop.length === 0 ? (
+          <p className="flex items-center gap-2 px-4 pl-20 text-sm text-muted-foreground">
             <Sparkles className="size-4 text-primary" />
-            Be the first to donate — your gift appears here instantly.
+            Be the first to donate — your gift scrolls across here instantly.
           </p>
         ) : (
-          feed.recent.map((d) => {
-            const isNew = d.id === newId;
-            const initial = (d.name || "?").charAt(0).toUpperCase();
-            return (
-              <div
-                key={d.id}
-                className={cn(
-                  "flex items-center justify-between gap-3 rounded-2xl border px-3.5 py-2.5 text-sm transition-all duration-500",
-                  isNew
-                    ? "donation-pop border-success/60 bg-success/10 shadow-glow"
-                    : "border-border/70 bg-card hover:border-primary/30",
-                )}
-              >
-                <span className="flex min-w-0 items-center gap-3">
-                  <span className="relative shrink-0">
-                    {isNew && (
-                      <span className="absolute inset-0 animate-ping rounded-full bg-success/50" />
-                    )}
-                    <span
-                      className="relative flex size-9 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm"
-                      style={{ backgroundImage: gradientFor(d.name) }}
-                    >
-                      {initial}
-                    </span>
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate">
-                      <span className="font-semibold">{d.name}</span>{" "}
-                      <span className="text-muted-foreground">donated</span>{" "}
-                      <span className="font-semibold text-primary">
-                        {d.amount != null
-                          ? formatCurrency(d.amount)
-                          : `${formatNumber(d.pads ?? 0)} pads`}
-                      </span>
-                    </span>
-                    <span className="text-xs text-muted-foreground">{timeAgo(d.at)}</span>
-                  </span>
-                </span>
-                {isNew ? (
-                  <span className="shrink-0 animate-pulse rounded-full bg-success px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                    New
-                  </span>
-                ) : (
-                  <HeartHandshake className="size-4 shrink-0 text-primary/40" />
-                )}
-              </div>
-            );
-          })
+          <div
+            className="animate-ticker flex w-max items-center"
+            style={{ animationDuration: duration }}
+          >
+            {loop.map((d, i) => (
+              <Pill key={`${d.id}-${i}`} d={d} />
+            ))}
+          </div>
         )}
       </div>
     </div>
