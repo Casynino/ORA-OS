@@ -79,7 +79,7 @@ export default async function DonatePage() {
         <div className="container relative z-10 pb-24 pt-28">
           <Reveal className="max-w-2xl">
             <h1 className="font-display text-5xl font-extrabold leading-[1.03] tracking-tight text-white sm:text-6xl lg:text-7xl">
-              When she has pads,
+              When she has <span className="text-gradient">ORA</span>,
               <br />
               she stays in <span className="text-gradient">school</span>.
             </h1>
