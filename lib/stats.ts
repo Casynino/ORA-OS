@@ -1,32 +1,23 @@
 import { prisma } from "@/lib/db";
 import { getStockTotals } from "@/lib/services/inventory";
 
-/**
- * Launch baselines so the public impact wall reflects Ora's cumulative reach,
- * not just data created in this environment. Tune as real figures grow.
- */
-const IMPACT_BASELINE = {
-  // Money donated now reflects REAL donations only (no baseline) — live
-  // donation payments will be integrated soon.
-  money: 0,
-  pads: 6_000,
-  girls: 5_200,
-  communities: 42,
-};
+// Only confirmed-paid donations count toward any public figure.
+const PAID_DONATION = ["RECEIVED", "ALLOCATED", "DISTRIBUTED"] as const;
 
-/** Headline figures for the public landing page + live impact wall. */
+/** Headline figures for the public landing page + live impact wall.
+ * Every number is derived from real data — no baselines or placeholders. */
 export async function getPublicImpactStats() {
-  const [stock, donatedPads, donatedMoney, partners, stories, articles] =
+  const [stock, donatedPads, donatedMoney, partners, stories, articles, communityRows] =
     await Promise.all([
       getStockTotals(),
       prisma.donation.aggregate({
         _sum: { quantity: true },
-        where: { type: "PADS" },
+        where: { type: "PADS", status: { in: [...PAID_DONATION] } },
       }),
       prisma.donation.aggregate({
         _sum: { amount: true },
         // Only money that's actually been received counts as "raised".
-        where: { status: { in: ["RECEIVED", "ALLOCATED", "DISTRIBUTED"] } },
+        where: { status: { in: [...PAID_DONATION] } },
       }),
       prisma.user.count({ where: { role: "PARTNER", status: "ACTIVE" } }),
       prisma.impactStory.aggregate({
@@ -34,21 +25,23 @@ export async function getPublicImpactStats() {
         where: { published: true },
       }),
       prisma.educationContent.count({ where: { published: true } }),
+      prisma.donation.findMany({
+        where: { distributedTo: { not: null } },
+        select: { distributedTo: true },
+        distinct: ["distributedTo"],
+      }),
     ]);
 
-  const padsDistributed =
-    stock.distributed +
-    (stories._sum.padsDistributed ?? 0) +
-    IMPACT_BASELINE.pads;
-  const moneyDonated = (donatedMoney._sum.amount ?? 0) + IMPACT_BASELINE.money;
-  const girlsReached = (stories._sum.livesReached ?? 0) + IMPACT_BASELINE.girls;
+  const padsDistributed = stock.distributed + (stories._sum.padsDistributed ?? 0);
+  const moneyDonated = donatedMoney._sum.amount ?? 0;
+  const girlsReached = stories._sum.livesReached ?? 0;
 
   return {
     padsDistributed,
     livesReached: girlsReached,
     girlsReached,
     moneyDonated,
-    communities: IMPACT_BASELINE.communities,
+    communities: communityRows.length,
     partners,
     articles,
     pledgedPads: donatedPads._sum.quantity ?? 0,
