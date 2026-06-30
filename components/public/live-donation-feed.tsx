@@ -17,8 +17,12 @@ export type Feed = {
   recent: FeedItem[];
 };
 
-const MAX_CARDS = 4;
-const POLL_MS = 4000;
+const VISIBLE_MAX = 4; // cards on screen at once
+const POOL_MAX = 24; // recent gifts kept to cycle through
+const EMIT_MS = 2600; // a card flows in this often → always moving
+const POLL_MS = 6000; // how often we check NTZS for genuinely-new gifts
+
+type Card = { key: number; item: FeedItem; isNew: boolean };
 
 /** A number that smoothly tweens from its previous value to the new one. */
 function Tally({ value, prefix = "" }: { value: number; prefix?: string }) {
@@ -56,16 +60,16 @@ function relTime(at: string) {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-function DonationCard({ d, fresh }: { d: FeedItem; fresh: boolean }) {
+function DonationCard({ d, isNew }: { d: FeedItem; isNew: boolean }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-2xl border bg-card/60 p-3 shadow-soft backdrop-blur-md transition-shadow",
-        fresh ? "border-primary/50 shadow-glow" : "border-border/60",
+        "flex items-center gap-3 rounded-2xl border bg-card/60 p-3 shadow-soft backdrop-blur-md",
+        isNew ? "border-primary/60 shadow-glow" : "border-border/60",
       )}
     >
       <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-white shadow-sm">
-        <Heart className={cn("size-5 fill-white", fresh && "animate-heart-beat")} />
+        <Heart className={cn("size-5 fill-white", isNew && "animate-heart-beat")} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate font-semibold leading-tight">{d.name}</p>
@@ -83,20 +87,16 @@ function DonationCard({ d, fresh }: { d: FeedItem; fresh: boolean }) {
   );
 }
 
-/** Soft floating hearts that rise once when a new gift lands. */
+/** Soft hearts that rise once when a brand-new gift lands. */
 function FloatingHearts({ burst }: { burst: number }) {
   if (burst === 0) return null;
-  const hearts = [0, 1, 2, 3, 4, 5];
   return (
     <div key={burst} className="pointer-events-none absolute inset-x-0 bottom-3 z-20 h-20">
-      {hearts.map((i) => (
+      {[0, 1, 2, 3, 4, 5].map((i) => (
         <span
           key={i}
           className="float-heart absolute text-primary"
-          style={{
-            left: `${42 + (i - 2.5) * 9}%`,
-            animationDelay: `${i * 0.09}s`,
-          }}
+          style={{ left: `${42 + (i - 2.5) * 9}%`, animationDelay: `${i * 0.09}s` }}
         >
           <Heart className="size-4 fill-primary" style={{ opacity: 0.85 }} />
         </span>
@@ -113,14 +113,42 @@ export function LiveDonationFeed({
   showCounters?: boolean;
 }) {
   const [counters, setCounters] = useState(initial.counters);
-  // Stack is oldest → newest (newest at the bottom).
-  const [cards, setCards] = useState<FeedItem[]>(() =>
-    initial.recent.slice(0, MAX_CARDS).reverse(),
-  );
-  const [freshId, setFreshId] = useState<string | null>(null);
+  const [cards, setCards] = useState<Card[]>([]);
   const [burst, setBurst] = useState(0);
-  const seen = useRef<Set<string>>(new Set(initial.recent.map((d) => d.id)));
 
+  const pool = useRef<FeedItem[]>(initial.recent.slice(0, POOL_MAX)); // newest-first
+  const cursor = useRef(0);
+  const keyId = useRef(0);
+  const seen = useRef(new Set(initial.recent.map((d) => d.id)));
+
+  // Seed the stack with the latest gifts so it's never empty.
+  useEffect(() => {
+    const p = pool.current;
+    if (!p.length) return;
+    const seedCount = Math.min(VISIBLE_MAX, p.length);
+    const seed = p
+      .slice(0, seedCount)
+      .reverse()
+      .map((item) => ({ key: ++keyId.current, item, isNew: false }));
+    setCards(seed);
+    cursor.current = seedCount % p.length;
+  }, []);
+
+  // The heartbeat: every EMIT_MS a card flows in, so the feed is always alive.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const p = pool.current;
+      if (!p.length) return;
+      const item = p[cursor.current % p.length];
+      cursor.current = (cursor.current + 1) % p.length;
+      setCards((prev) =>
+        [...prev, { key: ++keyId.current, item, isNew: false }].slice(-VISIBLE_MAX),
+      );
+    }, EMIT_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  // Poll NTZS for genuinely-new gifts + live counters.
   useEffect(() => {
     let alive = true;
     async function pull() {
@@ -130,19 +158,17 @@ export function LiveDonationFeed({
         const next: Feed = await res.json();
         if (!alive) return;
         setCounters(next.counters);
-        // New donations are at the front of recent (newest-first); take the
-        // ones we haven't shown yet, oldest-first, and stack them in.
-        const fresh = next.recent.filter((d) => !seen.current.has(d.id)).reverse();
+        const fresh = next.recent.filter((d) => !seen.current.has(d.id)); // newest-first
         if (fresh.length) {
           fresh.forEach((d) => seen.current.add(d.id));
-          setCards((prev) => [...prev, ...fresh].slice(-MAX_CARDS));
-          const newest = fresh[fresh.length - 1];
-          setFreshId(newest.id);
+          // Push to the front of the cycle so they show up next, and pop the
+          // newest in immediately with a celebration.
+          pool.current = [...fresh, ...pool.current].slice(0, POOL_MAX);
+          cursor.current = Math.min(fresh.length, pool.current.length) % pool.current.length;
+          setCards((prev) =>
+            [...prev, { key: ++keyId.current, item: fresh[0], isNew: true }].slice(-VISIBLE_MAX),
+          );
           setBurst((b) => b + 1);
-          setTimeout(() => alive && setFreshId(null), 2600);
-        } else {
-          // keep relative times ("Just now" → "1m ago") fresh
-          setCards((prev) => [...prev]);
         }
       } catch {
         /* keep last good data */
@@ -166,12 +192,7 @@ export function LiveDonationFeed({
   return (
     <div className="relative overflow-hidden rounded-3xl border border-border bg-card/70 p-5 shadow-soft backdrop-blur-xl sm:p-6">
       <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent live-shimmer" />
-      <span
-        className={cn(
-          "pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-primary/20 blur-3xl transition-opacity duration-700",
-          freshId ? "opacity-100" : "opacity-40",
-        )}
-      />
+      <span className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-primary/15 blur-3xl" />
 
       <div className="relative flex items-center justify-between">
         <h3 className="font-display text-lg font-semibold">Live donations</h3>
@@ -187,19 +208,8 @@ export function LiveDonationFeed({
       {showCounters && (
         <div className="relative mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {stats.map((s) => (
-            <div
-              key={s.label}
-              className={cn(
-                "rounded-2xl border border-border/70 bg-muted/30 p-3.5 transition-all",
-                freshId && "border-primary/40",
-              )}
-            >
-              <span
-                className={cn(
-                  "flex size-8 items-center justify-center rounded-xl bg-primary/10 text-primary transition-shadow",
-                  freshId && "shadow-glow",
-                )}
-              >
+            <div key={s.label} className="rounded-2xl border border-border/70 bg-muted/30 p-3.5">
+              <span className="flex size-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <s.icon className="size-4" />
               </span>
               <p
@@ -216,22 +226,22 @@ export function LiveDonationFeed({
         </div>
       )}
 
-      {/* live activity stack — newest pops in at the bottom, older float up */}
-      <div className="relative mt-4 h-[268px] overflow-hidden sm:h-[300px]">
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-14 bg-gradient-to-b from-card/90 to-transparent" />
+      {/* live activity stack — a card flows in continuously, older float up */}
+      <div className="relative mt-4 h-[268px] overflow-hidden sm:h-[296px]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-gradient-to-b from-card via-card/70 to-transparent" />
         <FloatingHearts burst={burst} />
-        <div className="flex h-full flex-col justify-end gap-2.5 px-0.5">
+        <div className="flex h-full flex-col justify-end gap-2.5 px-0.5 pb-0.5">
           <AnimatePresence initial={false}>
-            {cards.map((d) => (
+            {cards.map((c) => (
               <motion.div
-                key={d.id}
+                key={c.key}
                 layout
-                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                initial={{ opacity: 0, scale: 0.94, y: 18 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.96, y: -12, transition: { duration: 0.45 } }}
-                transition={{ type: "spring", stiffness: 240, damping: 22 }}
+                exit={{ opacity: 0, scale: 0.96, y: -14, transition: { duration: 0.5 } }}
+                transition={{ type: "spring", stiffness: 220, damping: 24 }}
               >
-                <DonationCard d={d} fresh={d.id === freshId} />
+                <DonationCard d={c.item} isNew={c.isNew} />
               </motion.div>
             ))}
           </AnimatePresence>
