@@ -119,12 +119,14 @@ export function LiveDonationFeed({
   initial,
   showCounters = false,
   compact = false,
+  bare = false,
 }: {
   initial: Feed;
   showCounters?: boolean;
   compact?: boolean;
+  bare?: boolean;
 }) {
-  const visibleMax = compact ? 3 : 4;
+  const visibleMax = compact ? 3 : bare ? 5 : 4;
   const [counters, setCounters] = useState(initial.counters);
   const [cards, setCards] = useState<Card[]>([]);
   const [burst, setBurst] = useState(0);
@@ -206,37 +208,45 @@ export function LiveDonationFeed({
     { icon: Users, label: "Donors", value: counters.donors },
   ];
 
-  const stackH = compact ? "h-[150px]" : "h-[268px] sm:h-[296px]";
+  const stackH = compact
+    ? "h-[150px]"
+    : bare
+      ? "h-[360px] sm:h-[420px]"
+      : "h-[268px] sm:h-[296px]";
 
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-3xl border border-border bg-card/70 shadow-soft backdrop-blur-xl",
-        compact ? "p-3.5" : "p-5 sm:p-6",
+        "relative overflow-hidden",
+        !bare && "rounded-3xl border border-border bg-card/70 shadow-soft backdrop-blur-xl",
+        bare ? "" : compact ? "p-3.5" : "p-5 sm:p-6",
       )}
     >
-      <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent live-shimmer" />
-      <span className="pointer-events-none absolute -right-16 -top-16 size-44 rounded-full bg-primary/15 blur-3xl" />
+      {!bare && (
+        <>
+          <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent live-shimmer" />
+          <span className="pointer-events-none absolute -right-16 -top-16 size-44 rounded-full bg-primary/15 blur-3xl" />
+          <div className="relative flex items-center justify-between">
+            <h3 className={cn("font-display font-semibold", compact ? "text-sm" : "text-lg")}>
+              {compact ? "Live activity" : "Live donations"}
+            </h3>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full bg-success/10 font-semibold text-success",
+                compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs",
+              )}
+            >
+              <span className="relative flex size-2">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-75" />
+                <span className="relative inline-flex size-2 rounded-full bg-success" />
+              </span>
+              Live
+            </span>
+          </div>
+        </>
+      )}
 
-      <div className="relative flex items-center justify-between">
-        <h3 className={cn("font-display font-semibold", compact ? "text-sm" : "text-lg")}>
-          {compact ? "Live activity" : "Live donations"}
-        </h3>
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full bg-success/10 font-semibold text-success",
-            compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs",
-          )}
-        >
-          <span className="relative flex size-2">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-75" />
-            <span className="relative inline-flex size-2 rounded-full bg-success" />
-          </span>
-          Live
-        </span>
-      </div>
-
-      {showCounters && !compact && (
+      {showCounters && !compact && !bare && (
         <div className="relative mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {stats.map((s) => (
             <div key={s.label} className="rounded-2xl border border-border/60 bg-muted/30 p-3.5">
@@ -257,8 +267,15 @@ export function LiveDonationFeed({
         </div>
       )}
 
-      <div className={cn("relative overflow-hidden", compact ? "mt-3" : "mt-4", stackH)}>
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-14 bg-gradient-to-b from-card via-card/70 to-transparent" />
+      <div className={cn("relative overflow-hidden", bare ? "mt-0" : compact ? "mt-3" : "mt-4", stackH)}>
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-x-0 top-0 z-10 h-16",
+            bare
+              ? "bg-gradient-to-b from-background via-background/70 to-transparent"
+              : "bg-gradient-to-b from-card via-card/70 to-transparent",
+          )}
+        />
         <FloatingHearts burst={burst} />
         <div className="flex h-full flex-col justify-end gap-2 px-0.5 pb-0.5">
           <AnimatePresence initial={false}>
