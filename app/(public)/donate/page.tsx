@@ -7,7 +7,6 @@ import {
   ArrowDown,
   Smartphone,
   PackageCheck,
-  Sparkles,
   ChevronDown,
   Quote,
 } from "lucide-react";
@@ -79,11 +78,7 @@ export default async function DonatePage() {
 
         <div className="container relative z-10 pb-24 pt-28">
           <Reveal className="max-w-2xl">
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-white/85 backdrop-blur-md">
-              <Sparkles className="size-3.5 text-primary" />
-              Secure mobile-money giving · no account needed
-            </span>
-            <h1 className="mt-6 font-display text-5xl font-extrabold leading-[1.03] tracking-tight text-white sm:text-6xl lg:text-7xl">
+            <h1 className="font-display text-5xl font-extrabold leading-[1.03] tracking-tight text-white sm:text-6xl lg:text-7xl">
               When she has pads,
               <br />
               she stays in <span className="text-gradient">school</span>.

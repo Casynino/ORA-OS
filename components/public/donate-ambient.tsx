@@ -57,15 +57,18 @@ export function AmbientDonations({ initial }: { initial: Feed }) {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -14, scale: 0.95 }}
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="flex items-center gap-2.5 rounded-full border border-white/15 bg-white/10 py-2 pl-2 pr-4 backdrop-blur-xl"
+          className="flex items-center gap-2.5 rounded-full border border-white/15 bg-white/10 py-1.5 pl-1.5 pr-4 backdrop-blur-xl"
           style={{ boxShadow: "0 10px 40px -12px rgba(0,0,0,0.6)" }}
         >
-          <span className="flex size-7 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-white">
-            <Heart className="size-3.5 fill-white" />
+          <span className="relative flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-white">
+            <span className="absolute inset-0 animate-ping rounded-full bg-primary/40" />
+            <Heart className="relative size-4 fill-white" />
           </span>
-          <span className="text-sm text-white/90">
-            <span className="font-semibold text-white">{d.name}</span> just gave{" "}
-            <span className="font-semibold text-white">{gift(d)}</span>
+          <span className="text-sm leading-tight text-white/90">
+            <span className="font-semibold text-white">{d.name}</span>
+            <span className="text-white/60"> donated </span>
+            <span className="font-bold text-white">{gift(d)}</span>
+            <span className="ml-1 text-primary">💜</span>
           </span>
         </motion.div>
       </AnimatePresence>
