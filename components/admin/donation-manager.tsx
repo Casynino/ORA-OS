@@ -30,10 +30,13 @@ type Donation = {
   type: string;
   donorName: string;
   donorEmail: string | null;
+  donorPhone: string | null;
   amount: number | null;
   quantity: number | null;
   status: string;
   message: string | null;
+  reference: string | null;
+  paidAt: string | null;
   allocationNote: string | null;
   distributedTo: string | null;
   createdAt: string;
@@ -61,9 +64,10 @@ export function DonationManager({ donations }: { donations: Donation[] }) {
             <TableHeader>
               <TableRow>
                 <TableHead>Donor</TableHead>
+                <TableHead>Phone</TableHead>
                 <TableHead>Gift</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Allocation</TableHead>
+                <TableHead>Reference</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Manage</TableHead>
               </TableRow>
@@ -78,16 +82,22 @@ export function DonationManager({ donations }: { donations: Donation[] }) {
                       {d.donorEmail ? ` · ${d.donorEmail}` : ""}
                     </div>
                   </TableCell>
+                  <TableCell data-label="Phone" className="whitespace-nowrap text-sm text-muted-foreground">
+                    {d.donorPhone ?? "—"}
+                  </TableCell>
                   <TableCell data-label="Gift">
-                    {d.type === "MONEY"
-                      ? formatCurrency(d.amount)
-                      : `${formatNumber(d.quantity ?? 0)} pads`}
+                    {d.amount != null ? formatCurrency(d.amount) : "—"}
+                    {d.quantity ? (
+                      <span className="block text-xs text-muted-foreground">
+                        {formatNumber(d.quantity)} pads
+                      </span>
+                    ) : null}
                   </TableCell>
                   <TableCell data-label="Status">
                     <StatusBadge status={d.status} />
                   </TableCell>
-                  <TableCell data-label="Allocation" className="max-w-[180px] truncate text-sm text-muted-foreground">
-                    {d.distributedTo ?? "—"}
+                  <TableCell data-label="Reference" className="max-w-[160px] truncate font-mono text-xs text-muted-foreground">
+                    {d.reference ?? "—"}
                   </TableCell>
                   <TableCell data-label="Date" className="text-sm text-muted-foreground">
                     {formatDate(d.createdAt)}
@@ -175,6 +185,14 @@ function ManageModal({
       }`}
     >
       <div className="space-y-4">
+        <dl className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-lg bg-muted/40 p-3 text-sm">
+          <Detail label="Phone" value={donation.donorPhone ?? "—"} />
+          <Detail label="Email" value={donation.donorEmail ?? "—"} />
+          <Detail label="Payment method" value={donation.reference ? "Mobile money" : "—"} />
+          <Detail label="NTZS reference" value={donation.reference ?? "Not paid yet"} mono />
+          <Detail label="Submitted" value={formatDate(donation.createdAt)} />
+          <Detail label="Paid" value={donation.paidAt ? formatDate(donation.paidAt) : "—"} />
+        </dl>
         {donation.message && (
           <p className="rounded-lg bg-muted/50 p-3 text-sm italic text-muted-foreground">
             “{donation.message}”
@@ -216,5 +234,14 @@ function ManageModal({
         </Button>
       </div>
     </Modal>
+  );
+}
+
+function Detail({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className={mono ? "truncate font-mono text-xs" : "font-medium"}>{value}</dd>
+    </div>
   );
 }
