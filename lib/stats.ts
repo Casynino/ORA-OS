@@ -25,7 +25,8 @@ export async function getPublicImpactStats() {
       }),
       prisma.donation.aggregate({
         _sum: { amount: true },
-        where: { type: "MONEY" },
+        // Only money that's actually been received counts as "raised".
+        where: { status: { in: ["RECEIVED", "ALLOCATED", "DISTRIBUTED"] } },
       }),
       prisma.user.count({ where: { role: "PARTNER", status: "ACTIVE" } }),
       prisma.impactStory.aggregate({

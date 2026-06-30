@@ -542,12 +542,19 @@ model Donation {
   distributedTo  String? // beneficiary group / region
   handledBy      User?            @relation("DonationHandler", fields: [handledById], references: [id])
   handledById    String?
+  // ── NTZS payment (mobile money → ORA treasury) ──
+  donorPhone     String? // payer mobile number
+  ntzsUserId     String? // NTZS payer user id
+  ntzsDepositId  String? // NTZS deposit id (matched by the webhook)
+  txHash         String? // on-chain settlement reference
+  paidAt         DateTime? // when payment was confirmed
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
   @@index([status])
   @@index([type])
   @@index([createdAt])
+  @@index([ntzsDepositId])
 }
 
 // ── Education & impact ─────────────────────────────────────────────────────
