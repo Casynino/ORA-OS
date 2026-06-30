@@ -106,7 +106,7 @@ export default async function DonatePage() {
                   "h-12 rounded-full border-white/25 bg-white/5 px-7 text-white hover:bg-white/10",
                 )}
               >
-                See the impact
+                See it live
                 <ArrowDown className="size-4" />
               </Link>
             </div>
