@@ -11,6 +11,7 @@ import {
   normalizeTzPhone,
   ntzsCreateUser,
   ntzsCreateTreasuryDeposit,
+  ntzsTreasuryUserId,
   MIN_DONATION_TZS,
 } from "@/lib/ntzs";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
@@ -123,20 +124,27 @@ export async function createDonation(
         return fail("Enter a valid Tanzanian mobile number (e.g. 0752 000 000).");
       }
       try {
-        const payer = await ntzsCreateUser({
-          externalId: donation.code,
-          name: d.donorName.trim(),
-          phoneNumber: phone,
-          email: d.donorEmail?.trim() || null,
-        });
+        // Prefer collecting under OUR treasury user so donors never get their
+        // own NTZS wallet. Only fall back to a per-donor payer if the treasury
+        // id isn't configured yet.
+        let payerUserId = ntzsTreasuryUserId();
+        if (!payerUserId) {
+          const payer = await ntzsCreateUser({
+            externalId: donation.code,
+            name: d.donorName.trim(),
+            phoneNumber: phone,
+            email: d.donorEmail?.trim() || null,
+          });
+          payerUserId = payer.id;
+        }
         const deposit = await ntzsCreateTreasuryDeposit({
-          userId: payer.id,
+          userId: payerUserId,
           amountTzs,
           phoneNumber: phone,
         });
         await prisma.donation.update({
           where: { id: donation.id },
-          data: { ntzsUserId: payer.id, ntzsDepositId: deposit.id },
+          data: { ntzsUserId: payerUserId, ntzsDepositId: deposit.id },
         });
         revalidate();
         return ok(

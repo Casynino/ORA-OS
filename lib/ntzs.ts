@@ -17,11 +17,20 @@ import crypto from "crypto";
 const API_URL = process.env.NTZS_API_URL || "https://www.ntzs.co.tz/api/v1";
 const API_KEY = process.env.NTZS_API_KEY || "";
 const WEBHOOK_SECRET = process.env.NTZS_WEBHOOK_SECRET || "";
+// The NTZS user id of OUR treasury account ("ORA-PADs Tanzania"). When set,
+// every collection is owned by the treasury user — so donors never get their
+// own NTZS wallet. Find it in the NTZS dashboard under the treasury wallet.
+const TREASURY_USER_ID = process.env.NTZS_TREASURY_USER_ID || "";
 
 export const MIN_DONATION_TZS = 500; // NTZS minimum collection amount
 
 export function ntzsConfigured(): boolean {
   return API_KEY.length > 0;
+}
+
+/** Our treasury's NTZS user id, if configured. */
+export function ntzsTreasuryUserId(): string | null {
+  return TREASURY_USER_ID || null;
 }
 
 /** Normalise a Tanzanian mobile number to NTZS format: 2557XXXXXXXX. */
