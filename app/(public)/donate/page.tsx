@@ -3,7 +3,9 @@ import Image from "next/image";
 import { Truck, HeartHandshake, GraduationCap, Sparkles } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getPublicImpactStats } from "@/lib/stats";
+import { getDonationFeed } from "@/lib/services/donation-feed";
 import { DonationForm } from "@/components/public/donation-form";
+import { LiveDonationWall } from "@/components/public/live-donation-wall";
 import { Badge } from "@/components/ui/badge";
 import { Reveal } from "@/components/ui/reveal";
 import { CountUp } from "@/components/ui/count-up";
@@ -36,12 +38,13 @@ const benefits = [
 ];
 
 export default async function DonatePage() {
-  const [packages, stats] = await Promise.all([
+  const [packages, stats, feed] = await Promise.all([
     prisma.donationPackage.findMany({
       where: { isActive: true },
       orderBy: { sortOrder: "asc" },
     }),
     getPublicImpactStats(),
+    getDonationFeed(),
   ]);
 
   return (
@@ -74,6 +77,11 @@ export default async function DonatePage() {
             Live · {formatNumber(stats.girlsReached)} girls reached and counting
           </p>
         </div>
+      </Reveal>
+
+      {/* Live donation wall — updates as gifts arrive */}
+      <Reveal className="mx-auto mt-8 max-w-3xl">
+        <LiveDonationWall initial={feed} />
       </Reveal>
 
       <div className="mt-12 grid gap-8 lg:grid-cols-[1fr_1.2fr]">

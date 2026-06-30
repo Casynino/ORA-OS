@@ -17,20 +17,24 @@ import crypto from "crypto";
 const API_URL = process.env.NTZS_API_URL || "https://www.ntzs.co.tz/api/v1";
 const API_KEY = process.env.NTZS_API_KEY || "";
 const WEBHOOK_SECRET = process.env.NTZS_WEBHOOK_SECRET || "";
-// The NTZS user id of OUR treasury account ("ORA-PADs Tanzania"). When set,
-// every collection is owned by the treasury user — so donors never get their
-// own NTZS wallet. Find it in the NTZS dashboard under the treasury wallet.
-const TREASURY_USER_ID = process.env.NTZS_TREASURY_USER_ID || "";
+// Single shared "ORA Donations" collection user. Every donation deposit is
+// owned by this one NTZS user (funds still settle to the treasury via
+// collectToTreasury), so donors never get their own wallet. It's an account
+// identifier, not a secret; override via env if the collector is recreated.
+const COLLECTOR_USER_ID =
+  process.env.NTZS_TREASURY_USER_ID || "7821f20d-d2e1-40c5-98e0-d58e0577d29d";
 
 export const MIN_DONATION_TZS = 500; // NTZS minimum collection amount
+// Deposit statuses that mean the money has settled to the treasury.
+export const NTZS_PAID_STATUSES = ["minted", "completed", "settled", "success"];
 
 export function ntzsConfigured(): boolean {
   return API_KEY.length > 0;
 }
 
-/** Our treasury's NTZS user id, if configured. */
+/** The shared collection user id used to own every donation deposit. */
 export function ntzsTreasuryUserId(): string | null {
-  return TREASURY_USER_ID || null;
+  return COLLECTOR_USER_ID || null;
 }
 
 /** Normalise a Tanzanian mobile number to NTZS format: 2557XXXXXXXX. */
@@ -99,6 +103,27 @@ export function ntzsCreateUser(input: {
     phone: input.phoneNumber,
     ...(input.email ? { email: input.email } : {}),
   });
+}
+
+export type NtzsDepositStatus = {
+  id: string;
+  status: string;
+  amountTzs: number;
+  txHash?: string | null;
+};
+
+/** Read a deposit's current status (used to confirm payments by polling). */
+export async function ntzsGetDeposit(id: string): Promise<NtzsDepositStatus> {
+  const res = await fetch(`${API_URL}/deposits/${id}`, {
+    headers: { Authorization: `Bearer ${API_KEY}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`NTZS deposit lookup failed (${res.status})`);
+  return (await res.json()) as NtzsDepositStatus;
+}
+
+export function ntzsDepositPaid(status: string): boolean {
+  return NTZS_PAID_STATUSES.includes((status || "").toLowerCase());
 }
 
 /** Start a mobile-money collection that settles to the ORA treasury. */
