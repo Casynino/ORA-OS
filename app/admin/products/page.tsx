@@ -37,7 +37,7 @@ export default async function AdminProductsPage() {
           const onHand = inv?.warehouseQty ?? 0;
           const margin = p.price > 0 ? ((p.price - p.costPrice) / p.price) * 100 : 0;
           return (
-            <div key={p.id} className="glass-card rounded-2xl p-5">
+            <div key={p.id} className="glass-card rounded-2xl p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <span className={`flex size-11 shrink-0 items-center justify-center rounded-xl text-white ${DOT[p.sku] ?? "bg-primary"}`}>
                   <Package className="size-5" />

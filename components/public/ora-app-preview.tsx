@@ -55,7 +55,7 @@ export function OraAppPreview() {
         </div>
 
         {/* chart + activity */}
-        <div className="mt-3 grid gap-2.5 sm:grid-cols-[1.7fr_1fr]">
+        <div className="mt-3 grid gap-2.5 grid-cols-1 sm:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
           <div className="rounded-xl border border-border/60 bg-white/80 p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium">Stock movement</span>

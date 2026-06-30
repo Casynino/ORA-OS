@@ -77,7 +77,7 @@ export default async function WarehouseReturnDetailPage({
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         {/* Details */}
         <Card>
           <CardHeader>

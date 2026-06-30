@@ -222,8 +222,8 @@ export default async function PartnerOverviewPage() {
       </div>
 
       {/* Orders + trend / credit + actions */}
-      <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        <div className="space-y-6">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-6">
           {/* Recent orders */}
           <Reveal>
             <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
@@ -335,7 +335,7 @@ export default async function PartnerOverviewPage() {
           </Reveal>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {/* Credit overview */}
           <Reveal>
             <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
@@ -438,7 +438,7 @@ export default async function PartnerOverviewPage() {
 
       {/* Distribution + ORA updates */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Reveal>
+        <Reveal className="min-w-0">
           <div className="h-full rounded-2xl border border-border bg-card p-5 shadow-soft">
             <h2 className="font-display text-lg font-semibold">Product mix</h2>
             <p className="text-sm text-muted-foreground">Your delivered units by size.</p>
@@ -456,7 +456,7 @@ export default async function PartnerOverviewPage() {
           </div>
         </Reveal>
 
-        <Reveal delay={0.05}>
+        <Reveal delay={0.05} className="min-w-0">
           <div className="h-full rounded-2xl border border-border bg-card p-5 shadow-soft">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-lg font-semibold">ORA updates</h2>

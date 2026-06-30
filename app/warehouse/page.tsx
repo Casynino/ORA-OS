@@ -275,7 +275,7 @@ export default async function WarehouseOverviewPage() {
         <StatCard label="Low stock" value={formatNumber(lowStock.length)} icon={AlertTriangle} accent={lowStock.length > 0 ? "warning" : "success"} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         {/* Today's tasks + quick actions */}
         <div className="space-y-6">
           <Reveal>

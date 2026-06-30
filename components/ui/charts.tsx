@@ -123,9 +123,9 @@ export function DonutChart({
   let offset = 0;
 
   return (
-    <div className="flex items-center gap-5">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
+    <div className="flex flex-col items-center gap-5 sm:flex-row">
+      <div className="relative max-w-full shrink-0" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90 max-w-full">
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -163,15 +163,15 @@ export function DonutChart({
           </div>
         )}
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="flex w-full min-w-0 flex-col gap-2">
         {segments.map((seg, i) => (
           <div key={i} className="flex items-center gap-2 text-sm">
             <span
-              className="size-2.5 rounded-full"
+              className="size-2.5 shrink-0 rounded-full"
               style={{ background: seg.color }}
             />
-            <span className="text-muted-foreground">{seg.label}</span>
-            <span className="font-medium">{seg.value}</span>
+            <span className="min-w-0 flex-1 truncate text-muted-foreground">{seg.label}</span>
+            <span className="shrink-0 font-medium">{seg.value}</span>
           </div>
         ))}
       </div>

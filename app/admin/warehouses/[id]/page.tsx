@@ -176,9 +176,9 @@ export default async function WarehouseDetailPage({
         <StatCard label="Pending returns" value={formatNumber(pendingReturns)} icon={Undo2} accent="warning" />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         {/* Inventory */}
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>Inventory</CardTitle>
           </CardHeader>
@@ -245,7 +245,7 @@ export default async function WarehouseDetailPage({
         </Card>
 
         {/* Activity */}
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ActivityIcon className="size-4" />

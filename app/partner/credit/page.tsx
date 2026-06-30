@@ -137,7 +137,7 @@ export default async function AgentCreditPage() {
 
       {/* Standing card */}
       <Card>
-        <CardContent className="grid gap-6 p-5 lg:grid-cols-[1.4fr_1fr]">
+        <CardContent className="grid gap-6 p-5 grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">

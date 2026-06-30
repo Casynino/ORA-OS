@@ -237,7 +237,7 @@ export default async function CustomerProfilePage({
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         {/* Business info */}
         <section>
           <SectionLabel>Business information</SectionLabel>
@@ -275,7 +275,8 @@ export default async function CustomerProfilePage({
             {stockRows.length === 0 ? (
               <EmptyState className="m-6" icon={Package} title="No stock with this customer" description="Credit holdings, in-transit and delivered units will show here." />
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[28rem] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-4 py-3 font-medium">Product</th>
@@ -295,6 +296,7 @@ export default async function CustomerProfilePage({
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </section>
@@ -395,7 +397,7 @@ export default async function CustomerProfilePage({
         </section>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         {/* Activity timeline */}
         <section>
           <SectionLabel>Activity timeline</SectionLabel>
@@ -506,10 +508,10 @@ function Row({
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="inline-flex items-center gap-2 text-muted-foreground">
-        <Icon className="size-4" /> {label}
+      <span className="inline-flex shrink-0 items-center gap-2 text-muted-foreground">
+        <Icon className="size-4 shrink-0" /> {label}
       </span>
-      <span className="truncate text-right font-medium">{value}</span>
+      <span className="min-w-0 truncate text-right font-medium">{value}</span>
     </div>
   );
 }
