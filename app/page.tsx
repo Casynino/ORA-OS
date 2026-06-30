@@ -27,6 +27,8 @@ import { SocialLinks } from "@/components/public/social-links";
 import { ORA_CONTACT } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { getPublicImpactStats } from "@/lib/stats";
+import { getDonationFeed } from "@/lib/services/donation-feed";
+import { DonationTicker } from "@/components/public/donation-ticker";
 
 // Always render the public impact figures live from the database (never a
 // build-time snapshot), so donations & stats are always current.
@@ -34,6 +36,7 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const stats = await getPublicImpactStats();
+  const donationFeed = await getDonationFeed();
 
   const heroStats = [
     { label: "Total Money Donated", value: stats.moneyDonated, prefix: "TZS ", icon: Coins },
@@ -136,6 +139,19 @@ export default async function HomePage() {
             </p>
           </Reveal>
         </div>
+      </section>
+
+      {/* Live donation ticker — see who's giving right now */}
+      <section className="container relative z-10 pt-8">
+        <Reveal>
+          <div className="mb-3 flex items-center gap-2">
+            <Heart className="size-4 fill-primary text-primary" />
+            <h2 className="font-display text-lg font-semibold">
+              See who&apos;s powering dignity right now
+            </h2>
+          </div>
+          <DonationTicker initial={donationFeed} />
+        </Reveal>
       </section>
 
       {/* Why Ora Exists */}
