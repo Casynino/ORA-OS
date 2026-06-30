@@ -328,8 +328,12 @@
 .animate-marquee-reverse {
   animation: marquee-reverse 70s linear infinite;
 }
+.animate-ticker {
+  animation: marquee 30s linear infinite;
+}
 .marquee-row:hover .animate-marquee,
-.marquee-row:hover .animate-marquee-reverse {
+.marquee-row:hover .animate-marquee-reverse,
+.marquee-row:hover .animate-ticker {
   animation-play-state: paused;
 }
 
@@ -436,6 +440,7 @@
   .animate-float-slow-rev,
   .live-shimmer,
   .donation-pop,
+  .animate-ticker,
   .star,
   .shooting-star {
     animation: none;
