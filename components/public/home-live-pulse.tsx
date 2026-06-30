@@ -29,9 +29,12 @@ function gift(d: FeedItem) {
 export function HomeLivePulse({
   initial,
   className,
+  tone = "light",
 }: {
   initial: Feed;
   className?: string;
+  /** "light" = white text (for dark hero backgrounds); "theme" = adapts to light/dark. */
+  tone?: "light" | "theme";
 }) {
   const [feed, setFeed] = useState<Feed>(initial);
   const [i, setI] = useState(0);
@@ -65,8 +68,18 @@ export function HomeLivePulse({
 
   const d = pool.length ? pool[i % pool.length] : null;
 
+  const c =
+    tone === "light"
+      ? { base: "text-white/55", name: "text-white/85", sep: "text-white/35", amount: "text-white" }
+      : {
+          base: "text-muted-foreground",
+          name: "text-foreground/90",
+          sep: "text-muted-foreground/50",
+          amount: "text-foreground",
+        };
+
   return (
-    <p className={cn("flex items-center gap-2.5 text-sm text-white/55", className)}>
+    <p className={cn("flex items-center gap-2.5 text-sm", c.base, className)}>
       <span className="size-2 shrink-0 animate-pulse rounded-full bg-success" />
       {d ? (
         <span className="relative inline-flex h-5 items-center overflow-hidden">
@@ -79,9 +92,9 @@ export function HomeLivePulse({
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
               className="whitespace-nowrap"
             >
-              <span className="text-white/85">{love(d.id, d.name)}</span>
-              <span className="text-white/35"> · </span>
-              <span className="font-semibold text-white">{gift(d)}</span>
+              <span className={c.name}>{love(d.id, d.name)}</span>
+              <span className={c.sep}> · </span>
+              <span className={cn("font-semibold", c.amount)}>{gift(d)}</span>
             </motion.span>
           </AnimatePresence>
         </span>
