@@ -429,6 +429,27 @@
 .donation-pop {
   animation: donation-pop 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
+@keyframes heart-beat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  15% {
+    transform: scale(1.28);
+  }
+  30% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.16);
+  }
+  60% {
+    transform: scale(1);
+  }
+}
+.animate-heart-beat {
+  animation: heart-beat 1.8s ease-in-out infinite;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .aurora-blob,
@@ -441,6 +462,7 @@
   .live-shimmer,
   .donation-pop,
   .animate-ticker,
+  .animate-heart-beat,
   .star,
   .shooting-star {
     animation: none;

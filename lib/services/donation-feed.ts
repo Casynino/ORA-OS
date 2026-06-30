@@ -8,8 +8,14 @@ const PAID = ["RECEIVED", "ALLOCATED", "DISTRIBUTED"] as const;
  * donation that has an NTZS deposit, check whether the money has settled and,
  * if so, mark it received. Returns how many were newly confirmed.
  */
+let lastReconcile = 0;
+
 export async function reconcilePendingDonations(): Promise<number> {
   if (!ntzsConfigured()) return 0;
+  // Throttle so frequent polling from many visitors can't stampede NTZS.
+  const now = Date.now();
+  if (now - lastReconcile < 2500) return 0;
+  lastReconcile = now;
   const pending = await prisma.donation.findMany({
     where: { status: "PENDING", ntzsDepositId: { not: null } },
     select: { id: true, code: true, ntzsDepositId: true },

@@ -1,27 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { HeartHandshake, Coins, Droplets, Users, Sparkles } from "lucide-react";
-import { cn, formatCurrency, formatNumber } from "@/lib/utils";
-
-type Feed = {
-  counters: { moneyRaised: number; padsSponsored: number; donations: number; donors: number };
-  recent: { id: string; name: string; amount: number | null; pads: number | null; at: string }[];
-};
-
-const AVATAR_GRADIENTS = [
-  "linear-gradient(135deg,#ec4899,#a855f7)",
-  "linear-gradient(135deg,#06b6d4,#3b82f6)",
-  "linear-gradient(135deg,#f59e0b,#ef4444)",
-  "linear-gradient(135deg,#10b981,#14b8a6)",
-  "linear-gradient(135deg,#8b5cf6,#ec4899)",
-  "linear-gradient(135deg,#f43f5e,#fb923c)",
-];
-function gradientFor(name: string) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return AVATAR_GRADIENTS[h % AVATAR_GRADIENTS.length];
-}
+import { HeartHandshake, Coins, Droplets, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { TickerStrip, type Feed } from "@/components/public/donation-ticker";
 
 /** A number that smoothly tweens from its previous value to the new one. */
 function Tally({ value, prefix = "" }: { value: number; prefix?: string }) {
@@ -51,26 +33,6 @@ function Tally({ value, prefix = "" }: { value: number; prefix?: string }) {
   );
 }
 
-function Pill({ d }: { d: Feed["recent"][number] }) {
-  return (
-    <span className="mr-3 inline-flex shrink-0 items-center gap-2.5 rounded-full border border-border/70 bg-card/80 py-1.5 pl-1.5 pr-4">
-      <span
-        className="flex size-7 items-center justify-center rounded-full text-xs font-bold text-white"
-        style={{ backgroundImage: gradientFor(d.name) }}
-      >
-        {(d.name || "?").charAt(0).toUpperCase()}
-      </span>
-      <span className="whitespace-nowrap text-sm">
-        <span className="font-semibold">{d.name}</span>{" "}
-        <span className="text-muted-foreground">donated</span>{" "}
-        <span className="font-semibold text-primary">
-          {d.amount != null ? formatCurrency(d.amount) : `${formatNumber(d.pads ?? 0)} pads`}
-        </span>
-      </span>
-    </span>
-  );
-}
-
 export function LiveDonationWall({ initial }: { initial: Feed }) {
   const [feed, setFeed] = useState<Feed>(initial);
   const [pulse, setPulse] = useState(false);
@@ -88,14 +50,14 @@ export function LiveDonationWall({ initial }: { initial: Feed }) {
         if (top && top !== topId.current) {
           topId.current = top;
           setPulse(true);
-          setTimeout(() => alive && setPulse(false), 1600);
+          setTimeout(() => alive && setPulse(false), 1800);
         }
         setFeed(next);
       } catch {
         /* keep last good data */
       }
     }
-    const t = setInterval(pull, 10000);
+    const t = setInterval(pull, 4000);
     pull();
     return () => {
       alive = false;
@@ -109,15 +71,6 @@ export function LiveDonationWall({ initial }: { initial: Feed }) {
     { icon: HeartHandshake, label: "Donations", value: feed.counters.donations },
     { icon: Users, label: "Donors", value: feed.counters.donors },
   ];
-
-  // Build a wide "base" (repeat the feed until it can fill the bar), then
-  // duplicate it once so the marquee (translateX -50%) loops seamlessly.
-  const items = feed.recent;
-  const base = items.length
-    ? Array.from({ length: Math.max(items.length, 6) }, (_, i) => items[i % items.length])
-    : [];
-  const loop = base.length ? [...base, ...base] : [];
-  const duration = `${Math.max(22, base.length * 5)}s`;
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-border bg-card/70 p-6 shadow-soft backdrop-blur-xl sm:p-7">
@@ -140,7 +93,6 @@ export function LiveDonationWall({ initial }: { initial: Feed }) {
         </span>
       </div>
 
-      {/* counters */}
       <div className="relative mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {stats.map((s) => (
           <div
@@ -171,34 +123,8 @@ export function LiveDonationWall({ initial }: { initial: Feed }) {
         ))}
       </div>
 
-      {/* scrolling live ticker — donations glide across, coming and going */}
-      <div className="marquee-row relative mt-5 overflow-hidden rounded-2xl border border-border/70 bg-muted/20 py-2.5">
-        {/* LIVE badge + left fade */}
-        <span className="absolute left-0 top-0 z-20 flex h-full items-center gap-1.5 bg-gradient-to-r from-card via-card/95 to-transparent pl-3 pr-10 text-xs font-bold uppercase tracking-wide text-success">
-          <span className="relative flex size-2">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-75" />
-            <span className="relative inline-flex size-2 rounded-full bg-success" />
-          </span>
-          Live
-        </span>
-        {/* right fade */}
-        <span className="pointer-events-none absolute right-0 top-0 z-20 h-full w-12 bg-gradient-to-l from-card to-transparent" />
-
-        {loop.length === 0 ? (
-          <p className="flex items-center gap-2 px-4 pl-20 text-sm text-muted-foreground">
-            <Sparkles className="size-4 text-primary" />
-            Be the first to donate — your gift scrolls across here instantly.
-          </p>
-        ) : (
-          <div
-            className="animate-ticker flex w-max items-center"
-            style={{ animationDuration: duration }}
-          >
-            {loop.map((d, i) => (
-              <Pill key={`${d.id}-${i}`} d={d} />
-            ))}
-          </div>
-        )}
+      <div className="relative mt-5">
+        <TickerStrip items={feed.recent} glow={pulse} />
       </div>
     </div>
   );
