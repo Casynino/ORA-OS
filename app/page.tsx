@@ -141,16 +141,10 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Live donation feed — see who's giving right now */}
-      <section className="container relative z-10 pt-8">
-        <Reveal className="mx-auto max-w-2xl">
-          <div className="mb-3 flex items-center gap-2">
-            <Heart className="size-4 fill-primary text-primary" />
-            <h2 className="font-display text-lg font-semibold">
-              See who&apos;s powering dignity right now
-            </h2>
-          </div>
-          <LiveDonationFeed initial={donationFeed} showCounters />
+      {/* Subtle live pulse — small floating activity feed */}
+      <section className="container relative z-10 -mt-6 pb-2">
+        <Reveal className="mx-auto max-w-xs sm:ml-auto sm:mr-0">
+          <LiveDonationFeed initial={donationFeed} compact />
         </Reveal>
       </section>
 
