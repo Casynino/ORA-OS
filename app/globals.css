@@ -450,6 +450,22 @@
 .animate-heart-beat {
   animation: heart-beat 1.8s ease-in-out infinite;
 }
+@keyframes float-heart {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-78px) scale(1.15);
+  }
+}
+.float-heart {
+  animation: float-heart 1.7s ease-out forwards;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .aurora-blob,
@@ -463,6 +479,7 @@
   .donation-pop,
   .animate-ticker,
   .animate-heart-beat,
+  .float-heart,
   .star,
   .shooting-star {
     animation: none;
