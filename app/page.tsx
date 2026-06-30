@@ -28,7 +28,7 @@ import { ORA_CONTACT } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { getPublicImpactStats } from "@/lib/stats";
 import { getDonationFeed } from "@/lib/services/donation-feed";
-import { DonationTicker } from "@/components/public/donation-ticker";
+import { LiveDonationFeed } from "@/components/public/live-donation-feed";
 
 // Always render the public impact figures live from the database (never a
 // build-time snapshot), so donations & stats are always current.
@@ -141,16 +141,16 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Live donation ticker — see who's giving right now */}
+      {/* Live donation feed — see who's giving right now */}
       <section className="container relative z-10 pt-8">
-        <Reveal>
+        <Reveal className="mx-auto max-w-2xl">
           <div className="mb-3 flex items-center gap-2">
             <Heart className="size-4 fill-primary text-primary" />
             <h2 className="font-display text-lg font-semibold">
               See who&apos;s powering dignity right now
             </h2>
           </div>
-          <DonationTicker initial={donationFeed} />
+          <LiveDonationFeed initial={donationFeed} showCounters />
         </Reveal>
       </section>
 

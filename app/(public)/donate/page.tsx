@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { getPublicImpactStats } from "@/lib/stats";
 import { getDonationFeed } from "@/lib/services/donation-feed";
 import { DonationForm } from "@/components/public/donation-form";
-import { LiveDonationWall } from "@/components/public/live-donation-wall";
+import { LiveDonationFeed } from "@/components/public/live-donation-feed";
 import { Badge } from "@/components/ui/badge";
 import { Reveal } from "@/components/ui/reveal";
 import { CountUp } from "@/components/ui/count-up";
@@ -79,9 +79,9 @@ export default async function DonatePage() {
         </div>
       </Reveal>
 
-      {/* Live donation wall — updates as gifts arrive */}
+      {/* Live donation feed — gifts pop in as they arrive */}
       <Reveal className="mx-auto mt-8 max-w-3xl">
-        <LiveDonationWall initial={feed} />
+        <LiveDonationFeed initial={feed} showCounters />
       </Reveal>
 
       <div className="mt-12 grid gap-8 lg:grid-cols-[1fr_1.2fr]">
