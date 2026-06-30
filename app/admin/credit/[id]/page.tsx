@@ -139,7 +139,7 @@ export default async function AdminCreditOrderPage({
         </Link>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-start">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start">
         {/* Order information */}
         <section className="rounded-2xl border border-border bg-card p-5 shadow-soft">
           <h2 className="font-display text-lg font-semibold">Order information</h2>

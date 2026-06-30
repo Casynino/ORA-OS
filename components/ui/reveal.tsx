@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 /** Fade-and-rise wrapper that animates once when scrolled into view. */
 export function Reveal({
@@ -19,7 +20,9 @@ export function Reveal({
   return (
     <motion.div
       id={id}
-      className={className}
+      // min-w-0 is a no-op for normal blocks but stops a Reveal that happens to
+      // be a flex/grid item from blowing the layout wider than its track.
+      className={cn("min-w-0", className)}
       initial={{ opacity: 0, y }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-80px" }}

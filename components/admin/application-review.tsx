@@ -162,7 +162,7 @@ export function ApplicationReview({ app }: { app: AppDTO }) {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-start">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
         {/* Business details */}
         <section className="space-y-6">
           <div className="rounded-2xl border border-border bg-card shadow-soft">
@@ -175,29 +175,29 @@ export function ApplicationReview({ app }: { app: AppDTO }) {
             <div className="space-y-2.5 px-5 py-4 text-sm">
               <p className="flex items-center gap-2">
                 <Mail className="size-4 shrink-0 text-muted-foreground" />
-                {app.email}
+                <span className="min-w-0 break-all">{app.email}</span>
               </p>
               {app.phone && (
                 <p className="flex items-center gap-2">
                   <Phone className="size-4 shrink-0 text-muted-foreground" />
-                  {app.phone}
+                  <span className="min-w-0 break-all">{app.phone}</span>
                 </p>
               )}
               {app.location && (
                 <p className="flex items-center gap-2">
                   <MapPin className="size-4 shrink-0 text-muted-foreground" />
-                  {app.location}
+                  <span className="min-w-0 break-words">{app.location}</span>
                 </p>
               )}
             </div>
-            <dl className="grid grid-cols-2 gap-px border-t border-border bg-border">
+            <dl className="grid grid-cols-1 gap-px border-t border-border bg-border sm:grid-cols-2">
               {details.map((d) => (
-                <div key={d.label} className="bg-card px-5 py-3">
+                <div key={d.label} className="min-w-0 bg-card px-4 py-3 sm:px-5">
                   <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <d.icon className="size-3.5" />
+                    <d.icon className="size-3.5 shrink-0" />
                     {d.label}
                   </dt>
-                  <dd className="mt-0.5 font-medium">{d.value || "—"}</dd>
+                  <dd className="mt-0.5 break-words font-medium">{d.value || "—"}</dd>
                 </div>
               ))}
             </dl>

@@ -136,7 +136,7 @@ export function PartnerRequestBuilder({
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
+    <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start">
       {/* LEFT — products, delivery, payment, notes */}
       <div className="space-y-6">
         {/* Products */}

@@ -337,7 +337,7 @@ export default async function AdminCommandCenter() {
       </section>
 
       {/* ── Approval queue + Live activity ───────────────────── */}
-      <div id="queue" className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div id="queue" className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <Reveal>
           <div className="glass-card rounded-2xl p-5 sm:p-6">
             <div className="flex items-center justify-between">
@@ -422,7 +422,7 @@ export default async function AdminCommandCenter() {
       </div>
 
       {/* ── Today's orders + request pipeline ────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <Reveal>
           <div className="glass-card rounded-2xl p-5 sm:p-6">
             <div className="flex items-center justify-between">

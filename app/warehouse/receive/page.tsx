@@ -78,7 +78,7 @@ export default async function WarehouseReceivePage() {
         <StatCard label="Deliveries logged" value={formatNumber(history.length)} hint="most recent" icon={PackagePlus} accent="accent" />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr]">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         {/* Form */}
         <Card className="glass-card lg:sticky lg:top-24 lg:self-start">
           <CardHeader>

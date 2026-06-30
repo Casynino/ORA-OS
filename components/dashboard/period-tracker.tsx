@@ -110,7 +110,7 @@ export function PeriodTracker() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
+    <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <Card className="lg:sticky lg:top-24 lg:self-start">
         <CardHeader>
           <CardTitle>Log your cycle</CardTitle>

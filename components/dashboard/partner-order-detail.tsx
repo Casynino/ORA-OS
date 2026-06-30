@@ -290,7 +290,7 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start">
         {/* Order */}
         <section className="rounded-2xl border border-border bg-card shadow-soft">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">

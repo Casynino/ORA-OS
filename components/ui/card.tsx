@@ -8,7 +8,8 @@ export const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-xl border border-border bg-card text-card-foreground shadow-soft",
+      // min-w-0 keeps a Card from blowing out its track when used as a grid/flex item
+      "min-w-0 rounded-xl border border-border bg-card text-card-foreground shadow-soft",
       className,
     )}
     {...props}
