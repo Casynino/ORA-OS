@@ -52,19 +52,11 @@ function Tally({ value, prefix = "" }: { value: number; prefix?: string }) {
 
 // Warm, varied ways to thank a donor — chosen deterministically per gift so
 // each donor keeps one kind phrasing while the feed reads differently overall.
-const PHRASES = [
-  { verb: "donated", suffix: "" },
-  { verb: "gave", suffix: "with love" },
-  { verb: "sponsored pads worth", suffix: "" },
-  { verb: "powered dignity with", suffix: "" },
-  { verb: "gifted", suffix: "" },
-  { verb: "kept a girl in school with", suffix: "" },
-  { verb: "backed the movement with", suffix: "" },
-];
-export function donationPhrase(id: string) {
+const VERBS = ["donated", "gave", "gifted", "contributed", "chipped in"];
+export function donationVerb(id: string) {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return PHRASES[h % PHRASES.length];
+  return VERBS[h % VERBS.length];
 }
 
 function relTime(at: string) {
@@ -97,18 +89,10 @@ function DonationCard({ d, isNew, compact }: { d: FeedItem; isNew: boolean; comp
           {d.name}
         </p>
         <p className={cn("truncate text-muted-foreground", compact ? "text-xs" : "text-sm")}>
-          {(() => {
-            const ph = donationPhrase(d.id);
-            const amt =
-              d.amount != null ? formatCurrency(d.amount) : `${formatNumber(d.pads ?? 0)} pads`;
-            return (
-              <>
-                {ph.verb}{" "}
-                <span className="font-semibold text-primary">{amt}</span>
-                {ph.suffix ? ` ${ph.suffix}` : ""}
-              </>
-            );
-          })()}
+          {donationVerb(d.id)}{" "}
+          <span className="font-semibold text-primary">
+            {d.amount != null ? formatCurrency(d.amount) : `${formatNumber(d.pads ?? 0)} pads`}
+          </span>
         </p>
       </div>
       <span

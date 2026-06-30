@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Heart } from "lucide-react";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import {
-  donationPhrase,
+  donationVerb,
   type Feed,
   type FeedItem,
 } from "@/components/public/live-donation-feed";
@@ -53,29 +53,23 @@ export function AmbientDonations({ initial }: { initial: Feed }) {
   const d = pool[i % pool.length];
 
   return (
-    <div className="pointer-events-none absolute bottom-6 right-4 z-20 sm:bottom-10 sm:right-8">
+    <div className="pointer-events-none absolute bottom-5 right-4 z-20 sm:bottom-8 sm:right-8">
       <AnimatePresence mode="wait">
         <motion.div
           key={`${d.id}-${i}`}
-          initial={{ opacity: 0, y: 18, scale: 0.92 }}
+          initial={{ opacity: 0, y: 14, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -14, scale: 0.95 }}
-          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="flex items-center gap-2.5 rounded-full border border-white/15 bg-white/10 py-1.5 pl-1.5 pr-4 backdrop-blur-xl"
-          style={{ boxShadow: "0 10px 40px -12px rgba(0,0,0,0.6)" }}
+          exit={{ opacity: 0, y: -10, scale: 0.94 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          className="flex items-center gap-2 rounded-full border border-white/10 bg-black/40 py-1 pl-1 pr-3 backdrop-blur-xl"
+          style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.04), 0 18px 40px -16px rgba(217,70,239,0.45)" }}
         >
-          <span className="relative flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-white">
-            <span className="absolute inset-0 animate-ping rounded-full bg-primary/40" />
-            <Heart className="relative size-4 fill-white" />
+          <span className="flex size-6 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent">
+            <Heart className="size-3 fill-white text-white" />
           </span>
-          <span className="text-sm leading-tight text-white/90">
-            <span className="font-semibold text-white">{d.name}</span>
-            <span className="text-white/60"> {donationPhrase(d.id).verb} </span>
-            <span className="font-bold text-white">{gift(d)}</span>
-            {donationPhrase(d.id).suffix ? (
-              <span className="text-white/60"> {donationPhrase(d.id).suffix}</span>
-            ) : null}
-            <span className="ml-1 text-primary">💜</span>
+          <span className="whitespace-nowrap text-[13px] leading-none text-white/70">
+            <span className="font-semibold text-white">{d.name}</span> {donationVerb(d.id)}{" "}
+            <span className="font-semibold text-white">{gift(d)}</span>
           </span>
         </motion.div>
       </AnimatePresence>
