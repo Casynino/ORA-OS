@@ -4,7 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Heart } from "lucide-react";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
-import type { Feed, FeedItem } from "@/components/public/live-donation-feed";
+import {
+  donationPhrase,
+  type Feed,
+  type FeedItem,
+} from "@/components/public/live-donation-feed";
 
 const POLL_MS = 5000;
 
@@ -66,8 +70,11 @@ export function AmbientDonations({ initial }: { initial: Feed }) {
           </span>
           <span className="text-sm leading-tight text-white/90">
             <span className="font-semibold text-white">{d.name}</span>
-            <span className="text-white/60"> donated </span>
+            <span className="text-white/60"> {donationPhrase(d.id).verb} </span>
             <span className="font-bold text-white">{gift(d)}</span>
+            {donationPhrase(d.id).suffix ? (
+              <span className="text-white/60"> {donationPhrase(d.id).suffix}</span>
+            ) : null}
             <span className="ml-1 text-primary">💜</span>
           </span>
         </motion.div>
