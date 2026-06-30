@@ -111,7 +111,7 @@ export default async function HomePage() {
                 Donate Now
               </Link>
               <Link href="/impact" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "rounded-full border-white/25 bg-white/5 text-white hover:bg-white/10")}>
-                Explore Our Impact
+                See Our Story
                 <ArrowRight className="size-4" />
               </Link>
             </div>
