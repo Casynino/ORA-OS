@@ -4,6 +4,7 @@ import {
   Sparkles,
   ShieldCheck,
   Heart,
+  HeartHandshake,
   Coins,
   Droplets,
   Users,
@@ -13,7 +14,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { getPublicImpactStats } from "@/lib/stats";
 import { getDonationFeed } from "@/lib/services/donation-feed";
 import { DonationForm } from "@/components/public/donation-form";
 import { LiveDonationFeed } from "@/components/public/live-donation-feed";
@@ -52,16 +52,15 @@ const faqs = [
 ];
 
 export default async function DonatePage() {
-  const [packages, stats, feed] = await Promise.all([
+  const [packages, feed] = await Promise.all([
     prisma.donationPackage.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } }),
-    getPublicImpactStats(),
     getDonationFeed(),
   ]);
 
   const heroStats = [
     { icon: Coins, label: "Raised", value: feed.counters.moneyRaised, prefix: "TSh " },
     { icon: Droplets, label: "Pads sponsored", value: feed.counters.padsSponsored },
-    { icon: Heart, label: "Girls reached", value: stats.girlsReached },
+    { icon: HeartHandshake, label: "Donations", value: feed.counters.donations },
     { icon: Users, label: "Donors", value: feed.counters.donors },
   ];
 
