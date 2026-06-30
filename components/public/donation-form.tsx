@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Check, Heart, PartyPopper, Smartphone, ShieldCheck, Pencil } from "lucide-react";
 import { createDonation } from "@/lib/actions/donations";
 import { toast } from "@/components/ui/use-toast";
@@ -32,6 +32,8 @@ function priceOf(p: Pkg) {
 export function DonationForm({ packages }: { packages: Pkg[] }) {
   const [pending, startTransition] = useTransition();
   const [done, setDone] = useState<DoneInfo | null>(null);
+  // Flips true the moment the mobile-money payment actually clears.
+  const [confirmed, setConfirmed] = useState(false);
 
   const [packageId, setPackageId] = useState<string | "custom">(
     packages[0]?.id ?? "custom",
@@ -45,6 +47,47 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
   const isCustom = packageId === "custom";
   const selectedPkg = packages.find((p) => p.id === packageId);
   const charge = isCustom ? Number(amount) || 0 : selectedPkg ? priceOf(selectedPkg) : 0;
+
+  // While the donor approves the prompt on their phone, poll the gift's status
+  // and switch to a real "thank you" the instant the payment clears.
+  useEffect(() => {
+    if (!done?.paymentInitiated || !done.code || confirmed) return;
+    let alive = true;
+    let attempts = 0;
+    const check = async () => {
+      if (!alive) return;
+      try {
+        const res = await fetch(
+          `/api/donations/status?code=${encodeURIComponent(done.code)}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok || !alive) return;
+        const data = await res.json();
+        if (data.confirmed && alive) {
+          setConfirmed(true);
+          toast({
+            variant: "success",
+            title: "Thank you! Your donation is confirmed 💖",
+          });
+        }
+      } catch {
+        /* keep trying */
+      }
+    };
+    const t = setInterval(() => {
+      // Stop after ~5 minutes if it never clears.
+      if (++attempts > 85) {
+        clearInterval(t);
+        return;
+      }
+      check();
+    }, 3500);
+    check();
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [done, confirmed]);
 
   function submit() {
     if (!donorName.trim())
@@ -86,6 +129,10 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
   }
 
   if (done) {
+    const firstName = donorName.split(" ")[0] || "friend";
+    // Show the celebratory thank-you once the payment has cleared, or right
+    // away for a recorded pledge (no live mobile-money step).
+    const thankYou = confirmed || !done.paymentInitiated;
     return (
       <div className="flex flex-col items-center px-2 py-6 text-center sm:py-8">
         <span className="relative flex size-16 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-white shadow-glow">
@@ -98,41 +145,56 @@ export function DonationForm({ packages }: { packages: Pkg[] }) {
               <Heart className="size-3.5 fill-primary" />
             </span>
           ))}
-          {done.paymentInitiated ? (
-            <Smartphone className="size-7" />
-          ) : (
+          {thankYou ? (
             <PartyPopper className="size-7" />
+          ) : (
+            <Smartphone className="size-7" />
           )}
         </span>
         <h3 className="mt-4 font-display text-xl font-bold tracking-tight">
-          {done.paymentInitiated
-            ? "Approve it on your phone 📲"
-            : `Thank you, ${donorName.split(" ")[0]}!`}
+          {thankYou
+            ? `Thank you for your donation, ${firstName}! 💖`
+            : "Approve it on your phone 📲"}
         </h3>
         <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-          {done.paymentInitiated ? (
+          {thankYou ? (
+            confirmed ? (
+              <>
+                Your payment cleared — you just helped keep a girl in school. Your
+                gift{done.code ? ` (${done.code})` : ""} is now part of the
+                movement; watch it appear in the live feed above. 🌸
+              </>
+            ) : (
+              <>
+                Your donation has been recorded{done.code ? ` as ${done.code}` : ""}.
+                Our team will confirm and allocate it where it&apos;s needed most.
+              </>
+            )
+          ) : (
             <>
               {done.instructions ??
                 "Check your phone for the mobile-money prompt and enter your PIN."}{" "}
-              Your gift{done.code ? ` (${done.code})` : ""} confirms the moment it clears
-              — watch it appear in the live feed.
-            </>
-          ) : (
-            <>
-              Your donation has been recorded{done.code ? ` as ${done.code}` : ""}. Our
-              team will confirm and allocate it where it&apos;s needed most.
+              Your gift{done.code ? ` (${done.code})` : ""} confirms the moment it
+              clears — keep this open and we&apos;ll thank you right here.
             </>
           )}
         </p>
+        {!thankYou && (
+          <p className="mt-3 inline-flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="size-1.5 animate-pulse rounded-full bg-success" />
+            Waiting for your confirmation…
+          </p>
+        )}
         <Button
           variant="outline"
           className="mt-6 rounded-full"
           onClick={() => {
             setDone(null);
+            setConfirmed(false);
             setMessage("");
           }}
         >
-          Make another gift
+          Make another donation
         </Button>
       </div>
     );
