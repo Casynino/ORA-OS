@@ -108,10 +108,10 @@ export default async function HomePage() {
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/donate" className={cn(buttonVariants({ size: "lg" }), "rounded-full shadow-glow")}>
                 <Heart className="size-5" />
-                Donate Now
+                Support a Girl
               </Link>
               <Link href="/impact" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "rounded-full border-white/25 bg-white/5 text-white hover:bg-white/10")}>
-                See Our Story
+                Meet the Girls
                 <ArrowRight className="size-4" />
               </Link>
             </div>
@@ -227,7 +227,7 @@ export default async function HomePage() {
               <p className="mt-2 max-w-[18rem] text-sm text-white/85">Your donation helps us reach more girls, support more communities and create better futures.</p>
               <Link href="/donate" className={cn(buttonVariants(), "mt-6 rounded-full bg-white text-primary hover:bg-white/90")}>
                 <Heart className="size-4" />
-                Donate Now
+                Support a Girl
               </Link>
             </div>
           </Reveal>

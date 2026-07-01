@@ -70,7 +70,7 @@ export function LandingHeader() {
               className={cn(buttonVariants({ size: "sm" }), "rounded-full")}
             >
               <Heart className="size-4" />
-              Donate Now
+              Support a Girl
             </Link>
             <button
               onClick={() => setOpen((v) => !v)}
