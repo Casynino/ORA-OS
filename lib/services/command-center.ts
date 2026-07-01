@@ -144,9 +144,12 @@ export async function getCommandCenter() {
         fulfilledAt: { gte: startToday },
       },
     }),
+    // Total donated = money that has actually been received (matches the
+    // public "Total Money Donated" figure). Excludes pending/cancelled gifts
+    // and counts every confirmed donation that carried money, not just MONEY-type.
     prisma.donation.aggregate({
       _sum: { amount: true },
-      where: { type: "MONEY" },
+      where: { status: { in: ["RECEIVED", "ALLOCATED", "DISTRIBUTED"] } },
     }),
     prisma.user.count({ where: { role: "PARTNER", status: "PENDING" } }),
     prisma.request.count({ where: { status: { in: ["PENDING", "PRICED"] } } }),
