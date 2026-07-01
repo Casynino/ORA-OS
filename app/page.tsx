@@ -156,7 +156,7 @@ export default async function HomePage() {
               support that transform lives.
             </p>
             <Link href="/impact" className={cn(buttonVariants(), "mt-7 rounded-full")}>
-              Learn Our Story
+              Meet the Movement
               <ArrowRight className="size-4" />
             </Link>
           </Reveal>
