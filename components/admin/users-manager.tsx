@@ -49,13 +49,14 @@ type UserDTO = {
 type ProductDTO = { id: string; name: string; sku: string; price: number };
 type WarehouseDTO = { id: string; name: string };
 
-const roleVariant: Record<string, "default" | "accent" | "info"> = {
+const roleVariant: Record<string, "default" | "accent" | "info" | "success"> = {
   ADMIN: "default",
   PARTNER: "accent",
   WAREHOUSE: "info",
+  SALES_REP: "success",
 };
 
-const TABS = ["ALL", "PENDING", "PARTNER", "WAREHOUSE", "ADMIN"];
+const TABS = ["ALL", "PENDING", "PARTNER", "WAREHOUSE", "SALES_REP", "ADMIN"];
 
 export function UsersManager({
   users,
@@ -363,7 +364,7 @@ function CreateUserModal({
   onDone: () => void;
 }) {
   const [pending, start] = useTransition();
-  const [role, setRole] = useState<"WAREHOUSE" | "PARTNER" | "ADMIN">("WAREHOUSE");
+  const [role, setRole] = useState<"WAREHOUSE" | "PARTNER" | "ADMIN" | "SALES_REP">("WAREHOUSE");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -420,6 +421,7 @@ function CreateUserModal({
           <Select value={role} onChange={(e) => setRole(e.target.value as typeof role)} className="mt-1.5">
             <option value="WAREHOUSE">Warehouse staff</option>
             <option value="PARTNER">Partner</option>
+            <option value="SALES_REP">Sales rep</option>
             <option value="ADMIN">Admin</option>
           </Select>
         </div>

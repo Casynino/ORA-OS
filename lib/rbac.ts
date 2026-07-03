@@ -8,6 +8,8 @@ export function dashboardPath(role?: Role | string | null): string {
       return "/admin";
     case "WAREHOUSE":
       return "/warehouse";
+    case "SALES_REP":
+      return "/rep";
     default:
       return "/partner";
   }

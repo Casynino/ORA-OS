@@ -43,6 +43,11 @@ const MAP: Record<string, Variant> = {
   // Payment type
   IMMEDIATE: "secondary",
   CREDIT: "accent",
+  // Field sales
+  ISSUED: "success",
+  CASH: "success",
+  SELLABLE: "accent",
+  SAMPLE: "info",
 };
 
 export function StatusBadge({

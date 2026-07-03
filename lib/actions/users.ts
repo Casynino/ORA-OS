@@ -221,7 +221,7 @@ const createSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
-  role: z.enum(["ADMIN", "WAREHOUSE", "PARTNER"]),
+  role: z.enum(["ADMIN", "WAREHOUSE", "PARTNER", "SALES_REP"]),
   organization: z.string().optional(),
   location: z.string().optional(),
   phone: z.string().optional(),

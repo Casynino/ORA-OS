@@ -23,6 +23,7 @@ const nav: NavGroup[] = [
     items: [
       { href: "/admin/requests", label: "Orders", icon: "requests" },
       { href: "/admin/sales", label: "Sales", icon: "sales" },
+      { href: "/admin/reps", label: "Sales Reps", icon: "reps" },
       { href: "/admin/customers", label: "Customers", icon: "customers" },
       { href: "/admin/invoices", label: "Invoices", icon: "invoices" },
     ],
