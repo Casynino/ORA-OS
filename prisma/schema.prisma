@@ -27,6 +27,7 @@ enum Role {
   ADMIN
   WAREHOUSE
   PARTNER
+  SALES_REP
 }
 
 enum UserStatus {
@@ -171,6 +172,17 @@ model User {
   settlementsSubmitted SettlementRequest[] @relation("SettlementPartner")
   settlementsReviewed  SettlementRequest[] @relation("SettlementReviewer")
   contactMessages   ContactMessage[]   @relation("ContactSender")
+  // Field sales (SALES_REP)
+  repStock          RepStock[]          @relation("RepStockRep")
+  repIssuesReceived RepStockIssue[]     @relation("RepIssueRep")
+  repIssuesGiven    RepStockIssue[]     @relation("RepIssuer")
+  repStockRequests  RepStockRequest[]   @relation("RepStockRequestRep")
+  fieldCustomers    FieldCustomer[]     @relation("RepCustomers")
+  fieldSales        FieldSale[]         @relation("RepSales")
+  fieldPaymentsRecorded FieldPayment[]  @relation("FieldPaymentRecorder")
+  sampleLogs        SampleLog[]         @relation("RepSamples")
+  fieldReports      FieldReport[]       @relation("RepReports")
+  repTargets        RepTarget[]         @relation("RepTargets")
 
   @@index([role])
   @@index([status])
@@ -295,6 +307,11 @@ model Product {
   partnerPrices  PartnerPrice[]
   warehouseStock WarehouseStock[]
   transferItems  WarehouseTransferItem[]
+  repStock       RepStock[]
+  repIssues      RepStockIssue[]
+  repStockRequests RepStockRequest[]
+  fieldSaleItems FieldSaleItem[]
+  sampleLogs     SampleLog[]
 
   @@index([category])
   @@index([isActive])
@@ -664,4 +681,217 @@ model Setting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// ── Field sales (Sales Rep module) ─────────────────────────────────────────
+//  Warehouse → Sales Rep → Customer. Every unit is traceable:
+//  RepStockIssue (immutable) moves stock to a rep; FieldSale / SampleLog
+//  consume it. RepStock is the per-rep snapshot, reconciled by those ledgers.
+
+enum RepStockKind {
+  SELLABLE // stock issued for selling (cash or credit)
+  SAMPLE // free-distribution sample stock
+}
+
+enum FieldSaleType {
+  CASH
+  CREDIT
+}
+
+enum FieldCreditStatus {
+  PENDING // credit sale, nothing (or only part) collected yet
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+enum RepStockRequestStatus {
+  PENDING
+  ISSUED
+  REJECTED
+}
+
+/// Per-rep, per-product stock snapshot. Mutated only via issues/sales/samples.
+model RepStock {
+  id          String   @id @default(cuid())
+  rep         User     @relation("RepStockRep", fields: [repId], references: [id], onDelete: Cascade)
+  repId       String
+  product     Product  @relation(fields: [productId], references: [id])
+  productId   String
+  sellableQty Int      @default(0) // in hand, available to sell
+  sampleQty   Int      @default(0) // in hand, available to give as samples
+  receivedQty Int      @default(0) // cumulative received from warehouse
+  soldQty     Int      @default(0) // cumulative units sold
+  sampledQty  Int      @default(0) // cumulative samples distributed
+  updatedAt   DateTime @updatedAt
+
+  @@unique([repId, productId])
+  @@index([repId])
+}
+
+/// Immutable record of stock issued from the warehouse to a rep.
+model RepStockIssue {
+  id         String       @id @default(cuid())
+  code       String       @unique
+  rep        User         @relation("RepIssueRep", fields: [repId], references: [id])
+  repId      String
+  product    Product      @relation(fields: [productId], references: [id])
+  productId  String
+  kind       RepStockKind @default(SELLABLE)
+  quantity   Int
+  note       String?
+  issuedBy   User         @relation("RepIssuer", fields: [issuedById], references: [id])
+  issuedById String
+  createdAt  DateTime     @default(now())
+
+  @@index([repId])
+  @@index([createdAt])
+}
+
+/// A rep's request for more stock — admin issues or rejects it.
+model RepStockRequest {
+  id           String                @id @default(cuid())
+  code         String                @unique
+  rep          User                  @relation("RepStockRequestRep", fields: [repId], references: [id])
+  repId        String
+  product      Product               @relation(fields: [productId], references: [id])
+  productId    String
+  kind         RepStockKind          @default(SELLABLE)
+  quantity     Int
+  note         String?
+  status       RepStockRequestStatus @default(PENDING)
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime              @default(now())
+
+  @@index([status])
+  @@index([repId])
+}
+
+/// A rep's field customer — the debtor profile for credit sales.
+model FieldCustomer {
+  id              String   @id @default(cuid())
+  name            String
+  phone           String?
+  location        String?
+  notes           String?
+  rep             User     @relation("RepCustomers", fields: [repId], references: [id])
+  repId           String
+  creditSuspended Boolean  @default(false) // admin can cut off credit access
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  sales FieldSale[]
+
+  @@index([repId])
+}
+
+/// A field sale (cash or credit). Stock is deducted atomically on creation.
+model FieldSale {
+  id           String             @id @default(cuid())
+  code         String             @unique
+  type         FieldSaleType
+  rep          User               @relation("RepSales", fields: [repId], references: [id])
+  repId        String
+  customer     FieldCustomer?     @relation(fields: [customerId], references: [id])
+  customerId   String? // required for CREDIT
+  customerName String? // optional walk-in name for CASH sales
+  location     String?
+  total        Int // whole TSh
+  amountPaid   Int                @default(0) // CASH ⇒ equals total
+  creditStatus FieldCreditStatus? // null for CASH sales
+  dueDate      DateTime?
+  note         String?
+  voided       Boolean            @default(false) // admin correction — restores stock
+  voidReason   String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  items    FieldSaleItem[]
+  payments FieldPayment[]
+
+  @@index([repId])
+  @@index([type])
+  @@index([creditStatus])
+  @@index([createdAt])
+}
+
+model FieldSaleItem {
+  id        String    @id @default(cuid())
+  sale      FieldSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId    String
+  product   Product   @relation(fields: [productId], references: [id])
+  productId String
+  quantity  Int
+  unitPrice Int // TSh per unit at time of sale
+  lineTotal Int
+
+  @@index([saleId])
+}
+
+/// A collection against a credit sale (rep or admin records it).
+model FieldPayment {
+  id           String    @id @default(cuid())
+  sale         FieldSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId       String
+  amount       Int
+  method       String? // cash, mobile money, bank
+  note         String?
+  recordedBy   User      @relation("FieldPaymentRecorder", fields: [recordedById], references: [id])
+  recordedById String
+  createdAt    DateTime  @default(now())
+
+  @@index([saleId])
+}
+
+/// Free-sample distribution record — deducts the rep's sample stock.
+model SampleLog {
+  id        String   @id @default(cuid())
+  rep       User     @relation("RepSamples", fields: [repId], references: [id])
+  repId     String
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  quantity  Int
+  location  String?
+  reason    String? // campaign or reason
+  createdAt DateTime @default(now())
+
+  @@index([repId])
+  @@index([createdAt])
+}
+
+/// Daily field report submitted by a rep, visible to admin in real time.
+model FieldReport {
+  id              String   @id @default(cuid())
+  rep             User     @relation("RepReports", fields: [repId], references: [id])
+  repId           String
+  reportDate      DateTime @default(now())
+  location        String
+  salesAchieved   Int      @default(0) // TSh recorded that day
+  unitsSold       Int      @default(0)
+  creditCollected Int      @default(0) // TSh collected from debtors
+  challenges      String?
+  marketFeedback  String?
+  createdAt       DateTime @default(now())
+
+  @@index([repId])
+  @@index([reportDate])
+}
+
+/// Monthly targets per rep (admin-set), driving the rep's progress dashboard.
+model RepTarget {
+  id                   String   @id @default(cuid())
+  rep                  User     @relation("RepTargets", fields: [repId], references: [id], onDelete: Cascade)
+  repId                String
+  year                 Int
+  month                Int // 1–12
+  salesTarget          Int      @default(0) // TSh
+  unitsTarget          Int      @default(0)
+  cashTarget           Int      @default(0) // TSh cash collection
+  creditRecoveryTarget Int      @default(0) // TSh recovered from debtors
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([repId, year, month])
+  @@index([repId])
 }

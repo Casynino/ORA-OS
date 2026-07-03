@@ -6,6 +6,7 @@ const { auth } = NextAuth(authConfig);
 function dashboardFor(role?: string) {
   if (role === "ADMIN") return "/admin";
   if (role === "WAREHOUSE") return "/warehouse";
+  if (role === "SALES_REP") return "/rep";
   return "/partner";
 }
 
@@ -20,7 +21,8 @@ export default auth((req) => {
   const inAdmin = path.startsWith("/admin");
   const inWarehouse = path.startsWith("/warehouse");
   const inPartner = path.startsWith("/partner");
-  const isProtected = inAdmin || inWarehouse || inPartner;
+  const inRep = path.startsWith("/rep");
+  const isProtected = inAdmin || inWarehouse || inPartner || inRep;
 
   // Signed-in users never see the auth pages — bounce to their home.
   if (isAuthPage && isLoggedIn) {
@@ -41,6 +43,8 @@ export default auth((req) => {
     if (inWarehouse && role !== "WAREHOUSE")
       return Response.redirect(new URL(dashboardFor(role), nextUrl));
     if (inPartner && role !== "PARTNER")
+      return Response.redirect(new URL(dashboardFor(role), nextUrl));
+    if (inRep && role !== "SALES_REP")
       return Response.redirect(new URL(dashboardFor(role), nextUrl));
   }
 });
