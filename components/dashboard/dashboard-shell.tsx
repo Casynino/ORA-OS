@@ -45,6 +45,7 @@ import {
   Target,
   MapPin,
   BadgeCheck,
+  Wallet,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Avatar } from "@/components/ui/avatar";
@@ -91,6 +92,7 @@ const ICONS: Record<string, LucideIcon> = {
   targets: Target,
   fieldReports: MapPin,
   reps: BadgeCheck,
+  finance: Wallet,
 };
 
 export type NavItem = { href: string; label: string; icon: string };

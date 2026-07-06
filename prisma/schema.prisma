@@ -183,6 +183,9 @@ model User {
   sampleLogs        SampleLog[]         @relation("RepSamples")
   fieldReports      FieldReport[]       @relation("RepReports")
   repTargets        RepTarget[]         @relation("RepTargets")
+  // Finance
+  expensesRecorded  Expense[]           @relation("ExpenseRecorder")
+  capitalRecorded   CapitalEntry[]      @relation("CapitalRecorder")
 
   @@index([role])
   @@index([status])
@@ -876,6 +879,79 @@ model FieldReport {
 
   @@index([repId])
   @@index([reportDate])
+}
+
+// ── Finance ────────────────────────────────────────────────────────────────
+//  Income is DERIVED from the operational tables (sales, collections,
+//  donations) so it can never drift out of sync. Only money going OUT
+//  (expenses) and capital coming IN are recorded here directly.
+
+enum ExpenseCategory {
+  // Operational
+  RENT
+  UTILITIES
+  STATIONERY
+  OFFICE
+  // Staff
+  SALARIES
+  ALLOWANCES
+  TRANSPORT_REIMBURSEMENT
+  // Logistics
+  DELIVERY
+  WAREHOUSE_HANDLING
+  TRANSPORT_OF_GOODS
+  // Business
+  STOCK_PURCHASE
+  IMPORT_COSTS
+  PACKAGING
+  MARKETING
+  OTHER
+}
+
+enum CapitalType {
+  FOUNDER_INVESTMENT
+  INVESTMENT
+  PROFIT_REINVESTED
+  GRANT
+  OTHER
+}
+
+/// Money leaving ORA — always categorised, always tied to the admin who
+/// approved it. No expense exists without a record.
+model Expense {
+  id            String          @id @default(cuid())
+  code          String          @unique
+  category      ExpenseCategory
+  amount        Int // whole TSh
+  purpose       String
+  paymentMethod String? // cash, mobile money, bank
+  expenseDate   DateTime        @default(now())
+  note          String?
+  recordedBy    User            @relation("ExpenseRecorder", fields: [recordedById], references: [id])
+  recordedById  String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([category])
+  @@index([expenseDate])
+}
+
+/// Capital injected into the business — founder money, investments,
+/// reinvested profit — so growth over time is visible.
+model CapitalEntry {
+  id           String      @id @default(cuid())
+  code         String      @unique
+  type         CapitalType
+  amount       Int // whole TSh
+  source       String // who/where it came from
+  note         String?
+  entryDate    DateTime    @default(now())
+  recordedBy   User        @relation("CapitalRecorder", fields: [recordedById], references: [id])
+  recordedById String
+  createdAt    DateTime    @default(now())
+
+  @@index([type])
+  @@index([entryDate])
 }
 
 /// Monthly targets per rep (admin-set), driving the rep's progress dashboard.
