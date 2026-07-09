@@ -85,6 +85,9 @@ export const DISTRICT_COORDS: Record<string, [number, number]> = {
   same: [-4.07, 37.73],
   mwanga: [-3.68, 37.57],
   babati: [-4.217, 35.75],
+  karatu: [-3.34, 35.66],
+  busega: [-2.28, 33.55],
+  lamadi: [-2.28, 33.55],
   // Lake zone
   "mwanza city": [-2.517, 32.9],
   nyamagana: [-2.517, 32.9],
@@ -109,6 +112,8 @@ export const DISTRICT_COORDS: Record<string, [number, number]> = {
   sumbawanga: [-7.967, 31.617],
   // Southern highlands
   "mbeya city": [-8.9, 33.45],
+  mbalizi: [-8.92, 33.32],
+  vwawa: [-9.1, 32.94],
   mbozi: [-9.1, 32.94],
   kyela: [-9.58, 33.85],
   "iringa urban": [-7.77, 35.69],
@@ -136,6 +141,8 @@ export const DISTRICT_COORDS: Record<string, [number, number]> = {
   // Zanzibar & Pemba
   "mjini magharibi": [-6.165, 39.199],
   "zanzibar city": [-6.165, 39.199],
+  fuoni: [-6.2, 39.25],
+  tunguu: [-6.183, 39.318],
   wete: [-5.056, 39.728],
   "chake chake": [-5.245, 39.77],
   mkoani: [-5.36, 39.65],
