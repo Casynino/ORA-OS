@@ -881,6 +881,44 @@ model FieldReport {
   @@index([reportDate])
 }
 
+// ── Stockists & coverage ───────────────────────────────────────────────────
+
+enum StockistType {
+  PHARMACY
+  SUPERMARKET
+  SHOP
+  CLINIC
+  SCHOOL
+  NGO
+  OTHER
+}
+
+/// A physical outlet where ORA products are available — powers the public
+/// "Find ORA" coverage map. Admin-managed; the map updates automatically.
+model Stockist {
+  id        String       @id @default(cuid())
+  name      String
+  type      StockistType @default(SHOP)
+  region    String
+  district  String
+  address   String?
+  phone     String?
+  hours     String? // e.g. "Mon–Sat 8:00–20:00"
+  lat       Float? // explicit pin; falls back to district/region point
+  lng       Float?
+  products  String? // e.g. "Night 360 · Day 290 · Liners"
+  image     String?
+  isActive  Boolean      @default(true)
+  sortOrder Int          @default(0)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([region])
+  @@index([district])
+  @@index([isActive])
+  @@index([type])
+}
+
 // ── Finance ────────────────────────────────────────────────────────────────
 //  Income is DERIVED from the operational tables (sales, collections,
 //  donations) so it can never drift out of sync. Only money going OUT

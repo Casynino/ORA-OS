@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 const nav = [
   { href: "/impact", label: "Impact" },
   { href: "/education", label: "Education" },
+  { href: "/find-ora", label: "Find ORA" },
   { href: "/donate", label: "Donate" },
   { href: "/contact", label: "Contact" },
   { href: "/request-access", label: "Join Us" },

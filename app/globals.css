@@ -485,3 +485,21 @@
     animation: none;
   }
 }
+
+/* ── Find-ORA coverage map ── */
+@keyframes tz-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.35; }
+  50% { transform: scale(2); opacity: 0.1; }
+}
+.tz-pulse {
+  animation: tz-pulse 2.6s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+@keyframes tz-flow {
+  to { stroke-dashoffset: -40; }
+}
+.tz-flow { animation: tz-flow 4.5s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .tz-pulse, .tz-flow { animation: none; }
+}

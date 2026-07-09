@@ -13,6 +13,7 @@ const nav = [
   { name: "Home", href: "/" },
   { name: "About Us", href: "#about" },
   { name: "Products", href: "/products" },
+  { name: "Find ORA", href: "/find-ora" },
   { name: "Education", href: "/education" },
   { name: "Impact", href: "/impact" },
   { name: "News", href: "/news" },
