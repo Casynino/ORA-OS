@@ -400,73 +400,6 @@
   animation: float-slow 11s ease-in-out infinite reverse;
 }
 
-/* Live donation wall */
-@keyframes live-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-.live-shimmer {
-  background-size: 200% 100%;
-  animation: live-shimmer 3s linear infinite;
-}
-@keyframes donation-pop {
-  0% {
-    opacity: 0;
-    transform: translateY(-12px) scale(0.97);
-  }
-  55% {
-    opacity: 1;
-    transform: translateY(0) scale(1.015);
-  }
-  100% {
-    transform: translateY(0) scale(1);
-  }
-}
-.donation-pop {
-  animation: donation-pop 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-}
-@keyframes heart-beat {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  15% {
-    transform: scale(1.28);
-  }
-  30% {
-    transform: scale(1);
-  }
-  45% {
-    transform: scale(1.16);
-  }
-  60% {
-    transform: scale(1);
-  }
-}
-.animate-heart-beat {
-  animation: heart-beat 1.8s ease-in-out infinite;
-}
-@keyframes float-heart {
-  0% {
-    opacity: 0;
-    transform: translateY(10px) scale(0.5);
-  }
-  20% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-78px) scale(1.15);
-  }
-}
-.float-heart {
-  animation: float-heart 1.7s ease-out forwards;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .aurora-blob,
   .text-gradient,
@@ -475,11 +408,7 @@
   .animate-marquee-reverse,
   .animate-float-slow,
   .animate-float-slow-rev,
-  .live-shimmer,
-  .donation-pop,
   .animate-ticker,
-  .animate-heart-beat,
-  .float-heart,
   .star,
   .shooting-star {
     animation: none;

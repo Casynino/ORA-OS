@@ -85,13 +85,14 @@ export default async function ArticlePage({
           Help us share dignity
         </h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Your donation puts pads and knowledge into the hands that need them.
+          ORA puts pads and knowledge into the hands that need them — see the
+          impact we&apos;re creating together.
         </p>
         <Link
-          href="/donate"
+          href="/impact"
           className={buttonVariants({ variant: "accent", className: "mt-4" })}
         >
-          Donate now
+          Join the movement
         </Link>
       </div>
     </article>

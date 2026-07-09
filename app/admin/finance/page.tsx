@@ -5,7 +5,6 @@ import {
   Wallet,
   CreditCard,
   Package,
-  HeartHandshake,
   Banknote,
   ArrowRight,
   ShieldCheck,
@@ -58,7 +57,6 @@ export default async function AdminFinancePage({
   const incomeSources = [
     { label: "Sales income", value: w.income.sales, icon: Banknote },
     { label: "Credit collected", value: w.income.collections, icon: CreditCard },
-    { label: "Donations", value: w.income.donations, icon: HeartHandshake },
     { label: "Capital injected", value: w.income.capital, icon: PiggyBank },
   ].filter((s) => s.value > 0);
 

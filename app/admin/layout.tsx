@@ -48,7 +48,7 @@ const nav: NavGroup[] = [
     label: "Impact",
     items: [
       { href: "/admin/news", label: "News & Posts", icon: "news" },
-      { href: "/admin/donations", label: "Donations", icon: "activities" },
+      { href: "/admin/impact", label: "Impact Management", icon: "activities" },
       { href: "/admin/stockists", label: "Stockists & Coverage", icon: "fieldReports" },
       { href: "/admin/education", label: "Education Hub", icon: "education" },
     ],

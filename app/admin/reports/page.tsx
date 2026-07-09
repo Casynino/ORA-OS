@@ -6,12 +6,15 @@ import { KpiCard } from "@/components/admin/kpi-card";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
 export default async function AdminReportsPage() {
-  const [stock, salesAgg, donationMoney, donationPads, creditAgg, products] =
+  const [stock, salesAgg, impactAgg, activityCount, creditAgg, products] =
     await Promise.all([
       getStockTotals(),
       prisma.request.aggregate({ _sum: { totalAmount: true }, _count: true, where: { status: "FULFILLED" } }),
-      prisma.donation.aggregate({ _sum: { amount: true }, where: { type: "MONEY" } }),
-      prisma.donation.aggregate({ _sum: { quantity: true }, where: { type: "PADS" } }),
+      prisma.impactActivity.aggregate({
+        _sum: { padsDistributed: true, peopleReached: true },
+        where: { isPublished: true },
+      }),
+      prisma.impactActivity.count({ where: { isPublished: true } }),
       prisma.creditAccount.aggregate({ _sum: { principal: true, amountPaid: true }, where: { status: { not: "SETTLED" } } }),
       prisma.product.findMany({ include: { inventory: true } }),
     ]);
@@ -45,8 +48,9 @@ export default async function AdminReportsPage() {
       </Section>
 
       <Section title="Impact report">
-        <KpiCard label="Money donated" value={donationMoney._sum.amount ?? 0} prefix="TSh " icon={HeartHandshake} accent="accent" />
-        <KpiCard label="Pads donated" value={donationPads._sum.quantity ?? 0} icon={HeartHandshake} accent="accent" />
+        <KpiCard label="Impact activities" value={activityCount} icon={HeartHandshake} accent="accent" />
+        <KpiCard label="Pads distributed (activities)" value={impactAgg._sum.padsDistributed ?? 0} icon={HeartHandshake} accent="accent" />
+        <KpiCard label="People reached" value={impactAgg._sum.peopleReached ?? 0} icon={HeartHandshake} accent="success" />
       </Section>
     </div>
   );

@@ -155,13 +155,13 @@ export default async function ProductPage({
                   Partner with us
                 </Link>
                 <Link
-                  href="/donate"
+                  href="/find-ora"
                   className={cn(
                     buttonVariants({ size: "lg", variant: "outline" }),
                     "rounded-full",
                   )}
                 >
-                  Donate pads
+                  Find it near you
                   <ArrowRight className="size-4" />
                 </Link>
               </div>
@@ -260,19 +260,18 @@ export default async function ProductPage({
             Help put ORA in every girl&apos;s hand
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-white/85">
-            Donate pads or join our partner network and bring ORA to your school
-            or community.
+            Join our partner network and bring ORA to your school or community.
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-3">
             <Link
-              href="/donate"
+              href="/impact"
               className={cn(
                 buttonVariants({ size: "lg" }),
                 "rounded-full bg-white text-primary hover:bg-white/90",
               )}
             >
               <HeartHandshake className="size-5" />
-              Donate now
+              See our impact
             </Link>
             <Link
               href="/request-access"

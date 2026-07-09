@@ -102,10 +102,10 @@ export default async function NewsArticlePage({
           Your support helps us reach the next school, the next community.
         </p>
         <Link
-          href="/donate"
+          href="/impact"
           className={buttonVariants({ variant: "accent", className: "mt-4" })}
         >
-          Donate now
+          Join the movement
         </Link>
       </div>
     </article>

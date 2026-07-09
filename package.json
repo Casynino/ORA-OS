@@ -2,7 +2,7 @@
   "name": "ora-pads",
   "version": "0.1.0",
   "private": true,
-  "description": "Ora Pads — controlled distribution, donation & education platform with full admin governance.",
+  "description": "Ora Pads — controlled distribution, impact & education platform with full admin governance.",
   "engines": {
     "node": ">=18.18"
   },
