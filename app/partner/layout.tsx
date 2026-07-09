@@ -35,6 +35,7 @@ export default async function PartnerLayout({
       nav={nav}
       user={{ name: user.name, email: user.email, role: user.role }}
       areaLabel="Partner Portal"
+      profileHref="/partner/profile"
     >
       {children}
     </DashboardShell>

@@ -46,6 +46,8 @@ import {
   MapPin,
   BadgeCheck,
   Wallet,
+  ChevronDown,
+  UserRound,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Avatar } from "@/components/ui/avatar";
@@ -101,16 +103,31 @@ export function DashboardShell({
   nav,
   user,
   areaLabel,
+  profileHref,
   children,
 }: {
   nav: NavGroup[];
-  user: { name?: string | null; email?: string | null; role?: string };
+  user: {
+    name?: string | null;
+    email?: string | null;
+    role?: string;
+    avatar?: string | null;
+    preferredName?: string | null;
+  };
   areaLabel: string;
+  profileHref?: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const homeHref = nav[0]?.items[0]?.href ?? "/";
+  const displayName = user.preferredName || user.name;
+
+  // Close the user menu on route change.
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
 
   // Lock background scroll while the mobile drawer is open.
   useEffect(() => {
@@ -168,7 +185,7 @@ export function DashboardShell({
   const UserCard = () => (
     <div className="border-t border-border p-3">
       <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-        <Avatar name={user.name} />
+        <Avatar name={user.name} src={user.avatar} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{user.name}</p>
           <p className="truncate text-xs text-muted-foreground">{user.email}</p>
@@ -256,10 +273,90 @@ export function DashboardShell({
               <span className="hidden sm:inline">Main site</span>
             </Link>
             <ThemeToggle />
-            <span className="hidden text-sm text-muted-foreground md:inline">
-              {user.name}
-            </span>
-            <Avatar name={user.name} className="size-8" />
+
+            {/* User menu */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
+                className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-muted"
+              >
+                <Avatar name={user.name} src={user.avatar} className="size-8" />
+                <span className="hidden max-w-36 truncate text-sm font-medium md:inline">
+                  {displayName}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "hidden size-3.5 text-muted-foreground transition-transform md:block",
+                    menuOpen && "rotate-180",
+                  )}
+                />
+              </button>
+
+              {menuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setMenuOpen(false)}
+                  />
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-2xl border border-border bg-card shadow-glow"
+                  >
+                    <div className="border-b border-border px-4 py-3">
+                      <p className="truncate text-sm font-semibold">{user.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {user.email}
+                      </p>
+                    </div>
+                    <div className="p-1.5">
+                      {profileHref && (
+                        <>
+                          <Link
+                            href={profileHref}
+                            role="menuitem"
+                            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            <UserRound className="size-4" />
+                            My profile
+                          </Link>
+                          <Link
+                            href={`${profileHref}#security`}
+                            role="menuitem"
+                            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            <Shield className="size-4" />
+                            Security
+                          </Link>
+                        </>
+                      )}
+                      {user.role === "ADMIN" && (
+                        <Link
+                          href="/admin/activity"
+                          role="menuitem"
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                          <Activity className="size-4" />
+                          My activity
+                        </Link>
+                      )}
+                      <form action={logoutAction}>
+                        <button
+                          type="submit"
+                          role="menuitem"
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <LogOut className="size-4" />
+                          Sign out
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
         <main className="p-4 lg:p-8">{children}</main>

@@ -65,7 +65,7 @@ const DIST_COLORS = [
 ];
 
 export default async function AdminCommandCenter() {
-  await requireRole("ADMIN");
+  const me = await requireRole("ADMIN");
 
   const [d, queue] = await Promise.all([
     getCommandCenter(),
@@ -90,6 +90,15 @@ export default async function AdminCommandCenter() {
     ]),
   ]);
   const [pendingRequests, pendingReturns, pendingApplications] = queue;
+
+  // Personalised greeting — always the signed-in admin, never generic.
+  const meUser = await prisma.user.findUnique({
+    where: { id: me.id },
+    select: { name: true, preferredName: true },
+  });
+  const firstName =
+    meUser?.preferredName || (meUser?.name ?? "there").split(" ")[0];
+  const nickname = meUser?.preferredName || (meUser?.name ?? "").split(" ")[0];
 
   // Greeting + date (Tanzania time, EAT)
   const eatHour = Number(
@@ -142,10 +151,11 @@ export default async function AdminCommandCenter() {
               <span className="min-w-0 truncate">{dateLabel}</span>
             </p>
             <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight sm:text-4xl">
-              {greeting}.
+              {greeting}, {firstName} 👋
             </h1>
             <p className="mt-1.5 text-sm text-white/90 sm:text-base">
-              Welcome back. Here&apos;s what&apos;s happening across ORA today.
+              Welcome back, {nickname}. Here&apos;s everything happening across
+              ORA today.
             </p>
             <div className="mt-5 grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:gap-8">
               <HeroStat label="Cash collected today" value={formatCurrency(d.finance.cashToday)} />

@@ -143,6 +143,10 @@ model User {
   businessLicense  String? // licence number
   taxId            String? // TIN / tax number
   paymentTerms     String? // admin-set terms, e.g. "Net 30"
+  preferredName    String? // nickname used in greetings, e.g. "Recy"
+  avatar           String? // profile photo (/uploads/... or blob URL)
+  lastLoginAt      DateTime?
+  sessionVersion   Int      @default(0) // bump to sign the user out everywhere
   assignedWarehouse String? // partner's fulfilling warehouse (admin-set, denormalised name); orders default here, hidden from the customer
   warehouse    Warehouse? @relation("WarehouseStaff", fields: [warehouseId], references: [id])
   warehouseId  String? // for WAREHOUSE staff — the warehouse they operate
@@ -188,9 +192,22 @@ model User {
   capitalRecorded   CapitalEntry[]      @relation("CapitalRecorder")
   // Impact
   impactActivities  ImpactActivity[]    @relation("ImpactActivityCreator")
+  loginEvents       LoginEvent[]
 
   @@index([role])
   @@index([status])
+}
+
+/// One row per successful sign-in — powers the profile's login history.
+model LoginEvent {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 // ── Impact activities ──────────────────────────────────────────────────────
