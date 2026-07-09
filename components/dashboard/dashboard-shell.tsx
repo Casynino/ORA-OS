@@ -59,7 +59,6 @@ const ICONS: Record<string, LucideIcon> = {
   catalogue: Boxes,
   requests: ClipboardList,
   newRequest: PlusCircle,
-  donations: HeartHandshake,
   credit: CreditCard,
   returns: Undo2,
   users: Users,

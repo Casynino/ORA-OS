@@ -3,7 +3,7 @@ import Image from "next/image";
 import {
   Heart,
   ArrowRight,
-  Coins,
+  MapPin,
   Package,
   HeartHandshake,
   Users,
@@ -27,19 +27,19 @@ import { SocialLinks } from "@/components/public/social-links";
 import { ORA_CONTACT } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { getPublicImpactStats } from "@/lib/stats";
-import { getDonationFeed } from "@/lib/services/donation-feed";
-import { HomeLivePulse } from "@/components/public/home-live-pulse";
+import { getImpactFeed } from "@/lib/services/impact";
+import { ImpactPulse } from "@/components/public/impact-live";
 
 // Always render the public impact figures live from the database (never a
-// build-time snapshot), so donations & stats are always current.
+// build-time snapshot), so impact stats are always current.
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const stats = await getPublicImpactStats();
-  const donationFeed = await getDonationFeed();
+  const impactFeed = await getImpactFeed();
 
   const heroStats = [
-    { label: "Total Money Donated", value: stats.moneyDonated, prefix: "TZS ", icon: Coins },
+    { label: "Regions Covered", value: stats.regionsCovered, suffix: "+", icon: MapPin },
     { label: "Packs Distributed", value: stats.padsDistributed, suffix: "+", icon: Package },
     { label: "Girls Reached", value: stats.girlsReached, suffix: "+", icon: HeartHandshake },
     { label: "Communities Supported", value: stats.communities, suffix: "+", icon: Users },
@@ -106,12 +106,12 @@ export default async function HomePage() {
           </Reveal>
           <Reveal delay={0.18}>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/donate" className={cn(buttonVariants({ size: "lg" }), "rounded-full shadow-glow")}>
+              <Link href="/impact" className={cn(buttonVariants({ size: "lg" }), "rounded-full shadow-glow")}>
                 <Heart className="size-5" />
-                Support a Girl
+                Join the Movement
               </Link>
-              <Link href="/impact" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "rounded-full border-white/25 bg-white/5 text-white hover:bg-white/10")}>
-                Meet the Girls
+              <Link href="/find-ora" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "rounded-full border-white/25 bg-white/5 text-white hover:bg-white/10")}>
+                Find ORA Near You
                 <ArrowRight className="size-4" />
               </Link>
             </div>
@@ -125,7 +125,7 @@ export default async function HomePage() {
                     <s.icon className="size-4" />
                   </span>
                   <div className="mt-3 font-display text-2xl font-bold text-white">
-                    <CountUp value={s.value} prefix={s.prefix ?? ""} suffix={s.suffix ?? ""} />
+                    <CountUp value={s.value} suffix={s.suffix ?? ""} />
                   </div>
                   <div className="text-xs text-white/60">{s.label}</div>
                 </div>
@@ -133,7 +133,7 @@ export default async function HomePage() {
             </div>
           </Reveal>
           <Reveal delay={0.34}>
-            <HomeLivePulse initial={donationFeed} className="mt-5" />
+            <ImpactPulse initial={impactFeed} className="mt-5" />
           </Reveal>
         </div>
       </section>
@@ -224,10 +224,10 @@ export default async function HomePage() {
           <Reveal>
             <div className="glow-hover relative h-full overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-primary/40 p-7">
               <h3 className="font-display text-2xl font-bold text-white">Make an Impact Today</h3>
-              <p className="mt-2 max-w-[18rem] text-sm text-white/85">Your donation helps us reach more girls, support more communities and create better futures.</p>
-              <Link href="/donate" className={cn(buttonVariants(), "mt-6 rounded-full bg-white text-primary hover:bg-white/90")}>
+              <p className="mt-2 max-w-[18rem] text-sm text-white/85">Every school visit, every education session, every pad delivered — see the change we create together.</p>
+              <Link href="/impact" className={cn(buttonVariants(), "mt-6 rounded-full bg-white text-primary hover:bg-white/90")}>
                 <Heart className="size-4" />
-                Support a Girl
+                See Our Impact
               </Link>
             </div>
           </Reveal>
@@ -375,7 +375,7 @@ export default async function HomePage() {
           <div>
             <h4 className="font-semibold">Get Involved</h4>
             <ul className="mt-3 space-y-2 text-sm text-white/60">
-              {[["Donate", "/donate"], ["Join Us", "/request-access"], ["Sign in", "/login"]].map(([l, h]) => (
+              {[["Our Impact", "/impact"], ["Find ORA", "/find-ora"], ["Join Us", "/request-access"], ["Sign in", "/login"]].map(([l, h]) => (
                 <li key={l}><Link href={h} className="hover:text-primary">{l}</Link></li>
               ))}
             </ul>

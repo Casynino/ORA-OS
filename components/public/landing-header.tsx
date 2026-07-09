@@ -67,11 +67,11 @@ export function LandingHeader() {
           <div className="flex items-center gap-2">
             <ThemeToggle className="hidden border-white/15 bg-white/10 sm:inline-flex" />
             <Link
-              href="/donate"
+              href="/impact"
               className={cn(buttonVariants({ size: "sm" }), "rounded-full")}
             >
               <Heart className="size-4" />
-              Support a Girl
+              Join the Movement
             </Link>
             <button
               onClick={() => setOpen((v) => !v)}

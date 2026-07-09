@@ -10,7 +10,6 @@ import type { ExpenseCategory } from "@prisma/client";
 //                                  warehouse walk-in sales)
 //    · Credit collections ........ Payment (partners) + FieldPayment (field)
 //    · Field cash sales .......... FieldSale type=CASH (not voided)
-//    · Donations ................. Donation status RECEIVED/ALLOCATED/DISTRIBUTED
 //    · Capital ................... CapitalEntry (kept separate from income)
 //  Money out is the Expense table. Profit is accrual-based:
 //    revenue (fulfilled sales) − COGS (cost of units sold) − operating
@@ -29,8 +28,6 @@ export function periodStart(period: Period, now = new Date()): Date | null {
   if (period === "month") return new Date(now.getFullYear(), now.getMonth(), 1);
   return null;
 }
-
-const PAID_DONATION = ["RECEIVED", "ALLOCATED", "DISTRIBUTED"] as const;
 
 export const EXPENSE_GROUPS: { label: string; categories: ExpenseCategory[] }[] = [
   { label: "Operational", categories: ["RENT", "UTILITIES", "STATIONERY", "OFFICE"] },
@@ -64,7 +61,7 @@ const since = (start: Date | null): DateFilter | undefined =>
 
 /** Cash actually received in a window, split by source. */
 async function cashIn(start: Date | null) {
-  const [paidOrders, partnerPayments, fieldCash, fieldCollections, donations, capital] =
+  const [paidOrders, partnerPayments, fieldCash, fieldCollections, capital] =
     await Promise.all([
       prisma.request.aggregate({
         _sum: { totalAmount: true },
@@ -92,13 +89,6 @@ async function cashIn(start: Date | null) {
           ...(start ? { createdAt: { gte: start } } : {}),
         },
       }),
-      prisma.donation.aggregate({
-        _sum: { amount: true },
-        where: {
-          status: { in: [...PAID_DONATION] },
-          ...(start ? { paidAt: { gte: start } } : {}),
-        },
-      }),
       prisma.capitalEntry.aggregate({
         _sum: { amount: true },
         where: start ? { entryDate: { gte: start } } : {},
@@ -109,16 +99,14 @@ async function cashIn(start: Date | null) {
     (paidOrders._sum.totalAmount ?? 0) + (fieldCash._sum.total ?? 0);
   const collections =
     (partnerPayments._sum.amount ?? 0) + (fieldCollections._sum.amount ?? 0);
-  const donationsIn = donations._sum.amount ?? 0;
   const capitalIn = capital._sum.amount ?? 0;
   return {
     sales,
     collections,
-    donations: donationsIn,
     capital: capitalIn,
     // Income = money earned; capital is cash but not income.
-    income: sales + collections + donationsIn,
-    total: sales + collections + donationsIn + capitalIn,
+    income: sales + collections,
+    total: sales + collections + capitalIn,
   };
 }
 
@@ -262,7 +250,7 @@ export async function getFinanceOverview(period: Period) {
   }
   // One query per stream over the 6-month span, bucketed in JS.
   const spanStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-  const [mPaidOrders, mPayments, mFieldCash, mFieldPay, mDonations, mExpenses] =
+  const [mPaidOrders, mPayments, mFieldCash, mFieldPay, mExpenses] =
     await Promise.all([
       prisma.request.findMany({
         where: { paymentStatus: "PAID", fulfilledAt: { gte: spanStart } },
@@ -280,10 +268,6 @@ export async function getFinanceOverview(period: Period) {
         where: { createdAt: { gte: spanStart }, sale: { voided: false } },
         select: { amount: true, createdAt: true },
       }),
-      prisma.donation.findMany({
-        where: { status: { in: [...PAID_DONATION] }, paidAt: { gte: spanStart } },
-        select: { amount: true, paidAt: true },
-      }),
       prisma.expense.findMany({
         where: { expenseDate: { gte: spanStart } },
         select: { amount: true, expenseDate: true },
@@ -300,7 +284,6 @@ export async function getFinanceOverview(period: Period) {
   for (const r of mPayments) add(bucket(r.createdAt), "income", r.amount);
   for (const r of mFieldCash) add(bucket(r.createdAt), "income", r.total);
   for (const r of mFieldPay) add(bucket(r.createdAt), "income", r.amount);
-  for (const r of mDonations) add(bucket(r.paidAt), "income", r.amount ?? 0);
   for (const r of mExpenses) add(bucket(r.expenseDate), "expenses", r.amount);
   for (const m of months) m.net = m.income - m.expenses;
 
@@ -376,7 +359,6 @@ export type LedgerEntry = {
     | "CREDIT_COLLECTED"
     | "FIELD_SALE"
     | "FIELD_COLLECTION"
-    | "DONATION"
     | "EXPENSE"
     | "CAPITAL";
   label: string;
@@ -391,7 +373,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
   const start = periodStart(period);
   const dateW = since(start);
 
-  const [orders, payments, fieldSales, fieldPayments, donations, expenses, capital] =
+  const [orders, payments, fieldSales, fieldPayments, expenses, capital] =
     await Promise.all([
       prisma.request.findMany({
         where: { paymentStatus: "PAID", ...(dateW ? { fulfilledAt: dateW } : {}) },
@@ -430,12 +412,6 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
           sale: { select: { code: true, customer: { select: { name: true } } } },
           recordedBy: { select: { name: true } },
         },
-      }),
-      prisma.donation.findMany({
-        where: { status: { in: [...PAID_DONATION] }, amount: { not: null }, ...(dateW ? { paidAt: dateW } : {}) },
-        orderBy: { paidAt: "desc" },
-        take,
-        select: { id: true, code: true, amount: true, paidAt: true, createdAt: true, donorName: true },
       }),
       prisma.expense.findMany({
         where: dateW ? { expenseDate: dateW } : {},
@@ -495,17 +471,6 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
       amount: p.amount,
       method: p.method,
       actor: p.recordedBy.name,
-    })),
-    ...donations.map((d) => ({
-      id: `don-${d.id}`,
-      date: d.paidAt ?? d.createdAt,
-      kind: "DONATION" as const,
-      label: `Donation — ${d.donorName}`,
-      reference: d.code,
-      category: "Donations",
-      amount: d.amount ?? 0,
-      method: "Mobile money",
-      actor: null,
     })),
     ...expenses.map((e) => ({
       id: `exp-${e.id}`,

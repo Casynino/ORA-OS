@@ -186,9 +186,49 @@ model User {
   // Finance
   expensesRecorded  Expense[]           @relation("ExpenseRecorder")
   capitalRecorded   CapitalEntry[]      @relation("CapitalRecorder")
+  // Impact
+  impactActivities  ImpactActivity[]    @relation("ImpactActivityCreator")
 
   @@index([role])
   @@index([status])
+}
+
+// ── Impact activities ──────────────────────────────────────────────────────
+//  ORA is not a fundraising platform: impact is measured in pads distributed,
+//  girls supported and communities visited. Every activity recorded here
+//  updates the public impact statistics automatically.
+
+enum ImpactActivityType {
+  SCHOOL_VISIT
+  COMMUNITY_OUTREACH
+  EDUCATION_SESSION
+  AWARENESS_CAMPAIGN
+  PAD_DISTRIBUTION
+  OTHER
+}
+
+model ImpactActivity {
+  id              String             @id @default(cuid())
+  title           String
+  type            ImpactActivityType @default(COMMUNITY_OUTREACH)
+  description     String?
+  location        String // school / community / venue
+  region          String?
+  district        String?
+  partnerOrg      String? // partner organisation, if any
+  padsDistributed Int                @default(0)
+  peopleReached   Int                @default(0)
+  images          String[]           @default([])
+  activityDate    DateTime           @default(now())
+  isPublished     Boolean            @default(true)
+  createdBy       User?              @relation("ImpactActivityCreator", fields: [createdById], references: [id])
+  createdById     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([isPublished])
+  @@index([activityDate])
+  @@index([type])
 }
 
 /// Per-partner negotiated price for a product (TSh per unit). Set by admin at
@@ -528,7 +568,9 @@ model ReturnRequest {
   @@index([requesterId])
 }
 
-// ── Donations ──────────────────────────────────────────────────────────────
+// ── Donations (ARCHIVED) ───────────────────────────────────────────────────
+//  ORA no longer accepts monetary donations. These tables are retained only
+//  as the historical record of past NTZS payments — no UI or API uses them.
 
 model DonationPackage {
   id           String       @id @default(cuid())

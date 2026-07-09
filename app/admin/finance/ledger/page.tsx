@@ -14,7 +14,6 @@ const KIND_LABEL: Record<string, string> = {
   CREDIT_COLLECTED: "Credit payment",
   FIELD_SALE: "Field sale",
   FIELD_COLLECTION: "Field collection",
-  DONATION: "Donation",
   EXPENSE: "Expense",
   CAPITAL: "Capital",
 };

@@ -152,7 +152,7 @@ export default async function AdminCommandCenter() {
               <HeroStat label="Revenue today" value={formatCurrency(d.sales.today.revenue)} />
               <HeroStat label="Revenue this month" value={formatCurrency(d.sales.month.revenue)} />
               <HeroStat label="Outstanding credit" value={formatCurrency(d.finance.outstandingCredit)} />
-              <HeroStat label="Total donated" value={formatCurrency(d.sales.donations)} />
+              <HeroStat label="Pads distributed" value={formatNumber(d.sales.padsDistributed)} />
             </div>
           </div>
         </div>

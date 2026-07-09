@@ -3,32 +3,36 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   Quote,
-  Sparkles,
   Camera,
   GraduationCap,
   Truck,
   Heart,
   ArrowRight,
+  MapPin,
+  Users,
+  CalendarDays,
+  Package,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { cn, formatNumber } from "@/lib/utils";
+import { cn, formatNumber, formatDate } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Reveal } from "@/components/ui/reveal";
 import { CountUp } from "@/components/ui/count-up";
 import { PhotoGallery } from "@/components/public/photo-gallery";
-import { HomeLivePulse } from "@/components/public/home-live-pulse";
+import { ImpactPulse, ImpactActivityFeed } from "@/components/public/impact-live";
+import { activityMeta } from "@/lib/impact-meta";
 import { getPublicImpactStats } from "@/lib/stats";
-import { getDonationFeed } from "@/lib/services/donation-feed";
+import { getImpactFeed } from "@/lib/services/impact";
 
 export const metadata: Metadata = {
-  title: "Impact",
+  title: "ORA Impact",
   description:
-    "ORA is a movement to end period poverty in Tanzania — not a shop. See the change we're making, in lives, schools and communities.",
+    "Every pad distributed represents dignity, confidence and opportunity. See the impact ORA is creating across Tanzania — school by school, community by community.",
 };
 
-// Live money raised + the live donation pulse must always be current.
+// Impact counters and activities must always be current.
 export const dynamic = "force-dynamic";
 
 const story = [
@@ -61,20 +65,31 @@ const galleryPhotos = [
 ].map((e) => `/ora/event/${e}.jpg`);
 
 export default async function ImpactPage() {
-  const [stories, stats, feed] = await Promise.all([
+  const [stories, stats, feed, activities] = await Promise.all([
     prisma.impactStory.findMany({
       where: { published: true },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     }),
     getPublicImpactStats(),
-    getDonationFeed(),
+    getImpactFeed(),
+    prisma.impactActivity.findMany({
+      where: { isPublished: true },
+      orderBy: { activityDate: "desc" },
+      take: 9,
+    }),
   ]);
 
-  const headline = [
-    { label: "Total donated", value: stats.moneyDonated, prefix: "TZS ", suffix: "" },
-    { label: "Pads distributed", value: stats.padsDistributed, prefix: "", suffix: "+" },
-    { label: "Girls reached", value: stats.livesReached, prefix: "", suffix: "+" },
-    { label: "Communities reached", value: stats.communities, prefix: "", suffix: "+" },
+  const counters = [
+    { label: "Pads distributed", value: stats.padsDistributed, suffix: "+" },
+    { label: "Girls supported", value: stats.girlsReached, suffix: "+" },
+    { label: "Communities visited", value: stats.communities, suffix: "+" },
+    { label: "Regions covered", value: stats.regionsCovered, suffix: "" },
+    ...(stats.schoolsReached > 0
+      ? [{ label: "Schools reached", value: stats.schoolsReached, suffix: "" }]
+      : []),
+    ...(stats.educationSessions > 0
+      ? [{ label: "Education sessions", value: stats.educationSessions, suffix: "" }]
+      : []),
   ];
 
   return (
@@ -84,40 +99,39 @@ export default async function ImpactPage() {
         <div className="container grid items-center gap-10 py-16 lg:grid-cols-2">
           <Reveal>
             <Badge variant="accent" className="gap-1.5">
-              <Sparkles className="size-3.5" />
-              Our impact
+              <Heart className="size-3.5" />
+              ORA Impact
             </Badge>
-            <h1 className="mt-4 font-display text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl">
-              Dignity, measured in{" "}
-              <span className="text-gradient">lives changed</span>
+            <h1 className="mt-4 font-display text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl">
+              Empowering <span className="text-gradient">Every Cycle</span>
             </h1>
             <p className="mt-5 text-lg text-muted-foreground">
-              ORA isn&apos;t a shop — it&apos;s a movement. We exist to end
-              period poverty in Tanzania: keeping girls in school, with dignity,
-              not for profit. Here&apos;s the change we&apos;re making together.
+              Every pad distributed represents dignity, confidence and
+              opportunity. This is the movement — measured in girls supported,
+              schools reached and communities visited. Never in money.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
-                href="/donate"
+                href="/request-access"
                 className={cn(buttonVariants({ size: "lg" }), "rounded-full")}
               >
                 <Heart className="size-5" />
-                Power the mission
+                Join the movement
               </Link>
               <Link
-                href="/request-access"
+                href="/find-ora"
                 className={cn(
                   buttonVariants({ size: "lg", variant: "outline" }),
                   "rounded-full",
                 )}
               >
-                Join us
+                Find ORA near you
                 <ArrowRight className="size-4" />
               </Link>
             </div>
 
-            {/* live donations — same simple cycling line as the home page */}
-            <HomeLivePulse initial={feed} tone="theme" className="mt-7" />
+            {/* live activities — the movement in motion */}
+            <ImpactPulse initial={feed} tone="theme" className="mt-7" />
           </Reveal>
 
           <Reveal delay={0.1}>
@@ -144,14 +158,22 @@ export default async function ImpactPage() {
         </div>
       </section>
 
-      {/* Impact numbers */}
+      {/* Impact counters */}
       <section className="container py-14">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {headline.map((h, i) => (
-            <Reveal key={h.label} delay={i * 0.08}>
+        <Reveal className="mb-8 text-center">
+          <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+            Our impact
+          </h2>
+          <p className="mt-2 text-muted-foreground">
+            Real numbers from the field — updated with every activity we run.
+          </p>
+        </Reveal>
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          {counters.map((h, i) => (
+            <Reveal key={h.label} delay={i * 0.06}>
               <div className="glass-card h-full rounded-2xl p-6 text-center">
-                <div className="font-display text-4xl font-bold text-primary">
-                  <CountUp value={h.value} prefix={h.prefix} suffix={h.suffix} />
+                <div className="font-display text-3xl font-bold text-primary sm:text-4xl">
+                  <CountUp value={h.value} suffix={h.suffix} />
                 </div>
                 <div className="mt-1 text-sm text-muted-foreground">
                   {h.label}
@@ -161,6 +183,101 @@ export default async function ImpactPage() {
           ))}
         </div>
       </section>
+
+      {/* Latest activities feed */}
+      <section className="container py-10">
+        <div className="mx-auto max-w-xl">
+          <Reveal className="text-center">
+            <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+              Happening <span className="text-gradient">on the ground</span>
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              The latest ORA activities — schools, streets and communities.
+            </p>
+          </Reveal>
+          <Reveal delay={0.1} className="mt-7">
+            <ImpactActivityFeed initial={feed} />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Community activities */}
+      {activities.length > 0 && (
+        <section className="container py-14">
+          <Reveal className="mb-8">
+            <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+              Community activities
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              Where we&apos;ve been and what it changed.
+            </p>
+          </Reveal>
+          <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {activities.map((a, i) => {
+              const meta = activityMeta(a.type);
+              return (
+                <Reveal key={a.id} delay={i * 0.05}>
+                  <div className="glow-hover h-full overflow-hidden rounded-3xl border border-border bg-card/60 backdrop-blur">
+                    {a.images[0] && (
+                      <div className="relative aspect-[16/10]">
+                        <Image
+                          src={a.images[0]}
+                          alt={a.title}
+                          fill
+                          sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 33vw"
+                          className="object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="p-5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="accent" className="gap-1">
+                          <meta.icon className="size-3" />
+                          {meta.label}
+                        </Badge>
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <CalendarDays className="size-3" />
+                          {formatDate(a.activityDate)}
+                        </span>
+                      </div>
+                      <h3 className="mt-2.5 font-display text-lg font-bold leading-snug">
+                        {a.title}
+                      </h3>
+                      <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
+                        <MapPin className="size-3.5 shrink-0" />
+                        {a.location}
+                        {a.region ? `, ${a.region}` : ""}
+                      </p>
+                      {a.description && (
+                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                          {a.description}
+                        </p>
+                      )}
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {a.padsDistributed > 0 && (
+                          <Badge variant="secondary" className="gap-1">
+                            <Package className="size-3" />
+                            {formatNumber(a.padsDistributed)} pads
+                          </Badge>
+                        )}
+                        {a.peopleReached > 0 && (
+                          <Badge variant="success" className="gap-1">
+                            <Users className="size-3" />
+                            {formatNumber(a.peopleReached)} reached
+                          </Badge>
+                        )}
+                        {a.partnerOrg && (
+                          <Badge variant="outline">with {a.partnerOrg}</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Reveal>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* The story — alternating text + photo */}
       <section className="container space-y-16 py-10 sm:space-y-24">
@@ -180,10 +297,7 @@ export default async function ImpactPage() {
                 />
               </div>
             </Reveal>
-            <Reveal
-              delay={0.1}
-              className={i % 2 === 1 ? "lg:order-1" : ""}
-            >
+            <Reveal delay={0.1} className={i % 2 === 1 ? "lg:order-1" : ""}>
               <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
                 <s.icon className="size-4" />
                 {s.eyebrow}
@@ -283,28 +397,28 @@ export default async function ImpactPage() {
             Be part of the change
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-white/85">
-            Every donation and every partner helps us reach one more girl, one
-            more school, one more community.
+            Every partner, every stockist, every education session helps us
+            reach one more girl, one more school, one more community.
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-3">
             <Link
-              href="/donate"
+              href="/request-access"
               className={cn(
                 buttonVariants({ size: "lg" }),
                 "rounded-full bg-white text-primary hover:bg-white/90",
               )}
             >
               <Heart className="size-5" />
-              Donate now
+              Join the movement
             </Link>
             <Link
-              href="/request-access"
+              href="/find-ora"
               className={cn(
                 buttonVariants({ size: "lg", variant: "outline" }),
                 "rounded-full border-white/40 bg-white/10 text-white hover:bg-white/20",
               )}
             >
-              Join us
+              Find ORA near you
               <ArrowRight className="size-4" />
             </Link>
           </div>

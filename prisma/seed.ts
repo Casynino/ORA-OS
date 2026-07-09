@@ -10,8 +10,6 @@ async function reset() {
   await prisma.requestItem.deleteMany();
   await prisma.returnRequest.deleteMany();
   await prisma.request.deleteMany();
-  await prisma.donation.deleteMany();
-  await prisma.donationPackage.deleteMany();
   await prisma.cycleLog.deleteMany();
   await prisma.activityLog.deleteMany();
   await prisma.inventory.deleteMany();
@@ -96,17 +94,6 @@ async function main() {
     });
   }
   const P = (sku: string) => products.find((x) => x.sku === sku)!.id;
-
-  // ── Donation packages (pad-sponsorship tiers) ──────────────────────────────
-  // Real donations only — collected live via the NTZS mobile-money rail.
-  await prisma.donationPackage.createMany({
-    data: [
-      { name: "Sponsor 10 Pads",  description: "Protect one girl this month.",       type: "PADS", padsQuantity: 10,  sortOrder: 1 },
-      { name: "Sponsor 25 Pads",  description: "Keep a girl in school all term.",     type: "PADS", padsQuantity: 25,  sortOrder: 2 },
-      { name: "Sponsor 50 Pads",  description: "A full term of dignity for one girl.", type: "PADS", padsQuantity: 50,  sortOrder: 3 },
-      { name: "Sponsor 100 Pads", description: "Reach a whole classroom of girls.",    type: "PADS", padsQuantity: 100, sortOrder: 4 },
-    ],
-  });
 
   const articles = [
     { slug: "understanding-your-menstrual-cycle", title: "Understanding Your Menstrual Cycle", excerpt: "A simple guide to the phases of your cycle and what's normal.", category: "MENSTRUAL_HEALTH", language: "EN", readMinutes: 4, body: "Your menstrual cycle is your body's monthly rhythm, usually lasting between 21 and 35 days.\n\nThe cycle has four phases: menstruation, the follicular phase, ovulation and the luteal phase.\n\nTracking your cycle helps you understand your body and predict your period." },

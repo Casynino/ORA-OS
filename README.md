@@ -1,6 +1,6 @@
 # 🚀 Ora Pads — Unified Control & Impact Platform
 
-A controlled distribution, donation and education platform for Ora Pads — **not** a normal online shop. Stock, pricing and financial decisions are fully governed by admin, while partners and users operate through a structured, **request-based** system. No public pricing. No retail checkout.
+A controlled distribution, impact and education platform for Ora Pads — **not** a normal online shop. Stock, pricing and financial decisions are fully governed by admin, while partners and users operate through a structured, **request-based** system. No public pricing. No retail checkout.
 
 Built as a single, production-ready Next.js application.
 
@@ -10,15 +10,15 @@ Built as a single, production-ready Next.js application.
 
 | Area | Highlights |
 | --- | --- |
-| 🔐 **One login, three roles** | Admin · Agent/Partner · General User, with automatic role-based routing |
+| 🔐 **One login, four roles** | Admin · Warehouse · Partner · Sales Rep, with automatic role-based routing |
 | 🏭 **Inventory engine** | Every stock movement (inbound → assigned → distributed → restocked) is an immutable ledger entry. No invisible stock. |
 | 📩 **Request-based orders** | No cart, no checkout, no public prices. Submit → admin prices → admin approves → fulfil. |
 | 💰 **Credit system** | Admin-approved pay-later orders with manual repayment tracking and progress. |
 | 🔁 **Returns** | User/agent returns require admin approval, then auto-restock the warehouse. |
-| 💝 **Donations** | Guest or member donations (pads or money), preset packages, full distribution tracking. |
+| 💝 **Impact platform** | Community activities (school visits, education sessions, distributions) with photos, live counters and stories — no fundraising. |
 | 📚 **Education hub** | Menstrual-health articles in English & Kiswahili, category filtering, admin authoring. |
 | 📅 **Period tracker** | Private cycle logging with next-period prediction, fertile window and health tips. |
-| 📊 **Admin dashboard** | SaaS-grade overview: live stock, request queue, donations, credit, returns, users, full activity log. |
+| 📊 **Admin dashboard** | SaaS-grade overview: live stock, request queue, finance, impact, credit, returns, users, full activity log. |
 | 🧾 **Activity log** | Append-only audit trail of every state change across the platform. |
 
 ---
@@ -63,7 +63,7 @@ createdb ora            # if it doesn't exist yet
 ### 4. Push schema + seed demo data
 ```bash
 npm run db:push         # sync Prisma schema to the database
-npm run db:seed         # load demo accounts, products, stock, requests, donations…
+npm run db:seed         # load demo accounts, products, stock, requests…
 ```
 
 ### 5. Run
@@ -104,21 +104,21 @@ npm run dev             # http://localhost:3000
 
 ```
 app/
-  (public)/        Landing, donate, education, education/[slug], impact
+  (public)/        Landing, impact, find-ora, education, news, products, tracker
   (auth)/          login, request-access  (centred brand layout)
-  admin/           Admin console (overview, inventory, requests, donations,
-                   credit, returns, users, education, activity)
-  agent/           Partner portal (overview, catalogue, request, orders,
-                   credit, returns)
-  dashboard/       User account (overview, request, requests, donations, tracker)
-  api/auth/        Auth.js route handler
+  admin/           Admin console (dashboard, inventory, orders, sales reps,
+                   finance, impact, stockists, credit, returns, users, …)
+  partner/         Partner portal (overview, catalogue, orders, credit, returns)
+  rep/             Sales rep portal (sell, stock, samples, customers, reports)
+  warehouse/       Warehouse portal (orders, inventory, transfers, returns)
+  api/             Auth.js route handler + image upload
 components/
   ui/              Design system (button, card, table, dialog, charts, …)
-  public/ auth/ admin/ dashboard/ brand/   Feature components
+  public/ auth/ admin/ dashboard/ field/ brand/   Feature components
 lib/
-  actions/         Server actions (auth, requests, inventory, donations,
-                   credit, returns, users, products, education, cycle)
-  services/        inventory.ts — the single source of truth for stock maths
+  actions/         Server actions (auth, requests, inventory, impact, field,
+                   finance, stockists, credit, returns, users, education, …)
+  services/        inventory.ts (stock maths) · finance · impact · field
   db.ts rbac.ts activity.ts stats.ts utils.ts types.ts
 prisma/
   schema.prisma    Full data model

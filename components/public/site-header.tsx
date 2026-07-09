@@ -12,7 +12,6 @@ const nav = [
   { href: "/impact", label: "Impact" },
   { href: "/education", label: "Education" },
   { href: "/find-ora", label: "Find ORA" },
-  { href: "/donate", label: "Donate" },
   { href: "/contact", label: "Contact" },
   { href: "/request-access", label: "Join Us" },
 ];
@@ -67,11 +66,9 @@ export function SiteHeader({
                 Sign in
               </Link>
               <Link
-                href="/donate"
+                href="/impact"
                 className={buttonVariants({ size: "sm" })}
-              >
-                Donate
-              </Link>
+              >Join the Movement</Link>
             </>
           )}
         </div>
@@ -117,12 +114,10 @@ export function SiteHeader({
                     Sign in
                   </Link>
                   <Link
-                    href="/donate"
+                    href="/impact"
                     className={buttonVariants({ size: "sm" })}
                     onClick={() => setOpen(false)}
-                  >
-                    Donate
-                  </Link>
+                  >Join the Movement</Link>
                 </>
               )}
             </div>
