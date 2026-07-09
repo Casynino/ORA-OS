@@ -72,7 +72,7 @@ export default async function AdminLayout({
   // JWT can hold a stale name until the next sign-in).
   const me = await prisma.user.findUnique({
     where: { id: session.id },
-    select: { name: true, email: true },
+    select: { name: true, email: true, avatar: true, preferredName: true },
   });
   return (
     <DashboardShell
@@ -81,8 +81,11 @@ export default async function AdminLayout({
         name: me?.name ?? session.name,
         email: me?.email ?? session.email,
         role: session.role,
+        avatar: me?.avatar ?? null,
+        preferredName: me?.preferredName ?? null,
       }}
       areaLabel="Admin Console"
+      profileHref="/admin/profile"
     >
       {children}
     </DashboardShell>

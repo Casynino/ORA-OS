@@ -16,18 +16,15 @@ export default auth((req) => {
   const isLoggedIn = !!session?.user;
   const role = session?.user?.role;
   const path = nextUrl.pathname;
-
-  const isAuthPage = path === "/login" || path === "/request-access";
   const inAdmin = path.startsWith("/admin");
   const inWarehouse = path.startsWith("/warehouse");
   const inPartner = path.startsWith("/partner");
   const inRep = path.startsWith("/rep");
   const isProtected = inAdmin || inWarehouse || inPartner || inRep;
 
-  // Signed-in users never see the auth pages — bounce to their home.
-  if (isAuthPage && isLoggedIn) {
-    return Response.redirect(new URL(dashboardFor(role), nextUrl));
-  }
+  // Note: signed-in users are bounced away from /login by the login page
+  // itself (Node runtime, DB-validated) — the edge token here can be stale
+  // after a 'sign out everywhere', which would cause a redirect loop.
 
   // Gate protected areas behind authentication.
   if (isProtected && !isLoggedIn) {
