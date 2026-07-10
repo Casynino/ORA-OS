@@ -25,6 +25,23 @@ export function formatCurrency(
   return `${symbol} ${new Intl.NumberFormat("en-US").format(Math.round(value))}`;
 }
 
+/**
+ * Compact money for headline figures — e.g. "TSh 200.4M", "TSh 1.2B".
+ * Used where full precision would overflow a KPI card.
+ */
+export function formatCompactCurrency(
+  value: number | null | undefined,
+  symbol = "TSh",
+): string {
+  if (value == null) return "—";
+  const n = Math.round(value);
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000_000) return `${symbol} ${(n / 1_000_000_000).toFixed(1)}B`;
+  if (abs >= 1_000_000) return `${symbol} ${(n / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${symbol} ${(n / 1_000).toFixed(1)}K`;
+  return `${symbol} ${new Intl.NumberFormat("en-US").format(n)}`;
+}
+
 /** Short, human date — e.g. "25 Jun 2026". */
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "—";

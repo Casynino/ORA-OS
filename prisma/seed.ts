@@ -74,9 +74,9 @@ async function main() {
 
   // ── The ONLY 3 real Ora products (system-locked) ───────────────────────────
   const productSeed = [
-    { sku: "ORA-PURPLE-360", name: "Ora Pads 360mm — Purple", category: "PADS", unitLabel: "360mm · Night Flow", desc: "Night Flow Protection — full overnight coverage, 100% air breathable.", iconKey: "purple", cost: 2000, price: 3500, stock: 150 },
-    { sku: "ORA-BLUE-290", name: "Ora Pads 290mm — Blue", category: "PADS", unitLabel: "290mm · Day Flow", desc: "Day Flow Comfort — discreet, breathable daytime protection.", iconKey: "blue", cost: 2000, price: 3500, stock: 150 },
-    { sku: "ORA-LINER-180", name: "Ora Pant Liners 180mm", category: "HYGIENE", unitLabel: "180mm · Daily", desc: "Daily Freshness — light, breathable everyday liners.", iconKey: "pink", cost: 1800, price: 3000, stock: 200 },
+    { sku: "ORA-360", name: "Ora Pads 360mm — Purple", category: "PADS", unitLabel: "360mm · Night Flow", desc: "Night Flow Protection — full overnight coverage, 100% air breathable.", iconKey: "purple", cost: 2000, price: 3500, stock: 150 },
+    { sku: "ORA-290", name: "Ora Pads 290mm — Blue", category: "PADS", unitLabel: "290mm · Day Flow", desc: "Day Flow Comfort — discreet, breathable daytime protection.", iconKey: "blue", cost: 2000, price: 3500, stock: 150 },
+    { sku: "ORA-180", name: "Ora Pant Liners 180mm", category: "HYGIENE", unitLabel: "180mm · Daily", desc: "Daily Freshness — light, breathable everyday liners.", iconKey: "pink", cost: 1800, price: 3000, stock: 200 },
   ] as const;
 
   const products: { id: string; sku: string }[] = [];
@@ -84,7 +84,7 @@ async function main() {
     const created = await prisma.product.create({
       data: {
         sku: p.sku, name: p.name, description: p.desc, category: p.category,
-        unitLabel: p.unitLabel, iconKey: p.iconKey, costPrice: p.cost, price: p.price,
+        unitLabel: p.unitLabel, iconKey: p.iconKey, unitsPerCarton: 24, costPrice: p.cost, price: p.price,
         inventory: { create: { warehouseQty: p.stock, lowStockThreshold: 40 } },
       },
     });
@@ -117,27 +117,27 @@ async function main() {
   // ── Real partner requests (quantities fit real stock) ──────────────────────
   await prisma.request.create({
     data: { code: "REQ-1001", type: "AGENT_STOCK", status: "PENDING", paymentType: "IMMEDIATE", requesterId: partner.id, note: "For a school outreach in Kisumu.",
-      items: { create: [{ productId: P("ORA-PURPLE-360"), quantity: 20 }, { productId: P("ORA-LINER-180"), quantity: 10 }] } },
+      items: { create: [{ productId: P("ORA-360"), quantity: 20 }, { productId: P("ORA-180"), quantity: 10 }] } },
   });
   await prisma.request.create({
     data: { code: "REQ-1002", type: "AGENT_STOCK", status: "PRICED", paymentType: "IMMEDIATE", requesterId: partner.id, totalAmount: 52500, reviewedById: admin.id, reviewedAt: new Date(),
-      items: { create: [{ productId: P("ORA-BLUE-290"), quantity: 15, unitPrice: 3500, lineTotal: 52500 }] } },
+      items: { create: [{ productId: P("ORA-290"), quantity: 15, unitPrice: 3500, lineTotal: 52500 }] } },
   });
   const creditReq = await prisma.request.create({
     data: { code: "REQ-1003", type: "AGENT_STOCK", status: "APPROVED", paymentType: "CREDIT", requesterId: partner2.id, totalAmount: 105000, reviewedById: admin.id, reviewedAt: new Date(),
-      items: { create: [{ productId: P("ORA-BLUE-290"), quantity: 30, unitPrice: 3500, lineTotal: 105000 }] } },
+      items: { create: [{ productId: P("ORA-290"), quantity: 30, unitPrice: 3500, lineTotal: 105000 }] } },
   });
-  await prisma.inventory.update({ where: { productId: P("ORA-BLUE-290") }, data: { warehouseQty: { decrement: 30 }, assignedQty: { increment: 30 } } });
-  await prisma.stockMovement.create({ data: { productId: P("ORA-BLUE-290"), type: "ASSIGNED", quantity: 30, requestId: creditReq.id, reference: creditReq.code, createdById: admin.id } });
+  await prisma.inventory.update({ where: { productId: P("ORA-290") }, data: { warehouseQty: { decrement: 30 }, assignedQty: { increment: 30 } } });
+  await prisma.stockMovement.create({ data: { productId: P("ORA-290"), type: "ASSIGNED", quantity: 30, requestId: creditReq.id, reference: creditReq.code, createdById: admin.id } });
   const credit = await prisma.creditAccount.create({ data: { requestId: creditReq.id, agentId: partner2.id, principal: 105000, amountPaid: 40000, status: "PARTIAL", approvedById: admin.id, dueDate: new Date(Date.now() + 30 * 86400000) } });
   await prisma.payment.create({ data: { creditAccountId: credit.id, amount: 40000, method: "Mobile money", recordedById: admin.id } });
 
   const fulfilled = await prisma.request.create({
     data: { code: "REQ-1004", type: "AGENT_STOCK", status: "FULFILLED", paymentType: "IMMEDIATE", requesterId: partner.id, totalAmount: 87500, reviewedById: admin.id, reviewedAt: new Date(Date.now() - 3 * 86400000), fulfilledAt: new Date(),
-      items: { create: [{ productId: P("ORA-PURPLE-360"), quantity: 25, unitPrice: 3500, lineTotal: 87500 }] } },
+      items: { create: [{ productId: P("ORA-360"), quantity: 25, unitPrice: 3500, lineTotal: 87500 }] } },
   });
-  await prisma.inventory.update({ where: { productId: P("ORA-PURPLE-360") }, data: { warehouseQty: { decrement: 25 }, distributedQty: { increment: 25 } } });
-  await prisma.stockMovement.create({ data: { productId: P("ORA-PURPLE-360"), type: "DISTRIBUTED", quantity: 25, requestId: fulfilled.id, reference: fulfilled.code, createdById: admin.id } });
+  await prisma.inventory.update({ where: { productId: P("ORA-360") }, data: { warehouseQty: { decrement: 25 }, distributedQty: { increment: 25 } } });
+  await prisma.stockMovement.create({ data: { productId: P("ORA-360"), type: "DISTRIBUTED", quantity: 25, requestId: fulfilled.id, reference: fulfilled.code, createdById: admin.id } });
 
   // Mirror opening stock into the per-warehouse location ledger so the
   // invariant holds from the start: Σ WarehouseStock.onHand == Inventory.warehouseQty
@@ -158,7 +158,7 @@ async function main() {
     });
   }
 
-  await prisma.returnRequest.create({ data: { code: "RET-1001", productId: P("ORA-LINER-180"), requesterId: partner.id, quantity: 8, reason: "Surplus from a cancelled outreach.", status: "PENDING" } });
+  await prisma.returnRequest.create({ data: { code: "RET-1001", productId: P("ORA-180"), requesterId: partner.id, quantity: 8, reason: "Surplus from a cancelled outreach.", status: "PENDING" } });
 
   await prisma.activityLog.createMany({
     data: [

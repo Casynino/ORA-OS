@@ -30,8 +30,8 @@ export type OraProduct = {
 export const products: OraProduct[] = [
   {
     slug: "night-360",
-    sku: "ORA-PURPLE-360",
-    packsPerCarton: 48,
+    sku: "ORA-360",
+    packsPerCarton: 24,
     moq: 10,
     leadTime: "2–4 days",
     name: "ORA Night Sanitary Pads",
@@ -67,8 +67,8 @@ export const products: OraProduct[] = [
   },
   {
     slug: "day-290",
-    sku: "ORA-BLUE-290",
-    packsPerCarton: 48,
+    sku: "ORA-290",
+    packsPerCarton: 24,
     moq: 10,
     leadTime: "2–4 days",
     name: "ORA Day Sanitary Pads",
@@ -104,8 +104,8 @@ export const products: OraProduct[] = [
   },
   {
     slug: "liner-180",
-    sku: "ORA-LINER-180",
-    packsPerCarton: 60,
+    sku: "ORA-180",
+    packsPerCarton: 24,
     moq: 20,
     leadTime: "2–4 days",
     name: "ORA Daily Liners",

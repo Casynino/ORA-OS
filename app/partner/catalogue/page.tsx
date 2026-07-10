@@ -17,7 +17,7 @@ export default async function PartnerCataloguePage() {
   const [products, partnerPrices, recent, fulfilledItems] =
     await Promise.all([
       prisma.product.findMany({
-        where: { isActive: true },
+        where: { isActive: true, notForSale: false },
         orderBy: { price: "desc" },
       }),
       prisma.partnerPrice.findMany({ where: { partnerId: me.id } }),

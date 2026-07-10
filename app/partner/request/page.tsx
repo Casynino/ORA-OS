@@ -64,7 +64,7 @@ export default async function PartnerRequestPage() {
   const [products, credits, fulfilled, lastReq, history, partnerPrices] =
     await Promise.all([
       prisma.product.findMany({
-        where: { isActive: true },
+        where: { isActive: true, notForSale: false },
         orderBy: { price: "desc" },
       }),
       prisma.creditAccount.findMany({
