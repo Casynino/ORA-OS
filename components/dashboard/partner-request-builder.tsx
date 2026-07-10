@@ -47,7 +47,7 @@ export function PartnerRequestBuilder({
   customer,
 }: {
   products: BuilderProduct[];
-  credit: { limit: number; outstanding: number; available: number };
+  credit: { limit: number; outstanding: number; available: number; overdue: boolean };
   customer: {
     name?: string | null;
     phone?: string | null;
@@ -61,8 +61,9 @@ export function PartnerRequestBuilder({
 
   // The customer explicitly chooses how they want to pay — we never auto-assign.
   // Their usual method is pre-selected as a convenience, but stays changeable.
-  const hasActiveCredit = credit.outstanding > 0;
-  const canUseCredit = credit.limit > 0 && !hasActiveCredit;
+  // Revolving facility: an outstanding balance is fine — new credit orders just
+  // need to fit inside the available credit. Only overdue (or exhausted) blocks.
+  const canUseCredit = credit.limit > 0 && !credit.overdue && credit.available > 0;
   const prefersCredit =
     (customer.preferredPayment ?? "").toLowerCase() === "credit";
   const [paymentType, setPaymentType] = useState<"IMMEDIATE" | "CREDIT">(
@@ -288,10 +289,14 @@ export function PartnerRequestBuilder({
               title="Credit"
               desc={
                 canUseCredit
-                  ? "Place this order on your credit account."
-                  : hasActiveCredit
-                    ? "Settle your current balance first."
-                    : "No credit limit on your account yet."
+                  ? credit.outstanding > 0
+                    ? `${formatCurrency(credit.available)} available on your facility.`
+                    : "Place this order on your credit account."
+                  : credit.overdue
+                    ? "Overdue balance — make a payment to restore your credit."
+                    : credit.limit > 0
+                      ? "Available credit used up — make a payment to restore it."
+                      : "No credit limit on your account yet."
               }
               onClick={() => canUseCredit && setPaymentType("CREDIT")}
             />
@@ -306,10 +311,10 @@ export function PartnerRequestBuilder({
             >
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <MiniStat label="Credit limit" value={formatCurrency(credit.limit)} />
-                <MiniStat label="Available credit" value={formatCurrency(credit.available)} accent="success" />
-                <MiniStat label="This order" value={formatCurrency(estValue)} />
+                <MiniStat label="In use" value={formatCurrency(credit.outstanding)} />
+                <MiniStat label="Available" value={formatCurrency(credit.available)} accent="success" />
                 <MiniStat
-                  label="Remaining after"
+                  label="After this order"
                   value={formatCurrency(Math.max(0, creditRemaining))}
                   accent={creditExceeded ? "destructive" : undefined}
                 />
@@ -318,7 +323,9 @@ export function PartnerRequestBuilder({
                 <div className="mt-3 space-y-2">
                   <p className="inline-flex items-start gap-1.5 text-sm font-medium text-destructive">
                     <ShieldAlert className="mt-0.5 size-4 shrink-0" />
-                    Your order exceeds your available credit limit by {formatCurrency(Math.abs(creditRemaining))}. Reduce the order quantity or switch to Cash payment.
+                    Your available credit is {formatCurrency(credit.available)}. Please reduce the
+                    order amount, make a payment to restore your available credit, or contact ORA
+                    to request a credit limit review.
                   </p>
                   <Button size="sm" variant="outline" onClick={() => setPaymentType("IMMEDIATE")}>
                     <Wallet className="size-3.5" /> Switch to Cash payment

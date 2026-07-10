@@ -17,7 +17,7 @@ const nav: NavGroup[] = [
   {
     label: "Finance & support",
     items: [
-      { href: "/partner/credit", label: "Debt & payments", icon: "credit" },
+      { href: "/partner/credit", label: "Credit & payments", icon: "credit" },
       { href: "/partner/returns", label: "Returns", icon: "returns" },
       { href: "/partner/profile", label: "My profile", icon: "profile" },
     ],

@@ -167,7 +167,7 @@ export default async function PartnerOverviewPage() {
     { label: "Request stock", href: "/partner/request", icon: PlusCircle },
     { label: "Browse products", href: "/partner/catalogue", icon: Boxes },
     { label: "My orders", href: "/partner/requests", icon: FileText },
-    { label: "Debt & payments", href: "/partner/credit", icon: CreditCard },
+    { label: "Credit & payments", href: "/partner/credit", icon: CreditCard },
     { label: "Request a return", href: "/partner/returns", icon: Undo2 },
     { label: "Contact ORA", href: ORA_CONTACT.emailHref, icon: LifeBuoy },
   ];
@@ -370,7 +370,7 @@ export default async function PartnerOverviewPage() {
                 </p>
               )}
               <Link href="/partner/credit" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-4 w-full")}>
-                Debt & payments
+                Credit & payments
               </Link>
             </div>
           </Reveal>

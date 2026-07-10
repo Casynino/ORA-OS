@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { refCode, formatCurrency } from "@/lib/utils";
+import { completeCycleIfCleared } from "@/lib/services/credit";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 function revalidateSettlements() {
@@ -100,10 +101,42 @@ export async function confirmSettlement(id: string): Promise<ActionResult> {
     }
 
     const newPaid = account.amountPaid + sr.amount;
+    // OVERDUE stays sticky on partial settlement — only full repayment clears it.
     const status: CreditStatus =
-      newPaid >= account.principal ? "SETTLED" : "PARTIAL";
+      newPaid >= account.principal
+        ? "SETTLED"
+        : account.status === "OVERDUE"
+          ? "OVERDUE"
+          : "PARTIAL";
 
-    await prisma.$transaction(async (tx) => {
+    const cycleMsg = await prisma.$transaction(async (tx) => {
+      // Claim the settlement atomically — a double confirm matches 0 rows.
+      const claimedSr = await tx.settlementRequest.updateMany({
+        where: { id: sr.id, status: "PENDING" },
+        data: {
+          status: "CONFIRMED",
+          reviewedById: admin.id,
+          reviewedAt: new Date(),
+        },
+      });
+      if (claimedSr.count === 0) {
+        throw new Error("This settlement was already reviewed.");
+      }
+      // Claim the account against the exact balance we validated — a
+      // concurrent payment aborts instead of double-applying.
+      const claimedAcc = await tx.creditAccount.updateMany({
+        where: {
+          id: account.id,
+          status: { not: "SETTLED" },
+          amountPaid: account.amountPaid,
+        },
+        data: { amountPaid: newPaid, status },
+      });
+      if (claimedAcc.count === 0) {
+        throw new Error(
+          "The account changed while confirming — refresh and review again.",
+        );
+      }
       const payment = await tx.payment.create({
         data: {
           creditAccountId: account.id,
@@ -113,19 +146,17 @@ export async function confirmSettlement(id: string): Promise<ActionResult> {
           recordedById: admin.id,
         },
       });
-      await tx.creditAccount.update({
-        where: { id: account.id },
-        data: { amountPaid: newPaid, status },
-      });
       await tx.settlementRequest.update({
         where: { id: sr.id },
-        data: {
-          status: "CONFIRMED",
-          reviewedById: admin.id,
-          reviewedAt: new Date(),
-          paymentId: payment.id,
-        },
+        data: { paymentId: payment.id },
       });
+      // Full repayment closes the cycle → score +1 and automatic limit growth
+      // (when the cycle never went overdue). Available credit is restored
+      // instantly either way, since it's computed live from open balances.
+      if (status === "SETTLED") {
+        return completeCycleIfCleared(tx, { partnerId: account.agentId });
+      }
+      return null;
     });
 
     await logActivity({
@@ -134,15 +165,16 @@ export async function confirmSettlement(id: string): Promise<ActionResult> {
       action: "SETTLEMENT_CONFIRMED",
       entity: "SettlementRequest",
       entityId: sr.id,
-      summary: `Settlement ${sr.code} confirmed — ${formatCurrency(sr.amount)} posted (${status.toLowerCase()}).`,
+      summary: `Settlement ${sr.code} confirmed — ${formatCurrency(sr.amount)} posted (${status.toLowerCase()}).${cycleMsg ? ` ${cycleMsg}` : ""}`,
     });
 
     revalidateSettlements();
     return ok(
       undefined,
-      status === "SETTLED"
-        ? "Confirmed — credit fully settled."
-        : "Confirmed and posted to the ledger.",
+      cycleMsg ??
+        (status === "SETTLED"
+          ? "Confirmed — credit fully settled."
+          : "Confirmed and posted to the ledger."),
     );
   } catch (e) {
     return fail(errorMessage(e));

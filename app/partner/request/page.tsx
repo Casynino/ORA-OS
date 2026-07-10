@@ -94,10 +94,16 @@ export default async function PartnerRequestPage() {
     partnerPrices.map((pp) => [pp.productId, pp.price]),
   );
 
-  const outstanding = credits.reduce((s, c) => s + (c.principal - c.amountPaid), 0);
+  const outstanding = credits.reduce(
+    (s, c) => s + Math.max(0, c.principal - c.amountPaid),
+    0,
+  );
+  // One definition of overdue everywhere — the flagged status the server
+  // gate uses, so what the partner sees always matches what the rules do.
   const overdue = credits
-    .filter((c) => c.dueDate && c.dueDate < new Date())
-    .reduce((s, c) => s + (c.principal - c.amountPaid), 0);
+    .filter((c) => c.status === "OVERDUE")
+    .reduce((s, c) => s + Math.max(0, c.principal - c.amountPaid), 0);
+  const hasOverdue = credits.some((c) => c.status === "OVERDUE");
   const limit = me.creditLimit ?? 0;
   const available = Math.max(0, limit - outstanding);
   const lifetime = fulfilled.reduce((s, r) => s + (r.totalAmount ?? 0), 0);
@@ -218,7 +224,7 @@ export default async function PartnerRequestPage() {
       {/* Builder */}
       <PartnerRequestBuilder
         products={builderProducts}
-        credit={{ limit, outstanding, available }}
+        credit={{ limit, outstanding, available, overdue: hasOverdue }}
         customer={{
           name: me.name,
           phone: me.phone,

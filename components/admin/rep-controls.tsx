@@ -142,11 +142,15 @@ export function FulfillRequestButton({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
-  // Each line defaults to the requested amount, split into cartons + loose pcs.
+  // Each line defaults to the requested amount — split into cartons + loose pcs
+  // for sellable products; samples stay in packs (pieces) only.
   const [q, setQ] = useState<Record<string, { cartons: string; pieces: string }>>(
     () =>
       Object.fromEntries(
         items.map((it) => {
+          if (it.isSample) {
+            return [it.productId, { cartons: "", pieces: it.requested ? String(it.requested) : "" }];
+          }
           const c = Math.floor(it.requested / it.unitsPerCarton);
           const p = it.requested % it.unitsPerCarton;
           return [it.productId, { cartons: c ? String(c) : "", pieces: p ? String(p) : "" }];
@@ -157,9 +161,16 @@ export function FulfillRequestButton({
   const setField = (id: string, k: "cartons" | "pieces", v: string) =>
     setQ((s) => ({ ...s, [id]: { ...get(id), [k]: v } }));
 
-  const lines = items.map((it) => {
+  // Samples are counted in packs only — never cartons.
+  const lineTotal = (it: FulfillItem) => {
     const { cartons, pieces } = get(it.productId);
-    const total = combineToPieces(Number(cartons), Number(pieces), it.unitsPerCarton);
+    return it.isSample
+      ? Math.max(0, Math.floor(Number(pieces) || 0))
+      : combineToPieces(Number(cartons), Number(pieces), it.unitsPerCarton);
+  };
+
+  const lines = items.map((it) => {
+    const total = lineTotal(it);
     return { it, total, over: total > it.available };
   });
   const anyPositive = lines.some((l) => l.total > 0);
@@ -195,7 +206,7 @@ export function FulfillRequestButton({
           <div className="space-y-3">
             {items.map((it) => {
               const { cartons, pieces } = get(it.productId);
-              const total = combineToPieces(Number(cartons), Number(pieces), it.unitsPerCarton);
+              const total = lineTotal(it);
               const over = total > it.available;
               return (
                 <div key={it.productId} className="rounded-xl border border-border p-3">
@@ -203,36 +214,56 @@ export function FulfillRequestButton({
                     <p className="text-sm font-medium">
                       {it.productName}
                       {it.isSample && (
-                        <span className="ml-1.5 text-xs text-muted-foreground">(sample)</span>
+                        <span className="ml-1.5 text-xs text-muted-foreground">(free samples)</span>
                       )}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
                       requested {formatNumber(it.requested)} · {formatNumber(it.available)} in stock
                     </p>
                   </div>
-                  <div className="mt-2 grid grid-cols-[1fr_1fr_auto] items-end gap-2">
-                    <div>
-                      <Label className="text-[11px] text-muted-foreground">Cartons</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={cartons}
-                        onChange={(e) => setField(it.productId, "cartons", e.target.value)}
-                        className="mt-1 h-9"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[11px] text-muted-foreground">Pieces</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={pieces}
-                        onChange={(e) => setField(it.productId, "pieces", e.target.value)}
-                        className="mt-1 h-9"
-                        placeholder="0"
-                      />
-                    </div>
+                  <div
+                    className={`mt-2 grid items-end gap-2 ${
+                      it.isSample ? "grid-cols-[1fr_auto]" : "grid-cols-[1fr_1fr_auto]"
+                    }`}
+                  >
+                    {it.isSample ? (
+                      <div>
+                        <Label className="text-[11px] text-muted-foreground">Sample packs</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={pieces}
+                          onChange={(e) => setField(it.productId, "pieces", e.target.value)}
+                          className="mt-1 h-9"
+                          placeholder="0"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <Label className="text-[11px] text-muted-foreground">Cartons</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={cartons}
+                            onChange={(e) => setField(it.productId, "cartons", e.target.value)}
+                            className="mt-1 h-9"
+                            placeholder="0"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[11px] text-muted-foreground">Pieces</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={pieces}
+                            onChange={(e) => setField(it.productId, "pieces", e.target.value)}
+                            className="mt-1 h-9"
+                            placeholder="0"
+                          />
+                        </div>
+                      </>
+                    )}
                     <p
                       className={`pb-2 text-right text-xs font-semibold ${
                         over ? "text-destructive" : "text-primary"

@@ -26,7 +26,7 @@ export default async function RepStockPage() {
         name: true,
         unitsPerCarton: true,
         notForSale: true,
-        inventory: { select: { warehouseQty: true } },
+        inventory: { select: { warehouseQty: true, lowStockThreshold: true } },
       },
     }),
     prisma.repStockIssue.findMany({
@@ -43,13 +43,21 @@ export default async function RepStockPage() {
     }),
   ]);
 
-  const productOpts = products.map((p) => ({
-    id: p.id,
-    name: p.name,
-    unitsPerCarton: p.unitsPerCarton,
-    notForSale: p.notForSale,
-    available: p.inventory?.warehouseQty ?? 0,
-  }));
+  // Reps only see availability status — never the actual warehouse quantities.
+  const productOpts = products.map((p) => {
+    const qty = p.inventory?.warehouseQty ?? 0;
+    const threshold = p.inventory?.lowStockThreshold ?? 50;
+    return {
+      id: p.id,
+      name: p.name,
+      unitsPerCarton: p.unitsPerCarton,
+      notForSale: p.notForSale,
+      stock: (qty === 0 ? "OUT" : qty <= threshold ? "LOW" : "IN") as
+        | "IN"
+        | "LOW"
+        | "OUT",
+    };
+  });
 
   return (
     <div className="space-y-6">

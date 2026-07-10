@@ -31,7 +31,7 @@ export default async function AgentCreditPage() {
   const me = await prisma.user.findUnique({ where: { id: session.id } });
   if (!me) notFound();
 
-  const [accounts, settlements] = await Promise.all([
+  const [accounts, settlements, creditEvents] = await Promise.all([
     prisma.creditAccount.findMany({
       where: { agentId: me.id },
       orderBy: [{ status: "asc" }, { dueDate: "asc" }],
@@ -44,6 +44,11 @@ export default async function AgentCreditPage() {
       where: { partnerId: me.id },
       orderBy: { createdAt: "desc" },
       include: { creditAccount: { include: { request: { select: { code: true } } } } },
+    }),
+    prisma.partnerCreditEvent.findMany({
+      where: { partnerId: me.id },
+      orderBy: { createdAt: "desc" },
+      take: 12,
     }),
   ]);
 
@@ -92,7 +97,6 @@ export default async function AgentCreditPage() {
     .sort((x, y) => x.dueDate!.getTime() - y.dueDate!.getTime())[0];
 
   const blocked = me.status === "SUSPENDED";
-  const restricted = active.length > 0;
   const standing = blocked
     ? { label: "Blocked", tone: "destructive" as const }
     : overdue > 0
@@ -110,8 +114,8 @@ export default async function AgentCreditPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Debt & payments"
-        description="Your credit with ORA. We extend one credit batch at a time — finish repaying it to unlock the next. Open any batch to see its full ledger."
+        title="Credit & payments"
+        description="Your revolving credit facility with ORA — every repayment restores your available credit instantly, and full on-time repayment grows your limit automatically."
       >
         <SubmitSettlement accounts={openAccounts} />
       </PageHeader>
@@ -207,6 +211,72 @@ export default async function AgentCreditPage() {
           accent={overdue > 0 ? "warning" : "info"}
         />
       </div>
+
+      {/* Credit score & automatic growth */}
+      <Card>
+        <CardContent className="grid gap-5 p-5 grid-cols-1 sm:grid-cols-[auto_minmax(0,1fr)]">
+          <div className="flex items-center gap-4">
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent font-display text-2xl font-bold text-white">
+              {me.creditScore}
+            </span>
+            <div>
+              <p className="font-display font-semibold">Credit score</p>
+              <p className="text-xs text-muted-foreground">
+                {me.creditCycles} credit cycle{me.creditCycles === 1 ? "" : "s"} completed
+              </p>
+            </div>
+          </div>
+          <div className="border-t border-border pt-4 text-sm text-muted-foreground sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+            <p className="font-medium text-foreground">How your limit grows</p>
+            <p className="mt-1">
+              Repay your full outstanding balance on time and your credit limit
+              automatically grows by <span className="font-semibold text-success">10%</span>{" "}
+              — from {formatCurrency(limit)} to {formatCurrency(Math.round(limit * 1.1))} on
+              your next completed cycle.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Facility history — limit changes & completed cycles */}
+      {creditEvents.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="font-display text-lg font-semibold">Facility history</h2>
+          <Card>
+            <CardContent className="divide-y divide-border p-0">
+              {creditEvents.map((e) => (
+                <div key={e.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">
+                      {e.type === "LIMIT_INCREASE"
+                        ? "Limit increased automatically"
+                        : e.type === "CYCLE_COMPLETED"
+                          ? "Credit cycle completed"
+                          : "Credit limit updated"}
+                    </p>
+                    {e.note && (
+                      <p className="text-xs text-muted-foreground">{e.note}</p>
+                    )}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    {e.type !== "CYCLE_COMPLETED" &&
+                      e.prevLimit != null &&
+                      e.newLimit != null && (
+                        <p className="text-sm font-semibold">
+                          {formatCurrency(e.prevLimit)} →{" "}
+                          <span className={e.newLimit >= e.prevLimit ? "text-success" : ""}>
+                            {formatCurrency(e.newLimit)}
+                          </span>
+                        </p>
+                      )}
+                    <p className="text-xs text-muted-foreground">{formatDate(e.createdAt)}</p>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Active credit */}
       <section className="space-y-3">
