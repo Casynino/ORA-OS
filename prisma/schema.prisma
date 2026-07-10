@@ -875,12 +875,18 @@ model RepStockRequestItem {
   @@index([requestId])
 }
 
-/// A rep's field customer — the debtor profile for credit sales.
+/// A rep's field customer. Each customer belongs to exactly ONE sales rep
+/// (the rep who created them) — customer books are never shared between reps.
 model FieldCustomer {
   id              String   @id @default(cuid())
   name            String
+  businessName    String? // trading name, e.g. "ABC Pharmacy"
   phone           String?
   location        String?
+  region          String? // administrative region, e.g. "Dar es Salaam"
+  customerType    String? // Pharmacy / Shop / Supermarket / Kiosk / …
+  gpsLat          Float? // captured on creation when the device allows it
+  gpsLng          Float?
   notes           String?
   rep             User     @relation("RepCustomers", fields: [repId], references: [id])
   repId           String

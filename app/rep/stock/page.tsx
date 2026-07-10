@@ -16,7 +16,7 @@ export default async function RepStockPage() {
     prisma.repStock.findMany({
       where: { repId: me.id },
       include: { product: true },
-      orderBy: { updatedAt: "desc" },
+      orderBy: [{ product: { notForSale: "asc" } }, { updatedAt: "desc" }],
     }),
     prisma.product.findMany({
       where: { isActive: true },
@@ -78,24 +78,52 @@ export default async function RepStockPage() {
           />
         ) : (
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {stock.map((s) => (
-              <div key={s.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft">
-                <p className="truncate font-semibold">{s.product.name}</p>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-                  <div className="rounded-lg bg-muted/50 p-2">
-                    <p className="font-display text-xl font-bold">{formatNumber(s.sellableQty)}</p>
-                    <p className="text-[10px] text-muted-foreground">Sellable</p>
+            {stock.map((s) => {
+              const inHand = s.sellableQty + s.sampleQty;
+              const isSample = s.product.notForSale;
+              const cartons = Math.floor(inHand / s.product.unitsPerCarton);
+              const loose = inHand % s.product.unitsPerCarton;
+              return (
+                <div key={s.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+                  <p className="truncate font-semibold">{s.product.name}</p>
+                  <div className="mt-3 rounded-lg bg-muted/50 p-3">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Available
+                    </p>
+                    {isSample ? (
+                      <p className="font-display text-2xl font-bold">
+                        {formatNumber(inHand)}
+                        <span className="ml-1 text-sm font-medium text-muted-foreground">
+                          sample packs
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="font-display text-2xl font-bold">
+                        {formatNumber(cartons)}
+                        <span className="ml-1 mr-2 text-sm font-medium text-muted-foreground">
+                          carton{cartons === 1 ? "" : "s"}
+                        </span>
+                        {formatNumber(loose)}
+                        <span className="ml-1 text-sm font-medium text-muted-foreground">
+                          pcs
+                        </span>
+                      </p>
+                    )}
+                    {!isSample && (
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {formatNumber(inHand)} pieces total
+                      </p>
+                    )}
                   </div>
-                  <div className="rounded-lg bg-muted/50 p-2">
-                    <p className="font-display text-xl font-bold">{formatNumber(s.sampleQty)}</p>
-                    <p className="text-[10px] text-muted-foreground">Samples</p>
-                  </div>
+                  <p className="mt-2.5 text-xs text-muted-foreground">
+                    received {formatNumber(s.receivedQty)} ·{" "}
+                    {isSample
+                      ? `distributed ${formatNumber(s.sampledQty)}`
+                      : `sold ${formatNumber(s.soldQty)}`}
+                  </p>
                 </div>
-                <p className="mt-2.5 text-xs text-muted-foreground">
-                  received {formatNumber(s.receivedQty)} · sold {formatNumber(s.soldQty)} · sampled {formatNumber(s.sampledQty)}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

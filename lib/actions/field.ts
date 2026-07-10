@@ -6,6 +6,10 @@ import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { applyMovement } from "@/lib/services/inventory";
+import {
+  addWarehouseStock,
+  deductWarehouseStock,
+} from "@/lib/services/warehouse-stock";
 import { refCode } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 import type { FieldCreditStatus } from "@prisma/client";
@@ -58,8 +62,13 @@ const saleSchema = z.object({
   newCustomer: z
     .object({
       name: z.string().min(2),
+      businessName: z.string().max(120).optional().or(z.literal("")),
       phone: z.string().max(30).optional().or(z.literal("")),
       location: z.string().max(120).optional().or(z.literal("")),
+      region: z.string().max(60).optional().or(z.literal("")),
+      customerType: z.string().max(40).optional().or(z.literal("")),
+      gpsLat: z.number().min(-90).max(90).optional(),
+      gpsLng: z.number().min(-180).max(180).optional(),
     })
     .optional(),
   customerName: z.string().max(120).optional().or(z.literal("")), // walk-in cash
@@ -96,20 +105,27 @@ export async function recordFieldSale(
         const c = await tx.fieldCustomer.create({
           data: {
             name: d.newCustomer.name,
+            businessName: d.newCustomer.businessName || null,
             phone: d.newCustomer.phone || null,
             location: d.newCustomer.location || null,
-            repId: actor.id,
+            region: d.newCustomer.region || null,
+            customerType: d.newCustomer.customerType || null,
+            gpsLat: d.newCustomer.gpsLat ?? null,
+            gpsLng: d.newCustomer.gpsLng ?? null,
+            repId: actor.id, // customer belongs to the rep who created them
           },
         });
         customerId = c.id;
       }
 
+      let soldTo = d.customerName?.trim() || "walk-in customer";
       if (customerId) {
         const cust = await tx.fieldCustomer.findUnique({ where: { id: customerId } });
         if (!cust || cust.repId !== actor.id)
           throw new Error("That customer isn't in your book.");
         if (d.type === "CREDIT" && cust.creditSuspended)
           throw new Error(`${cust.name}'s credit access is suspended.`);
+        soldTo = cust.name;
       }
 
       // Deduct rep stock atomically — a sale can never exceed stock in hand.
@@ -136,7 +152,7 @@ export async function recordFieldSale(
           quantity: item.quantity,
           createdById: actor.id,
           reference: code,
-          note: `Field ${d.type.toLowerCase()} sale by ${actor.name}`,
+          note: `${actor.name} → ${soldTo} (${d.type.toLowerCase()} sale)`,
         });
       }
 
@@ -289,7 +305,7 @@ export async function logSampleDistribution(
         quantity: d.quantity,
         createdById: actor.id,
         reference: "SAMPLE",
-        note: `Samples at ${d.location} by ${actor.name}`,
+        note: `${actor.name} → community samples · ${d.location}`,
       });
       await tx.sampleLog.create({
         data: {
@@ -367,8 +383,13 @@ export async function submitFieldReport(
 
 const customerSchema = z.object({
   name: z.string().min(2, "Customer name is required.").max(120),
+  businessName: z.string().max(120).optional().or(z.literal("")),
   phone: z.string().max(30).optional().or(z.literal("")),
   location: z.string().max(120).optional().or(z.literal("")),
+  region: z.string().max(60).optional().or(z.literal("")),
+  customerType: z.string().max(40).optional().or(z.literal("")),
+  gpsLat: z.number().min(-90).max(90).optional(),
+  gpsLng: z.number().min(-180).max(180).optional(),
   notes: z.string().max(500).optional().or(z.literal("")),
 });
 
@@ -384,10 +405,15 @@ export async function createFieldCustomer(
     const c = await prisma.fieldCustomer.create({
       data: {
         name: d.name,
+        businessName: d.businessName || null,
         phone: d.phone || null,
         location: d.location || null,
+        region: d.region || null,
+        customerType: d.customerType || null,
+        gpsLat: d.gpsLat ?? null,
+        gpsLng: d.gpsLng ?? null,
         notes: d.notes || null,
-        repId: actor.id,
+        repId: actor.id, // ownership: the creating rep's book, never shared
       },
     });
     revalidateField();
@@ -549,14 +575,20 @@ export async function fulfillRepStockRequest(
             `Not enough ${item.product.name} — only ${inv?.warehouseQty ?? 0} in the warehouse.`,
           );
         }
-        // Warehouse → rep: units become committed to the field ("assigned").
+        // Warehouse → Sales Rep: units become committed to the field ("assigned").
         await applyMovement(tx, {
           productId: item.productId,
           type: "ASSIGNED",
           quantity: qty,
           createdById: actor.id,
           reference: `${base}-${i}`,
-          note: `Issued to ${rep.name} (${item.kind.toLowerCase()}) · ${req.code}`,
+          note: `Warehouse → ${rep.name} (${item.kind === "SAMPLE" ? "samples" : "selling"}) · ${req.code}`,
+        });
+        // Keep the per-warehouse location ledger in lock-step (invariant:
+        // Σ WarehouseStock.onHand == Inventory.warehouseQty).
+        await deductWarehouseStock(tx, {
+          productId: item.productId,
+          quantity: qty,
         });
         await tx.repStock.upsert({
           where: { repId_productId: { repId: rep.id, productId: item.productId } },
@@ -642,14 +674,20 @@ export async function issueRepStock(
         throw new Error(
           `Not enough warehouse stock — ${inv?.warehouseQty ?? 0} available.`,
         );
-      // Warehouse → rep: the units are now committed to the field ("assigned").
+      // Warehouse → Sales Rep: the units are now committed to the field ("assigned").
       await applyMovement(tx, {
         productId: d.productId,
         type: "ASSIGNED",
         quantity: d.quantity,
         createdById: actor.id,
         reference: code,
-        note: `Issued to sales rep ${rep.name} (${d.kind.toLowerCase()})`,
+        note: `Warehouse → ${rep.name} (${d.kind === "SAMPLE" ? "samples" : "selling"})`,
+      });
+      // Keep the per-warehouse location ledger in lock-step (invariant:
+      // Σ WarehouseStock.onHand == Inventory.warehouseQty).
+      await deductWarehouseStock(tx, {
+        productId: d.productId,
+        quantity: d.quantity,
       });
       await tx.repStock.upsert({
         where: { repId_productId: { repId: d.repId, productId: d.productId } },
@@ -679,10 +717,15 @@ export async function issueRepStock(
         },
       });
       if (d.requestId) {
-        await tx.repStockRequest.update({
-          where: { id: d.requestId },
+        // Atomic: only a still-PENDING request can be closed by this issue —
+        // an already-handled request aborts instead of double-issuing.
+        const claimed = await tx.repStockRequest.updateMany({
+          where: { id: d.requestId, status: "PENDING" },
           data: { status: "ISSUED", reviewedById: actor.id, reviewedAt: new Date() },
         });
+        if (claimed.count === 0) {
+          throw new Error("That stock request was already handled.");
+        }
       }
     });
 
@@ -881,7 +924,7 @@ export async function voidFieldSale(
           quantity: item.quantity,
           createdById: actor.id,
           reference: `VOID ${sale.code}`,
-          note: reason,
+          note: `Customer → ${sale.rep.name} (sale voided: ${reason})`,
         });
         await applyMovement(tx, {
           productId: item.productId,
@@ -889,7 +932,7 @@ export async function voidFieldSale(
           quantity: item.quantity,
           createdById: actor.id,
           reference: `VOID ${sale.code}`,
-          note: `Stock back with ${sale.rep.name}`,
+          note: `Stock back in ${sale.rep.name}'s hands`,
         });
         await tx.repStock.update({
           where: {

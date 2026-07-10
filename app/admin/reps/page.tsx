@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Trophy,
   ClipboardList,
+  Users,
 } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
@@ -63,7 +64,15 @@ export default async function AdminRepsPage() {
       <PageHeader
         title="Sales reps"
         description="Field team performance, stock in their hands and credit exposure — live."
-      />
+      >
+        <Link
+          href="/admin/reps/customers"
+          className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+        >
+          <Users className="size-4" />
+          Field customers
+        </Link>
+      </PageHeader>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Field sales this month" value={formatCurrency(totals.sales)} icon={TrendingUp} accent="primary" />
