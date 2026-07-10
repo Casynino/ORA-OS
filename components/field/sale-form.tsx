@@ -37,12 +37,37 @@ export function FieldSaleForm({
   const [customerId, setCustomerId] = useState("");
   const [newCustomer, setNewCustomer] = useState(false);
   const [ncName, setNcName] = useState("");
+  const [ncBusiness, setNcBusiness] = useState("");
   const [ncPhone, setNcPhone] = useState("");
   const [ncLocation, setNcLocation] = useState("");
+  const [ncRegion, setNcRegion] = useState("");
+  const [ncType, setNcType] = useState("");
+  const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsBusy, setGpsBusy] = useState(false);
   const [customerName, setCustomerName] = useState(""); // cash walk-in
   const [location, setLocation] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [note, setNote] = useState("");
+
+  function captureGps() {
+    if (!navigator.geolocation) {
+      toast({ variant: "error", title: "GPS isn't available on this device." });
+      return;
+    }
+    setGpsBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGpsBusy(false);
+        toast({ variant: "success", title: "GPS location captured." });
+      },
+      () => {
+        setGpsBusy(false);
+        toast({ variant: "error", title: "Couldn't get your location." });
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
 
   const items = useMemo(
     () =>
@@ -70,19 +95,30 @@ export function FieldSaleForm({
     }
     if (type === "CREDIT" && !customerId && !newCustomer)
       return toast({ variant: "error", title: "Credit sales need a customer." });
-    if (type === "CREDIT" && newCustomer && ncName.trim().length < 2)
+    if (newCustomer && ncName.trim().length < 2)
       return toast({ variant: "error", title: "Enter the customer's name." });
 
     start(async () => {
       const res = await recordFieldSale({
         type,
         items,
-        customerId: type === "CREDIT" && !newCustomer ? customerId : undefined,
-        newCustomer:
-          type === "CREDIT" && newCustomer
-            ? { name: ncName, phone: ncPhone, location: ncLocation }
-            : undefined,
-        customerName: type === "CASH" ? customerName : "",
+        // A saved customer (or a brand-new one) can be attached to ANY sale —
+        // cash included — so the customer's history stays complete.
+        customerId: !newCustomer && customerId ? customerId : undefined,
+        newCustomer: newCustomer
+          ? {
+              name: ncName,
+              businessName: ncBusiness,
+              phone: ncPhone,
+              location: ncLocation,
+              region: ncRegion,
+              customerType: ncType,
+              gpsLat: gps?.lat,
+              gpsLng: gps?.lng,
+            }
+          : undefined,
+        customerName:
+          type === "CASH" && !customerId && !newCustomer ? customerName : "",
         location,
         note,
         dueDate: type === "CREDIT" ? dueDate : "",
@@ -92,6 +128,9 @@ export function FieldSaleForm({
         setQty({});
         setCustomerName("");
         setNote("");
+        setNewCustomer(false);
+        setNcName(""); setNcBusiness(""); setNcPhone(""); setNcLocation("");
+        setNcRegion(""); setNcType(""); setGps(null);
         router.refresh();
       } else {
         toast({ variant: "error", title: res.error });
@@ -187,58 +226,94 @@ export function FieldSaleForm({
         </div>
       </div>
 
-      {/* Customer */}
-      {type === "CREDIT" ? (
-        <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Credit customer
-          </p>
-          {!newCustomer && (
-            <select
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
-            >
-              <option value="">Select a customer…</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id} disabled={c.creditSuspended}>
-                  {c.name}
-                  {c.creditSuspended ? " (credit suspended)" : ""}
-                </option>
-              ))}
-            </select>
-          )}
-          {newCustomer && (
-            <div className="grid gap-2.5 sm:grid-cols-3">
-              <Input placeholder="Customer name" value={ncName} onChange={(e) => setNcName(e.target.value)} />
-              <Input placeholder="Phone (optional)" value={ncPhone} onChange={(e) => setNcPhone(e.target.value)} />
-              <Input placeholder="Location (optional)" value={ncLocation} onChange={(e) => setNcLocation(e.target.value)} />
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => setNewCustomer((v) => !v)}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+      {/* Customer — pick from YOUR book or add a new one (any sale type) */}
+      <div className="space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {type === "CREDIT" ? "Credit customer" : "Customer"}
+        </p>
+        {!newCustomer && (
+          <select
+            value={customerId}
+            onChange={(e) => setCustomerId(e.target.value)}
+            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
           >
-            <UserPlus className="size-4" />
-            {newCustomer ? "Pick an existing customer instead" : "New customer"}
-          </button>
+            <option value="">
+              {type === "CREDIT"
+                ? "Select a customer…"
+                : "Walk-in — no saved customer"}
+            </option>
+            {customers.map((c) => (
+              <option
+                key={c.id}
+                value={c.id}
+                disabled={type === "CREDIT" && c.creditSuspended}
+              >
+                {c.name}
+                {type === "CREDIT" && c.creditSuspended ? " (credit suspended)" : ""}
+              </option>
+            ))}
+          </select>
+        )}
+        {!newCustomer && type === "CASH" && !customerId && (
+          <Input
+            placeholder="Walk-in customer name (optional)"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+          />
+        )}
+        {newCustomer && (
+          <div className="space-y-2.5 rounded-xl border border-border p-3">
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              <Input placeholder="Customer name *" value={ncName} onChange={(e) => setNcName(e.target.value)} />
+              <Input placeholder="Business name (optional)" value={ncBusiness} onChange={(e) => setNcBusiness(e.target.value)} />
+              <Input placeholder="Phone" value={ncPhone} onChange={(e) => setNcPhone(e.target.value)} />
+              <select
+                value={ncType}
+                onChange={(e) => setNcType(e.target.value)}
+                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Customer type…</option>
+                <option>Pharmacy</option>
+                <option>Shop</option>
+                <option>Supermarket</option>
+                <option>Kiosk</option>
+                <option>Clinic</option>
+                <option>Other</option>
+              </select>
+              <Input placeholder="Location / street" value={ncLocation} onChange={(e) => setNcLocation(e.target.value)} />
+              <Input placeholder="Region" value={ncRegion} onChange={(e) => setNcRegion(e.target.value)} />
+            </div>
+            <button
+              type="button"
+              onClick={captureGps}
+              disabled={gpsBusy}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                gps
+                  ? "border-success/40 bg-success/10 text-success"
+                  : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Check className={cn("size-3.5", !gps && "opacity-0")} />
+              {gpsBusy ? "Getting GPS…" : gps ? "GPS captured" : "Capture GPS location"}
+            </button>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setNewCustomer((v) => !v)}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+        >
+          <UserPlus className="size-4" />
+          {newCustomer ? "Pick an existing customer instead" : "Add new customer"}
+        </button>
+        {type === "CREDIT" && (
           <div>
             <Label className="text-xs text-muted-foreground">Due date (optional)</Label>
             <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="mt-1.5 sm:max-w-52" />
           </div>
-        </div>
-      ) : (
-        <div>
-          <Label className="text-xs text-muted-foreground">Customer name (optional)</Label>
-          <Input
-            placeholder="Walk-in customer"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            className="mt-1.5"
-          />
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="grid gap-2.5 sm:grid-cols-2">
         <div>

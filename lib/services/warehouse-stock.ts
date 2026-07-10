@@ -54,19 +54,22 @@ export async function deductWarehouseStock(
     const row = await tx.warehouseStock.findUnique({
       where: { warehouseId_productId: { warehouseId, productId } },
     });
-    if (!row) return;
-    const take = Math.min(row.onHand, quantity);
-    if (take > 0) {
-      await tx.warehouseStock.update({
-        where: { id: row.id },
-        data: { onHand: { decrement: take }, lastMoveAt: new Date() },
-      });
+    if (!row || row.onHand < quantity) {
+      // Never clamp silently — a shortfall here means the units aren't
+      // physically on hand (in transit, or a concurrent deduction won).
+      // Throwing rolls the whole transaction back with a clear error.
+      throw new Error(
+        `Only ${row?.onHand ?? 0} units physically on hand in that warehouse — cannot deduct ${quantity}.`,
+      );
     }
+    await tx.warehouseStock.update({
+      where: { id: row.id },
+      data: { onHand: { decrement: quantity }, lastMoveAt: new Date() },
+    });
     return;
   }
 
   const rows = await tx.warehouseStock.findMany({ where: { productId } });
-  if (rows.length === 0) return;
 
   let preferredId: string | null = null;
   if (preferWarehouseName) {
@@ -92,6 +95,14 @@ export async function deductWarehouseStock(
       data: { onHand: { decrement: take }, lastMoveAt: new Date() },
     });
     remaining -= take;
+  }
+  if (remaining > 0) {
+    // Org-wide count said yes but the location ledger can't cover it — the
+    // difference is in transit or was taken by a concurrent operation.
+    // Abort loudly rather than corrupt Σ onHand == Inventory.warehouseQty.
+    throw new Error(
+      `Only ${quantity - remaining} of ${quantity} units are physically on hand across warehouses (the rest may be in transit). Try again after transfers arrive.`,
+    );
   }
 }
 

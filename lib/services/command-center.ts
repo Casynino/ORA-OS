@@ -89,6 +89,8 @@ export async function getCommandCenter() {
     paymentHistory,
     partnerHistory,
     todaysPartnerOrders,
+    repStockAgg,
+    pendingRepRequests,
   ] = await Promise.all([
     prisma.inventory.aggregate({
       _sum: { warehouseQty: true, assignedQty: true, distributedQty: true },
@@ -203,6 +205,9 @@ export async function getCommandCenter() {
       orderBy: { fulfilledAt: "desc" },
       take: 6,
     }),
+    // Stock physically in sales reps' hands (their own field inventory).
+    prisma.repStock.aggregate({ _sum: { sellableQty: true, sampleQty: true } }),
+    prisma.repStockRequest.count({ where: { status: "PENDING" } }),
   ]);
 
   // Cash orders awaiting the admin's payment confirmation (handled inside the
@@ -210,22 +215,31 @@ export async function getCommandCenter() {
   const pendingPayments = pendingCashPayments;
 
   // ── Inventory location ─────────────────────────────────────────
+  // "Assigned" holds BOTH stock committed to partner orders and stock issued
+  // to sales reps — reps' live in-hand total separates the two so the answer
+  // to "where is every unit?" is always Warehouse / Partner / Rep / Credit.
   const warehouseUnits = inventoryAgg._sum.warehouseQty ?? 0;
   const assignedUnits = inventoryAgg._sum.assignedQty ?? 0;
   const distributedUnits = inventoryAgg._sum.distributedQty ?? 0;
+  const repUnits =
+    (repStockAgg._sum.sellableQty ?? 0) + (repStockAgg._sum.sampleQty ?? 0);
+  const partnerCommittedUnits = Math.max(0, assignedUnits - repUnits);
   const creditUnits = creditAccounts.reduce(
     (s, c) => s + c.request.items.reduce((t, i) => t + i.quantity, 0),
     0,
   );
   const totalInventory = warehouseUnits + assignedUnits;
 
-  // Per-warehouse on-hand for the distribution view
+  // Per-warehouse on-hand for the distribution view. Only buckets that are
+  // part of "total inventory" belong in the bar — credit units are already
+  // DELIVERED to partners (they're money owed, not stock ORA still holds),
+  // so they'd double-count against the total if mixed in here.
   const distribution = [
     ...warehouseSummaries
       .map((w) => ({ label: w.name, units: w.onHand, kind: "warehouse" as const }))
       .filter((d) => d.units > 0),
-    { label: "With partners", units: assignedUnits, kind: "partner" as const },
-    { label: "On credit", units: creditUnits, kind: "credit" as const },
+    { label: "With sales reps", units: repUnits, kind: "rep" as const },
+    { label: "With partners", units: partnerCommittedUnits, kind: "partner" as const },
   ];
 
   // ── Credit & finance ───────────────────────────────────────────
@@ -356,6 +370,8 @@ export async function getCommandCenter() {
   const alerts: { tone: "warning" | "info" | "danger"; text: string; href: string }[] = [];
   if (pendingApprovals > 0)
     alerts.push({ tone: "warning", text: `${pendingApprovals} order${pendingApprovals === 1 ? "" : "s"} awaiting approval`, href: "/admin/requests" });
+  if (pendingRepRequests > 0)
+    alerts.push({ tone: "warning", text: `${pendingRepRequests} sales-rep stock request${pendingRepRequests === 1 ? "" : "s"} awaiting you`, href: "/admin/reps" });
   if (pendingPayments > 0)
     alerts.push({ tone: "warning", text: `${pendingPayments} order payment${pendingPayments === 1 ? "" : "s"} to confirm`, href: "/admin/requests" });
   if (pendingSettlements > 0)
@@ -380,7 +396,8 @@ export async function getCommandCenter() {
     inventory: {
       total: totalInventory,
       warehouse: warehouseUnits,
-      partner: assignedUnits,
+      partner: partnerCommittedUnits,
+      reps: repUnits,
       credit: creditUnits,
       distributed: distributedUnits,
       distribution,
@@ -404,6 +421,7 @@ export async function getCommandCenter() {
     operations: {
       pendingApplications,
       pendingApprovals,
+      pendingRepRequests,
       pendingPayments,
       readyForFulfillment,
       inTransitOrders,

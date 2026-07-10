@@ -72,6 +72,12 @@ export default async function RepCustomersPage() {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="truncate font-semibold">{c.name}</p>
+                  {c.businessName && (
+                    <span className="truncate text-sm text-muted-foreground">
+                      · {c.businessName}
+                    </span>
+                  )}
+                  {c.customerType && <Badge variant="secondary">{c.customerType}</Badge>}
                   {c.overdue && <Badge variant="destructive">Overdue</Badge>}
                   {c.creditSuspended && <Badge variant="secondary">Credit off</Badge>}
                 </div>

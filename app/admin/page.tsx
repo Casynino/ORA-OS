@@ -31,6 +31,7 @@ import {
   Banknote,
   Bell,
   Receipt,
+  BadgeCheck,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
@@ -200,11 +201,12 @@ export default async function AdminCommandCenter() {
       {/* ── Inventory: where every unit is ───────────────────── */}
       <section>
         <SectionLabel>Inventory · where every unit is</SectionLabel>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <Reveal><KpiCard label="Total inventory" value={inv.total} suffix=" units" icon={Boxes} accent="primary" hint={`${formatNumber(inv.distributed)} distributed to date`} /></Reveal>
           <Reveal delay={0.05}><KpiCard label="Warehouse inventory" value={inv.warehouse} suffix=" units" icon={WIcon} accent="info" hint="available in warehouses" /></Reveal>
-          <Reveal delay={0.1}><KpiCard label="With partners" value={inv.partner} suffix=" units" icon={Users} accent="accent" hint="committed to partner orders" /></Reveal>
-          <Reveal delay={0.15}><KpiCard label="On credit" value={inv.credit} suffix=" units" icon={CreditCard} accent="warning" hint="held by partners, owed to ORA" /></Reveal>
+          <Reveal delay={0.1}><KpiCard label="With sales reps" value={inv.reps} suffix=" units" icon={BadgeCheck} accent="success" hint="in the field team's hands" /></Reveal>
+          <Reveal delay={0.15}><KpiCard label="With partners" value={inv.partner} suffix=" units" icon={Users} accent="accent" hint="committed to partner orders" /></Reveal>
+          <Reveal delay={0.2}><KpiCard label="On credit" value={inv.credit} suffix=" units" icon={CreditCard} accent="warning" hint="held by partners, owed to ORA" /></Reveal>
         </div>
 
         {/* Distribution */}
@@ -261,9 +263,10 @@ export default async function AdminCommandCenter() {
       {/* ── Operations ───────────────────────────────────────── */}
       <section>
         <SectionLabel>Operations · needs action</SectionLabel>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
           <OpTile icon={UserPlus} label="Applications" value={d.operations.pendingApplications} href="/admin/users" />
           <OpTile icon={Clock} label="Order approvals" value={d.operations.pendingApprovals} href="/admin/requests" />
+          <OpTile icon={BadgeCheck} label="Rep stock requests" value={d.operations.pendingRepRequests} href="/admin/reps" />
           <OpTile icon={Receipt} label="Payments to confirm" value={d.operations.pendingPayments} href="/admin/requests" />
           <OpTile icon={PackagePlus} label="Ready to fulfil" value={d.operations.readyForFulfillment} href="/admin/requests" />
           <OpTile icon={Truck} label="In transit" value={d.operations.inTransitOrders} href="/admin/requests" />
@@ -277,6 +280,7 @@ export default async function AdminCommandCenter() {
         <SectionLabel>Quick actions</SectionLabel>
         <div className="flex flex-wrap gap-2">
           <QuickAction icon={CheckCircle2} label="Approve orders" href="/admin/requests" />
+          <QuickAction icon={BadgeCheck} label="Rep requests" href="/admin/reps" />
           <QuickAction icon={UserCheck} label="Applications" href="/admin/users" />
           <QuickAction icon={ArrowLeftRight} label="New transfer" href="/admin/transfers" />
           <QuickAction icon={Banknote} label="Record payment" href="/admin/credit" />

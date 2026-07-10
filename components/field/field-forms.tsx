@@ -393,22 +393,58 @@ export function CollectForm({
   );
 }
 
-/** Add a customer to the rep's book. */
+/** Add a customer to the rep's book — full profile, auto-owned by this rep. */
 export function NewCustomerForm() {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [businessName, setBusinessName] = useState("");
   const [phone, setPhone] = useState("");
   const [location, setLocation] = useState("");
+  const [region, setRegion] = useState("");
+  const [customerType, setCustomerType] = useState("");
+  const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsBusy, setGpsBusy] = useState(false);
+
+  function captureGps() {
+    if (!navigator.geolocation) {
+      toast({ variant: "error", title: "GPS isn't available on this device." });
+      return;
+    }
+    setGpsBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGpsBusy(false);
+        toast({ variant: "success", title: "GPS location captured." });
+      },
+      () => {
+        setGpsBusy(false);
+        toast({ variant: "error", title: "Couldn't get your location." });
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
 
   function submit() {
     start(async () => {
-      const res = await createFieldCustomer({ name, phone, location, notes: "" });
+      const res = await createFieldCustomer({
+        name,
+        businessName,
+        phone,
+        location,
+        region,
+        customerType,
+        gpsLat: gps?.lat,
+        gpsLng: gps?.lng,
+        notes: "",
+      });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         setOpen(false);
-        setName(""); setPhone(""); setLocation("");
+        setName(""); setBusinessName(""); setPhone(""); setLocation("");
+        setRegion(""); setCustomerType(""); setGps(null);
         router.refresh();
       } else toast({ variant: "error", title: res.error });
     });
@@ -422,17 +458,48 @@ export function NewCustomerForm() {
     );
 
   return (
-    <div className="flex w-full flex-wrap items-center gap-2">
-      <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} className="h-9 w-full sm:w-44" />
-      <Input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-9 w-full sm:w-36" />
-      <Input placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} className="h-9 w-full sm:w-40" />
-      <div className="flex gap-2">
-        <Button size="sm" className="rounded-full" disabled={pending || name.trim().length < 2} onClick={submit}>
-          {pending ? "Saving…" : "Save"}
-        </Button>
-        <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setOpen(false)}>
-          Cancel
-        </Button>
+    <div className="w-full space-y-2.5 rounded-xl border border-border p-3">
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <Input placeholder="Customer name *" value={name} onChange={(e) => setName(e.target.value)} className="h-9" />
+        <Input placeholder="Business name (optional)" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="h-9" />
+        <Input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-9" />
+        <select
+          value={customerType}
+          onChange={(e) => setCustomerType(e.target.value)}
+          className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+        >
+          <option value="">Customer type…</option>
+          <option>Pharmacy</option>
+          <option>Shop</option>
+          <option>Supermarket</option>
+          <option>Kiosk</option>
+          <option>Clinic</option>
+          <option>Other</option>
+        </select>
+        <Input placeholder="Location / street" value={location} onChange={(e) => setLocation(e.target.value)} className="h-9" />
+        <Input placeholder="Region" value={region} onChange={(e) => setRegion(e.target.value)} className="h-9" />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={captureGps}
+          disabled={gpsBusy}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+            gps
+              ? "border-success/40 bg-success/10 text-success"
+              : "border-border text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {gpsBusy ? "Getting GPS…" : gps ? "✓ GPS captured" : "Capture GPS location"}
+        </button>
+        <div className="ml-auto flex gap-2">
+          <Button size="sm" className="rounded-full" disabled={pending || name.trim().length < 2} onClick={submit}>
+            {pending ? "Saving…" : "Save customer"}
+          </Button>
+          <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+        </div>
       </div>
     </div>
   );
