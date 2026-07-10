@@ -6,6 +6,7 @@ import type { CreditStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
+import { completeCycleIfCleared } from "@/lib/services/credit";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 function revalidateCredit() {
@@ -47,12 +48,16 @@ export async function recordPayment(
     }
 
     const newPaid = account.amountPaid + parsed.data.amount;
+    // OVERDUE is sticky: a partial payment reduces the balance but does NOT
+    // restore the facility — only full settlement clears the flag.
     const status: CreditStatus =
       newPaid >= account.principal
         ? "SETTLED"
-        : newPaid > 0
-          ? "PARTIAL"
-          : "OUTSTANDING";
+        : account.status === "OVERDUE"
+          ? "OVERDUE"
+          : newPaid > 0
+            ? "PARTIAL"
+            : "OUTSTANDING";
 
     const note = [
       parsed.data.collectedBy?.trim()
@@ -63,7 +68,23 @@ export async function recordPayment(
       .filter(Boolean)
       .join(" · ");
 
-    await prisma.$transaction(async (tx) => {
+    const cycleMsg = await prisma.$transaction(async (tx) => {
+      // Atomic claim: only applies on top of the exact balance we validated
+      // against — a concurrent payment makes this match 0 rows and abort, so
+      // the same debt can never be paid (or a cycle completed) twice.
+      const claimed = await tx.creditAccount.updateMany({
+        where: {
+          id: account.id,
+          status: { not: "SETTLED" },
+          amountPaid: account.amountPaid,
+        },
+        data: { amountPaid: newPaid, status },
+      });
+      if (claimed.count === 0) {
+        throw new Error(
+          "This account changed while you were recording — refresh and try again.",
+        );
+      }
       await tx.payment.create({
         data: {
           creditAccountId: account.id,
@@ -73,10 +94,12 @@ export async function recordPayment(
           recordedById: admin.id,
         },
       });
-      await tx.creditAccount.update({
-        where: { id: account.id },
-        data: { amountPaid: newPaid, status },
-      });
+      // Full repayment may close the partner's whole borrow→repay cycle:
+      // score +1, and +10% limit growth when the cycle never went overdue.
+      if (status === "SETTLED") {
+        return completeCycleIfCleared(tx, { partnerId: account.agentId });
+      }
+      return null;
     });
 
     await logActivity({
@@ -85,16 +108,17 @@ export async function recordPayment(
       action: "CREDIT_PAYMENT_RECORDED",
       entity: "CreditAccount",
       entityId: account.id,
-      summary: `Payment of ${parsed.data.amount} recorded against ${account.request.code} (${status.toLowerCase()}).`,
+      summary: `Payment of ${parsed.data.amount} recorded against ${account.request.code} (${status.toLowerCase()}).${cycleMsg ? ` ${cycleMsg}` : ""}`,
       meta: { amount: parsed.data.amount, status },
     });
 
     revalidateCredit();
     return ok(
       undefined,
-      status === "SETTLED"
-        ? "Payment recorded — credit fully settled."
-        : "Payment recorded.",
+      cycleMsg ??
+        (status === "SETTLED"
+          ? "Payment recorded — credit fully settled."
+          : "Payment recorded."),
     );
   } catch (e) {
     return fail(errorMessage(e));
@@ -113,7 +137,9 @@ export async function markOverdue(accountId: string): Promise<ActionResult> {
     if (a.status === "OVERDUE") return fail("Already marked overdue.");
     await prisma.creditAccount.update({
       where: { id: a.id },
-      data: { status: "OVERDUE" },
+      // wentOverdue is sticky — it permanently marks this cycle as late, so
+      // automatic limit growth is withheld even after full repayment.
+      data: { status: "OVERDUE", wentOverdue: true },
     });
     await logActivity({
       actorId: admin.id,

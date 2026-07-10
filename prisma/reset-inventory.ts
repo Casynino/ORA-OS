@@ -143,6 +143,16 @@ async function main() {
     ["payments", () => prisma.payment.deleteMany()],
     ["settlement requests", () => prisma.settlementRequest.deleteMany()],
     ["credit accounts", () => prisma.creditAccount.deleteMany()],
+    // Cycle/growth history earned on the wiped demo accounts goes too (manual
+    // LIMIT_SET events stay — that's real commercial-terms audit, like the
+    // limit itself). Scores/cycles reset to match the now-empty ledger.
+    [
+      "credit growth events",
+      () =>
+        prisma.partnerCreditEvent.deleteMany({
+          where: { type: { in: ["CYCLE_COMPLETED", "LIMIT_INCREASE"] } },
+        }),
+    ],
     ["returns", () => prisma.returnRequest.deleteMany()],
     ["stock movements", () => prisma.stockMovement.deleteMany()],
     ["order items", () => prisma.requestItem.deleteMany()],
@@ -180,6 +190,13 @@ async function main() {
     },
   });
   console.log(`   • ${"stock activity log".padEnd(26)} ${purgedLog.count} removed`);
+
+  // Credit scores/cycles were earned on the demo ledger — reset with it.
+  const scoreReset = await prisma.user.updateMany({
+    where: { role: "PARTNER" },
+    data: { creditScore: 0, creditCycles: 0 },
+  });
+  console.log(`   • ${"partner credit scores".padEnd(26)} ${scoreReset.count} reset`);
 
   // 3) Consolidate to a single "Main Warehouse".
   console.log("\n🏬 Consolidating to one warehouse…");

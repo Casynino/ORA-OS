@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
+import { recordLimitSet } from "@/lib/services/credit";
 import { formatCurrency } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
@@ -66,14 +67,22 @@ export async function approveApplication(
     if (user.role !== "PARTNER") return fail("Not a partner application.");
 
     await prisma.$transaction(async (tx) => {
+      const newLimit = parsed.data.creditLimit ?? user.creditLimit ?? 0;
       await tx.user.update({
         where: { id: user.id },
         data: {
           status: "ACTIVE",
-          creditLimit: parsed.data.creditLimit ?? user.creditLimit ?? 0,
+          creditLimit: newLimit,
           paymentTerms: parsed.data.paymentTerms?.trim() || user.paymentTerms,
           applicationNote: null, // clear any outstanding info request on approval
         },
+      });
+      // Opening limit lands in the auditable credit history too.
+      await recordLimitSet(tx, {
+        partnerId: user.id,
+        prevLimit: user.creditLimit ?? 0,
+        newLimit,
+        note: `Opening limit on approval by ${admin.name}.`,
       });
       for (const p of parsed.data.prices ?? []) {
         await tx.partnerPrice.upsert({
@@ -198,9 +207,18 @@ export async function setCreditLimit(
     });
     if (!user) return fail("User not found.");
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { creditLimit: parsed.data.creditLimit },
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { creditLimit: parsed.data.creditLimit },
+      });
+      // Auditable credit history — every manual limit change is recorded.
+      await recordLimitSet(tx, {
+        partnerId: user.id,
+        prevLimit: user.creditLimit ?? 0,
+        newLimit: parsed.data.creditLimit,
+        note: `Limit set by ${admin.name}.`,
+      });
     });
     await logActivity({
       actorId: admin.id,

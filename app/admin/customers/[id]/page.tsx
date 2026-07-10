@@ -51,7 +51,7 @@ export default async function CustomerProfilePage({
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user || user.role !== "PARTNER") notFound();
 
-  const [creditAccounts, requests, returns, messages, activity, warehouses] =
+  const [creditAccounts, requests, returns, messages, activity, warehouses, creditEvents] =
     await Promise.all([
       prisma.creditAccount.findMany({
         where: { agentId: id },
@@ -84,6 +84,11 @@ export default async function CustomerProfilePage({
         where: { isActive: true },
         orderBy: { name: "asc" },
         select: { id: true, name: true },
+      }),
+      prisma.partnerCreditEvent.findMany({
+        where: { partnerId: id },
+        orderBy: { createdAt: "desc" },
+        take: 15,
       }),
     ]);
 
@@ -234,7 +239,45 @@ export default async function CustomerProfilePage({
           <Tile icon={CalendarDays} accent="info" label="Next payment due" value={nextDue ? formatDate(nextDue) : "—"} />
           <Tile icon={ActivityIcon} accent="accent" label="Payment performance" value={performance.label} valueClass={performance.tone} hint={`${paidPct}% of credit repaid`} />
           <Tile icon={CreditCard} accent="warning" label="Payment terms" value={user.paymentTerms ?? "—"} />
+          <Tile icon={TrendingUp} accent="primary" label="Credit score" value={String(user.creditScore)} hint={`${user.creditCycles} cycle${user.creditCycles === 1 ? "" : "s"} completed`} />
+          <Tile icon={Wallet} accent="info" label="Next auto-growth" value={formatCurrency(Math.round(creditLimit * 1.1))} hint="+10% after an on-time cycle" />
         </div>
+
+        {/* Auditable facility history — limit changes, cycles, automatic growth */}
+        {creditEvents.length > 0 && (
+          <div className="mt-4 glass-card rounded-2xl p-4 sm:p-5">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Credit facility history
+            </p>
+            <div className="space-y-2">
+              {creditEvents.map((e) => (
+                <div key={e.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">
+                      {e.type === "LIMIT_INCREASE"
+                        ? "Automatic +10% limit growth"
+                        : e.type === "CYCLE_COMPLETED"
+                          ? `Cycle ${e.cycles ?? "—"} completed`
+                          : "Limit set manually"}
+                    </p>
+                    {e.note && <p className="text-xs text-muted-foreground">{e.note}</p>}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    {e.type !== "CYCLE_COMPLETED" && e.prevLimit != null && e.newLimit != null && (
+                      <p className="text-sm font-semibold">
+                        {formatCurrency(e.prevLimit)} →{" "}
+                        <span className={e.newLimit >= e.prevLimit ? "text-success" : "text-warning"}>
+                          {formatCurrency(e.newLimit)}
+                        </span>
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">{formatDateTime(e.createdAt)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">

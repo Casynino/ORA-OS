@@ -7,6 +7,7 @@ import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { applyMovement } from "@/lib/services/inventory";
 import { deductWarehouseStock } from "@/lib/services/warehouse-stock";
+import { getPartnerCredit } from "@/lib/services/credit";
 import { refCode, formatCurrency } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
@@ -95,28 +96,22 @@ export async function createRequest(
       select: { creditLimit: true, assignedWarehouse: true },
     });
 
-    // ── Credit-control rule: pay-later is a controlled loan tied to stock. ──
-    // A partner cannot take new credit while a balance is overdue, and the new
-    // order must fit inside their remaining credit availability.
+    // ── Revolving credit facility: available = limit − credit in use. ──
+    // A partner keeps ordering on credit while the order fits inside their
+    // available credit; repayments restore it automatically. Only an overdue
+    // balance (or exhausted availability) blocks new credit. Cash is always
+    // open. "In use" counts open ledger balances AND credit orders still in
+    // flight, so several pending orders can't stack past the ceiling.
     if (paymentType === "CREDIT") {
-      const openAccounts = await prisma.creditAccount.findMany({
-        where: { agentId: actor.id, status: { not: "SETTLED" } },
-        select: { principal: true, amountPaid: true, status: true },
-      });
-      // One active credit at a time: a partner must finish (settle) their
-      // current credit cycle before a new pay-later order is allowed.
-      if (openAccounts.length > 0) {
-        const overdue = openAccounts.some((a) => a.status === "OVERDUE");
+      const facility = await getPartnerCredit(actor.id);
+      if (facility.hasOverdue) {
         return fail(
-          overdue
-            ? "You have an overdue credit balance. Clear it before requesting new pay-later stock."
-            : "You already have an active credit batch. Finish repaying it before taking new pay-later stock.",
+          "You have an overdue credit balance. Clear it to restore your credit facility — cash orders remain available.",
         );
       }
-      const available = me?.creditLimit ?? 0;
-      if (totalAmount > available) {
+      if (totalAmount > facility.available) {
         return fail(
-          `This pay-later order (${formatCurrency(totalAmount)}) is over your credit limit of ${formatCurrency(available)}. Pay down to a lower amount or choose immediate payment.`,
+          `Your available credit is ${formatCurrency(facility.available)} (limit ${formatCurrency(facility.limit)}, ${formatCurrency(facility.used)} in use). Please reduce the order amount, make a payment to restore your available credit, or contact ORA to request a credit limit review.`,
         );
       }
     }
@@ -480,6 +475,24 @@ export async function approveRequest(
     // a CASH order stays UNPAID and is held back until an admin confirms payment
     // — only then does it become visible to warehouse staff.
     const isCredit = request.paymentType === "CREDIT";
+
+    // Re-check the facility at approval time (exposure may have changed since
+    // submission — other orders approved, payments posted, limit adjusted).
+    if (isCredit) {
+      const facility = await getPartnerCredit(request.requesterId, {
+        excludeRequestId: request.id,
+      });
+      if (facility.hasOverdue) {
+        return fail(
+          `${request.requester.name} has an overdue balance — clear it before approving new credit.`,
+        );
+      }
+      if ((request.totalAmount ?? 0) > facility.available) {
+        return fail(
+          `This order (${formatCurrency(request.totalAmount ?? 0)}) exceeds ${request.requester.name}'s available credit of ${formatCurrency(facility.available)} (limit ${formatCurrency(facility.limit)}, ${formatCurrency(facility.used)} in use).`,
+        );
+      }
+    }
     const invoiceNo = request.invoiceNo ?? refCode("INV");
     await prisma.request.update({
       where: { id: request.id },
@@ -799,7 +812,9 @@ export async function fulfillRequest(
       });
 
       // Credit order → open the debt ledger now that goods are delivered.
-      if (isCredit) {
+      // A zero-value order (e.g. fully discounted) opens no debt — an
+      // unsettleable 0-principal account would jam the cycle engine forever.
+      if (isCredit && (request.totalAmount ?? 0) > 0) {
         const exists = await tx.creditAccount.findUnique({
           where: { requestId: request.id },
         });
@@ -934,6 +949,28 @@ export async function partnerUpdateOrder(
     const priceMap = new Map<string, number>();
     for (const p of products) priceMap.set(p.id, p.price);
     for (const pp of partnerPrices) priceMap.set(pp.productId, pp.price);
+
+    // Credit orders: an edit must still fit the facility (exposure excludes
+    // this order's own current total, which is being replaced).
+    if (request.paymentType === "CREDIT") {
+      const newTotal = [...desired.entries()].reduce(
+        (s, [productId, quantity]) => s + (priceMap.get(productId) ?? 0) * quantity,
+        0,
+      );
+      const facility = await getPartnerCredit(actor.id, {
+        excludeRequestId: request.id,
+      });
+      if (facility.hasOverdue) {
+        return fail(
+          "You have an overdue credit balance. Clear it to restore your credit facility — cash orders remain available.",
+        );
+      }
+      if (newTotal > facility.available) {
+        return fail(
+          `Your available credit is ${formatCurrency(facility.available)}. Please reduce the order amount, make a payment to restore your available credit, or contact ORA to request a credit limit review.`,
+        );
+      }
+    }
 
     let total = 0;
     await prisma.$transaction(async (tx) => {

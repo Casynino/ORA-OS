@@ -132,6 +132,8 @@ model User {
   organization String? // business/partner name for partners
   location     String?
   creditLimit  Int? // admin-set credit ceiling (whole TSh) for partners
+  creditScore  Int  @default(0) // grows with each successfully repaid credit cycle
+  creditCycles Int  @default(0) // completed borrow→repay-in-full cycles
   notes        String? // internal admin notes
   applicationNote String? // applicant-facing: info the ORA team has requested
   businessType     String? // Agent / Distributor / NGO / School / Retail chain
@@ -193,9 +195,34 @@ model User {
   // Impact
   impactActivities  ImpactActivity[]    @relation("ImpactActivityCreator")
   loginEvents       LoginEvent[]
+  creditEvents      PartnerCreditEvent[] @relation("PartnerCreditEvents")
 
   @@index([role])
   @@index([status])
+}
+
+/// Auditable history of a partner's credit facility: manual limit changes,
+/// automatic 10% growth, and completed repayment cycles.
+enum CreditEventType {
+  LIMIT_SET // admin manually set/changed the limit
+  LIMIT_INCREASE // automatic growth after a successful cycle
+  CYCLE_COMPLETED // outstanding balance repaid in full
+}
+
+model PartnerCreditEvent {
+  id        String          @id @default(cuid())
+  partner   User            @relation("PartnerCreditEvents", fields: [partnerId], references: [id], onDelete: Cascade)
+  partnerId String
+  type      CreditEventType
+  prevLimit Int? // limit before the event (TSh)
+  newLimit  Int? // limit after the event (TSh)
+  score     Int? // credit score after the event
+  cycles    Int? // completed cycles after the event
+  note      String? // human-readable reason, e.g. "Cycle 3 repaid on time"
+  createdAt DateTime        @default(now())
+
+  @@index([partnerId])
+  @@index([type])
 }
 
 /// One row per successful sign-in — powers the profile's login history.
@@ -478,6 +505,7 @@ model CreditAccount {
   principal    Int // total owed (whole KES)
   amountPaid   Int          @default(0)
   status       CreditStatus @default(OUTSTANDING)
+  wentOverdue  Boolean      @default(false) // sticky: ever flagged overdue (blocks automatic limit growth for the cycle)
   dueDate      DateTime?
   approvedBy   User?        @relation("CreditApprover", fields: [approvedById], references: [id])
   approvedById String?

@@ -24,7 +24,13 @@ type StockProduct = {
   name: string;
   unitsPerCarton: number;
   notForSale: boolean;
-  available: number;
+  stock: "IN" | "LOW" | "OUT"; // availability only — quantities stay confidential
+};
+
+const STOCK_BADGE: Record<StockProduct["stock"], { label: string; cls: string }> = {
+  IN: { label: "In stock", cls: "bg-success/12 text-success" },
+  LOW: { label: "Low stock", cls: "bg-warning/15 text-warning" },
+  OUT: { label: "Out of stock", cls: "bg-destructive/12 text-destructive" },
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -159,8 +165,9 @@ export function ReportForm() {
 }
 
 /** Request more stock from the warehouse. */
-// Multi-product stock request: every product on one page, each with cartons +
-// pieces inputs that convert automatically. Leave a product blank to skip it.
+// Multi-product stock request — compact: one row per product, cartons + pieces
+// inputs inline (sample packs are pieces-only), availability shown as a status
+// badge (never actual warehouse numbers). Leave a product blank to skip it.
 export function StockRequestForm({ products }: { products: StockProduct[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -175,7 +182,9 @@ export function StockRequestForm({ products }: { products: StockProduct[] }) {
     const { cartons, pieces } = get(p.id);
     return {
       p,
-      pieces: combineToPieces(Number(cartons), Number(pieces), p.unitsPerCarton),
+      pieces: p.notForSale
+        ? Math.max(0, Math.floor(Number(pieces) || 0)) // sample: packs only
+        : combineToPieces(Number(cartons), Number(pieces), p.unitsPerCarton),
     };
   });
   const totalPieces = lines.reduce((s, l) => s + l.pieces, 0);
@@ -200,68 +209,89 @@ export function StockRequestForm({ products }: { products: StockProduct[] }) {
 
   return (
     <div className="space-y-3">
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         {products.map((p) => {
           const { cartons, pieces } = get(p.id);
-          const line = combineToPieces(
-            Number(cartons),
-            Number(pieces),
-            p.unitsPerCarton,
-          );
+          const line = p.notForSale
+            ? Math.max(0, Math.floor(Number(pieces) || 0))
+            : combineToPieces(Number(cartons), Number(pieces), p.unitsPerCarton);
+          const badge = STOCK_BADGE[p.stock];
           return (
             <div
               key={p.id}
-              className={`rounded-xl border p-3 transition-colors ${
+              className={`rounded-xl border px-3 py-2.5 transition-colors ${
                 line > 0 ? "border-primary/40 bg-primary/[0.03]" : "border-border"
               }`}
             >
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 text-sm font-medium">
-                    {p.name}
-                    {p.notForSale && (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">
-                        <Gift className="size-2.5" />
-                        Free
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {formatNumber(p.available)} pcs in warehouse · 1 carton ={" "}
-                    {formatNumber(p.unitsPerCarton)}
-                  </p>
-                </div>
-                {line > 0 && (
-                  <span className="shrink-0 text-xs font-semibold text-primary">
-                    {formatNumber(line)} pcs
-                  </span>
-                )}
+              <div className="flex items-center justify-between gap-2">
+                <p className="flex min-w-0 items-center gap-1.5 truncate text-sm font-medium">
+                  <span className="truncate">{p.name}</span>
+                  {p.notForSale && (
+                    <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">
+                      <Gift className="size-2.5" />
+                      Free
+                    </span>
+                  )}
+                </p>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}
+                >
+                  {badge.label}
+                </span>
               </div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-[11px] text-muted-foreground">Cartons</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    inputMode="numeric"
-                    value={cartons}
-                    onChange={(e) => setField(p.id, "cartons", e.target.value)}
-                    placeholder="0"
-                    className="mt-1 h-9"
-                  />
-                </div>
-                <div>
-                  <Label className="text-[11px] text-muted-foreground">Pieces</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    inputMode="numeric"
-                    value={pieces}
-                    onChange={(e) => setField(p.id, "pieces", e.target.value)}
-                    placeholder="0"
-                    className="mt-1 h-9"
-                  />
-                </div>
+              <div className="mt-1.5 flex items-end gap-2">
+                {p.notForSale ? (
+                  <div className="min-w-0 flex-1">
+                    <Label className="text-[10px] text-muted-foreground">
+                      Sample packs
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      value={pieces}
+                      onChange={(e) => setField(p.id, "pieces", e.target.value)}
+                      placeholder="0"
+                      className="mt-0.5 h-8 text-sm"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="min-w-0 flex-1">
+                      <Label className="text-[10px] text-muted-foreground">
+                        Cartons ({p.unitsPerCarton} pcs)
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        inputMode="numeric"
+                        value={cartons}
+                        onChange={(e) => setField(p.id, "cartons", e.target.value)}
+                        placeholder="0"
+                        className="mt-0.5 h-8 text-sm"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <Label className="text-[10px] text-muted-foreground">Pieces</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        inputMode="numeric"
+                        value={pieces}
+                        onChange={(e) => setField(p.id, "pieces", e.target.value)}
+                        placeholder="0"
+                        className="mt-0.5 h-8 text-sm"
+                      />
+                    </div>
+                  </>
+                )}
+                <span
+                  className={`w-16 shrink-0 pb-1.5 text-right text-xs font-semibold ${
+                    line > 0 ? "text-primary" : "text-muted-foreground/50"
+                  }`}
+                >
+                  {line > 0 ? `${formatNumber(line)}` : "—"}
+                </span>
               </div>
             </div>
           );
