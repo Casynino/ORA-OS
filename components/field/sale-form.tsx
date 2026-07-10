@@ -2,8 +2,15 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, CreditCard, Check, UserPlus } from "lucide-react";
-import { recordFieldSale } from "@/lib/actions/field";
+import {
+  Banknote,
+  CreditCard,
+  Check,
+  UserPlus,
+  Search,
+  X,
+} from "lucide-react";
+import { recordFieldSale, createFieldCustomer } from "@/lib/actions/field";
 import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +25,14 @@ type ProductRow = {
   price: number;
   inHand: number;
 };
-type CustomerRow = { id: string; name: string; creditSuspended: boolean };
+type CustomerRow = {
+  id: string;
+  name: string;
+  businessName?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  creditSuspended: boolean;
+};
 
 export function FieldSaleForm({
   products,
@@ -36,6 +50,12 @@ export function FieldSaleForm({
   );
   const [customerId, setCustomerId] = useState("");
   const [newCustomer, setNewCustomer] = useState(false);
+  // Customers saved during this visit — visible & selectable immediately,
+  // before the server refresh lands.
+  const [added, setAdded] = useState<CustomerRow[]>([]);
+  const [search, setSearch] = useState("");
+  const [listOpen, setListOpen] = useState(false);
+  const [savingCustomer, startSaveCustomer] = useTransition();
   const [ncName, setNcName] = useState("");
   const [ncBusiness, setNcBusiness] = useState("");
   const [ncPhone, setNcPhone] = useState("");
@@ -48,6 +68,66 @@ export function FieldSaleForm({
   const [location, setLocation] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [note, setNote] = useState("");
+
+  // Full book = server list + just-saved ones (deduped by id).
+  const allCustomers = useMemo(() => {
+    const seen = new Set(customers.map((c) => c.id));
+    return [...customers, ...added.filter((c) => !seen.has(c.id))];
+  }, [customers, added]);
+  const selected = allCustomers.find((c) => c.id === customerId) ?? null;
+
+  // Live search across name, business name, phone and location.
+  const matches = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const pool = q
+      ? allCustomers.filter((c) =>
+          [c.name, c.businessName, c.phone, c.location]
+            .filter(Boolean)
+            .some((v) => String(v).toLowerCase().includes(q)),
+        )
+      : allCustomers;
+    return pool.slice(0, 8);
+  }, [allCustomers, search]);
+
+  function saveNewCustomer() {
+    if (ncName.trim().length < 2) {
+      toast({ variant: "error", title: "Enter the customer's name." });
+      return;
+    }
+    startSaveCustomer(async () => {
+      const res = await createFieldCustomer({
+        name: ncName,
+        businessName: ncBusiness,
+        phone: ncPhone,
+        location: ncLocation,
+        region: ncRegion,
+        customerType: ncType,
+        gpsLat: gps?.lat,
+        gpsLng: gps?.lng,
+        notes: "",
+      });
+      if (res.ok && res.data) {
+        // Saved for real — confirm, show them in the book, and select them.
+        const saved: CustomerRow = {
+          id: res.data.id,
+          name: ncName.trim(),
+          businessName: ncBusiness.trim() || null,
+          phone: ncPhone.trim() || null,
+          location: ncLocation.trim() || null,
+          creditSuspended: false,
+        };
+        setAdded((a) => [...a, saved]);
+        setCustomerId(saved.id);
+        setNewCustomer(false);
+        setNcName(""); setNcBusiness(""); setNcPhone(""); setNcLocation("");
+        setNcRegion(""); setNcType(""); setGps(null);
+        toast({ variant: "success", title: `${saved.name} saved & selected.` });
+        router.refresh();
+      } else if (!res.ok) {
+        toast({ variant: "error", title: res.error });
+      }
+    });
+  }
 
   function captureGps() {
     if (!navigator.geolocation) {
@@ -93,32 +173,25 @@ export function FieldSaleForm({
           title: `You only have ${p.inHand} of ${p.name} in hand.`,
         });
     }
-    if (type === "CREDIT" && !customerId && !newCustomer)
-      return toast({ variant: "error", title: "Credit sales need a customer." });
-    if (newCustomer && ncName.trim().length < 2)
-      return toast({ variant: "error", title: "Enter the customer's name." });
+    if (type === "CREDIT" && !customerId)
+      return toast({
+        variant: "error",
+        title: "Credit sales need a customer — pick one or save a new customer first.",
+      });
+    if (newCustomer)
+      return toast({
+        variant: "error",
+        title: "Save (or cancel) the new customer first.",
+      });
 
     start(async () => {
       const res = await recordFieldSale({
         type,
         items,
-        // A saved customer (or a brand-new one) can be attached to ANY sale —
-        // cash included — so the customer's history stays complete.
-        customerId: !newCustomer && customerId ? customerId : undefined,
-        newCustomer: newCustomer
-          ? {
-              name: ncName,
-              businessName: ncBusiness,
-              phone: ncPhone,
-              location: ncLocation,
-              region: ncRegion,
-              customerType: ncType,
-              gpsLat: gps?.lat,
-              gpsLng: gps?.lng,
-            }
-          : undefined,
-        customerName:
-          type === "CASH" && !customerId && !newCustomer ? customerName : "",
+        // A saved customer can be attached to ANY sale — cash included —
+        // so the customer's history stays complete.
+        customerId: customerId || undefined,
+        customerName: type === "CASH" && !customerId ? customerName : "",
         location,
         note,
         dueDate: type === "CREDIT" ? dueDate : "",
@@ -128,9 +201,6 @@ export function FieldSaleForm({
         setQty({});
         setCustomerName("");
         setNote("");
-        setNewCustomer(false);
-        setNcName(""); setNcBusiness(""); setNcPhone(""); setNcLocation("");
-        setNcRegion(""); setNcType(""); setGps(null);
         router.refresh();
       } else {
         toast({ variant: "error", title: res.error });
@@ -226,43 +296,127 @@ export function FieldSaleForm({
         </div>
       </div>
 
-      {/* Customer — pick from YOUR book or add a new one (any sale type) */}
+      {/* Customer — search YOUR book, or save a new one first, then it's
+          selected automatically (any sale type). */}
       <div className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {type === "CREDIT" ? "Credit customer" : "Customer"}
         </p>
-        {!newCustomer && (
-          <select
-            value={customerId}
-            onChange={(e) => setCustomerId(e.target.value)}
-            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
-          >
-            <option value="">
-              {type === "CREDIT"
-                ? "Select a customer…"
-                : "Walk-in — no saved customer"}
-            </option>
-            {customers.map((c) => (
-              <option
-                key={c.id}
-                value={c.id}
-                disabled={type === "CREDIT" && c.creditSuspended}
-              >
-                {c.name}
-                {type === "CREDIT" && c.creditSuspended ? " (credit suspended)" : ""}
-              </option>
-            ))}
-          </select>
+
+        {/* Selected customer chip */}
+        {selected && !newCustomer && (
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-primary/40 bg-primary/[0.04] px-3 py-2.5">
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 truncate text-sm font-medium">
+                <Check className="size-4 shrink-0 text-success" />
+                {selected.name}
+                {selected.businessName && (
+                  <span className="truncate font-normal text-muted-foreground">
+                    · {selected.businessName}
+                  </span>
+                )}
+              </p>
+              {(selected.phone || selected.location) && (
+                <p className="ml-[22px] text-xs text-muted-foreground">
+                  {[selected.phone, selected.location].filter(Boolean).join(" · ")}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => { setCustomerId(""); setSearch(""); }}
+              className="shrink-0 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Clear customer"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
         )}
-        {!newCustomer && type === "CASH" && !customerId && (
+
+        {/* Search picker */}
+        {!selected && !newCustomer && (
+          <div className="relative">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setListOpen(true); }}
+                onFocus={() => setListOpen(true)}
+                placeholder={
+                  allCustomers.length === 0
+                    ? "No saved customers yet — add one below"
+                    : "Search your customers — name, business, phone…"
+                }
+                className="pl-9"
+              />
+            </div>
+            {listOpen && allCustomers.length > 0 && (
+              <div className="mt-1.5 overflow-hidden rounded-xl border border-border bg-card shadow-soft">
+                {matches.length === 0 ? (
+                  <p className="px-3 py-2.5 text-sm text-muted-foreground">
+                    No customer matches “{search}” — add them below.
+                  </p>
+                ) : (
+                  matches.map((c) => {
+                    const blocked = type === "CREDIT" && c.creditSuspended;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        disabled={blocked}
+                        onClick={() => {
+                          setCustomerId(c.id);
+                          setListOpen(false);
+                          setSearch("");
+                        }}
+                        className={cn(
+                          "flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm transition-colors",
+                          blocked
+                            ? "cursor-not-allowed opacity-50"
+                            : "hover:bg-muted/60",
+                        )}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">
+                            {c.name}
+                            {c.businessName ? (
+                              <span className="font-normal text-muted-foreground">
+                                {" "}· {c.businessName}
+                              </span>
+                            ) : null}
+                          </span>
+                          {(c.phone || c.location) && (
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {[c.phone, c.location].filter(Boolean).join(" · ")}
+                            </span>
+                          )}
+                        </span>
+                        {blocked && (
+                          <span className="shrink-0 text-[10px] text-destructive">
+                            credit suspended
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Walk-in fallback (cash only, nothing selected) */}
+        {!selected && !newCustomer && type === "CASH" && (
           <Input
             placeholder="Walk-in customer name (optional)"
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
           />
         )}
+
+        {/* New customer — SAVED FIRST, then auto-selected */}
         {newCustomer && (
-          <div className="space-y-2.5 rounded-xl border border-border p-3">
+          <div className="space-y-2.5 rounded-xl border border-primary/30 p-3">
             <div className="grid gap-2.5 sm:grid-cols-2">
               <Input placeholder="Customer name *" value={ncName} onChange={(e) => setNcName(e.target.value)} />
               <Input placeholder="Business name (optional)" value={ncBusiness} onChange={(e) => setNcBusiness(e.target.value)} />
@@ -283,30 +437,60 @@ export function FieldSaleForm({
               <Input placeholder="Location / street" value={ncLocation} onChange={(e) => setNcLocation(e.target.value)} />
               <Input placeholder="Region" value={ncRegion} onChange={(e) => setNcRegion(e.target.value)} />
             </div>
-            <button
-              type="button"
-              onClick={captureGps}
-              disabled={gpsBusy}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                gps
-                  ? "border-success/40 bg-success/10 text-success"
-                  : "border-border text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <Check className={cn("size-3.5", !gps && "opacity-0")} />
-              {gpsBusy ? "Getting GPS…" : gps ? "GPS captured" : "Capture GPS location"}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={captureGps}
+                disabled={gpsBusy}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                  gps
+                    ? "border-success/40 bg-success/10 text-success"
+                    : "border-border text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Check className={cn("size-3.5", !gps && "opacity-0")} />
+                {gpsBusy ? "Getting GPS…" : gps ? "GPS captured" : "Capture GPS location"}
+              </button>
+              <div className="ml-auto flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="rounded-full"
+                  disabled={savingCustomer || ncName.trim().length < 2}
+                  onClick={saveNewCustomer}
+                >
+                  {savingCustomer ? "Saving…" : "Save customer"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="rounded-full"
+                  onClick={() => setNewCustomer(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              The customer is saved to your book first — then they're selected
+              for this sale automatically.
+            </p>
           </div>
         )}
-        <button
-          type="button"
-          onClick={() => setNewCustomer((v) => !v)}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-        >
-          <UserPlus className="size-4" />
-          {newCustomer ? "Pick an existing customer instead" : "Add new customer"}
-        </button>
+
+        {!newCustomer && (
+          <button
+            type="button"
+            onClick={() => { setNewCustomer(true); setListOpen(false); }}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+          >
+            <UserPlus className="size-4" />
+            Add new customer
+          </button>
+        )}
+
         {type === "CREDIT" && (
           <div>
             <Label className="text-xs text-muted-foreground">Due date (optional)</Label>
