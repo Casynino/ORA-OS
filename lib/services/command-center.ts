@@ -91,6 +91,15 @@ export async function getCommandCenter() {
     todaysPartnerOrders,
     repStockAgg,
     pendingRepRequests,
+    fieldToday,
+    fieldWeek,
+    fieldMonth,
+    fieldCashToday,
+    fieldPaymentsToday,
+    fieldPaymentsMonth,
+    fieldCreditAgg,
+    fieldOverdueAgg,
+    fieldSalesHistory,
   ] = await Promise.all([
     prisma.inventory.aggregate({
       _sum: { warehouseQty: true, assignedQty: true, distributedQty: true },
@@ -208,6 +217,46 @@ export async function getCommandCenter() {
     // Stock physically in sales reps' hands (their own field inventory).
     prisma.repStock.aggregate({ _sum: { sellableQty: true, sampleQty: true } }),
     prisma.repStockRequest.count({ where: { status: "PENDING" } }),
+    // ── Field sales (sales reps) — cash + credit, live on the same dashboard ──
+    prisma.fieldSale.aggregate({
+      _sum: { total: true },
+      _count: true,
+      where: { voided: false, createdAt: { gte: startToday } },
+    }),
+    prisma.fieldSale.aggregate({
+      _sum: { total: true },
+      _count: true,
+      where: { voided: false, createdAt: { gte: startWeek } },
+    }),
+    prisma.fieldSale.aggregate({
+      _sum: { total: true },
+      _count: true,
+      where: { voided: false, createdAt: { gte: startMonth } },
+    }),
+    prisma.fieldSale.aggregate({
+      _sum: { total: true },
+      where: { voided: false, type: "CASH", createdAt: { gte: startToday } },
+    }),
+    prisma.fieldPayment.aggregate({
+      _sum: { amount: true },
+      where: { createdAt: { gte: startToday } },
+    }),
+    prisma.fieldPayment.aggregate({
+      _sum: { amount: true },
+      where: { createdAt: { gte: startMonth } },
+    }),
+    prisma.fieldSale.aggregate({
+      _sum: { total: true, amountPaid: true },
+      where: { voided: false, type: "CREDIT" },
+    }),
+    prisma.fieldSale.aggregate({
+      _sum: { total: true, amountPaid: true },
+      where: { voided: false, type: "CREDIT", creditStatus: "OVERDUE" },
+    }),
+    prisma.fieldSale.findMany({
+      where: { voided: false, createdAt: { gte: sixMonthsAgo } },
+      select: { createdAt: true, total: true },
+    }),
   ]);
 
   // Cash orders awaiting the admin's payment confirmation (handled inside the
@@ -256,13 +305,32 @@ export async function getCommandCenter() {
       overdueCount += 1;
     }
   }
-  const collectionsMonth = paymentsMonth._sum.amount ?? 0;
-  const cashToday =
-    (paymentsToday._sum.amount ?? 0) + (cashSalesToday._sum.totalAmount ?? 0);
+  // Field credit (rep customers' pay-later balances) — separate from partners.
+  const fieldOutstanding = Math.max(
+    0,
+    (fieldCreditAgg._sum.total ?? 0) - (fieldCreditAgg._sum.amountPaid ?? 0),
+  );
+  const fieldOverdue = Math.max(
+    0,
+    (fieldOverdueAgg._sum.total ?? 0) - (fieldOverdueAgg._sum.amountPaid ?? 0),
+  );
 
-  // ── Sales ──────────────────────────────────────────────────────
-  const monthRevenue = salesMonth._sum.totalAmount ?? 0;
-  const monthOrders = salesMonth._count ?? 0;
+  // Collections & cash include the field team: rep cash sales land as cash the
+  // moment they're recorded, and rep credit collections are repayments too.
+  const collectionsMonth =
+    (paymentsMonth._sum.amount ?? 0) + (fieldPaymentsMonth._sum.amount ?? 0);
+  const cashToday =
+    (paymentsToday._sum.amount ?? 0) +
+    (cashSalesToday._sum.totalAmount ?? 0) +
+    (fieldCashToday._sum.total ?? 0) +
+    (fieldPaymentsToday._sum.amount ?? 0);
+
+  // ── Sales — partner orders AND field sales, one truthful number ───────────
+  const fieldRevToday = fieldToday._sum.total ?? 0;
+  const fieldRevWeek = fieldWeek._sum.total ?? 0;
+  const fieldRevMonth = fieldMonth._sum.total ?? 0;
+  const monthRevenue = (salesMonth._sum.totalAmount ?? 0) + fieldRevMonth;
+  const monthOrders = (salesMonth._count ?? 0) + (fieldMonth._count ?? 0);
   const avgOrderValue = monthOrders > 0 ? Math.round(monthRevenue / monthOrders) : 0;
 
   let topPartner: { name: string; org: string | null; value: number } | null =
@@ -347,6 +415,11 @@ export async function getCommandCenter() {
     const b = salesTrend.find((x) => x.key === mKey(r.fulfilledAt!));
     if (b) b.value += r.totalAmount ?? 0;
   }
+  // Field sales count toward the same revenue trend.
+  for (const s of fieldSalesHistory) {
+    const b = salesTrend.find((x) => x.key === mKey(s.createdAt));
+    if (b) b.value += s.total;
+  }
   const collectionsTrend = monthBuckets(eat.y, eat.m);
   for (const p of paymentHistory) {
     const b = collectionsTrend.find((x) => x.key === mKey(p.createdAt));
@@ -403,9 +476,24 @@ export async function getCommandCenter() {
       distribution,
     },
     sales: {
-      today: { revenue: salesToday._sum.totalAmount ?? 0, orders: salesToday._count ?? 0 },
-      week: { revenue: salesWeek._sum.totalAmount ?? 0, orders: salesWeek._count ?? 0 },
-      month: { revenue: monthRevenue, orders: monthOrders },
+      today: {
+        revenue: (salesToday._sum.totalAmount ?? 0) + fieldRevToday,
+        orders: (salesToday._count ?? 0) + (fieldToday._count ?? 0),
+        partnerOrders: salesToday._count ?? 0,
+        fieldSales: fieldToday._count ?? 0,
+      },
+      week: {
+        revenue: (salesWeek._sum.totalAmount ?? 0) + fieldRevWeek,
+        orders: (salesWeek._count ?? 0) + (fieldWeek._count ?? 0),
+        partnerOrders: salesWeek._count ?? 0,
+        fieldSales: fieldWeek._count ?? 0,
+      },
+      month: {
+        revenue: monthRevenue,
+        orders: monthOrders,
+        partnerOrders: salesMonth._count ?? 0,
+        fieldSales: fieldMonth._count ?? 0,
+      },
       avgOrderValue,
       topPartner,
       padsDistributed: inventoryAgg._sum.distributedQty ?? 0,
@@ -415,6 +503,8 @@ export async function getCommandCenter() {
       activeCreditAccounts: creditAccounts.length,
       collectionsMonth,
       overdueCredit,
+      fieldOutstanding,
+      fieldOverdue,
       overdueCount,
       cashToday,
     },

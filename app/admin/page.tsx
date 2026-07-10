@@ -236,14 +236,14 @@ export default async function AdminCommandCenter() {
         </Reveal>
       </section>
 
-      {/* ── Sales ────────────────────────────────────────────── */}
+      {/* ── Sales — partner orders + field (rep) sales, combined ── */}
       <section>
-        <SectionLabel>Sales</SectionLabel>
+        <SectionLabel>Sales · partners + field team</SectionLabel>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <MiniStat icon={TrendingUp} accent="success" label="Sales today" value={formatCurrency(d.sales.today.revenue)} hint={`${d.sales.today.orders} order${d.sales.today.orders === 1 ? "" : "s"}`} />
-          <MiniStat icon={TrendingUp} accent="success" label="This week" value={formatCurrency(d.sales.week.revenue)} hint={`${d.sales.week.orders} order${d.sales.week.orders === 1 ? "" : "s"}`} />
-          <MiniStat icon={TrendingUp} accent="success" label="This month" value={formatCurrency(d.sales.month.revenue)} hint={`${d.sales.month.orders} order${d.sales.month.orders === 1 ? "" : "s"}`} />
-          <MiniStat icon={ShoppingCart} accent="info" label="Avg order value" value={formatCurrency(d.sales.avgOrderValue)} hint="this month" />
+          <MiniStat icon={TrendingUp} accent="success" label="Sales today" value={formatCurrency(d.sales.today.revenue)} hint={salesSplit(d.sales.today)} />
+          <MiniStat icon={TrendingUp} accent="success" label="This week" value={formatCurrency(d.sales.week.revenue)} hint={salesSplit(d.sales.week)} />
+          <MiniStat icon={TrendingUp} accent="success" label="This month" value={formatCurrency(d.sales.month.revenue)} hint={salesSplit(d.sales.month)} />
+          <MiniStat icon={ShoppingCart} accent="info" label="Avg sale value" value={formatCurrency(d.sales.avgOrderValue)} hint="this month" />
           <MiniStat icon={Star} accent="accent" label="Top partner" value={d.sales.topPartner?.name ?? "—"} hint={d.sales.topPartner ? formatCurrency(d.sales.topPartner.value) : "no sales yet"} small />
         </div>
       </section>
@@ -251,10 +251,11 @@ export default async function AdminCommandCenter() {
       {/* ── Credit & finance ─────────────────────────────────── */}
       <section>
         <SectionLabel>Credit &amp; finance</SectionLabel>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
           <MiniStat icon={Wallet} accent="warning" label="Outstanding credit" value={formatCurrency(d.finance.outstandingCredit)} hint="owed by partners" />
           <MiniStat icon={CreditCard} accent="info" label="Active credit accounts" value={formatNumber(d.finance.activeCreditAccounts)} hint="partners on credit" />
-          <MiniStat icon={Banknote} accent="success" label="Collections this month" value={formatCurrency(d.finance.collectionsMonth)} hint="repayments received" />
+          <MiniStat icon={Wallet} accent={d.finance.fieldOutstanding > 0 ? "warning" : "info"} label="Field credit" value={formatCurrency(d.finance.fieldOutstanding)} hint={d.finance.fieldOverdue > 0 ? `${formatCurrency(d.finance.fieldOverdue)} overdue` : "owed by rep customers"} />
+          <MiniStat icon={Banknote} accent="success" label="Collections this month" value={formatCurrency(d.finance.collectionsMonth)} hint="partner + field repayments" />
           <MiniStat icon={AlertTriangle} accent={d.finance.overdueCredit > 0 ? "warning" : "success"} label="Overdue credit" value={formatCurrency(d.finance.overdueCredit)} hint={`${d.finance.overdueCount} partner${d.finance.overdueCount === 1 ? "" : "s"}`} />
           <MiniStat icon={Coins} accent="primary" label="Cash collected today" value={formatCurrency(d.finance.cashToday)} hint="sales + repayments" />
         </div>
@@ -478,6 +479,15 @@ export default async function AdminCommandCenter() {
 }
 
 /* ── helper components ───────────────────────────────────────── */
+
+/** "2 partner · 1 field" style breakdown for a sales period. */
+function salesSplit(p: { orders: number; partnerOrders: number; fieldSales: number }) {
+  if (p.orders === 0) return "0 sales";
+  const parts: string[] = [];
+  if (p.partnerOrders > 0) parts.push(`${p.partnerOrders} partner`);
+  if (p.fieldSales > 0) parts.push(`${p.fieldSales} field`);
+  return parts.join(" · ") || `${p.orders} sales`;
+}
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
