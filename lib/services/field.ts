@@ -152,6 +152,8 @@ export type RepPerformanceRow = {
   region: string | null;
   status: string;
   salesMonth: number;
+  cashMonth: number;
+  creditMonth: number;
   unitsMonth: number;
   creditOutstanding: number;
   overdue: number;
@@ -179,7 +181,7 @@ export async function getRepsPerformance(): Promise<RepPerformanceRow[]> {
 
   const [sales, units, credit, samples, stock, targets, reports] = await Promise.all([
     prisma.fieldSale.groupBy({
-      by: ["repId"],
+      by: ["repId", "type"],
       _sum: { total: true },
       where: { repId: { in: ids }, voided: false, createdAt: { gte: month } },
     }),
@@ -234,7 +236,16 @@ export async function getRepsPerformance(): Promise<RepPerformanceRow[]> {
     }),
   ]);
 
-  const salesMap = new Map(sales.map((s) => [s.repId, s._sum.total ?? 0]));
+  // Per-rep totals split by cash vs credit.
+  const salesMap = new Map<string, { total: number; cash: number; credit: number }>();
+  for (const s of sales) {
+    const cur = salesMap.get(s.repId) ?? { total: 0, cash: 0, credit: 0 };
+    const amount = s._sum.total ?? 0;
+    cur.total += amount;
+    if (s.type === "CASH") cur.cash += amount;
+    else cur.credit += amount;
+    salesMap.set(s.repId, cur);
+  }
   const samplesMap = new Map(samples.map((s) => [s.repId, s._sum.quantity ?? 0]));
   const stockMap = new Map(
     stock.map((s) => [s.repId, { sell: s._sum.sellableQty ?? 0, sample: s._sum.sampleQty ?? 0 }]),
@@ -253,7 +264,9 @@ export async function getRepsPerformance(): Promise<RepPerformanceRow[]> {
     .map((r) => ({
       ...r,
       status: r.status as string,
-      salesMonth: salesMap.get(r.id) ?? 0,
+      salesMonth: salesMap.get(r.id)?.total ?? 0,
+      cashMonth: salesMap.get(r.id)?.cash ?? 0,
+      creditMonth: salesMap.get(r.id)?.credit ?? 0,
       unitsMonth: units.get(r.id) ?? 0,
       creditOutstanding: creditMap.get(r.id)?.out ?? 0,
       overdue: creditMap.get(r.id)?.overdue ?? 0,

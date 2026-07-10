@@ -137,7 +137,24 @@ export default async function AdminRepDetailPage({
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Sales this month" value={formatCurrency(d.salesMonth)} icon={TrendingUp} accent="primary" hint={`${formatNumber(d.unitsMonth)} units`} />
+        <StatCard
+          label="Sales this month"
+          value={formatCurrency(d.salesMonth)}
+          icon={TrendingUp}
+          accent="primary"
+          hint={
+            d.salesMonth > 0 ? (
+              <>
+                <span className="block">
+                  Cash {formatCurrency(d.cashSalesMonth)} · Credit {formatCurrency(d.creditSalesMonth)}
+                </span>
+                <span className="block">{formatNumber(d.unitsMonth)} units</span>
+              </>
+            ) : (
+              `${formatNumber(d.unitsMonth)} units`
+            )
+          }
+        />
         <StatCard label="Credit exposure" value={formatCurrency(d.creditOutstanding)} icon={CreditCard} accent="warning" hint={d.overdueCount > 0 ? `${d.overdueCount} overdue` : "all on track"} />
         <StatCard label="Stock in hand" value={formatNumber(d.stockInHand)} icon={Package} accent="info" hint={`+${formatNumber(d.samplesInHand)} samples`} />
         <StatCard label="Samples this month" value={formatNumber(d.samplesMonth)} icon={Gift} accent="accent" />
