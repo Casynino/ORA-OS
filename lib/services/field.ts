@@ -40,22 +40,38 @@ export async function getRepOverview(repId: string) {
   const live = { repId, voided: false } as const;
 
   const [
-    salesToday,
-    salesWeek,
-    salesMonth,
+    salesTodayRows,
+    salesWeekRows,
+    salesMonthRows,
     unitsMonthRows,
     creditOpen,
     collectedMonth,
-    cashMonth,
     samplesMonth,
     stock,
     target,
     recentSales,
     pendingStockRequests,
   ] = await Promise.all([
-    prisma.fieldSale.aggregate({ _sum: { total: true }, where: { ...live, createdAt: { gte: today } } }),
-    prisma.fieldSale.aggregate({ _sum: { total: true }, where: { ...live, createdAt: { gte: week } } }),
-    prisma.fieldSale.aggregate({ _sum: { total: true }, _count: true, where: { ...live, createdAt: { gte: month } } }),
+    // Split every period by CASH vs CREDIT — the totals stay honest and the
+    // rep (and admin) always see how a figure is composed.
+    prisma.fieldSale.groupBy({
+      by: ["type"],
+      _sum: { total: true },
+      _count: { _all: true },
+      where: { ...live, createdAt: { gte: today } },
+    }),
+    prisma.fieldSale.groupBy({
+      by: ["type"],
+      _sum: { total: true },
+      _count: { _all: true },
+      where: { ...live, createdAt: { gte: week } },
+    }),
+    prisma.fieldSale.groupBy({
+      by: ["type"],
+      _sum: { total: true },
+      _count: { _all: true },
+      where: { ...live, createdAt: { gte: month } },
+    }),
     prisma.fieldSaleItem.aggregate({
       _sum: { quantity: true },
       where: { sale: { ...live, createdAt: { gte: month } } },
@@ -67,10 +83,6 @@ export async function getRepOverview(repId: string) {
     prisma.fieldPayment.aggregate({
       _sum: { amount: true },
       where: { sale: { repId, voided: false }, createdAt: { gte: month } },
-    }),
-    prisma.fieldSale.aggregate({
-      _sum: { total: true },
-      where: { ...live, type: "CASH", createdAt: { gte: month } },
     }),
     prisma.sampleLog.aggregate({ _sum: { quantity: true }, where: { repId, createdAt: { gte: month } } }),
     prisma.repStock.findMany({
@@ -90,16 +102,33 @@ export async function getRepOverview(repId: string) {
     prisma.repStockRequest.count({ where: { repId, status: "PENDING" } }),
   ]);
 
+  // Cash vs credit composition per period.
+  const split = (rows: { type: string; _sum: { total: number | null }; _count: { _all: number } }[]) => ({
+    total: rows.reduce((s, r) => s + (r._sum.total ?? 0), 0),
+    cash: rows.find((r) => r.type === "CASH")?._sum.total ?? 0,
+    credit: rows.find((r) => r.type === "CREDIT")?._sum.total ?? 0,
+    count: rows.reduce((s, r) => s + r._count._all, 0),
+  });
+  const tSplit = split(salesTodayRows);
+  const wSplit = split(salesWeekRows);
+  const mSplit = split(salesMonthRows);
+
   const creditOutstanding = creditOpen.reduce((s, c) => s + (c.total - c.amountPaid), 0);
   const overdueCount = creditOpen.filter((c) => c.creditStatus === "OVERDUE").length;
   // Cash collected = cash sales + credit collections this month.
-  const cashCollectedMonth = (cashMonth._sum.total ?? 0) + (collectedMonth._sum.amount ?? 0);
+  const cashCollectedMonth = mSplit.cash + (collectedMonth._sum.amount ?? 0);
 
   return {
-    salesToday: salesToday._sum.total ?? 0,
-    salesWeek: salesWeek._sum.total ?? 0,
-    salesMonth: salesMonth._sum.total ?? 0,
-    ordersMonth: salesMonth._count,
+    salesToday: tSplit.total,
+    cashSalesToday: tSplit.cash,
+    creditSalesToday: tSplit.credit,
+    salesWeek: wSplit.total,
+    cashSalesWeek: wSplit.cash,
+    creditSalesWeek: wSplit.credit,
+    salesMonth: mSplit.total,
+    cashSalesMonth: mSplit.cash,
+    creditSalesMonth: mSplit.credit,
+    ordersMonth: mSplit.count,
     unitsMonth: unitsMonthRows._sum.quantity ?? 0,
     creditOutstanding,
     overdueCount,
