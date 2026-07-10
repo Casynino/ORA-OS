@@ -91,10 +91,11 @@ export async function getCommandCenter() {
     todaysPartnerOrders,
     repStockAgg,
     pendingRepRequests,
-    fieldToday,
-    fieldWeek,
-    fieldMonth,
-    fieldCashToday,
+    fieldTodayRows,
+    fieldWeekRows,
+    fieldMonthRows,
+    partnerCashWeek,
+    partnerCashMonth,
     fieldPaymentsToday,
     fieldPaymentsMonth,
     fieldCreditAgg,
@@ -217,25 +218,41 @@ export async function getCommandCenter() {
     // Stock physically in sales reps' hands (their own field inventory).
     prisma.repStock.aggregate({ _sum: { sellableQty: true, sampleQty: true } }),
     prisma.repStockRequest.count({ where: { status: "PENDING" } }),
-    // ── Field sales (sales reps) — cash + credit, live on the same dashboard ──
-    prisma.fieldSale.aggregate({
+    // ── Field sales (sales reps) — split CASH vs CREDIT per period ──────────
+    prisma.fieldSale.groupBy({
+      by: ["type"],
       _sum: { total: true },
-      _count: true,
+      _count: { _all: true },
       where: { voided: false, createdAt: { gte: startToday } },
     }),
-    prisma.fieldSale.aggregate({
+    prisma.fieldSale.groupBy({
+      by: ["type"],
       _sum: { total: true },
-      _count: true,
+      _count: { _all: true },
       where: { voided: false, createdAt: { gte: startWeek } },
     }),
-    prisma.fieldSale.aggregate({
+    prisma.fieldSale.groupBy({
+      by: ["type"],
       _sum: { total: true },
-      _count: true,
+      _count: { _all: true },
       where: { voided: false, createdAt: { gte: startMonth } },
     }),
-    prisma.fieldSale.aggregate({
-      _sum: { total: true },
-      where: { voided: false, type: "CASH", createdAt: { gte: startToday } },
+    // Partner cash orders per period (today's version already exists above).
+    prisma.request.aggregate({
+      _sum: { totalAmount: true },
+      where: {
+        status: "FULFILLED",
+        paymentType: "IMMEDIATE",
+        fulfilledAt: { gte: startWeek },
+      },
+    }),
+    prisma.request.aggregate({
+      _sum: { totalAmount: true },
+      where: {
+        status: "FULFILLED",
+        paymentType: "IMMEDIATE",
+        fulfilledAt: { gte: startMonth },
+      },
     }),
     prisma.fieldPayment.aggregate({
       _sum: { amount: true },
@@ -315,22 +332,50 @@ export async function getCommandCenter() {
     (fieldOverdueAgg._sum.total ?? 0) - (fieldOverdueAgg._sum.amountPaid ?? 0),
   );
 
+  // ── Sales — partner orders AND field sales, split cash vs credit ──────────
+  const splitField = (
+    rows: { type: string; _sum: { total: number | null }; _count: { _all: number } }[],
+  ) => ({
+    total: rows.reduce((s, r) => s + (r._sum.total ?? 0), 0),
+    cash: rows.find((r) => r.type === "CASH")?._sum.total ?? 0,
+    credit: rows.find((r) => r.type === "CREDIT")?._sum.total ?? 0,
+    count: rows.reduce((s, r) => s + r._count._all, 0),
+  });
+  const fToday = splitField(fieldTodayRows);
+  const fWeek = splitField(fieldWeekRows);
+  const fMonth = splitField(fieldMonthRows);
+
+  // Partner cash per period; credit = total − cash (an order is one or the other).
+  const pCash = {
+    today: cashSalesToday._sum.totalAmount ?? 0,
+    week: partnerCashWeek._sum.totalAmount ?? 0,
+    month: partnerCashMonth._sum.totalAmount ?? 0,
+  };
+  const pTotal = {
+    today: salesToday._sum.totalAmount ?? 0,
+    week: salesWeek._sum.totalAmount ?? 0,
+    month: salesMonth._sum.totalAmount ?? 0,
+  };
+  const period = (k: "today" | "week" | "month", f: typeof fToday) => ({
+    revenue: pTotal[k] + f.total,
+    cashRevenue: pCash[k] + f.cash,
+    creditRevenue: Math.max(0, pTotal[k] - pCash[k]) + f.credit,
+  });
+  const revToday = period("today", fToday);
+  const revWeek = period("week", fWeek);
+  const revMonth = period("month", fMonth);
+
   // Collections & cash include the field team: rep cash sales land as cash the
   // moment they're recorded, and rep credit collections are repayments too.
   const collectionsMonth =
     (paymentsMonth._sum.amount ?? 0) + (fieldPaymentsMonth._sum.amount ?? 0);
   const cashToday =
     (paymentsToday._sum.amount ?? 0) +
-    (cashSalesToday._sum.totalAmount ?? 0) +
-    (fieldCashToday._sum.total ?? 0) +
+    revToday.cashRevenue +
     (fieldPaymentsToday._sum.amount ?? 0);
 
-  // ── Sales — partner orders AND field sales, one truthful number ───────────
-  const fieldRevToday = fieldToday._sum.total ?? 0;
-  const fieldRevWeek = fieldWeek._sum.total ?? 0;
-  const fieldRevMonth = fieldMonth._sum.total ?? 0;
-  const monthRevenue = (salesMonth._sum.totalAmount ?? 0) + fieldRevMonth;
-  const monthOrders = (salesMonth._count ?? 0) + (fieldMonth._count ?? 0);
+  const monthRevenue = revMonth.revenue;
+  const monthOrders = (salesMonth._count ?? 0) + fMonth.count;
   const avgOrderValue = monthOrders > 0 ? Math.round(monthRevenue / monthOrders) : 0;
 
   let topPartner: { name: string; org: string | null; value: number } | null =
@@ -477,22 +522,22 @@ export async function getCommandCenter() {
     },
     sales: {
       today: {
-        revenue: (salesToday._sum.totalAmount ?? 0) + fieldRevToday,
-        orders: (salesToday._count ?? 0) + (fieldToday._count ?? 0),
+        ...revToday,
+        orders: (salesToday._count ?? 0) + fToday.count,
         partnerOrders: salesToday._count ?? 0,
-        fieldSales: fieldToday._count ?? 0,
+        fieldSales: fToday.count,
       },
       week: {
-        revenue: (salesWeek._sum.totalAmount ?? 0) + fieldRevWeek,
-        orders: (salesWeek._count ?? 0) + (fieldWeek._count ?? 0),
+        ...revWeek,
+        orders: (salesWeek._count ?? 0) + fWeek.count,
         partnerOrders: salesWeek._count ?? 0,
-        fieldSales: fieldWeek._count ?? 0,
+        fieldSales: fWeek.count,
       },
       month: {
-        revenue: monthRevenue,
+        ...revMonth,
         orders: monthOrders,
         partnerOrders: salesMonth._count ?? 0,
-        fieldSales: fieldMonth._count ?? 0,
+        fieldSales: fMonth.count,
       },
       avgOrderValue,
       topPartner,

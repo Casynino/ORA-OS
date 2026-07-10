@@ -24,6 +24,12 @@ import { cn, formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
+/** "Cash TSh 6,000 · Credit TSh 12,000" composition line for a sales total. */
+function cashCreditHint(cash: number, credit: number) {
+  if (cash === 0 && credit === 0) return "no sales yet";
+  return `Cash ${formatCurrency(cash)} · Credit ${formatCurrency(credit)}`;
+}
+
 export default async function RepOverviewPage() {
   const me = await requireRole("SALES_REP");
   const d = await getRepOverview(me.id);
@@ -86,16 +92,43 @@ export default async function RepOverviewPage() {
         </div>
       </Reveal>
 
-      {/* Headline stats */}
+      {/* Headline stats — every total shows its cash vs credit composition */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "Sales today", value: formatCurrency(d.salesToday), icon: TrendingUp, accent: "primary" as const },
-          { label: "This week", value: formatCurrency(d.salesWeek), icon: ShoppingCart, accent: "accent" as const },
-          { label: "This month", value: formatCurrency(d.salesMonth), icon: Wallet, accent: "success" as const },
-          { label: "Credit outstanding", value: formatCurrency(d.creditOutstanding), icon: CreditCard, accent: "warning" as const },
+          {
+            label: "Sales today",
+            value: formatCurrency(d.salesToday),
+            hint: cashCreditHint(d.cashSalesToday, d.creditSalesToday),
+            icon: TrendingUp,
+            accent: "primary" as const,
+          },
+          {
+            label: "This week",
+            value: formatCurrency(d.salesWeek),
+            hint: cashCreditHint(d.cashSalesWeek, d.creditSalesWeek),
+            icon: ShoppingCart,
+            accent: "accent" as const,
+          },
+          {
+            label: "This month",
+            value: formatCurrency(d.salesMonth),
+            hint: cashCreditHint(d.cashSalesMonth, d.creditSalesMonth),
+            icon: Wallet,
+            accent: "success" as const,
+          },
+          {
+            label: "Credit outstanding",
+            value: formatCurrency(d.creditOutstanding),
+            hint:
+              d.overdueCount > 0
+                ? `${d.overdueCount} overdue debt${d.overdueCount === 1 ? "" : "s"}`
+                : "owed by your customers",
+            icon: CreditCard,
+            accent: "warning" as const,
+          },
         ].map((s, i) => (
           <Reveal key={s.label} delay={i * 0.04}>
-            <StatCard label={s.label} value={s.value} icon={s.icon} accent={s.accent} />
+            <StatCard label={s.label} value={s.value} hint={s.hint} icon={s.icon} accent={s.accent} />
           </Reveal>
         ))}
       </div>

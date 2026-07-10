@@ -236,13 +236,13 @@ export default async function AdminCommandCenter() {
         </Reveal>
       </section>
 
-      {/* ── Sales — partner orders + field (rep) sales, combined ── */}
+      {/* ── Sales — partner orders + field (rep) sales, cash vs credit ── */}
       <section>
         <SectionLabel>Sales · partners + field team</SectionLabel>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <MiniStat icon={TrendingUp} accent="success" label="Sales today" value={formatCurrency(d.sales.today.revenue)} hint={salesSplit(d.sales.today)} />
-          <MiniStat icon={TrendingUp} accent="success" label="This week" value={formatCurrency(d.sales.week.revenue)} hint={salesSplit(d.sales.week)} />
-          <MiniStat icon={TrendingUp} accent="success" label="This month" value={formatCurrency(d.sales.month.revenue)} hint={salesSplit(d.sales.month)} />
+          <MiniStat icon={TrendingUp} accent="success" label="Sales today" value={formatCurrency(d.sales.today.revenue)} hint={salesHint(d.sales.today)} />
+          <MiniStat icon={TrendingUp} accent="success" label="This week" value={formatCurrency(d.sales.week.revenue)} hint={salesHint(d.sales.week)} />
+          <MiniStat icon={TrendingUp} accent="success" label="This month" value={formatCurrency(d.sales.month.revenue)} hint={salesHint(d.sales.month)} />
           <MiniStat icon={ShoppingCart} accent="info" label="Avg sale value" value={formatCurrency(d.sales.avgOrderValue)} hint="this month" />
           <MiniStat icon={Star} accent="accent" label="Top partner" value={d.sales.topPartner?.name ?? "—"} hint={d.sales.topPartner ? formatCurrency(d.sales.topPartner.value) : "no sales yet"} small />
         </div>
@@ -480,13 +480,26 @@ export default async function AdminCommandCenter() {
 
 /* ── helper components ───────────────────────────────────────── */
 
-/** "2 partner · 1 field" style breakdown for a sales period. */
-function salesSplit(p: { orders: number; partnerOrders: number; fieldSales: number }) {
+/** Two-line breakdown: cash vs credit money, then partner vs field count. */
+function salesHint(p: {
+  orders: number;
+  partnerOrders: number;
+  fieldSales: number;
+  cashRevenue: number;
+  creditRevenue: number;
+}) {
   if (p.orders === 0) return "0 sales";
-  const parts: string[] = [];
-  if (p.partnerOrders > 0) parts.push(`${p.partnerOrders} partner`);
-  if (p.fieldSales > 0) parts.push(`${p.fieldSales} field`);
-  return parts.join(" · ") || `${p.orders} sales`;
+  const who: string[] = [];
+  if (p.partnerOrders > 0) who.push(`${p.partnerOrders} partner`);
+  if (p.fieldSales > 0) who.push(`${p.fieldSales} field`);
+  return (
+    <>
+      <span className="block">
+        Cash {formatCurrency(p.cashRevenue)} · Credit {formatCurrency(p.creditRevenue)}
+      </span>
+      {who.length > 0 && <span className="block">{who.join(" · ")}</span>}
+    </>
+  );
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -525,7 +538,7 @@ function MiniStat({
   icon: LucideIcon;
   label: string;
   value: string;
-  hint?: string;
+  hint?: React.ReactNode;
   accent?: string;
   small?: boolean;
 }) {
