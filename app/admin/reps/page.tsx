@@ -54,6 +54,8 @@ export default async function AdminRepsPage() {
 
   const totals = {
     sales: rows.reduce((s, r) => s + r.salesMonth, 0),
+    cash: rows.reduce((s, r) => s + r.cashMonth, 0),
+    creditSales: rows.reduce((s, r) => s + r.creditMonth, 0),
     credit: rows.reduce((s, r) => s + r.creditOutstanding, 0),
     stock: rows.reduce((s, r) => s + r.stockInHand, 0),
     samples: rows.reduce((s, r) => s + r.samplesMonth, 0),
@@ -75,8 +77,24 @@ export default async function AdminRepsPage() {
       </PageHeader>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Field sales this month" value={formatCurrency(totals.sales)} icon={TrendingUp} accent="primary" />
-        <StatCard label="Credit exposure" value={formatCurrency(totals.credit)} icon={CreditCard} accent="warning" />
+        <StatCard
+          label="Field sales this month"
+          value={formatCurrency(totals.sales)}
+          icon={TrendingUp}
+          accent="primary"
+          hint={
+            totals.sales > 0
+              ? `Cash ${formatCurrency(totals.cash)} · Credit ${formatCurrency(totals.creditSales)}`
+              : "no sales yet"
+          }
+        />
+        <StatCard
+          label="Credit exposure"
+          value={formatCurrency(totals.credit)}
+          icon={CreditCard}
+          accent="warning"
+          hint="owed by rep customers"
+        />
         <StatCard label="Stock in the field" value={formatNumber(totals.stock)} icon={Package} accent="info" hint="units with reps" />
         <StatCard label="Samples this month" value={formatNumber(totals.samples)} icon={Gift} accent="accent" />
       </div>
@@ -195,6 +213,11 @@ export default async function AdminRepsPage() {
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="font-display font-bold">{formatCurrency(r.salesMonth)}</p>
+                  {r.salesMonth > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Cash {formatCurrency(r.cashMonth)} · Credit {formatCurrency(r.creditMonth)}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     {r.salesTarget > 0
                       ? `${Math.min(100, Math.round((r.salesMonth / r.salesTarget) * 100))}% of target`
