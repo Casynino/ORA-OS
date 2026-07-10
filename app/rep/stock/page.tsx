@@ -20,8 +20,14 @@ export default async function RepStockPage() {
     }),
     prisma.product.findMany({
       where: { isActive: true },
-      orderBy: { price: "desc" },
-      select: { id: true, name: true },
+      orderBy: [{ notForSale: "asc" }, { price: "desc" }],
+      select: {
+        id: true,
+        name: true,
+        unitsPerCarton: true,
+        notForSale: true,
+        inventory: { select: { warehouseQty: true } },
+      },
     }),
     prisma.repStockIssue.findMany({
       where: { repId: me.id },
@@ -33,9 +39,17 @@ export default async function RepStockPage() {
       where: { repId: me.id },
       orderBy: { createdAt: "desc" },
       take: 12,
-      include: { product: { select: { name: true } } },
+      include: { items: { include: { product: { select: { name: true } } } } },
     }),
   ]);
+
+  const productOpts = products.map((p) => ({
+    id: p.id,
+    name: p.name,
+    unitsPerCarton: p.unitsPerCarton,
+    notForSale: p.notForSale,
+    available: p.inventory?.warehouseQty ?? 0,
+  }));
 
   return (
     <div className="space-y-6">
@@ -82,7 +96,7 @@ export default async function RepStockPage() {
       <section>
         <h2 className="mb-3 font-display text-lg font-semibold">Request stock</h2>
         <div className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5">
-          <StockRequestForm products={products} />
+          <StockRequestForm products={productOpts} />
         </div>
       </section>
 
@@ -97,16 +111,23 @@ export default async function RepStockPage() {
               </p>
             ) : (
               requests.map((r) => (
-                <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card p-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {formatNumber(r.quantity)} × {r.product.name}
-                    </p>
+                <div key={r.id} className="rounded-xl border border-border bg-card p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">
-                      {r.code} · {r.kind === "SAMPLE" ? "samples" : "selling"} · {timeAgo(r.createdAt)}
+                      {r.code} · {r.items.length} product{r.items.length === 1 ? "" : "s"} · {timeAgo(r.createdAt)}
                     </p>
+                    <StatusBadge status={r.status} />
                   </div>
-                  <StatusBadge status={r.status} />
+                  <ul className="mt-1.5 space-y-0.5">
+                    {r.items.map((it) => (
+                      <li key={it.id} className="flex items-center justify-between text-sm">
+                        <span className="min-w-0 truncate">{it.product.name}</span>
+                        <span className="shrink-0 font-medium">
+                          {formatNumber(it.quantity)} pcs
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ))
             )}

@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { PackagePlus, Target, Ban, RotateCcw, MapPin, Undo2 } from "lucide-react";
+import { PackagePlus, Target, Ban, RotateCcw, MapPin, Undo2, PackageCheck } from "lucide-react";
 import {
   issueRepStock,
+  fulfillRepStockRequest,
   rejectRepStockRequest,
   setRepTarget,
   setRepStatus,
@@ -18,27 +19,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
+import { combineToPieces } from "@/lib/units";
+import { formatNumber } from "@/lib/utils";
 
 type ProductOpt = { id: string; name: string; available: number };
 
-/** Issue stock to a rep (optionally fulfilling one of their requests). */
+/** Ad-hoc: issue a single product to a rep (used from the rep's profile). */
 export function IssueStockButton({
   repId,
   repName,
   products,
-  prefill,
 }: {
   repId: string;
   repName: string;
   products: ProductOpt[];
-  prefill?: { requestId: string; productId: string; quantity: number; kind: "SELLABLE" | "SAMPLE" };
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
-  const [productId, setProductId] = useState(prefill?.productId ?? products[0]?.id ?? "");
-  const [kind, setKind] = useState<"SELLABLE" | "SAMPLE">(prefill?.kind ?? "SELLABLE");
-  const [quantity, setQuantity] = useState(prefill ? String(prefill.quantity) : "");
+  const [productId, setProductId] = useState(products[0]?.id ?? "");
+  const [kind, setKind] = useState<"SELLABLE" | "SAMPLE">("SELLABLE");
+  const [quantity, setQuantity] = useState("");
   const [note, setNote] = useState("");
 
   const selected = products.find((p) => p.id === productId);
@@ -51,7 +52,6 @@ export function IssueStockButton({
         quantity: Number(quantity) || 0,
         kind,
         note,
-        requestId: prefill?.requestId,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
@@ -64,14 +64,9 @@ export function IssueStockButton({
 
   return (
     <>
-      <Button
-        size="sm"
-        className="rounded-full"
-        variant={prefill ? "default" : "outline"}
-        onClick={() => setOpen(true)}
-      >
+      <Button size="sm" className="rounded-full" variant="outline" onClick={() => setOpen(true)}>
         <PackagePlus className="size-4" />
-        {prefill ? "Issue" : "Issue stock"}
+        Issue stock
       </Button>
       {open && (
         <Modal
@@ -117,6 +112,149 @@ export function IssueStockButton({
             </div>
             <Button className="w-full rounded-full" disabled={pending || !quantity} onClick={submit}>
               {pending ? "Issuing…" : "Issue stock"}
+            </Button>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+type FulfillItem = {
+  productId: string;
+  productName: string;
+  unitsPerCarton: number;
+  requested: number; // pieces
+  available: number; // pieces in warehouse
+  isSample: boolean;
+};
+
+/** Fulfil a whole multi-product request in one go (issue everything at once). */
+export function FulfillRequestButton({
+  requestId,
+  repName,
+  items,
+}: {
+  requestId: string;
+  repName: string;
+  items: FulfillItem[];
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [open, setOpen] = useState(false);
+  // Each line defaults to the requested amount, split into cartons + loose pcs.
+  const [q, setQ] = useState<Record<string, { cartons: string; pieces: string }>>(
+    () =>
+      Object.fromEntries(
+        items.map((it) => {
+          const c = Math.floor(it.requested / it.unitsPerCarton);
+          const p = it.requested % it.unitsPerCarton;
+          return [it.productId, { cartons: c ? String(c) : "", pieces: p ? String(p) : "" }];
+        }),
+      ),
+  );
+  const get = (id: string) => q[id] ?? { cartons: "", pieces: "" };
+  const setField = (id: string, k: "cartons" | "pieces", v: string) =>
+    setQ((s) => ({ ...s, [id]: { ...get(id), [k]: v } }));
+
+  const lines = items.map((it) => {
+    const { cartons, pieces } = get(it.productId);
+    const total = combineToPieces(Number(cartons), Number(pieces), it.unitsPerCarton);
+    return { it, total, over: total > it.available };
+  });
+  const anyPositive = lines.some((l) => l.total > 0);
+  const anyOver = lines.some((l) => l.over);
+
+  function submit() {
+    start(async () => {
+      const res = await fulfillRepStockRequest({
+        requestId,
+        lines: lines.map((l) => ({ productId: l.it.productId, quantity: l.total })),
+      });
+      if (res.ok) {
+        toast({ variant: "success", title: res.message });
+        setOpen(false);
+        router.refresh();
+      } else toast({ variant: "error", title: res.error });
+    });
+  }
+
+  return (
+    <>
+      <Button size="sm" className="rounded-full" onClick={() => setOpen(true)}>
+        <PackageCheck className="size-4" />
+        Issue
+      </Button>
+      {open && (
+        <Modal
+          open
+          onClose={() => setOpen(false)}
+          title={`Issue stock to ${repName}`}
+          description="Confirm or adjust each product, then issue the whole request at once."
+        >
+          <div className="space-y-3">
+            {items.map((it) => {
+              const { cartons, pieces } = get(it.productId);
+              const total = combineToPieces(Number(cartons), Number(pieces), it.unitsPerCarton);
+              const over = total > it.available;
+              return (
+                <div key={it.productId} className="rounded-xl border border-border p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
+                    <p className="text-sm font-medium">
+                      {it.productName}
+                      {it.isSample && (
+                        <span className="ml-1.5 text-xs text-muted-foreground">(sample)</span>
+                      )}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      requested {formatNumber(it.requested)} · {formatNumber(it.available)} in stock
+                    </p>
+                  </div>
+                  <div className="mt-2 grid grid-cols-[1fr_1fr_auto] items-end gap-2">
+                    <div>
+                      <Label className="text-[11px] text-muted-foreground">Cartons</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={cartons}
+                        onChange={(e) => setField(it.productId, "cartons", e.target.value)}
+                        className="mt-1 h-9"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[11px] text-muted-foreground">Pieces</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={pieces}
+                        onChange={(e) => setField(it.productId, "pieces", e.target.value)}
+                        className="mt-1 h-9"
+                        placeholder="0"
+                      />
+                    </div>
+                    <p
+                      className={`pb-2 text-right text-xs font-semibold ${
+                        over ? "text-destructive" : "text-primary"
+                      }`}
+                    >
+                      {formatNumber(total)} pcs
+                    </p>
+                  </div>
+                  {over && (
+                    <p className="mt-1 text-xs text-destructive">
+                      Only {formatNumber(it.available)} in the warehouse.
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+            <Button
+              className="w-full rounded-full"
+              disabled={pending || !anyPositive || anyOver}
+              onClick={submit}
+            >
+              {pending ? "Issuing…" : "Issue to rep"}
             </Button>
           </div>
         </Modal>
