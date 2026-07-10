@@ -20,7 +20,14 @@ export default async function RepSellPage() {
     prisma.fieldCustomer.findMany({
       where: { repId: me.id },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, creditSuspended: true },
+      select: {
+        id: true,
+        name: true,
+        businessName: true,
+        phone: true,
+        location: true,
+        creditSuspended: true,
+      },
     }),
     prisma.fieldSale.findMany({
       where: { repId: me.id },
