@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { applyMovement } from "@/lib/services/inventory";
+import { addWarehouseStock } from "@/lib/services/warehouse-stock";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 const createSchema = z.object({
@@ -15,7 +16,11 @@ const createSchema = z.object({
   category: z.enum(["PADS", "HYGIENE", "ACCESSORY", "OTHER"]),
   unitLabel: z.string().max(40).optional(),
   iconKey: z.string().max(40).optional(),
-  initialStock: z.number().int().nonnegative().max(1000000).optional(),
+  unitsPerCarton: z.number().int().positive().max(100000).optional(),
+  costPrice: z.number().int().nonnegative().max(100000000).optional(),
+  price: z.number().int().nonnegative().max(100000000).optional(),
+  notForSale: z.boolean().optional(),
+  initialStock: z.number().int().nonnegative().max(100000000).optional(),
 });
 
 export async function createProduct(
@@ -40,6 +45,10 @@ export async function createProduct(
           category: parsed.data.category,
           unitLabel: parsed.data.unitLabel?.trim() || "pack",
           iconKey: parsed.data.iconKey?.trim() || "pads",
+          unitsPerCarton: parsed.data.unitsPerCarton ?? 24,
+          costPrice: parsed.data.costPrice ?? 0,
+          price: parsed.data.notForSale ? 0 : parsed.data.price ?? 0,
+          notForSale: parsed.data.notForSale ?? false,
           inventory: { create: {} },
         },
       });
@@ -50,6 +59,12 @@ export async function createProduct(
           quantity: parsed.data.initialStock,
           createdById: admin.id,
           reference: "Initial stock",
+        });
+        // Land the opening units in the Main warehouse so the per-warehouse
+        // ledger stays in lock-step with the org-wide snapshot.
+        await addWarehouseStock(tx, {
+          productId: created.id,
+          quantity: parsed.data.initialStock,
         });
       }
       return created;
@@ -78,6 +93,10 @@ const updateSchema = z.object({
   description: z.string().max(500).optional(),
   category: z.enum(["PADS", "HYGIENE", "ACCESSORY", "OTHER"]).optional(),
   unitLabel: z.string().max(40).optional(),
+  unitsPerCarton: z.number().int().positive().max(100000).optional(),
+  costPrice: z.number().int().nonnegative().max(100000000).optional(),
+  price: z.number().int().nonnegative().max(100000000).optional(),
+  notForSale: z.boolean().optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -94,6 +113,7 @@ export async function updateProduct(
     });
     if (!product) return fail("Product not found.");
 
+    const notForSale = rest.notForSale ?? product.notForSale;
     await prisma.product.update({
       where: { id: productId },
       data: {
@@ -104,6 +124,11 @@ export async function updateProduct(
             : product.description,
         category: rest.category ?? product.category,
         unitLabel: rest.unitLabel?.trim() ?? product.unitLabel,
+        unitsPerCarton: rest.unitsPerCarton ?? product.unitsPerCarton,
+        costPrice: rest.costPrice ?? product.costPrice,
+        // A not-for-sale product always has a zero selling price.
+        price: notForSale ? 0 : rest.price ?? product.price,
+        notForSale,
         isActive: rest.isActive ?? product.isActive,
       },
     });

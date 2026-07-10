@@ -10,8 +10,8 @@ async function main() {
   const admin = await prisma.user.findUnique({ where: { email: "admin@orapads.org" } });
   if (!main || !second || !admin) throw new Error("Need 2 warehouses + admin.");
 
-  const purple = await prisma.product.findUnique({ where: { sku: "ORA-PURPLE-360" } });
-  const blue = await prisma.product.findUnique({ where: { sku: "ORA-BLUE-290" } });
+  const purple = await prisma.product.findUnique({ where: { sku: "ORA-360" } });
+  const blue = await prisma.product.findUnique({ where: { sku: "ORA-290" } });
   if (!purple || !blue) throw new Error("Products missing.");
 
   // 1) A COMPLETED transfer (stock already moved Main → Lake Zone).

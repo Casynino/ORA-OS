@@ -9,9 +9,9 @@ async function main() {
   if (!partner || !admin || !main) throw new Error("Need partner, admin, main warehouse.");
 
   const [purple, blue, liner] = await Promise.all([
-    prisma.product.findUnique({ where: { sku: "ORA-PURPLE-360" } }),
-    prisma.product.findUnique({ where: { sku: "ORA-BLUE-290" } }),
-    prisma.product.findUnique({ where: { sku: "ORA-LINER-180" } }),
+    prisma.product.findUnique({ where: { sku: "ORA-360" } }),
+    prisma.product.findUnique({ where: { sku: "ORA-290" } }),
+    prisma.product.findUnique({ where: { sku: "ORA-180" } }),
   ]);
   if (!purple || !blue || !liner) throw new Error("Products missing.");
 

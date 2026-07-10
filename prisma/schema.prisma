@@ -354,8 +354,10 @@ model Product {
   category    ProductCategory @default(PADS)
   unitLabel   String          @default("pack") // e.g. "pack of 8"
   iconKey     String          @default("pads") // maps to a UI icon, never an external image
-  costPrice   Int             @default(0) // internal cost per pack (TSh) — admin/profit only
-  price       Int             @default(0) // standard selling price per pack (TSh) — never public
+  unitsPerCarton Int          @default(24) // pieces in one carton — cartons are a display unit, stock is stored in pieces
+  costPrice   Int             @default(0) // internal buying cost per piece (TSh)
+  price       Int             @default(0) // standard selling price per piece (TSh) — never public
+  notForSale  Boolean         @default(false) // e.g. free sample packs — no selling price, excluded from order/sell flows
   isActive    Boolean         @default(true)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt

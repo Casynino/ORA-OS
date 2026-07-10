@@ -2,12 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, PackagePlus, Settings2, AlertTriangle } from "lucide-react";
 import {
-  addStock,
-  adjustStock,
-} from "@/lib/actions/inventory";
-import { createProduct } from "@/lib/actions/products";
+  Plus,
+  PackagePlus,
+  Settings2,
+  AlertTriangle,
+  Boxes,
+  Gift,
+} from "lucide-react";
+import { addStock, adjustStock } from "@/lib/actions/inventory";
+import { createProduct, updateProduct } from "@/lib/actions/products";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,8 +28,10 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { toast } from "@/components/ui/use-toast";
-import { formatNumber, humanize } from "@/lib/utils";
+import { formatNumber, formatCurrency, humanize } from "@/lib/utils";
+import { combineToPieces, splitQty } from "@/lib/units";
 
 type Product = {
   id: string;
@@ -33,7 +39,13 @@ type Product = {
   sku: string;
   category: string;
   unitLabel: string;
+  iconKey: string;
   isActive: boolean;
+  notForSale: boolean;
+  unitsPerCarton: number;
+  costPrice: number;
+  price: number;
+  description: string;
   warehouseQty: number;
   assignedQty: number;
   distributedQty: number;
@@ -44,9 +56,24 @@ type Warehouse = { id: string; name: string };
 
 type ModalState =
   | { type: "product" }
+  | { type: "edit"; product: Product }
   | { type: "add"; product: Product }
   | { type: "adjust"; product: Product }
   | null;
+
+/** "47,832 pcs / 1,993 cartons" style stock breakdown. */
+function StockCell({ pieces, upc }: { pieces: number; upc: number }) {
+  const { cartons, pieces: loose } = splitQty(pieces, upc);
+  return (
+    <div>
+      <div className="font-semibold">{formatNumber(pieces)} pcs</div>
+      <div className="text-xs text-muted-foreground">
+        {formatNumber(cartons)} carton{cartons === 1 ? "" : "s"}
+        {loose > 0 ? ` + ${formatNumber(loose)}` : ""}
+      </div>
+    </div>
+  );
+}
 
 export function InventoryManager({
   products,
@@ -59,10 +86,19 @@ export function InventoryManager({
 }) {
   const router = useRouter();
   const [modal, setModal] = useState<ModalState>(null);
+  const close = () => setModal(null);
+  const done = () => {
+    setModal(null);
+    router.refresh();
+  };
 
   return (
     <>
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Stock is stored in pieces. Receive & adjust in cartons, pieces, or both —
+          conversion is automatic.
+        </p>
         <Button onClick={() => setModal({ type: "product" })}>
           <PackagePlus className="size-4" />
           Add product
@@ -75,9 +111,9 @@ export function InventoryManager({
             <TableHeader>
               <TableRow>
                 <TableHead>Product</TableHead>
-                <TableHead className="text-right">Warehouse</TableHead>
-                <TableHead className="text-right">Assigned</TableHead>
-                <TableHead className="text-right">Distributed</TableHead>
+                <TableHead className="text-right">In stock</TableHead>
+                <TableHead className="text-right">Carton</TableHead>
+                <TableHead className="text-right">Sell price</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -85,27 +121,54 @@ export function InventoryManager({
             <TableBody>
               {products.map((p) => {
                 const low = p.warehouseQty <= p.lowStockThreshold;
+                const out = p.warehouseQty === 0;
                 return (
                   <TableRow key={p.id}>
                     <TableCell data-cardtitle>
-                      <div className="font-medium">{p.name}</div>
+                      <div className="flex items-center gap-1.5 font-medium">
+                        {p.name}
+                        {p.notForSale && (
+                          <Badge variant="secondary" className="gap-1 text-[10px]">
+                            <Gift className="size-2.5" />
+                            Free
+                          </Badge>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         {p.sku} · {humanize(p.category)}
                         {!p.isActive && " · inactive"}
                       </div>
                     </TableCell>
-                    <TableCell data-label="Warehouse" className="text-right font-medium">
-                      {formatNumber(p.warehouseQty)}
+                    <TableCell data-label="In stock" className="text-right">
+                      <div className="inline-block text-right">
+                        <StockCell pieces={p.warehouseQty} upc={p.unitsPerCarton} />
+                        {(p.assignedQty > 0 || p.distributedQty > 0) && (
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">
+                            {p.assignedQty > 0 && `${formatNumber(p.assignedQty)} assigned`}
+                            {p.assignedQty > 0 && p.distributedQty > 0 && " · "}
+                            {p.distributedQty > 0 && `${formatNumber(p.distributedQty)} out`}
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
-                    <TableCell data-label="Assigned" className="text-right text-muted-foreground">
-                      {formatNumber(p.assignedQty)}
+                    <TableCell data-label="Carton" className="text-right text-muted-foreground">
+                      {formatNumber(p.unitsPerCarton)} pcs
                     </TableCell>
-                    <TableCell data-label="Distributed" className="text-right text-muted-foreground">
-                      {formatNumber(p.distributedQty)}
+                    <TableCell data-label="Sell price" className="text-right">
+                      {p.notForSale ? (
+                        <span className="font-medium text-success">Free</span>
+                      ) : (
+                        <span className="font-medium">{formatCurrency(p.price)}</span>
+                      )}
                     </TableCell>
                     <TableCell data-label="Status">
-                      {low ? (
+                      {out ? (
                         <Badge variant="destructive" className="gap-1">
+                          <AlertTriangle className="size-3" />
+                          Out
+                        </Badge>
+                      ) : low ? (
+                        <Badge variant="warning" className="gap-1">
                           <AlertTriangle className="size-3" />
                           Low
                         </Badge>
@@ -114,19 +177,28 @@ export function InventoryManager({
                       )}
                     </TableCell>
                     <TableCell data-label="Actions">
-                      <div className="flex justify-end gap-1.5">
+                      <div className="flex flex-wrap justify-end gap-1.5">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setModal({ type: "add", product: p })}
                         >
                           <Plus className="size-3.5" />
-                          Stock
+                          Receive
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => setModal({ type: "adjust", product: p })}
+                          title="Adjust count"
+                        >
+                          <Boxes className="size-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setModal({ type: "edit", product: p })}
+                          title="Edit product"
                         >
                           <Settings2 className="size-3.5" />
                         </Button>
@@ -141,24 +213,18 @@ export function InventoryManager({
       </Card>
 
       {modal?.type === "product" && (
-        <ProductModal
-          onClose={() => setModal(null)}
-          onDone={() => {
-            setModal(null);
-            router.refresh();
-          }}
-        />
+        <ProductModal onClose={close} onDone={done} />
+      )}
+      {modal?.type === "edit" && (
+        <EditProductModal product={modal.product} onClose={close} onDone={done} />
       )}
       {modal?.type === "add" && (
         <AddStockModal
           product={modal.product}
           warehouses={warehouses}
           stockByWarehouse={stockByWarehouse}
-          onClose={() => setModal(null)}
-          onDone={() => {
-            setModal(null);
-            router.refresh();
-          }}
+          onClose={close}
+          onDone={done}
         />
       )}
       {modal?.type === "adjust" && (
@@ -166,34 +232,35 @@ export function InventoryManager({
           product={modal.product}
           warehouses={warehouses}
           stockByWarehouse={stockByWarehouse}
-          onClose={() => setModal(null)}
-          onDone={() => {
-            setModal(null);
-            router.refresh();
-          }}
+          onClose={close}
+          onDone={done}
         />
       )}
     </>
   );
 }
 
-function ProductModal({
-  onClose,
-  onDone,
-}: {
-  onClose: () => void;
-  onDone: () => void;
-}) {
+// ── Create product ───────────────────────────────────────────────────────────
+function ProductModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [pending, start] = useTransition();
   const [form, setForm] = useState({
     sku: "",
     name: "",
     description: "",
     category: "PADS",
-    unitLabel: "pack",
-    initialStock: "0",
+    unitLabel: "",
+    unitsPerCarton: "24",
+    costPrice: "0",
+    price: "0",
+    notForSale: false,
   });
-  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const [cartons, setCartons] = useState("0");
+  const [pieces, setPieces] = useState("0");
+  const set = (k: string, v: string | boolean) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const upc = Math.max(1, Number(form.unitsPerCarton) || 1);
+  const initialStock = combineToPieces(Number(cartons), Number(pieces), upc);
 
   function submit() {
     start(async () => {
@@ -203,14 +270,16 @@ function ProductModal({
         description: form.description || undefined,
         category: form.category as "PADS" | "HYGIENE" | "ACCESSORY" | "OTHER",
         unitLabel: form.unitLabel || undefined,
-        initialStock: Number(form.initialStock) || 0,
+        unitsPerCarton: upc,
+        costPrice: Number(form.costPrice) || 0,
+        price: form.notForSale ? 0 : Number(form.price) || 0,
+        notForSale: form.notForSale,
+        initialStock,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         onDone();
-      } else {
-        toast({ variant: "error", title: res.error });
-      }
+      } else toast({ variant: "error", title: res.error });
     });
   }
 
@@ -223,7 +292,7 @@ function ProductModal({
             <Input
               value={form.sku}
               onChange={(e) => set("sku", e.target.value)}
-              placeholder="ORA-REG-8"
+              placeholder="ORA-360"
               className="mt-1.5"
             />
           </div>
@@ -246,39 +315,78 @@ function ProductModal({
           <Input
             value={form.name}
             onChange={(e) => set("name", e.target.value)}
-            placeholder="Ora Regular Pads"
+            placeholder="ORA Pads 360mm Purple Night"
             className="mt-1.5"
           />
         </div>
         <div>
-          <Label>Description</Label>
-          <Textarea
-            value={form.description}
-            onChange={(e) => set("description", e.target.value)}
+          <Label>Unit label</Label>
+          <Input
+            value={form.unitLabel}
+            onChange={(e) => set("unitLabel", e.target.value)}
+            placeholder="360mm · Night Flow"
             className="mt-1.5"
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+
+        <div className="grid grid-cols-3 gap-4">
           <div>
-            <Label>Unit label</Label>
+            <Label>Pieces / carton</Label>
             <Input
-              value={form.unitLabel}
-              onChange={(e) => set("unitLabel", e.target.value)}
-              placeholder="pack of 8"
+              type="number"
+              min={1}
+              value={form.unitsPerCarton}
+              onChange={(e) => set("unitsPerCarton", e.target.value)}
               className="mt-1.5"
             />
           </div>
           <div>
-            <Label>Initial stock</Label>
+            <Label>Cost / piece</Label>
             <Input
               type="number"
               min={0}
-              value={form.initialStock}
-              onChange={(e) => set("initialStock", e.target.value)}
+              value={form.costPrice}
+              onChange={(e) => set("costPrice", e.target.value)}
+              className="mt-1.5"
+            />
+          </div>
+          <div>
+            <Label>Sell / piece</Label>
+            <Input
+              type="number"
+              min={0}
+              value={form.price}
+              onChange={(e) => set("price", e.target.value)}
+              disabled={form.notForSale}
               className="mt-1.5"
             />
           </div>
         </div>
+
+        <label className="flex items-center gap-2.5 rounded-xl border border-border/60 p-3 text-sm">
+          <input
+            type="checkbox"
+            checked={form.notForSale}
+            onChange={(e) => set("notForSale", e.target.checked)}
+            className="size-4 accent-primary"
+          />
+          <span>
+            <span className="font-medium">Not for sale</span> — free sample / outreach
+            item (no selling price).
+          </span>
+        </label>
+
+        <div>
+          <Label className="mb-1.5 block">Opening stock (optional)</Label>
+          <QuantityInput
+            unitsPerCarton={upc}
+            cartons={cartons}
+            pieces={pieces}
+            onCartons={setCartons}
+            onPieces={setPieces}
+          />
+        </div>
+
         <Button className="w-full" onClick={submit} disabled={pending}>
           {pending ? "Creating…" : "Create product"}
         </Button>
@@ -287,6 +395,169 @@ function ProductModal({
   );
 }
 
+// ── Edit product ─────────────────────────────────────────────────────────────
+function EditProductModal({
+  product,
+  onClose,
+  onDone,
+}: {
+  product: Product;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [pending, start] = useTransition();
+  const [form, setForm] = useState({
+    name: product.name,
+    description: product.description,
+    category: product.category,
+    unitLabel: product.unitLabel,
+    unitsPerCarton: String(product.unitsPerCarton),
+    costPrice: String(product.costPrice),
+    price: String(product.price),
+    notForSale: product.notForSale,
+    isActive: product.isActive,
+  });
+  const set = (k: string, v: string | boolean) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  function submit() {
+    start(async () => {
+      const res = await updateProduct({
+        productId: product.id,
+        name: form.name,
+        description: form.description,
+        category: form.category as "PADS" | "HYGIENE" | "ACCESSORY" | "OTHER",
+        unitLabel: form.unitLabel,
+        unitsPerCarton: Math.max(1, Number(form.unitsPerCarton) || 1),
+        costPrice: Number(form.costPrice) || 0,
+        price: form.notForSale ? 0 : Number(form.price) || 0,
+        notForSale: form.notForSale,
+        isActive: form.isActive,
+      });
+      if (res.ok) {
+        toast({ variant: "success", title: res.message });
+        onDone();
+      } else toast({ variant: "error", title: res.error });
+    });
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Edit · ${product.name}`}
+      description={`${product.sku} — changes apply everywhere instantly. Stock isn't affected here.`}
+    >
+      <div className="space-y-4">
+        <div>
+          <Label>Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => set("name", e.target.value)}
+            className="mt-1.5"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Category</Label>
+            <Select
+              value={form.category}
+              onChange={(e) => set("category", e.target.value)}
+              className="mt-1.5"
+            >
+              <option value="PADS">Pads</option>
+              <option value="HYGIENE">Hygiene</option>
+              <option value="ACCESSORY">Accessory</option>
+              <option value="OTHER">Other</option>
+            </Select>
+          </div>
+          <div>
+            <Label>Unit label</Label>
+            <Input
+              value={form.unitLabel}
+              onChange={(e) => set("unitLabel", e.target.value)}
+              className="mt-1.5"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <Label>Pieces / carton</Label>
+            <Input
+              type="number"
+              min={1}
+              value={form.unitsPerCarton}
+              onChange={(e) => set("unitsPerCarton", e.target.value)}
+              className="mt-1.5"
+            />
+          </div>
+          <div>
+            <Label>Cost / piece</Label>
+            <Input
+              type="number"
+              min={0}
+              value={form.costPrice}
+              onChange={(e) => set("costPrice", e.target.value)}
+              className="mt-1.5"
+            />
+          </div>
+          <div>
+            <Label>Sell / piece</Label>
+            <Input
+              type="number"
+              min={0}
+              value={form.price}
+              onChange={(e) => set("price", e.target.value)}
+              disabled={form.notForSale}
+              className="mt-1.5"
+            />
+          </div>
+        </div>
+
+        <div>
+          <Label>Description</Label>
+          <Textarea
+            value={form.description}
+            onChange={(e) => set("description", e.target.value)}
+            className="mt-1.5"
+          />
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="flex items-center gap-2.5 rounded-xl border border-border/60 p-3 text-sm">
+            <input
+              type="checkbox"
+              checked={form.notForSale}
+              onChange={(e) => set("notForSale", e.target.checked)}
+              className="size-4 accent-primary"
+            />
+            <span className="font-medium">Not for sale (free)</span>
+          </label>
+          <label className="flex items-center gap-2.5 rounded-xl border border-border/60 p-3 text-sm">
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(e) => set("isActive", e.target.checked)}
+              className="size-4 accent-primary"
+            />
+            <span className="font-medium">Active</span>
+          </label>
+        </div>
+
+        <Button
+          className="w-full"
+          onClick={submit}
+          disabled={pending || form.name.trim().length < 2}
+        >
+          {pending ? "Saving…" : "Save changes"}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Receive stock ────────────────────────────────────────────────────────────
 function AddStockModal({
   product,
   warehouses,
@@ -302,10 +573,11 @@ function AddStockModal({
 }) {
   const [pending, start] = useTransition();
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? "");
-  const [quantity, setQuantity] = useState("100");
+  const [cartons, setCartons] = useState("1");
+  const [pieces, setPieces] = useState("0");
   const [reference, setReference] = useState("");
 
-  const qty = Math.max(0, Number(quantity) || 0);
+  const qty = combineToPieces(Number(cartons), Number(pieces), product.unitsPerCarton);
   const current = stockByWarehouse[product.id]?.[warehouseId] ?? 0;
   const whName = warehouses.find((w) => w.id === warehouseId)?.name ?? "warehouse";
 
@@ -324,39 +596,39 @@ function AddStockModal({
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         onDone();
-      } else {
-        toast({ variant: "error", title: res.error });
-      }
+      } else toast({ variant: "error", title: res.error });
     });
   }
 
   return (
     <Modal open onClose={onClose} title={`Receive stock · ${product.name}`}>
       <div className="space-y-4">
-        <div>
-          <Label>Into which warehouse?</Label>
-          <Select
-            value={warehouseId}
-            onChange={(e) => setWarehouseId(e.target.value)}
-            className="mt-1.5"
-          >
-            {warehouses.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name} — {formatNumber(stockByWarehouse[product.id]?.[w.id] ?? 0)} on hand
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div>
-          <Label>Quantity received</Label>
-          <Input
-            type="number"
-            min={1}
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            className="mt-1.5"
-          />
-        </div>
+        {warehouses.length > 1 && (
+          <div>
+            <Label>Into which warehouse?</Label>
+            <Select
+              value={warehouseId}
+              onChange={(e) => setWarehouseId(e.target.value)}
+              className="mt-1.5"
+            >
+              {warehouses.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name} — {formatNumber(stockByWarehouse[product.id]?.[w.id] ?? 0)} on hand
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+
+        <QuantityInput
+          unitsPerCarton={product.unitsPerCarton}
+          cartons={cartons}
+          pieces={pieces}
+          onCartons={setCartons}
+          onPieces={setPieces}
+          autoFocus
+        />
+
         <div>
           <Label>Reference (optional)</Label>
           <Input
@@ -366,20 +638,24 @@ function AddStockModal({
             className="mt-1.5"
           />
         </div>
+
         <div className="rounded-xl bg-muted/40 p-3 text-sm">
           <span className="text-muted-foreground">{whName}: </span>
           <span className="font-medium">{formatNumber(current)}</span>
           <span className="text-muted-foreground"> → </span>
           <span className="font-semibold text-success">{formatNumber(current + qty)}</span>
+          <span className="text-muted-foreground"> pcs</span>
         </div>
+
         <Button className="w-full" onClick={submit} disabled={pending || qty < 1}>
-          {pending ? "Adding…" : `Add ${formatNumber(qty)} to ${whName}`}
+          {pending ? "Adding…" : `Receive ${formatNumber(qty)} pcs`}
         </Button>
       </div>
     </Modal>
   );
 }
 
+// ── Adjust stock ─────────────────────────────────────────────────────────────
 function AdjustStockModal({
   product,
   warehouses,
@@ -396,10 +672,11 @@ function AdjustStockModal({
   const [pending, start] = useTransition();
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? "");
   const [mode, setMode] = useState<"add" | "remove">("remove");
-  const [amount, setAmount] = useState("1");
+  const [cartons, setCartons] = useState("0");
+  const [pieces, setPieces] = useState("0");
   const [note, setNote] = useState("");
 
-  const qty = Math.max(0, Number(amount) || 0);
+  const qty = combineToPieces(Number(cartons), Number(pieces), product.unitsPerCarton);
   const current = stockByWarehouse[product.id]?.[warehouseId] ?? 0;
   const whName = warehouses.find((w) => w.id === warehouseId)?.name ?? "warehouse";
   const next = mode === "add" ? current + qty : current - qty;
@@ -420,9 +697,7 @@ function AdjustStockModal({
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         onDone();
-      } else {
-        toast({ variant: "error", title: res.error });
-      }
+      } else toast({ variant: "error", title: res.error });
     });
   }
 
@@ -434,20 +709,22 @@ function AdjustStockModal({
       description="Correct a count (recount, damage, loss). Logged for audit."
     >
       <div className="space-y-4">
-        <div>
-          <Label>Which warehouse?</Label>
-          <Select
-            value={warehouseId}
-            onChange={(e) => setWarehouseId(e.target.value)}
-            className="mt-1.5"
-          >
-            {warehouses.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name} — {formatNumber(stockByWarehouse[product.id]?.[w.id] ?? 0)} on hand
-              </option>
-            ))}
-          </Select>
-        </div>
+        {warehouses.length > 1 && (
+          <div>
+            <Label>Which warehouse?</Label>
+            <Select
+              value={warehouseId}
+              onChange={(e) => setWarehouseId(e.target.value)}
+              className="mt-1.5"
+            >
+              {warehouses.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name} — {formatNumber(stockByWarehouse[product.id]?.[w.id] ?? 0)} on hand
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted p-1">
           {(["remove", "add"] as const).map((m) => (
@@ -468,16 +745,13 @@ function AdjustStockModal({
           ))}
         </div>
 
-        <div>
-          <Label>How many units?</Label>
-          <Input
-            type="number"
-            min={1}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="mt-1.5"
-          />
-        </div>
+        <QuantityInput
+          unitsPerCarton={product.unitsPerCarton}
+          cartons={cartons}
+          pieces={pieces}
+          onCartons={setCartons}
+          onPieces={setPieces}
+        />
 
         <div>
           <Label>Reason</Label>
@@ -493,9 +767,14 @@ function AdjustStockModal({
           <span className="text-muted-foreground">{whName}: </span>
           <span className="font-medium">{formatNumber(current)}</span>
           <span className="text-muted-foreground"> → </span>
-          <span className={`font-semibold ${tooMany ? "text-destructive" : mode === "add" ? "text-success" : "text-warning"}`}>
+          <span
+            className={`font-semibold ${
+              tooMany ? "text-destructive" : mode === "add" ? "text-success" : "text-warning"
+            }`}
+          >
             {formatNumber(Math.max(0, next))}
           </span>
+          <span className="text-muted-foreground"> pcs</span>
           {tooMany && (
             <p className="mt-1 text-xs text-destructive">
               Only {formatNumber(current)} on hand in {whName}.
@@ -503,12 +782,16 @@ function AdjustStockModal({
           )}
         </div>
 
-        <Button className="w-full" onClick={submit} disabled={pending || qty < 1 || tooMany}>
+        <Button
+          className="w-full"
+          onClick={submit}
+          disabled={pending || qty < 1 || tooMany}
+        >
           {pending
             ? "Saving…"
             : mode === "add"
-              ? `Add ${formatNumber(qty)} to ${whName}`
-              : `Remove ${formatNumber(qty)} from ${whName}`}
+              ? `Add ${formatNumber(qty)} pcs`
+              : `Remove ${formatNumber(qty)} pcs`}
         </Button>
       </div>
     </Modal>
