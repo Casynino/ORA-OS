@@ -17,7 +17,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { IssueStockButton, RejectStockRequestButton } from "@/components/admin/rep-controls";
+import { FulfillRequestButton, RejectStockRequestButton } from "@/components/admin/rep-controls";
 import { formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +32,11 @@ export default async function AdminRepsPage() {
       orderBy: { createdAt: "asc" },
       include: {
         rep: { select: { id: true, name: true } },
-        product: { select: { id: true, name: true } },
+        items: {
+          include: {
+            product: { select: { id: true, name: true, unitsPerCarton: true } },
+          },
+        },
       },
     }),
     prisma.inventory.findMany({
@@ -43,6 +47,9 @@ export default async function AdminRepsPage() {
   const productOpts = inventories
     .filter((i) => i.product.isActive)
     .map((i) => ({ id: i.productId, name: i.product.name, available: i.warehouseQty }));
+
+  // Warehouse availability per product — used to warn/limit at fulfilment time.
+  const availableById = new Map(inventories.map((i) => [i.productId, i.warehouseQty]));
 
   const totals = {
     sales: rows.reduce((s, r) => s + r.salesMonth, 0),
@@ -74,30 +81,60 @@ export default async function AdminRepsPage() {
           </h2>
           <div className="space-y-2">
             {pendingRequests.map((r) => (
-              <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning/30 bg-warning/[0.04] p-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold">
-                    {r.rep.name} · {formatNumber(r.quantity)} × {r.product.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {r.code} · for {r.kind === "SAMPLE" ? "free samples" : "selling"}
-                    {r.note ? ` · "${r.note}"` : ""} · {timeAgo(r.createdAt)}
-                  </p>
+              <div key={r.id} className="rounded-2xl border border-warning/30 bg-warning/[0.04] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">
+                      {r.rep.name} · {r.items.length} product{r.items.length === 1 ? "" : "s"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {r.code}
+                      {r.note ? ` · "${r.note}"` : ""} · {timeAgo(r.createdAt)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <FulfillRequestButton
+                      requestId={r.id}
+                      repName={r.rep.name}
+                      items={r.items.map((it) => ({
+                        productId: it.productId,
+                        productName: it.product.name,
+                        unitsPerCarton: it.product.unitsPerCarton,
+                        requested: it.quantity,
+                        available: availableById.get(it.productId) ?? 0,
+                        isSample: it.kind === "SAMPLE",
+                      }))}
+                    />
+                    <RejectStockRequestButton id={r.id} />
+                  </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <IssueStockButton
-                    repId={r.rep.id}
-                    repName={r.rep.name}
-                    products={productOpts}
-                    prefill={{
-                      requestId: r.id,
-                      productId: r.productId,
-                      quantity: r.quantity,
-                      kind: r.kind,
-                    }}
-                  />
-                  <RejectStockRequestButton id={r.id} />
-                </div>
+                <ul className="mt-2.5 space-y-1 border-t border-warning/20 pt-2.5">
+                  {r.items.map((it) => {
+                    const cartons = Math.floor(it.quantity / it.product.unitsPerCarton);
+                    const loose = it.quantity % it.product.unitsPerCarton;
+                    const avail = availableById.get(it.productId) ?? 0;
+                    const short = avail < it.quantity;
+                    return (
+                      <li key={it.id} className="flex items-center justify-between gap-2 text-sm">
+                        <span className="min-w-0 truncate">
+                          {it.product.name}
+                          {it.kind === "SAMPLE" && (
+                            <span className="ml-1.5 text-xs text-muted-foreground">(sample)</span>
+                          )}
+                        </span>
+                        <span className={`shrink-0 text-right ${short ? "text-destructive" : ""}`}>
+                          <span className="font-medium">{formatNumber(it.quantity)} pcs</span>
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            ({formatNumber(cartons)} ctn{loose ? ` +${formatNumber(loose)}` : ""})
+                          </span>
+                          {short && (
+                            <span className="ml-1 text-xs">· only {formatNumber(avail)} in stock</span>
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             ))}
           </div>

@@ -13,9 +13,19 @@ import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatCurrency } from "@/lib/utils";
+import { Gift } from "lucide-react";
+import { formatCurrency, formatNumber } from "@/lib/utils";
+import { combineToPieces } from "@/lib/units";
 
 type ProductOpt = { id: string; name: string; inHand?: number };
+
+type StockProduct = {
+  id: string;
+  name: string;
+  unitsPerCarton: number;
+  notForSale: boolean;
+  available: number;
+};
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -149,25 +159,40 @@ export function ReportForm() {
 }
 
 /** Request more stock from the warehouse. */
-export function StockRequestForm({ products }: { products: ProductOpt[] }) {
+// Multi-product stock request: every product on one page, each with cartons +
+// pieces inputs that convert automatically. Leave a product blank to skip it.
+export function StockRequestForm({ products }: { products: StockProduct[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [productId, setProductId] = useState(products[0]?.id ?? "");
-  const [kind, setKind] = useState<"SELLABLE" | "SAMPLE">("SELLABLE");
-  const [quantity, setQuantity] = useState("");
   const [note, setNote] = useState("");
+  const [qty, setQty] = useState<Record<string, { cartons: string; pieces: string }>>({});
+
+  const get = (id: string) => qty[id] ?? { cartons: "", pieces: "" };
+  const setField = (id: string, k: "cartons" | "pieces", v: string) =>
+    setQty((q) => ({ ...q, [id]: { ...get(id), [k]: v } }));
+
+  const lines = products.map((p) => {
+    const { cartons, pieces } = get(p.id);
+    return {
+      p,
+      pieces: combineToPieces(Number(cartons), Number(pieces), p.unitsPerCarton),
+    };
+  });
+  const totalPieces = lines.reduce((s, l) => s + l.pieces, 0);
+  const anyPositive = lines.some((l) => l.pieces > 0);
 
   function submit() {
     start(async () => {
       const res = await requestRepStock({
-        productId,
-        quantity: Number(quantity) || 0,
-        kind,
         note,
+        items: lines
+          .filter((l) => l.pieces > 0)
+          .map((l) => ({ productId: l.p.id, quantity: l.pieces })),
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
-        setQuantity(""); setNote("");
+        setQty({});
+        setNote("");
         router.refresh();
       } else toast({ variant: "error", title: res.error });
     });
@@ -175,38 +200,97 @@ export function StockRequestForm({ products }: { products: ProductOpt[] }) {
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Product">
-          <select
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
-          >
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="For">
-          <select
-            value={kind}
-            onChange={(e) => setKind(e.target.value as "SELLABLE" | "SAMPLE")}
-            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
-          >
-            <option value="SELLABLE">Selling</option>
-            <option value="SAMPLE">Free samples</option>
-          </select>
-        </Field>
-        <Field label="Quantity">
-          <Input type="number" inputMode="numeric" min={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="e.g. 100" />
-        </Field>
+      <div className="space-y-2.5">
+        {products.map((p) => {
+          const { cartons, pieces } = get(p.id);
+          const line = combineToPieces(
+            Number(cartons),
+            Number(pieces),
+            p.unitsPerCarton,
+          );
+          return (
+            <div
+              key={p.id}
+              className={`rounded-xl border p-3 transition-colors ${
+                line > 0 ? "border-primary/40 bg-primary/[0.03]" : "border-border"
+              }`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 text-sm font-medium">
+                    {p.name}
+                    {p.notForSale && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">
+                        <Gift className="size-2.5" />
+                        Free
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {formatNumber(p.available)} pcs in warehouse · 1 carton ={" "}
+                    {formatNumber(p.unitsPerCarton)}
+                  </p>
+                </div>
+                {line > 0 && (
+                  <span className="shrink-0 text-xs font-semibold text-primary">
+                    {formatNumber(line)} pcs
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-[11px] text-muted-foreground">Cartons</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={cartons}
+                    onChange={(e) => setField(p.id, "cartons", e.target.value)}
+                    placeholder="0"
+                    className="mt-1 h-9"
+                  />
+                </div>
+                <div>
+                  <Label className="text-[11px] text-muted-foreground">Pieces</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={pieces}
+                    onChange={(e) => setField(p.id, "pieces", e.target.value)}
+                    placeholder="0"
+                    className="mt-1 h-9"
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
+
       <Field label="Note (optional)">
-        <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why do you need it?" />
+        <Input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Why do you need it?"
+        />
       </Field>
-      <Button className="w-full rounded-full sm:w-auto" disabled={pending} onClick={submit}>
-        {pending ? "Sending…" : "Request stock"}
-      </Button>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+        <p className="text-sm text-muted-foreground">
+          Total:{" "}
+          <span className="font-semibold text-foreground">
+            {formatNumber(totalPieces)} pcs
+          </span>
+        </p>
+        <Button
+          className="rounded-full"
+          disabled={pending || !anyPositive}
+          onClick={submit}
+        >
+          {pending ? "Sending…" : "Request stock"}
+        </Button>
+      </div>
     </div>
   );
 }

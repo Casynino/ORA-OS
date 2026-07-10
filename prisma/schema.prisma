@@ -371,7 +371,7 @@ model Product {
   transferItems  WarehouseTransferItem[]
   repStock       RepStock[]
   repIssues      RepStockIssue[]
-  repStockRequests RepStockRequest[]
+  repStockRequestItems RepStockRequestItem[]
   fieldSaleItems FieldSaleItem[]
   sampleLogs     SampleLog[]
 
@@ -812,24 +812,39 @@ model RepStockIssue {
   @@index([createdAt])
 }
 
-/// A rep's request for more stock — admin issues or rejects it.
+/// A rep's request for more stock — one request can span several products.
+/// Admin issues (all lines at once) or rejects it.
 model RepStockRequest {
   id           String                @id @default(cuid())
   code         String                @unique
   rep          User                  @relation("RepStockRequestRep", fields: [repId], references: [id])
   repId        String
-  product      Product               @relation(fields: [productId], references: [id])
-  productId    String
-  kind         RepStockKind          @default(SELLABLE)
-  quantity     Int
   note         String?
   status       RepStockRequestStatus @default(PENDING)
   reviewedById String?
   reviewedAt   DateTime?
   createdAt    DateTime              @default(now())
 
+  items        RepStockRequestItem[]
+
   @@index([status])
   @@index([repId])
+}
+
+/// One product line within a rep's stock request. Quantities are in PIECES;
+/// cartons are entered in the UI and converted before saving.
+model RepStockRequestItem {
+  id        String          @id @default(cuid())
+  request   RepStockRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId String
+  product   Product         @relation(fields: [productId], references: [id])
+  productId String
+  kind      RepStockKind    @default(SELLABLE)
+  quantity  Int // pieces requested
+  issuedQty Int             @default(0) // pieces actually issued when fulfilled
+
+  @@unique([requestId, productId])
+  @@index([requestId])
 }
 
 /// A rep's field customer — the debtor profile for credit sales.

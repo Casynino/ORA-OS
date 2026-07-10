@@ -136,6 +136,7 @@ async function main() {
     ["field reports", () => prisma.fieldReport.deleteMany()],
     ["rep targets", () => prisma.repTarget.deleteMany()],
     ["field customers", () => prisma.fieldCustomer.deleteMany()],
+    ["rep stock request items", () => prisma.repStockRequestItem.deleteMany()],
     ["rep stock requests", () => prisma.repStockRequest.deleteMany()],
     ["rep stock issues", () => prisma.repStockIssue.deleteMany()],
     ["rep stock", () => prisma.repStock.deleteMany()],

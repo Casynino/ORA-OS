@@ -399,11 +399,19 @@ export async function createFieldCustomer(
 
 // ── Stock requests (rep → admin) ────────────────────────────────────────────
 
+// One request can span several products. Quantities arrive in PIECES (the rep
+// UI does the carton→piece conversion). Each line's "kind" is derived from the
+// product itself — the free sample product becomes SAMPLE stock, the rest sell.
 const stockRequestSchema = z.object({
-  productId: z.string().min(1),
-  quantity: z.number().int().positive().max(100000),
-  kind: z.enum(["SELLABLE", "SAMPLE"]),
   note: z.string().max(300).optional().or(z.literal("")),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().min(1),
+        quantity: z.number().int().nonnegative().max(1000000),
+      }),
+    )
+    .min(1, "Add at least one product."),
 });
 
 export async function requestRepStock(
@@ -412,29 +420,192 @@ export async function requestRepStock(
   try {
     const actor = await requireActor(["SALES_REP"]);
     const parsed = stockRequestSchema.safeParse(input);
-    if (!parsed.success) return fail("Invalid stock request.");
+    if (!parsed.success) {
+      return fail(parsed.error.issues[0]?.message ?? "Invalid stock request.");
+    }
     const d = parsed.data;
+
+    // Drop empty/zero lines and merge any duplicate product lines (the UI never
+    // sends dupes, but a crafted payload would otherwise hit the item unique key).
+    const merged = new Map<string, number>();
+    for (const i of d.items) {
+      if (i.quantity > 0) merged.set(i.productId, (merged.get(i.productId) ?? 0) + i.quantity);
+    }
+    const wanted = [...merged].map(([productId, quantity]) => ({ productId, quantity }));
+    if (wanted.length === 0) {
+      return fail("Enter a quantity for at least one product.");
+    }
+
+    // Look the products up to derive kind (sample vs sellable) and drop unknowns.
+    const products = await prisma.product.findMany({
+      where: { id: { in: wanted.map((i) => i.productId) }, isActive: true },
+      select: { id: true, notForSale: true },
+    });
+    const byId = new Map(products.map((p) => [p.id, p]));
+    const lines = wanted
+      .filter((i) => byId.has(i.productId))
+      .map((i) => ({
+        productId: i.productId,
+        quantity: i.quantity,
+        kind: byId.get(i.productId)!.notForSale
+          ? ("SAMPLE" as const)
+          : ("SELLABLE" as const),
+      }));
+    if (lines.length === 0) return fail("None of those products are available.");
+
     const code = refCode("RSR");
     await prisma.repStockRequest.create({
       data: {
         code,
         repId: actor.id,
-        productId: d.productId,
-        quantity: d.quantity,
-        kind: d.kind,
         note: d.note || null,
+        items: { create: lines },
       },
     });
+
+    const totalUnits = lines.reduce((s, l) => s + l.quantity, 0);
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
       action: "REP_STOCK_REQUESTED",
       entity: "RepStockRequest",
       entityId: code,
-      summary: `${actor.name} requested ${d.quantity} units (${d.kind.toLowerCase()}).`,
+      summary: `${actor.name} requested ${lines.length} product${lines.length === 1 ? "" : "s"} (${totalUnits} pcs) — ${code}.`,
     });
     revalidateField();
     return ok(undefined, `Stock request ${code} sent to the ORA team.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+// ── Admin: fulfil a whole multi-product request in one action ───────────────
+
+const fulfillSchema = z.object({
+  requestId: z.string().min(1),
+  lines: z
+    .array(
+      z.object({
+        productId: z.string().min(1),
+        quantity: z.number().int().nonnegative().max(1000000),
+      }),
+    )
+    .min(1),
+});
+
+export async function fulfillRepStockRequest(
+  input: z.infer<typeof fulfillSchema>,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["ADMIN", "WAREHOUSE"]);
+    const parsed = fulfillSchema.safeParse(input);
+    if (!parsed.success) return fail("Invalid stock issue.");
+    const d = parsed.data;
+
+    const req = await prisma.repStockRequest.findUnique({
+      where: { id: d.requestId },
+      include: { rep: true, items: { include: { product: true } } },
+    });
+    if (!req || req.status !== "PENDING") {
+      return fail("Request not found or already handled.");
+    }
+    const rep = req.rep;
+    if (rep.role !== "SALES_REP") return fail("Sales rep not found.");
+    if (rep.status !== "ACTIVE") return fail(`${rep.name} is not active.`);
+
+    // Only issue quantities against lines that are actually on the request.
+    const issueLines = req.items
+      .map((item) => {
+        const override = d.lines.find((l) => l.productId === item.productId);
+        const qty = override ? override.quantity : item.quantity;
+        return { item, qty: Math.max(0, qty) };
+      })
+      .filter((x) => x.qty > 0);
+    if (issueLines.length === 0) {
+      return fail("Nothing to issue — every quantity is zero.");
+    }
+
+    const base = refCode("ISS");
+    await prisma.$transaction(async (tx) => {
+      // Claim the request atomically. If another admin (or a double click) already
+      // handled it, this matches 0 rows and we abort before moving any stock —
+      // no double deduction, no double credit.
+      const claimed = await tx.repStockRequest.updateMany({
+        where: { id: req.id, status: "PENDING" },
+        data: { status: "ISSUED", reviewedById: actor.id, reviewedAt: new Date() },
+      });
+      if (claimed.count === 0) {
+        throw new Error("This request was already handled.");
+      }
+
+      let i = 0;
+      for (const { item, qty } of issueLines) {
+        i += 1;
+        const inv = await tx.inventory.findUnique({
+          where: { productId: item.productId },
+        });
+        if (!inv || inv.warehouseQty < qty) {
+          throw new Error(
+            `Not enough ${item.product.name} — only ${inv?.warehouseQty ?? 0} in the warehouse.`,
+          );
+        }
+        // Warehouse → rep: units become committed to the field ("assigned").
+        await applyMovement(tx, {
+          productId: item.productId,
+          type: "ASSIGNED",
+          quantity: qty,
+          createdById: actor.id,
+          reference: `${base}-${i}`,
+          note: `Issued to ${rep.name} (${item.kind.toLowerCase()}) · ${req.code}`,
+        });
+        await tx.repStock.upsert({
+          where: { repId_productId: { repId: rep.id, productId: item.productId } },
+          create: {
+            repId: rep.id,
+            productId: item.productId,
+            sellableQty: item.kind === "SELLABLE" ? qty : 0,
+            sampleQty: item.kind === "SAMPLE" ? qty : 0,
+            receivedQty: qty,
+          },
+          update: {
+            ...(item.kind === "SELLABLE"
+              ? { sellableQty: { increment: qty } }
+              : { sampleQty: { increment: qty } }),
+            receivedQty: { increment: qty },
+          },
+        });
+        await tx.repStockIssue.create({
+          data: {
+            code: `${base}-${i}`,
+            repId: rep.id,
+            productId: item.productId,
+            kind: item.kind,
+            quantity: qty,
+            note: req.code,
+            issuedById: actor.id,
+          },
+        });
+        await tx.repStockRequestItem.update({
+          where: { id: item.id },
+          data: { issuedQty: qty },
+        });
+      }
+      // The request was already marked ISSUED by the atomic claim above — any
+      // line left un-issued still closes it (the admin decided what to send).
+    });
+
+    const totalUnits = issueLines.reduce((s, l) => s + l.qty, 0);
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "REP_STOCK_ISSUED",
+      entity: "RepStockRequest",
+      entityId: req.code,
+      summary: `${actor.name} issued ${issueLines.length} product${issueLines.length === 1 ? "" : "s"} (${totalUnits} pcs) to ${rep.name} — ${req.code}.`,
+    });
+    revalidateField();
+    revalidatePath(`/admin/reps/${rep.id}`);
+    return ok(undefined, `Stock issued to ${rep.name}.`);
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -540,11 +711,14 @@ export async function rejectRepStockRequest(
       where: { id },
       include: { rep: { select: { name: true } } },
     });
-    if (!req || req.status !== "PENDING") return fail("Request not found.");
-    await prisma.repStockRequest.update({
-      where: { id },
+    if (!req) return fail("Request not found.");
+    // Atomic guard: only a still-PENDING request can be rejected, so a fulfil
+    // that lands first can't be overwritten by a stale reject.
+    const rejected = await prisma.repStockRequest.updateMany({
+      where: { id, status: "PENDING" },
       data: { status: "REJECTED", reviewedById: actor.id, reviewedAt: new Date() },
     });
+    if (rejected.count === 0) return fail("This request was already handled.");
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
