@@ -167,8 +167,9 @@ export function CreditLedger({
 }) {
   const router = useRouter();
   const pendingSettlements = settlements.filter((s) => s.status === "PENDING").length;
+  // Field credit leads — most of ORA's sales come from the rep team.
   const [tab, setTab] = useState<"CREDITS" | "FIELD" | "SETTLEMENTS" | "OVERDUE">(
-    "CREDITS",
+    "FIELD",
   );
   const [payTarget, setPayTarget] = useState<CreditAccountDTO | null>(null);
   const [termsTarget, setTermsTarget] = useState<CreditAccountDTO | null>(null);
@@ -279,8 +280,8 @@ export function CreditLedger({
       {/* Tabs */}
       <div className="flex flex-wrap gap-1.5">
         {[
-          { k: "CREDITS", label: "Partner credits", n: accounts.length },
           { k: "FIELD", label: "Field credit", n: fieldCredits.length },
+          { k: "CREDITS", label: "Partner credits", n: accounts.length },
           {
             k: "SETTLEMENTS",
             label: "Settlements",
