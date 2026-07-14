@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Wallet,
@@ -99,6 +100,31 @@ export type SettlementDTO = {
   createdAt: string;
 };
 
+/** A rep-recorded credit sale — an official ORA credit record. */
+export type FieldCreditDTO = {
+  id: string;
+  code: string;
+  repId: string;
+  repName: string;
+  customerId: string | null;
+  customerName: string;
+  customerBusiness: string | null;
+  customerLocation: string | null;
+  customerPhone: string | null;
+  total: number;
+  amountPaid: number;
+  status: string; // PENDING | PARTIAL | OVERDUE | PAID
+  createdAt: string;
+  dueDate: string | null;
+  items: { name: string; quantity: number; unitPrice: number }[];
+  payments: {
+    amount: number;
+    method: string | null;
+    recordedBy: string;
+    createdAt: string;
+  }[];
+};
+
 const DAY = 24 * 60 * 60 * 1000;
 const HIGH_VALUE = 50000;
 
@@ -115,75 +141,108 @@ function riskOf(a: CreditAccountDTO): "High" | "Medium" | "Low" {
   return "Low";
 }
 
+const fieldOwing = (f: FieldCreditDTO) => Math.max(0, f.total - f.amountPaid);
+const fieldOpen = (f: FieldCreditDTO) =>
+  f.status !== "PAID" && fieldOwing(f) > 0;
+
+function isToday(iso: string | null): boolean {
+  if (!iso) return false;
+  const d = new Date(iso);
+  const n = new Date();
+  return (
+    d.getDate() === n.getDate() &&
+    d.getMonth() === n.getMonth() &&
+    d.getFullYear() === n.getFullYear()
+  );
+}
+
 export function CreditLedger({
   accounts,
   settlements = [],
+  fieldCredits = [],
 }: {
   accounts: CreditAccountDTO[];
   settlements?: SettlementDTO[];
+  fieldCredits?: FieldCreditDTO[];
 }) {
   const router = useRouter();
   const pendingSettlements = settlements.filter((s) => s.status === "PENDING").length;
-  const [tab, setTab] = useState<"CREDITS" | "SETTLEMENTS" | "OVERDUE">(
+  const [tab, setTab] = useState<"CREDITS" | "FIELD" | "SETTLEMENTS" | "OVERDUE">(
     "CREDITS",
   );
   const [payTarget, setPayTarget] = useState<CreditAccountDTO | null>(null);
   const [termsTarget, setTermsTarget] = useState<CreditAccountDTO | null>(null);
 
-  // KPIs
+  // KPIs — the whole company's credit: partner batches AND rep-customer sales.
   const kpi = useMemo(() => {
     const now = new Date();
+    const inMonth = (iso: string) => {
+      const d = new Date(iso);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    };
     const open = accounts.filter((a) => a.status !== "SETTLED");
     const overdue = accounts.filter((a) => a.status === "OVERDUE");
-    const repaidThisMonth = accounts.reduce(
-      (s, a) =>
-        s +
-        a.payments
-          .filter((p) => {
-            const d = new Date(p.createdAt);
-            return (
-              d.getMonth() === now.getMonth() &&
-              d.getFullYear() === now.getFullYear()
-            );
-          })
-          .reduce((ps, p) => ps + p.amount, 0),
+    const partnerRepaidMo = accounts.reduce(
+      (s, a) => s + a.payments.filter((p) => inMonth(p.createdAt)).reduce((ps, p) => ps + p.amount, 0),
       0,
     );
+    const openField = fieldCredits.filter(fieldOpen);
+    const overdueField = fieldCredits.filter((f) => f.status === "OVERDUE");
+    const fieldRepaidMo = fieldCredits.reduce(
+      (s, f) => s + f.payments.filter((p) => inMonth(p.createdAt)).reduce((ps, p) => ps + p.amount, 0),
+      0,
+    );
+    const partnerOut = open.reduce((s, a) => s + Math.max(0, a.principal - a.amountPaid), 0);
+    const fieldOut = openField.reduce((s, f) => s + fieldOwing(f), 0);
+    const dueToday =
+      open.filter((a) => isToday(a.dueDate)).reduce((s, a) => s + Math.max(0, a.principal - a.amountPaid), 0) +
+      openField.filter((f) => isToday(f.dueDate)).reduce((s, f) => s + fieldOwing(f), 0);
     return {
-      outstanding: open.reduce(
-        (s, a) => s + Math.max(0, a.principal - a.amountPaid),
-        0,
-      ),
+      outstanding: partnerOut + fieldOut,
+      partnerOut,
+      fieldOut,
       activeBatches: open.length,
-      overdue: overdue.reduce(
-        (s, a) => s + Math.max(0, a.principal - a.amountPaid),
-        0,
-      ),
-      repaidThisMonth,
-      settled: accounts.filter((a) => a.status === "SETTLED").length,
+      activeField: openField.length,
+      overdue:
+        overdue.reduce((s, a) => s + Math.max(0, a.principal - a.amountPaid), 0) +
+        overdueField.reduce((s, f) => s + fieldOwing(f), 0),
+      dueToday,
+      repaidThisMonth: partnerRepaidMo + fieldRepaidMo,
+      settled:
+        accounts.filter((a) => a.status === "SETTLED").length +
+        fieldCredits.filter((f) => !fieldOpen(f)).length,
       partners: new Set(open.map((a) => a.partnerName)).size,
+      fieldCustomers: new Set(openField.map((f) => f.customerName)).size,
     };
-  }, [accounts]);
+  }, [accounts, fieldCredits]);
 
   const overdueAccounts = accounts.filter(
     (a) => a.status === "OVERDUE" || (daysOverdue(a) > 0 && a.status !== "SETTLED"),
   );
+  const overdueField = fieldCredits.filter((f) => f.status === "OVERDUE");
 
   return (
     <div className="space-y-5">
       {/* KPI bar */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         <Kpi
           icon={Wallet}
           label="Outstanding"
           value={formatCurrency(kpi.outstanding)}
           tone="text-warning"
+          hint={`partners ${formatCurrency(kpi.partnerOut)} · field ${formatCurrency(kpi.fieldOut)}`}
         />
         <Kpi
           icon={AlertTriangle}
           label="Overdue"
           value={formatCurrency(kpi.overdue)}
           tone="text-destructive"
+        />
+        <Kpi
+          icon={Layers}
+          label="Due today"
+          value={formatCurrency(kpi.dueToday)}
+          tone={kpi.dueToday > 0 ? "text-warning" : undefined}
         />
         <Kpi
           icon={Banknote}
@@ -193,8 +252,9 @@ export function CreditLedger({
         />
         <Kpi
           icon={Layers}
-          label="Active batches"
-          value={String(kpi.activeBatches)}
+          label="Active credits"
+          value={String(kpi.activeBatches + kpi.activeField)}
+          hint={`${kpi.activeBatches} partner · ${kpi.activeField} field`}
         />
         <Kpi
           icon={CheckCircle2}
@@ -202,7 +262,12 @@ export function CreditLedger({
           value={String(kpi.settled)}
           tone="text-success"
         />
-        <Kpi icon={Users} label="Partners on credit" value={String(kpi.partners)} />
+        <Kpi
+          icon={Users}
+          label="On credit"
+          value={String(kpi.partners + kpi.fieldCustomers)}
+          hint={`${kpi.partners} partner · ${kpi.fieldCustomers} field customer${kpi.fieldCustomers === 1 ? "" : "s"}`}
+        />
       </div>
 
       {/* Pending payments — the action queue, always on top */}
@@ -214,13 +279,17 @@ export function CreditLedger({
       {/* Tabs */}
       <div className="flex flex-wrap gap-1.5">
         {[
-          { k: "CREDITS", label: "Credits", n: accounts.length },
+          { k: "CREDITS", label: "Partner credits", n: accounts.length },
+          { k: "FIELD", label: "Field credit", n: fieldCredits.length },
           {
             k: "SETTLEMENTS",
             label: "Settlements",
-            n: settlements.length + accounts.reduce((s, a) => s + a.payments.length, 0),
+            n:
+              settlements.length +
+              accounts.reduce((s, a) => s + a.payments.length, 0) +
+              fieldCredits.reduce((s, f) => s + f.payments.length, 0),
           },
-          { k: "OVERDUE", label: "Overdue", n: overdueAccounts.length },
+          { k: "OVERDUE", label: "Overdue", n: overdueAccounts.length + overdueField.length },
         ].map((t) => (
           <button
             key={t.k}
@@ -245,15 +314,29 @@ export function CreditLedger({
           onRefresh={() => router.refresh()}
         />
       )}
+      {tab === "FIELD" && <FieldCreditPanel credits={fieldCredits} />}
       {tab === "SETTLEMENTS" && (
-        <SettlementsTable accounts={accounts} settlements={settlements} />
+        <>
+          <SettlementsTable accounts={accounts} settlements={settlements} />
+          <FieldCollections credits={fieldCredits} />
+        </>
       )}
       {tab === "OVERDUE" && (
-        <OverduePanel
-          accounts={overdueAccounts}
-          onPay={setPayTarget}
-          onRefresh={() => router.refresh()}
-        />
+        <>
+          <OverduePanel
+            accounts={overdueAccounts}
+            onPay={setPayTarget}
+            onRefresh={() => router.refresh()}
+          />
+          {overdueField.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-display text-sm font-semibold text-muted-foreground">
+                Overdue field credit (rep customers)
+              </h3>
+              <FieldCreditPanel credits={overdueField} compact />
+            </div>
+          )}
+        </>
       )}
 
       {payTarget && (
@@ -285,11 +368,13 @@ function Kpi({
   label,
   value,
   tone,
+  hint,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
   tone?: string;
+  hint?: string;
 }) {
   return (
     <div className="rounded-xl border border-border bg-card p-3">
@@ -302,6 +387,11 @@ function Kpi({
       <p className={`mt-1 font-display text-lg font-semibold ${tone ?? ""}`}>
         {value}
       </p>
+      {hint && (
+        <p className="mt-0.5 truncate text-[10px] text-muted-foreground" title={hint}>
+          {hint}
+        </p>
+      )}
     </div>
   );
 }
@@ -1236,5 +1326,200 @@ function TermsModal({
         </Button>
       </div>
     </Modal>
+  );
+}
+
+// ── Field credit (rep customers) ─────────────────────────────────────────────
+
+/** Every rep-recorded credit sale — filterable by rep, customer, status. */
+function FieldCreditPanel({
+  credits,
+  compact = false,
+}: {
+  credits: FieldCreditDTO[];
+  compact?: boolean;
+}) {
+  const [q, setQ] = useState("");
+  const [rep, setRep] = useState("ALL");
+  const [status, setStatus] = useState("ALL");
+  const [overdueOnly, setOverdueOnly] = useState(false);
+
+  const reps = useMemo(
+    () => [...new Set(credits.map((c) => c.repName))].sort(),
+    [credits],
+  );
+
+  const rows = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return credits.filter((c) => {
+      if (rep !== "ALL" && c.repName !== rep) return false;
+      if (status !== "ALL" && c.status !== status) return false;
+      if (overdueOnly && c.status !== "OVERDUE") return false;
+      if (
+        needle &&
+        ![c.customerName, c.customerBusiness, c.customerLocation, c.repName, c.code]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(needle))
+      )
+        return false;
+      return true;
+    });
+  }, [credits, q, rep, status, overdueOnly]);
+
+  return (
+    <div className="space-y-3">
+      {!compact && (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-3">
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search customer, rep, code…"
+            className="h-9 w-full sm:max-w-64"
+          />
+          <Select value={rep} onChange={(e) => setRep(e.target.value)} className="h-9 w-auto">
+            <option value="ALL">All reps</option>
+            {reps.map((r) => (
+              <option key={r}>{r}</option>
+            ))}
+          </Select>
+          <Select value={status} onChange={(e) => setStatus(e.target.value)} className="h-9 w-auto">
+            <option value="ALL">All statuses</option>
+            <option value="PENDING">Pending</option>
+            <option value="PARTIAL">Partial</option>
+            <option value="OVERDUE">Overdue</option>
+            <option value="PAID">Paid</option>
+          </Select>
+          <button
+            type="button"
+            onClick={() => setOverdueOnly((v) => !v)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+              overdueOnly
+                ? "border-destructive/40 bg-destructive/10 text-destructive"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Overdue only
+          </button>
+        </div>
+      )}
+
+      {rows.length === 0 ? (
+        <EmptyState
+          className="rounded-2xl border border-dashed border-border py-10"
+          icon={Wallet}
+          title="No field credit matches"
+          description="Credit sales recorded by sales reps appear here the moment they're saved."
+        />
+      ) : (
+        <div className="space-y-2">
+          {rows.map((c) => {
+            const owing = Math.max(0, c.total - c.amountPaid);
+            return (
+              <div
+                key={c.id}
+                className={`rounded-2xl border bg-card p-4 ${
+                  c.status === "OVERDUE" ? "border-destructive/40" : "border-border"
+                }`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-display font-semibold">{c.customerName}</span>
+                      {c.customerBusiness && (
+                        <span className="text-sm text-muted-foreground">· {c.customerBusiness}</span>
+                      )}
+                      <StatusBadge status={c.status} />
+                      <Badge variant="secondary">rep: {c.repName}</Badge>
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {c.code} · {formatDate(c.createdAt)}
+                      {c.dueDate ? ` · due ${formatDate(c.dueDate)}` : ""}
+                      {c.customerLocation ? ` · ${c.customerLocation}` : ""}
+                      {c.customerPhone ? ` · ${c.customerPhone}` : ""}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {c.items.map((i) => `${i.quantity} × ${i.name}`).join(" · ")}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="font-display font-bold">{formatCurrency(c.total)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      paid {formatCurrency(c.amountPaid)}
+                      {owing > 0 ? (
+                        <span className="text-warning"> · owing {formatCurrency(owing)}</span>
+                      ) : (
+                        <span className="text-success"> · settled</span>
+                      )}
+                    </p>
+                    {c.customerId && (
+                      <Link
+                        href={`/admin/reps/customers/${c.customerId}`}
+                        className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      >
+                        Customer profile <ExternalLink className="size-3" />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+                {c.payments.length > 0 && (
+                  <div className="mt-2.5 space-y-1 border-t border-border/60 pt-2">
+                    {c.payments.map((p, i) => (
+                      <p key={i} className="flex justify-between text-xs text-muted-foreground">
+                        <span>
+                          {formatDateTime(p.createdAt)} · {p.method ?? "payment"} · by {p.recordedBy}
+                        </span>
+                        <span className="font-medium text-success">+{formatCurrency(p.amount)}</span>
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Payments collected against field credit — part of the settlements picture. */
+function FieldCollections({ credits }: { credits: FieldCreditDTO[] }) {
+  const payments = useMemo(
+    () =>
+      credits
+        .flatMap((c) =>
+          c.payments.map((p) => ({
+            ...p,
+            customer: c.customerName,
+            rep: c.repName,
+            code: c.code,
+          })),
+        )
+        .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)),
+    [credits],
+  );
+  if (payments.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      <h3 className="font-display text-sm font-semibold text-muted-foreground">
+        Field collections — rep-customer credit repayments
+      </h3>
+      <div className="rounded-2xl border border-border bg-card">
+        <div className="divide-y divide-border/60">
+          {payments.map((p, i) => (
+            <div key={i} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
+              <span className="min-w-0 truncate">
+                <span className="font-medium">{p.customer}</span>
+                <span className="text-muted-foreground"> · {p.code} · rep {p.rep} · {p.method ?? "payment"}</span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className="font-semibold text-success">+{formatCurrency(p.amount)}</span>
+                <span className="ml-2 text-xs text-muted-foreground">{formatDateTime(p.createdAt)}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
