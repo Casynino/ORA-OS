@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/admin/finance", label: "Overview" },
   { href: "/admin/finance/expenses", label: "Expenses" },
   { href: "/admin/finance/capital", label: "Capital" },
+  { href: "/admin/finance/accounts", label: "Accounts" },
   { href: "/admin/finance/ledger", label: "Ledger" },
 ];
 

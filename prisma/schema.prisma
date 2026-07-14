@@ -419,6 +419,34 @@ model Inventory {
   updatedAt         DateTime @updatedAt
 }
 
+// ── Receiving accounts ──────────────────────────────────────────────────────
+
+/// Where money physically lands: cash offices, bank accounts, mobile-money
+/// merchant numbers. Admin-managed; every payment records which account
+/// received the funds so finance can reconcile against real balances.
+enum PaymentAccountType {
+  CASH
+  BANK
+  MOBILE_MONEY
+}
+
+model PaymentAccount {
+  id        String             @id @default(cuid())
+  name      String // e.g. "Main Cash Office", "CRDB Bank", "M-Pesa Lipa"
+  type      PaymentAccountType
+  details   String? // account number / lipa number / branch
+  isActive  Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  fieldSales    FieldSale[]
+  fieldPayments FieldPayment[]
+  payments      Payment[]
+
+  @@index([type])
+  @@index([isActive])
+}
+
 /// Immutable ledger of every physical stock change.
 model StockMovement {
   id          String       @id @default(cuid())
@@ -525,12 +553,16 @@ model Payment {
   creditAccountId String
   amount          Int
   method          String? // cash, mobile money, bank
+  paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  paymentAccountId String? // which company account received the funds
+  reference       String? // transaction reference (optional)
   note            String?
   recordedBy      User          @relation("PaymentRecorder", fields: [recordedById], references: [id])
   recordedById    String
   createdAt       DateTime      @default(now())
 
   @@index([creditAccountId])
+  @@index([paymentAccountId])
 }
 
 enum SettlementStatus {
@@ -913,6 +945,10 @@ model FieldSale {
   total        Int // whole TSh
   amountPaid   Int                @default(0) // CASH ⇒ equals total
   creditStatus FieldCreditStatus? // null for CASH sales
+  paymentMethod    String? // CASH sales: Cash / Bank Transfer / Mobile Money
+  paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  paymentAccountId String? // which company account received the cash
+  reference    String? // transaction reference (optional)
   dueDate      DateTime?
   note         String?
   voided       Boolean            @default(false) // admin correction — restores stock
@@ -949,12 +985,16 @@ model FieldPayment {
   saleId       String
   amount       Int
   method       String? // cash, mobile money, bank
+  paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  paymentAccountId String? // which company account received the funds
+  reference    String? // transaction reference (optional)
   note         String?
   recordedBy   User      @relation("FieldPaymentRecorder", fields: [recordedById], references: [id])
   recordedById String
   createdAt    DateTime  @default(now())
 
   @@index([saleId])
+  @@index([paymentAccountId])
 }
 
 /// Free-sample distribution record — deducts the rep's sample stock.

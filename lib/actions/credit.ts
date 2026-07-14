@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { completeCycleIfCleared } from "@/lib/services/credit";
+import { resolveReceivingAccount } from "@/lib/payment-methods";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 function revalidateCredit() {
@@ -20,6 +21,8 @@ const paymentSchema = z.object({
   creditAccountId: z.string().min(1),
   amount: z.number().int().positive().max(100000000),
   method: z.string().max(40).optional(),
+  paymentAccountId: z.string().optional().or(z.literal("")),
+  reference: z.string().max(80).optional().or(z.literal("")),
   collectedBy: z.string().max(80).optional(),
   note: z.string().max(500).optional(),
 });
@@ -85,11 +88,18 @@ export async function recordPayment(
           "This account changed while you were recording — refresh and try again.",
         );
       }
+      const receiving = await resolveReceivingAccount(
+        tx,
+        parsed.data.paymentAccountId || null,
+        parsed.data.method,
+      );
       await tx.payment.create({
         data: {
           creditAccountId: account.id,
           amount: parsed.data.amount,
-          method: parsed.data.method?.trim() || null,
+          method: receiving.method,
+          paymentAccountId: receiving.paymentAccountId,
+          reference: parsed.data.reference?.trim() || null,
           note: note || null,
           recordedById: admin.id,
         },

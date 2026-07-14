@@ -10,6 +10,7 @@ import {
   addWarehouseStock,
   deductWarehouseStock,
 } from "@/lib/services/warehouse-stock";
+import { resolveReceivingAccount } from "@/lib/payment-methods";
 import { refCode } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 import type { FieldCreditStatus } from "@prisma/client";
@@ -75,6 +76,10 @@ const saleSchema = z.object({
   location: z.string().max(120).optional().or(z.literal("")),
   note: z.string().max(500).optional().or(z.literal("")),
   dueDate: z.string().optional().or(z.literal("")), // ISO date for credit
+  // CASH sales: how & where the money was received.
+  paymentMethod: z.string().max(40).optional().or(z.literal("")),
+  paymentAccountId: z.string().optional().or(z.literal("")),
+  reference: z.string().max(80).optional().or(z.literal("")),
 });
 
 export async function recordFieldSale(
@@ -156,6 +161,13 @@ export async function recordFieldSale(
         });
       }
 
+      // CASH sales record how & where the money landed — the receiving
+      // account is the anchor for finance reconciliation.
+      const receiving =
+        d.type === "CASH"
+          ? await resolveReceivingAccount(tx, d.paymentAccountId || null, d.paymentMethod)
+          : { paymentAccountId: null, method: null };
+
       await tx.fieldSale.create({
         data: {
           code,
@@ -168,6 +180,9 @@ export async function recordFieldSale(
           amountPaid: d.type === "CASH" ? total : 0,
           creditStatus:
             d.type === "CREDIT" ? creditStatusFor(total, 0, dueDate) : null,
+          paymentMethod: receiving.method,
+          paymentAccountId: receiving.paymentAccountId,
+          reference: d.reference?.trim() || null,
           dueDate,
           note: d.note || null,
           items: {
@@ -203,6 +218,8 @@ const collectSchema = z.object({
   saleId: z.string().min(1),
   amount: z.number().int().positive().max(100000000),
   method: z.string().max(40).optional().or(z.literal("")),
+  paymentAccountId: z.string().optional().or(z.literal("")),
+  reference: z.string().max(80).optional().or(z.literal("")),
   note: z.string().max(300).optional().or(z.literal("")),
 });
 
@@ -229,24 +246,37 @@ export async function recordFieldCollection(
       return fail(`Amount exceeds the outstanding balance (TSh ${balance.toLocaleString()}).`);
 
     const newPaid = sale.amountPaid + d.amount;
-    await prisma.$transaction([
-      prisma.fieldPayment.create({
-        data: {
-          saleId: sale.id,
-          amount: d.amount,
-          method: d.method || null,
-          note: d.note || null,
-          recordedById: actor.id,
-        },
-      }),
-      prisma.fieldSale.update({
-        where: { id: sale.id },
+    await prisma.$transaction(async (tx) => {
+      const receiving = await resolveReceivingAccount(
+        tx,
+        d.paymentAccountId || null,
+        d.method,
+      );
+      // Atomic claim on the exact balance we validated — a concurrent
+      // collection makes this match 0 rows and abort instead of losing an
+      // update (payment rows and amountPaid must never drift apart).
+      const claimed = await tx.fieldSale.updateMany({
+        where: { id: sale.id, amountPaid: sale.amountPaid, voided: false },
         data: {
           amountPaid: newPaid,
           creditStatus: creditStatusFor(sale.total, newPaid, sale.dueDate),
         },
-      }),
-    ]);
+      });
+      if (claimed.count === 0) {
+        throw new Error("This sale changed while recording — refresh and try again.");
+      }
+      await tx.fieldPayment.create({
+        data: {
+          saleId: sale.id,
+          amount: d.amount,
+          method: receiving.method,
+          paymentAccountId: receiving.paymentAccountId,
+          reference: d.reference?.trim() || null,
+          note: d.note || null,
+          recordedById: actor.id,
+        },
+      });
+    });
 
     await logActivity({
       actorId: actor.id,

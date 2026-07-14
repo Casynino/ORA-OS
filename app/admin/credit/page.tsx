@@ -148,13 +148,24 @@ export default async function AdminCreditPage() {
     })),
   }));
 
+  const paymentAccounts = await prisma.paymentAccount.findMany({
+    where: { isActive: true },
+    orderBy: [{ type: "asc" }, { name: "asc" }],
+    select: { id: true, name: true, type: true, details: true },
+  });
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Credit & Settlements"
         description="A live financial control ledger — every credit in the company (partners AND rep customers), every repayment, every overdue risk."
       />
-      <CreditLedger accounts={dto} settlements={settlements} fieldCredits={fieldCredits} />
+      <CreditLedger
+        accounts={dto}
+        settlements={settlements}
+        fieldCredits={fieldCredits}
+        paymentAccounts={paymentAccounts}
+      />
     </div>
   );
 }

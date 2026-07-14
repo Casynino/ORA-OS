@@ -48,6 +48,12 @@ export default async function AdminCreditOrderPage({
   });
   if (!a) notFound();
 
+  const receivingAccounts = await prisma.paymentAccount.findMany({
+    where: { isActive: true },
+    orderBy: [{ type: "asc" }, { name: "asc" }],
+    select: { id: true, name: true, type: true, details: true },
+  });
+
   let running = 0;
   const payments = a.payments.map((p) => {
     running += p.amount;
@@ -174,7 +180,7 @@ export default async function AdminCreditOrderPage({
         </section>
 
         {/* Interactive credit management */}
-        <CreditOrderManager order={dto} />
+        <CreditOrderManager order={dto} receivingAccounts={receivingAccounts} />
       </div>
     </div>
   );
