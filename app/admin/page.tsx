@@ -159,10 +159,14 @@ export default async function AdminCommandCenter() {
               ORA today.
             </p>
             <div className="mt-5 grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:gap-8">
-              <HeroStat label="Cash collected today" value={formatCurrency(d.finance.cashToday)} />
-              <HeroStat label="Revenue today" value={formatCurrency(d.sales.today.revenue)} />
-              <HeroStat label="Revenue this month" value={formatCurrency(d.sales.month.revenue)} />
-              <HeroStat label="Outstanding credit" value={formatCurrency(d.finance.outstandingCredit)} />
+              <HeroStat label="Cash collected today" value={formatCurrency(d.finance.cashToday)} sub="money in hand" />
+              <HeroStat label="Revenue today" value={formatCurrency(d.sales.today.revenue)} sub="sold — cash + credit" />
+              <HeroStat label="Revenue this month" value={formatCurrency(d.sales.month.revenue)} sub="sold — cash + credit" />
+              <HeroStat
+                label="Outstanding credit"
+                value={formatCurrency(d.finance.outstandingCredit + d.finance.fieldOutstanding)}
+                sub="revenue still owed to ORA"
+              />
               <HeroStat label="Pads distributed" value={formatNumber(d.sales.padsDistributed)} />
             </div>
           </div>
@@ -510,11 +514,20 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function HeroStat({ label, value }: { label: string; value: string }) {
+function HeroStat({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+}) {
   return (
     <div className="min-w-0">
       <p className="truncate text-[11px] uppercase tracking-wide text-white/70">{label}</p>
       <p className="truncate font-display text-xl font-bold sm:text-2xl">{value}</p>
+      {sub && <p className="truncate text-[11px] text-white/60">{sub}</p>}
     </div>
   );
 }
