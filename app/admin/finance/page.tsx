@@ -55,8 +55,8 @@ export default async function AdminFinancePage({
         : { label: "Needs attention", tone: "text-destructive", bar: "bg-destructive" };
 
   const incomeSources = [
-    { label: "Sales income", value: w.income.sales, icon: Banknote },
-    { label: "Credit collected", value: w.income.collections, icon: CreditCard },
+    { label: "Cash sales", value: w.income.sales, icon: Banknote },
+    { label: "Credit repayments received", value: w.income.collections, icon: CreditCard },
     { label: "Capital injected", value: w.income.capital, icon: PiggyBank },
   ].filter((s) => s.value > 0);
 
@@ -75,7 +75,13 @@ export default async function AdminFinancePage({
 
       {/* Overview cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard label={`Income ${PERIOD_LABEL[period]}`} value={formatCurrency(w.income.income)} icon={TrendingUp} accent="success" hint={`+ ${formatCurrency(w.income.capital)} capital`} />
+        <StatCard
+          label={`Income ${PERIOD_LABEL[period]}`}
+          value={formatCurrency(w.income.income)}
+          icon={TrendingUp}
+          accent="success"
+          hint={`cash sales ${formatCurrency(w.income.sales)} · repayments ${formatCurrency(w.income.collections)}`}
+        />
         <StatCard label={`Expenses ${PERIOD_LABEL[period]}`} value={formatCurrency(w.expenses)} icon={TrendingDown} accent="warning" />
         <StatCard
           label={`Net profit ${PERIOD_LABEL[period]}`}
@@ -85,7 +91,25 @@ export default async function AdminFinancePage({
           hint={`gross ${formatCurrency(w.grossProfit)} − operating costs`}
         />
         <StatCard label="Cash available" value={formatCurrency(p.cashAvailable)} icon={Banknote} accent="success" hint="all money in − all money out" />
-        <StatCard label="Credit outstanding" value={formatCurrency(p.creditOutstanding)} icon={CreditCard} accent="warning" hint={p.overdueCount > 0 ? `${p.overdueCount} overdue — expected income, not cash` : "expected income, not cash yet"} />
+        <StatCard
+          label="Credit outstanding"
+          value={formatCurrency(p.creditOutstanding)}
+          icon={CreditCard}
+          accent="warning"
+          hint={
+            <>
+              <span className="block">
+                partners {formatCurrency(p.creditOutstandingPartner)} · rep customers{" "}
+                {formatCurrency(p.creditOutstandingField)}
+              </span>
+              <span className="block">
+                {p.overdueCount > 0
+                  ? `${p.overdueCount} overdue — expected income, not cash`
+                  : "expected income, not cash yet"}
+              </span>
+            </>
+          }
+        />
         <StatCard label="Stock value (cost)" value={formatCurrency(p.stockValue)} icon={Package} accent="info" hint={`worth ${formatCurrency(p.stockPotentialRevenue)} if all sold`} />
       </div>
 
@@ -175,6 +199,22 @@ export default async function AdminFinancePage({
                   <span className="font-semibold">{formatCurrency(s.value)}</span>
                 </div>
               ))
+            )}
+            {w.creditSales > 0 && (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-warning/40 bg-warning/[0.04] p-3">
+                <span className="flex items-center gap-2.5 text-sm font-medium">
+                  <span className="flex size-8 items-center justify-center rounded-lg bg-warning/15 text-warning">
+                    <CreditCard className="size-4" />
+                  </span>
+                  <span>
+                    Credit sales
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      receivable — becomes income when repaid
+                    </span>
+                  </span>
+                </span>
+                <span className="font-semibold text-warning">{formatCurrency(w.creditSales)}</span>
+              </div>
             )}
           </div>
         </section>

@@ -188,6 +188,8 @@ export async function getFinanceOverview(period: Period) {
     fieldCredit,
     inventories,
     capitalAll,
+    partnerCreditSalesWindow,
+    fieldCreditSalesWindow,
   ] = await Promise.all([
     cashIn(start),
     expensesIn(start),
@@ -212,14 +214,42 @@ export async function getFinanceOverview(period: Period) {
       include: { product: { select: { costPrice: true, price: true } } },
     }),
     prisma.capitalEntry.findMany({ orderBy: { entryDate: "asc" } }),
+    // Credit SALES made in the window (accrual — receivable, not cash yet).
+    prisma.request.aggregate({
+      _sum: { totalAmount: true },
+      where: {
+        status: "FULFILLED",
+        paymentType: "CREDIT",
+        ...(start ? { fulfilledAt: { gte: start } } : {}),
+      },
+    }),
+    prisma.fieldSale.aggregate({
+      _sum: { total: true },
+      where: {
+        type: "CREDIT",
+        voided: false,
+        ...(start ? { createdAt: { gte: start } } : {}),
+      },
+    }),
   ]);
 
   const grossProfit = rc.revenue - rc.cogs;
   const netProfit = grossProfit - exWindow.operating;
 
-  const creditOutstanding =
-    partnerCredit.reduce((s, c) => s + Math.max(0, c.principal - c.amountPaid), 0) +
-    fieldCredit.reduce((s, c) => s + (c.total - c.amountPaid), 0);
+  // Receivables — split so finance always shows WHO owes: partners vs the
+  // rep-customer book.
+  const creditOutstandingPartner = partnerCredit.reduce(
+    (s, c) => s + Math.max(0, c.principal - c.amountPaid),
+    0,
+  );
+  const creditOutstandingField = fieldCredit.reduce(
+    (s, c) => s + Math.max(0, c.total - c.amountPaid),
+    0,
+  );
+  const creditOutstanding = creditOutstandingPartner + creditOutstandingField;
+  const creditSalesWindow =
+    (partnerCreditSalesWindow._sum.totalAmount ?? 0) +
+    (fieldCreditSalesWindow._sum.total ?? 0);
   const overdueCount =
     partnerCredit.filter((c) => c.status === "OVERDUE").length +
     fieldCredit.filter((c) => c.creditStatus === "OVERDUE").length;
@@ -318,6 +348,7 @@ export async function getFinanceOverview(period: Period) {
   return {
     window: {
       income: inWindow,
+      creditSales: creditSalesWindow,
       expenses: exWindow.total,
       operatingExpenses: exWindow.operating,
       revenue: rc.revenue,
@@ -336,6 +367,8 @@ export async function getFinanceOverview(period: Period) {
     position: {
       cashAvailable,
       creditOutstanding,
+      creditOutstandingPartner,
+      creditOutstandingField,
       overdueCount,
       stockValue,
       stockPotentialRevenue,

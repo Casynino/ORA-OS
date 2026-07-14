@@ -1,15 +1,21 @@
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/ui/page-header";
 import { productMeta } from "@/lib/product-meta";
+import { refreshOverdueFieldCredit } from "@/lib/services/field";
 import {
   CreditLedger,
   type CreditAccountDTO,
   type SettlementDTO,
+  type FieldCreditDTO,
 } from "@/components/admin/credit-ledger";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminCreditPage() {
+  // Flip any past-due field credit to OVERDUE before reading — the admin's
+  // credit view must never show stale statuses.
+  await refreshOverdueFieldCredit();
+
   const settlementRows = await prisma.settlementRequest.findMany({
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     include: {
@@ -97,13 +103,58 @@ export default async function AdminCreditPage() {
     };
   });
 
+  // Field credit — every rep-recorded credit sale is a company credit record,
+  // visible here alongside partner credit (single source of truth).
+  const fieldSales = await prisma.fieldSale.findMany({
+    where: { type: "CREDIT", voided: false },
+    orderBy: [{ creditStatus: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
+    include: {
+      rep: { select: { id: true, name: true } },
+      customer: { select: { id: true, name: true, businessName: true, location: true, region: true, phone: true } },
+      items: { include: { product: { select: { name: true } } } },
+      payments: {
+        orderBy: { createdAt: "asc" },
+        include: { recordedBy: { select: { name: true } } },
+      },
+    },
+  });
+
+  const fieldCredits: FieldCreditDTO[] = fieldSales.map((s) => ({
+    id: s.id,
+    code: s.code,
+    repId: s.rep.id,
+    repName: s.rep.name,
+    customerId: s.customer?.id ?? null,
+    customerName: s.customer?.name ?? s.customerName ?? "Walk-in",
+    customerBusiness: s.customer?.businessName ?? null,
+    customerLocation:
+      [s.customer?.location, s.customer?.region].filter(Boolean).join(", ") || null,
+    customerPhone: s.customer?.phone ?? null,
+    total: s.total,
+    amountPaid: s.amountPaid,
+    status: s.creditStatus ?? "PENDING",
+    createdAt: s.createdAt.toISOString(),
+    dueDate: s.dueDate ? s.dueDate.toISOString() : null,
+    items: s.items.map((i) => ({
+      name: i.product.name,
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+    })),
+    payments: s.payments.map((p) => ({
+      amount: p.amount,
+      method: p.method,
+      recordedBy: p.recordedBy.name,
+      createdAt: p.createdAt.toISOString(),
+    })),
+  }));
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Credit & Settlements"
-        description="A live financial control ledger — every partner credit, repayment and overdue risk in one place."
+        description="A live financial control ledger — every credit in the company (partners AND rep customers), every repayment, every overdue risk."
       />
-      <CreditLedger accounts={dto} settlements={settlements} />
+      <CreditLedger accounts={dto} settlements={settlements} fieldCredits={fieldCredits} />
     </div>
   );
 }
