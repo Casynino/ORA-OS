@@ -8,6 +8,7 @@ import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { refCode, formatCurrency } from "@/lib/utils";
 import { completeCycleIfCleared } from "@/lib/services/credit";
+import { resolveReceivingAccount } from "@/lib/payment-methods";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 function revalidateSettlements() {
@@ -79,7 +80,10 @@ export async function submitSettlement(
 }
 
 // Admin confirms a partner's payment → posts it to the ledger.
-export async function confirmSettlement(id: string): Promise<ActionResult> {
+export async function confirmSettlement(
+  id: string,
+  paymentAccountId?: string,
+): Promise<ActionResult> {
   try {
     const admin = await requireActor(["ADMIN"]);
     const sr = await prisma.settlementRequest.findUnique({
@@ -137,11 +141,20 @@ export async function confirmSettlement(id: string): Promise<ActionResult> {
           "The account changed while confirming — refresh and review again.",
         );
       }
+      // Record which company account the money landed in (admin's call at
+      // confirmation time — the partner only declares the method).
+      const receiving = await resolveReceivingAccount(
+        tx,
+        paymentAccountId || null,
+        sr.method,
+      );
       const payment = await tx.payment.create({
         data: {
           creditAccountId: account.id,
           amount: sr.amount,
-          method: sr.method,
+          method: sr.method ?? receiving.method,
+          paymentAccountId: receiving.paymentAccountId,
+          reference: sr.reference,
           note: `Partner settlement ${sr.code}${sr.reference ? ` · ${sr.reference}` : ""}`,
           recordedById: admin.id,
         },

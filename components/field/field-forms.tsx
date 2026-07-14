@@ -14,6 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Gift } from "lucide-react";
+import {
+  ReceivingAccountPicker,
+  METHOD_LABELS,
+  type ReceivingAccount,
+} from "@/components/ui/receiving-account-picker";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { combineToPieces } from "@/lib/units";
 
@@ -329,27 +334,41 @@ export function StockRequestForm({ products }: { products: StockProduct[] }) {
 export function CollectForm({
   saleId,
   balance,
+  accounts = [],
 }: {
   saleId: string;
   balance: number;
+  accounts?: ReceivingAccount[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState("Cash");
+  const firstMethod = accounts[0]?.type ?? "CASH";
+  const [method, setMethod] = useState(firstMethod);
+  const [accountId, setAccountId] = useState(
+    accounts.find((a) => a.type === firstMethod)?.id ?? "",
+  );
+  const [reference, setReference] = useState("");
 
   function submit() {
+    if (accounts.length > 0 && !accountId) {
+      toast({ variant: "error", title: "Select which account received the money." });
+      return;
+    }
     start(async () => {
       const res = await recordFieldCollection({
         saleId,
         amount: Number(amount) || 0,
-        method,
+        method: METHOD_LABELS[method] ?? method,
+        paymentAccountId: accountId,
+        reference,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         setOpen(false);
         setAmount("");
+        setReference("");
         router.refresh();
       } else toast({ variant: "error", title: res.error });
     });
@@ -363,32 +382,38 @@ export function CollectForm({
     );
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Input
-        type="number"
-        inputMode="numeric"
-        min={1}
-        max={balance}
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        placeholder={`Up to ${formatCurrency(balance)}`}
-        className="h-9 w-40"
+    <div className="w-full space-y-2.5 rounded-xl border border-border p-3">
+      <div>
+        <Label className="text-xs text-muted-foreground">Amount</Label>
+        <Input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={balance}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder={`Up to ${formatCurrency(balance)}`}
+          className="mt-1 h-9 w-full sm:w-48"
+        />
+      </div>
+      <ReceivingAccountPicker
+        accounts={accounts}
+        method={method}
+        accountId={accountId}
+        reference={reference}
+        onMethod={setMethod}
+        onAccount={setAccountId}
+        onReference={setReference}
+        compact
       />
-      <select
-        value={method}
-        onChange={(e) => setMethod(e.target.value)}
-        className="h-9 rounded-lg border border-input bg-background px-2 text-sm"
-      >
-        <option>Cash</option>
-        <option>Mobile money</option>
-        <option>Bank</option>
-      </select>
-      <Button size="sm" className="rounded-full" disabled={pending || !amount} onClick={submit}>
-        {pending ? "Saving…" : "Save"}
-      </Button>
-      <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setOpen(false)}>
-        Cancel
-      </Button>
+      <div className="flex gap-2">
+        <Button size="sm" className="rounded-full" disabled={pending || !amount} onClick={submit}>
+          {pending ? "Saving…" : "Save payment"}
+        </Button>
+        <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setOpen(false)}>
+          Cancel
+        </Button>
+      </div>
     </div>
   );
 }

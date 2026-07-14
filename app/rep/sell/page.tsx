@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function RepSellPage() {
   const me = await requireRole("SALES_REP");
 
-  const [stock, customers, recent] = await Promise.all([
+  const [stock, customers, recent, accounts] = await Promise.all([
     prisma.repStock.findMany({
       where: { repId: me.id, sellableQty: { gt: 0 } },
       include: { product: true },
@@ -35,6 +35,11 @@ export default async function RepSellPage() {
       take: 10,
       include: { customer: { select: { name: true } } },
     }),
+    prisma.paymentAccount.findMany({
+      where: { isActive: true },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, type: true, details: true },
+    }),
   ]);
 
   const products = stock.map((s) => ({
@@ -54,7 +59,7 @@ export default async function RepSellPage() {
       />
 
       <div className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
-        <FieldSaleForm products={products} customers={customers} />
+        <FieldSaleForm products={products} customers={customers} accounts={accounts} />
       </div>
 
       <section>

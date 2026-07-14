@@ -22,18 +22,25 @@ export default async function RepCustomerDetailPage({
   const { id } = await params;
   await refreshOverdueFieldCredit();
 
-  const customer = await prisma.fieldCustomer.findUnique({
-    where: { id },
-    include: {
-      sales: {
-        orderBy: { createdAt: "desc" },
-        include: {
-          items: { include: { product: { select: { name: true } } } },
-          payments: { orderBy: { createdAt: "desc" } },
+  const [customer, accounts] = await Promise.all([
+    prisma.fieldCustomer.findUnique({
+      where: { id },
+      include: {
+        sales: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            items: { include: { product: { select: { name: true } } } },
+            payments: { orderBy: { createdAt: "desc" } },
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.paymentAccount.findMany({
+      where: { isActive: true },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, type: true, details: true },
+    }),
+  ]);
   if (!customer || customer.repId !== me.id) notFound();
 
   const live = customer.sales.filter((s) => !s.voided);
@@ -117,7 +124,7 @@ export default async function RepCustomerDetailPage({
                           </>
                         )}
                       </p>
-                      {balance > 0 && <CollectForm saleId={s.id} balance={balance} />}
+                      {balance > 0 && <CollectForm saleId={s.id} balance={balance} accounts={accounts} />}
                     </div>
                   )}
 

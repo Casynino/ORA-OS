@@ -20,6 +20,11 @@ import {
   editCreditTerms,
 } from "@/lib/actions/credit";
 import { confirmSettlement, rejectSettlement } from "@/lib/actions/settlements";
+import {
+  ReceivingAccountPicker,
+  METHOD_LABELS,
+  type ReceivingAccount,
+} from "@/components/ui/receiving-account-picker";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,7 +91,13 @@ const SETTLE_VARIANT: Record<string, "warning" | "success" | "destructive"> = {
   REJECTED: "destructive",
 };
 
-export function CreditOrderManager({ order: a }: { order: CreditOrderDTO }) {
+export function CreditOrderManager({
+  order: a,
+  receivingAccounts = [],
+}: {
+  order: CreditOrderDTO;
+  receivingAccounts?: ReceivingAccount[];
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [payOpen, setPayOpen] = useState(false);
@@ -241,16 +252,25 @@ export function CreditOrderManager({ order: a }: { order: CreditOrderDTO }) {
                   {s.note ? ` · ${s.note}` : ""}
                 </p>
                 {s.status === "PENDING" && (
-                  <div className="mt-2 flex gap-1.5">
-                    <ActionButton
-                      size="sm"
-                      variant="success"
-                      action={() => confirmSettlement(s.id)}
-                      onDone={() => router.refresh()}
-                      pendingText="…"
-                    >
-                      <Check className="size-3.5" /> Confirm payment
-                    </ActionButton>
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {receivingAccounts.length > 0 && (
+                      <SettleAccountSelect
+                        accounts={receivingAccounts}
+                        settlementId={s.id}
+                        onDone={() => router.refresh()}
+                      />
+                    )}
+                    {receivingAccounts.length === 0 && (
+                      <ActionButton
+                        size="sm"
+                        variant="success"
+                        action={() => confirmSettlement(s.id)}
+                        onDone={() => router.refresh()}
+                        pendingText="…"
+                      >
+                        <Check className="size-3.5" /> Confirm payment
+                      </ActionButton>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
@@ -316,6 +336,7 @@ export function CreditOrderManager({ order: a }: { order: CreditOrderDTO }) {
       {payOpen && (
         <PaymentModal
           order={a}
+          receivingAccounts={receivingAccounts}
           onClose={() => setPayOpen(false)}
           onDone={() => {
             setPayOpen(false);
@@ -339,25 +360,38 @@ export function CreditOrderManager({ order: a }: { order: CreditOrderDTO }) {
 
 function PaymentModal({
   order: a,
+  receivingAccounts = [],
   onClose,
   onDone,
 }: {
   order: CreditOrderDTO;
+  receivingAccounts?: ReceivingAccount[];
   onClose: () => void;
   onDone: () => void;
 }) {
   const [pending, start] = useTransition();
   const [amount, setAmount] = useState(a.remaining.toString());
-  const [method, setMethod] = useState("Mobile money");
+  const firstMethod = receivingAccounts[0]?.type ?? "MOBILE_MONEY";
+  const [method, setMethod] = useState(firstMethod);
+  const [accountId, setAccountId] = useState(
+    receivingAccounts.find((x) => x.type === firstMethod)?.id ?? "",
+  );
+  const [reference, setReference] = useState("");
   const [collectedBy, setCollectedBy] = useState("");
   const [note, setNote] = useState("");
 
   function submit() {
+    if (receivingAccounts.length > 0 && !accountId) {
+      toast({ variant: "error", title: "Select which account received the money." });
+      return;
+    }
     start(async () => {
       const res = await recordPayment({
         creditAccountId: a.id,
         amount: Number(amount),
-        method,
+        method: METHOD_LABELS[method] ?? method,
+        paymentAccountId: accountId,
+        reference,
         collectedBy: collectedBy || undefined,
         note: note || undefined,
       });
@@ -389,14 +423,15 @@ function PaymentModal({
             className="mt-1.5"
           />
         </div>
-        <div>
-          <Label>Payment type</Label>
-          <Select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1.5">
-            <option>Cash collection</option>
-            <option>Bank transfer</option>
-            <option>Mobile money</option>
-          </Select>
-        </div>
+        <ReceivingAccountPicker
+          accounts={receivingAccounts}
+          method={method}
+          accountId={accountId}
+          reference={reference}
+          onMethod={setMethod}
+          onAccount={setAccountId}
+          onReference={setReference}
+        />
         <div>
           <Label>Collected by (optional)</Label>
           <Input
@@ -499,5 +534,43 @@ function Row({ label, value }: { label: string; value: string }) {
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="text-right font-medium">{value}</dd>
     </div>
+  );
+}
+
+/** Account select + confirm for a pending settlement on the order page. */
+function SettleAccountSelect({
+  accounts,
+  settlementId,
+  onDone,
+}: {
+  accounts: ReceivingAccount[];
+  settlementId: string;
+  onDone: () => void;
+}) {
+  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
+  return (
+    <>
+      <select
+        value={accountId}
+        onChange={(e) => setAccountId(e.target.value)}
+        className="h-8 max-w-40 rounded-lg border border-input bg-background px-2 text-xs"
+        title="Account that received the money"
+      >
+        {accounts.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.name}
+          </option>
+        ))}
+      </select>
+      <ActionButton
+        size="sm"
+        variant="success"
+        action={() => confirmSettlement(settlementId, accountId || undefined)}
+        onDone={onDone}
+        pendingText="…"
+      >
+        <Check className="size-3.5" /> Confirm payment
+      </ActionButton>
+    </>
   );
 }

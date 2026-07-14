@@ -15,6 +15,11 @@ import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  ReceivingAccountPicker,
+  METHOD_LABELS,
+  type ReceivingAccount,
+} from "@/components/ui/receiving-account-picker";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 
 type ProductRow = {
@@ -37,13 +42,22 @@ type CustomerRow = {
 export function FieldSaleForm({
   products,
   customers,
+  accounts = [],
 }: {
   products: ProductRow[];
   customers: CustomerRow[];
+  accounts?: ReceivingAccount[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [type, setType] = useState<"CASH" | "CREDIT">("CASH");
+  // Where the money lands (CASH sales).
+  const firstMethod = accounts[0]?.type ?? "CASH";
+  const [payMethod, setPayMethod] = useState(firstMethod);
+  const [payAccountId, setPayAccountId] = useState(
+    accounts.find((a) => a.type === firstMethod)?.id ?? "",
+  );
+  const [payReference, setPayReference] = useState("");
   const [qty, setQty] = useState<Record<string, string>>({});
   const [price, setPrice] = useState<Record<string, string>>(
     Object.fromEntries(products.map((p) => [p.id, String(p.price)])),
@@ -183,11 +197,20 @@ export function FieldSaleForm({
         variant: "error",
         title: "Save (or cancel) the new customer first.",
       });
+    if (type === "CASH" && accounts.length > 0 && !payAccountId)
+      return toast({
+        variant: "error",
+        title: "Select which account received the money.",
+      });
 
     start(async () => {
       const res = await recordFieldSale({
         type,
         items,
+        paymentMethod:
+          type === "CASH" ? METHOD_LABELS[payMethod] ?? payMethod : "",
+        paymentAccountId: type === "CASH" ? payAccountId : "",
+        reference: type === "CASH" ? payReference : "",
         // A saved customer can be attached to ANY sale — cash included —
         // so the customer's history stays complete.
         customerId: customerId || undefined,
@@ -498,6 +521,24 @@ export function FieldSaleForm({
           </div>
         )}
       </div>
+
+      {/* Payment — how & where the money was received (cash sales) */}
+      {type === "CASH" && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Payment received
+          </p>
+          <ReceivingAccountPicker
+            accounts={accounts}
+            method={payMethod}
+            accountId={payAccountId}
+            reference={payReference}
+            onMethod={setPayMethod}
+            onAccount={setPayAccountId}
+            onReference={setPayReference}
+          />
+        </div>
+      )}
 
       <div className="grid gap-2.5 sm:grid-cols-2">
         <div>

@@ -50,6 +50,11 @@ import {
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/use-toast";
+import {
+  ReceivingAccountPicker,
+  METHOD_LABELS,
+  type ReceivingAccount,
+} from "@/components/ui/receiving-account-picker";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 
 export type CreditAccountDTO = {
@@ -160,10 +165,12 @@ export function CreditLedger({
   accounts,
   settlements = [],
   fieldCredits = [],
+  paymentAccounts = [],
 }: {
   accounts: CreditAccountDTO[];
   settlements?: SettlementDTO[];
   fieldCredits?: FieldCreditDTO[];
+  paymentAccounts?: ReceivingAccount[];
 }) {
   const router = useRouter();
   const pendingSettlements = settlements.filter((s) => s.status === "PENDING").length;
@@ -274,6 +281,7 @@ export function CreditLedger({
       {/* Pending payments — the action queue, always on top */}
       <PendingPayments
         settlements={settlements.filter((s) => s.status === "PENDING")}
+        receivingAccounts={paymentAccounts}
         onRefresh={() => router.refresh()}
       />
 
@@ -318,7 +326,11 @@ export function CreditLedger({
       {tab === "FIELD" && <FieldCreditPanel credits={fieldCredits} />}
       {tab === "SETTLEMENTS" && (
         <>
-          <SettlementsTable accounts={accounts} settlements={settlements} />
+          <SettlementsTable
+            accounts={accounts}
+            settlements={settlements}
+            receivingAccounts={paymentAccounts}
+          />
           <FieldCollections credits={fieldCredits} />
         </>
       )}
@@ -343,6 +355,7 @@ export function CreditLedger({
       {payTarget && (
         <PaymentModal
           account={payTarget}
+          paymentAccounts={paymentAccounts}
           onClose={() => setPayTarget(null)}
           onDone={() => {
             setPayTarget(null);
@@ -400,9 +413,11 @@ function Kpi({
 // ── Pending payments (top action queue) ───────────────────────────────────
 function PendingPayments({
   settlements,
+  receivingAccounts = [],
   onRefresh,
 }: {
   settlements: SettlementDTO[];
+  receivingAccounts?: ReceivingAccount[];
   onRefresh: () => void;
 }) {
   const router = useRouter();
@@ -462,16 +477,8 @@ function PendingPayments({
                 {s.reference ? ` · ${s.reference}` : ""} · {formatDateTime(s.createdAt)} · {s.code}
               </p>
             </div>
-            <div className="flex shrink-0 gap-1.5">
-              <ActionButton
-                size="sm"
-                variant="success"
-                action={() => confirmSettlement(s.id)}
-                onDone={onRefresh}
-                pendingText="…"
-              >
-                <Check className="size-3.5" /> Confirm
-              </ActionButton>
+            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+              <ConfirmSettlement id={s.id} accounts={receivingAccounts} onDone={onRefresh} />
               <Button
                 size="sm"
                 variant="outline"
@@ -916,9 +923,11 @@ function Row({ label, value }: { label: string; value: string }) {
 function SettlementsTable({
   accounts,
   settlements,
+  receivingAccounts = [],
 }: {
   accounts: CreditAccountDTO[];
   settlements: SettlementDTO[];
+  receivingAccounts?: ReceivingAccount[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -995,17 +1004,12 @@ function SettlementsTable({
                     </TableCell>
                     <TableCell className="text-right">
                       {s.status === "PENDING" ? (
-                        <div className="flex justify-end gap-1.5">
-                          <ActionButton
-                            size="sm"
-                            variant="success"
-                            action={() => confirmSettlement(s.id)}
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                          <ConfirmSettlement
+                            id={s.id}
+                            accounts={receivingAccounts}
                             onDone={() => router.refresh()}
-                            pendingText="…"
-                          >
-                            <Check className="size-3.5" />
-                            Confirm
-                          </ActionButton>
+                          />
                           <Button
                             size="sm"
                             variant="outline"
@@ -1191,26 +1195,39 @@ function OverduePanel({
 // ── Modals ────────────────────────────────────────────────────────────────
 function PaymentModal({
   account,
+  paymentAccounts = [],
   onClose,
   onDone,
 }: {
   account: CreditAccountDTO;
+  paymentAccounts?: ReceivingAccount[];
   onClose: () => void;
   onDone: () => void;
 }) {
   const [pending, start] = useTransition();
   const remaining = account.principal - account.amountPaid;
   const [amount, setAmount] = useState(remaining.toString());
-  const [method, setMethod] = useState("Mobile money");
+  const firstMethod = paymentAccounts[0]?.type ?? "MOBILE_MONEY";
+  const [method, setMethod] = useState(firstMethod);
+  const [receivingId, setReceivingId] = useState(
+    paymentAccounts.find((a) => a.type === firstMethod)?.id ?? "",
+  );
+  const [reference, setReference] = useState("");
   const [collectedBy, setCollectedBy] = useState("");
   const [note, setNote] = useState("");
 
   function submit() {
+    if (paymentAccounts.length > 0 && !receivingId) {
+      toast({ variant: "error", title: "Select which account received the money." });
+      return;
+    }
     start(async () => {
       const res = await recordPayment({
         creditAccountId: account.id,
         amount: Number(amount),
-        method,
+        method: METHOD_LABELS[method] ?? method,
+        paymentAccountId: receivingId,
+        reference,
         collectedBy: collectedBy || undefined,
         note: note || undefined,
       });
@@ -1242,18 +1259,15 @@ function PaymentModal({
             className="mt-1.5"
           />
         </div>
-        <div>
-          <Label>Payment type</Label>
-          <Select
-            value={method}
-            onChange={(e) => setMethod(e.target.value)}
-            className="mt-1.5"
-          >
-            <option>Cash collection</option>
-            <option>Bank transfer</option>
-            <option>Mobile money</option>
-          </Select>
-        </div>
+        <ReceivingAccountPicker
+          accounts={paymentAccounts}
+          method={method}
+          accountId={receivingId}
+          reference={reference}
+          onMethod={setMethod}
+          onAccount={setReceivingId}
+          onReference={setReference}
+        />
         <div>
           <Label>Collected by (optional)</Label>
           <Input
@@ -1521,6 +1535,46 @@ function FieldCollections({ credits }: { credits: FieldCreditDTO[] }) {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Confirm a settlement while recording which company account received it. */
+function ConfirmSettlement({
+  id,
+  accounts,
+  onDone,
+}: {
+  id: string;
+  accounts: ReceivingAccount[];
+  onDone: () => void;
+}) {
+  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
+  return (
+    <div className="flex items-center gap-1.5">
+      {accounts.length > 0 && (
+        <select
+          value={accountId}
+          onChange={(e) => setAccountId(e.target.value)}
+          className="h-8 max-w-40 rounded-lg border border-input bg-background px-2 text-xs"
+          title="Account that received the money"
+        >
+          {accounts.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </select>
+      )}
+      <ActionButton
+        size="sm"
+        variant="success"
+        action={() => confirmSettlement(id, accountId || undefined)}
+        onDone={onDone}
+        pendingText="…"
+      >
+        <Check className="size-3.5" /> Confirm
+      </ActionButton>
     </div>
   );
 }

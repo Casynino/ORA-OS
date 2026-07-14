@@ -41,7 +41,7 @@ export default async function AdminRepDetailPage({
   const rep = await prisma.user.findUnique({ where: { id } });
   if (!rep || rep.role !== "SALES_REP") notFound();
 
-  const [d, sales, customers, samples, reports, inventories] = await Promise.all([
+  const [d, sales, customers, samples, reports, inventories, accounts] = await Promise.all([
     getRepOverview(id),
     prisma.fieldSale.findMany({
       where: { repId: id },
@@ -75,6 +75,11 @@ export default async function AdminRepDetailPage({
     }),
     prisma.inventory.findMany({
       include: { product: { select: { id: true, name: true, isActive: true } } },
+    }),
+    prisma.paymentAccount.findMany({
+      where: { isActive: true },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, type: true, details: true },
     }),
   ]);
 
@@ -288,7 +293,7 @@ export default async function AdminRepDetailPage({
                         Owing <span className="font-semibold text-warning">{formatCurrency(balance)}</span>
                         {s.dueDate ? <span className="text-muted-foreground"> · due {formatDate(s.dueDate)}</span> : null}
                       </p>
-                      <CollectForm saleId={s.id} balance={balance} />
+                      <CollectForm saleId={s.id} balance={balance} accounts={accounts} />
                     </div>
                   )}
                 </div>
