@@ -37,13 +37,13 @@ export default async function WarehouseOrdersPage() {
     },
   });
 
+  // Operational data only — no order values reach the warehouse client.
   const dto: WhOrderDTO[] = orders.map((o) => ({
     id: o.id,
     code: o.code,
     partner: o.requester.name,
     products: o.items.map((i) => `${i.product.name} ×${i.quantity}`).join(", "),
     totalQty: o.items.reduce((s, i) => s + i.quantity, 0),
-    total: o.totalAmount,
     payment: o.paymentType,
     status: o.status,
     date: (o.fulfilledAt ?? o.createdAt).toISOString(),
@@ -52,8 +52,8 @@ export default async function WarehouseOrdersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Order fulfillment"
-        description={`Orders routed to ${me.warehouse.name}. Prepare, dispatch and confirm delivery.`}
+        title="Partner orders"
+        description={`Orders routed to ${me.warehouse.name}. Prepare, dispatch and confirm delivery — payment is confirmed before orders reach you.`}
       />
       <WarehouseOrders orders={dto} />
     </div>

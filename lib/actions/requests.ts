@@ -748,6 +748,9 @@ export async function fulfillRequest(
       include: { items: { include: { product: true } } },
     });
     if (!request) return fail("Request not found.");
+    // Warehouse staff can only deliver orders routed to their own warehouse.
+    const denied = await assertWarehouseOrderAccess(admin, request.warehouseName);
+    if (denied) return fail(denied);
     if (request.status !== "IN_TRANSIT" && request.status !== "APPROVED") {
       return fail("Only in-transit orders can be marked delivered.");
     }
@@ -785,6 +788,7 @@ export async function fulfillRequest(
           createdById: admin.id,
           requestId: request.id,
           reference: request.code,
+          warehouseName: request.warehouseName,
         });
         await applyMovement(tx, {
           productId: item.productId,
@@ -793,6 +797,7 @@ export async function fulfillRequest(
           createdById: admin.id,
           requestId: request.id,
           reference: request.code,
+          warehouseName: request.warehouseName,
         });
         // Draw the units down from the fulfilling warehouse's location ledger.
         await deductWarehouseStock(tx, {
@@ -905,7 +910,6 @@ const partnerEditSchema = z.object({
     .min(1, "Keep at least one product."),
   deliverTo: z.string().max(200).optional(),
   deliverBy: z.string().max(40).optional(),
-  warehouseName: z.string().max(120).optional(),
   note: z.string().max(1000).optional(),
 });
 
@@ -1006,7 +1010,7 @@ export async function partnerUpdateOrder(
           totalAmount: total,
           deliverTo: parsed.data.deliverTo?.trim() || null,
           deliverBy: parsed.data.deliverBy ? new Date(parsed.data.deliverBy) : null,
-          warehouseName: parsed.data.warehouseName?.trim() || null,
+          // warehouseName is routing, set server-side — never partner input.
           note: parsed.data.note?.trim() || null,
         },
       });

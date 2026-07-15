@@ -312,14 +312,13 @@ function PermissionsModal({
   onDone: () => void;
 }) {
   const [pending, start] = useTransition();
-  const [sales, setSales] = useState(!!user.canRecordSales);
   const [transfers, setTransfers] = useState(!!user.canCreateTransfers);
 
   function submit() {
     start(async () => {
       const res = await setWarehousePermissions({
         userId: user.id,
-        canRecordSales: sales,
+        canRecordSales: false, // warehouse staff never record sales
         canCreateTransfers: transfers,
       });
       if (res.ok) {
@@ -334,12 +333,6 @@ function PermissionsModal({
   return (
     <Modal open onClose={onClose} title={`Permissions · ${user.name}`} description="Operational permissions for this warehouse staff member.">
       <div className="space-y-3">
-        <PermissionToggle
-          label="Record sales"
-          hint="Allow recording cash & field sales (prices stay admin-set)."
-          checked={sales}
-          onChange={setSales}
-        />
         <PermissionToggle
           label="Create transfers"
           hint="Allow starting stock transfers out of their warehouse."
@@ -372,7 +365,6 @@ function CreateUserModal({
   const [position, setPosition] = useState("");
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? "");
   const [organization, setOrganization] = useState("");
-  const [canRecordSales, setCanRecordSales] = useState(false);
   const [canCreateTransfers, setCanCreateTransfers] = useState(false);
 
   const isWarehouse = role === "WAREHOUSE";
@@ -395,7 +387,6 @@ function CreateUserModal({
         phone: phone || undefined,
         position: isWarehouse ? position || undefined : undefined,
         warehouseId: isWarehouse ? warehouseId : undefined,
-        canRecordSales: isWarehouse ? canRecordSales : undefined,
         canCreateTransfers: isWarehouse ? canCreateTransfers : undefined,
         organization: role === "PARTNER" ? organization || undefined : undefined,
       });
@@ -467,12 +458,6 @@ function CreateUserModal({
         {isWarehouse && (
           <div className="space-y-2">
             <Label>Permissions</Label>
-            <PermissionToggle
-              label="Record sales"
-              hint="Record cash & field sales (admin-set prices)."
-              checked={canRecordSales}
-              onChange={setCanRecordSales}
-            />
             <PermissionToggle
               label="Create transfers"
               hint="Start transfers out of their warehouse."

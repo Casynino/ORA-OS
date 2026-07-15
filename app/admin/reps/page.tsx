@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminRepsPage() {
   await requireRole("ADMIN");
 
-  const [rows, pendingRequests, inventories] = await Promise.all([
+  const [rows, pendingRequests, readyRequests, inventories] = await Promise.all([
     getRepsPerformance(),
     prisma.repStockRequest.findMany({
       where: { status: "PENDING" },
@@ -40,17 +40,51 @@ export default async function AdminRepsPage() {
         },
       },
     }),
+    prisma.repStockRequest.findMany({
+      where: { status: "READY" },
+      orderBy: { preparedAt: "asc" },
+      include: {
+        rep: { select: { name: true } },
+        warehouse: { select: { name: true } },
+        preparedBy: { select: { name: true } },
+        items: { select: { issuedQty: true } },
+      },
+    }),
     prisma.inventory.findMany({
       include: { product: { select: { id: true, name: true, isActive: true } } },
     }),
   ]);
 
+  // Admin approval reserves at the main (oldest active) warehouse — the same
+  // one resolveFulfillingWarehouse falls back to — so availability shown must
+  // be that warehouse's free-to-promise (onHand − reserved), not org-wide.
+  const mainWarehouse = await prisma.warehouse.findFirst({
+    where: { isActive: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  const mainStock = mainWarehouse
+    ? await prisma.warehouseStock.findMany({
+        where: { warehouseId: mainWarehouse.id },
+        select: { productId: true, onHand: true, reserved: true },
+      })
+    : [];
+  const freeById = new Map(
+    mainStock.map((s) => [s.productId, Math.max(0, s.onHand - s.reserved)]),
+  );
+
   const productOpts = inventories
     .filter((i) => i.product.isActive)
-    .map((i) => ({ id: i.productId, name: i.product.name, available: i.warehouseQty }));
+    .map((i) => ({
+      id: i.productId,
+      name: i.product.name,
+      available: freeById.get(i.productId) ?? 0,
+    }));
 
-  // Warehouse availability per product — used to warn/limit at fulfilment time.
-  const availableById = new Map(inventories.map((i) => [i.productId, i.warehouseQty]));
+  // Free-to-promise per product at the fulfilling warehouse — used to warn/limit.
+  const availableById = new Map(
+    inventories.map((i) => [i.productId, freeById.get(i.productId) ?? 0]),
+  );
 
   const totals = {
     sales: rows.reduce((s, r) => s + r.salesMonth, 0),
@@ -164,6 +198,36 @@ export default async function AdminRepsPage() {
                 </ul>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* Prepared — awaiting rep pickup at the warehouse */}
+      {readyRequests.length > 0 && (
+        <section>
+          <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold">
+            <Package className="size-5 text-info" />
+            Awaiting pickup at the warehouse
+          </h2>
+          <div className="rounded-2xl border border-info/30 bg-info/[0.04]">
+            <ul className="divide-y divide-info/15">
+              {readyRequests.map((r) => (
+                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
+                  <span className="min-w-0">
+                    <span className="font-medium">{r.rep.name}</span>{" "}
+                    <span className="text-muted-foreground">
+                      · {r.code} · {formatNumber(r.items.reduce((s, i) => s + i.issuedQty, 0))} pcs
+                      reserved at {r.warehouse?.name ?? "warehouse"}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                    prepared by {r.preparedBy?.name ?? "ORA team"}
+                    {r.preparedAt ? ` · ${timeAgo(r.preparedAt)}` : ""}
+                    <RejectStockRequestButton id={r.id} label="Cancel" />
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
       )}

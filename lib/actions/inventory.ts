@@ -58,6 +58,7 @@ export async function addStock(
         createdById: admin.id,
         reference: parsed.data.reference?.trim() || "Stock received",
         note: parsed.data.note?.trim() || null,
+        warehouseName: wh?.name ?? null,
       });
       // Land the units in the chosen warehouse's location ledger.
       await addWarehouseStock(tx, {
@@ -128,7 +129,8 @@ export async function adjustStock(
       : null;
     const whLabel = wh?.name ?? "the main warehouse";
 
-    // Validate a removal against the actual on-hand of the chosen warehouse.
+    // Validate a removal against FREE stock (onHand − reserved) of the chosen
+    // warehouse — never let an adjustment eat units reserved for a rep pickup.
     if (parsed.data.quantity < 0) {
       if (warehouseId) {
         const ws = await prisma.warehouseStock.findUnique({
@@ -136,9 +138,10 @@ export async function adjustStock(
             warehouseId_productId: { warehouseId, productId: parsed.data.productId },
           },
         });
-        if ((ws?.onHand ?? 0) + parsed.data.quantity < 0) {
+        const free = (ws?.onHand ?? 0) - (ws?.reserved ?? 0);
+        if (free + parsed.data.quantity < 0) {
           return fail(
-            `Only ${ws?.onHand ?? 0} units of ${inv.product.name} in ${whLabel} — can't remove that many.`,
+            `Only ${Math.max(0, free)} unreserved units of ${inv.product.name} in ${whLabel} — can't remove that many.`,
           );
         }
       } else if (inv.warehouseQty + parsed.data.quantity < 0) {
@@ -153,6 +156,7 @@ export async function adjustStock(
         quantity: parsed.data.quantity,
         createdById: admin.id,
         note: parsed.data.note?.trim() || `Manual adjustment · ${whLabel}`,
+        warehouseName: wh?.name ?? null,
       });
       // Keep the per-warehouse location ledger in lock-step so the two never
       // drift (invariant: Σ WarehouseStock.onHand == Inventory.warehouseQty).

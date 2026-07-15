@@ -4,16 +4,18 @@ import {
   type NavGroup,
 } from "@/components/dashboard/dashboard-shell";
 
+// Inventory operations only — no sales, pricing, finance or customer
+// management. Warehouse staff receive, prepare, dispatch and count stock.
 const nav: NavGroup[] = [
   { items: [{ href: "/warehouse", label: "Overview", icon: "dashboard" }] },
   {
     label: "Operations",
     items: [
-      { href: "/warehouse/orders", label: "Order fulfillment", icon: "requests" },
+      { href: "/warehouse/orders", label: "Partner orders", icon: "requests" },
+      { href: "/warehouse/rep-requests", label: "Rep requests", icon: "reps" },
       { href: "/warehouse/transfers", label: "Transfers", icon: "transfers" },
       { href: "/warehouse/returns", label: "Returns", icon: "returns" },
       { href: "/warehouse/receive", label: "Receive stock", icon: "receive" },
-      { href: "/warehouse/sales", label: "Record sale", icon: "sales" },
     ],
   },
   {

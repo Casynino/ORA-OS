@@ -30,13 +30,15 @@ export default async function WarehouseInventoryPage() {
     );
   }
 
-  const [stock, reservedRows] = await Promise.all([
+  const [stock, outgoingRows] = await Promise.all([
     prisma.warehouseStock.findMany({
       where: { warehouseId: me.warehouse.id },
-      include: { product: { select: { name: true, sku: true } } },
+      include: {
+        product: { select: { name: true, sku: true, unitsPerCarton: true } },
+      },
       orderBy: { onHand: "desc" },
     }),
-    // "Reserved" = committed to approved orders routed here but not yet delivered.
+    // "Outgoing" = committed to approved partner orders routed here, not yet delivered.
     prisma.requestItem.groupBy({
       by: ["productId"],
       where: {
@@ -48,25 +50,28 @@ export default async function WarehouseInventoryPage() {
       _sum: { quantity: true },
     }),
   ]);
-  const reservedByProduct = new Map(
-    reservedRows.map((r) => [r.productId, r._sum.quantity ?? 0]),
+  const outgoingByProduct = new Map(
+    outgoingRows.map((r) => [r.productId, r._sum.quantity ?? 0]),
   );
 
   const onHand = stock.reduce((s, r) => s + r.onHand, 0);
-  const reserved = stock.reduce(
-    (s, r) => s + (reservedByProduct.get(r.productId) ?? 0),
+  // Reserved = held for prepared rep pickups (WarehouseStock.reserved).
+  const reserved = stock.reduce((s, r) => s + r.reserved, 0);
+  const incoming = stock.reduce((s, r) => s + r.inTransit, 0);
+  const outgoing = stock.reduce(
+    (s, r) => s + (outgoingByProduct.get(r.productId) ?? 0),
     0,
   );
-  const inTransit = stock.reduce((s, r) => s + r.inTransit, 0);
 
   return (
     <div className="space-y-6">
       <PageHeader title="Inventory" description={`Stock held at ${me.warehouse.name}.`} />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="On hand" value={formatNumber(onHand)} accent="success" />
-        <StatCard label="Reserved" value={formatNumber(reserved)} accent="warning" />
-        <StatCard label="In transit" value={formatNumber(inTransit)} accent="info" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Available" value={formatNumber(onHand)} hint="units on hand" accent="success" />
+        <StatCard label="Reserved" value={formatNumber(reserved)} hint="held for pickup" accent="warning" />
+        <StatCard label="Incoming" value={formatNumber(incoming)} hint="transfers arriving" accent="info" />
+        <StatCard label="Outgoing" value={formatNumber(outgoing)} hint="committed to orders" accent="accent" />
       </div>
 
       <Card>
@@ -79,15 +84,19 @@ export default async function WarehouseInventoryPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Product</TableHead>
-                    <TableHead className="text-right">Available</TableHead>
+                    <TableHead className="text-right">Avail. cartons</TableHead>
+                    <TableHead className="text-right">Avail. pieces</TableHead>
                     <TableHead className="text-right">Reserved</TableHead>
-                    <TableHead className="text-right">In transit</TableHead>
-                    <TableHead>Last updated</TableHead>
+                    <TableHead className="text-right">Incoming</TableHead>
+                    <TableHead className="text-right">Outgoing</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {stock.map((r) => {
+                    const perCarton = r.product.unitsPerCarton || 24;
+                    const cartons = Math.floor(r.onHand / perCarton);
+                    const loosePieces = r.onHand % perCarton;
                     const status =
                       r.onHand <= 0
                         ? { label: "Out of stock", variant: "destructive" as const }
@@ -104,12 +113,14 @@ export default async function WarehouseInventoryPage() {
                             <span className="text-sm font-medium">{r.product.name}</span>
                           </div>
                         </TableCell>
-                        <TableCell data-label="Available" className="text-right font-medium">{formatNumber(r.onHand)}</TableCell>
-                        <TableCell data-label="Reserved" className="text-right text-muted-foreground">{formatNumber(reservedByProduct.get(r.productId) ?? 0)}</TableCell>
-                        <TableCell data-label="In transit" className="text-right text-muted-foreground">{formatNumber(r.inTransit)}</TableCell>
-                        <TableCell data-label="Last updated" className="whitespace-nowrap text-sm text-muted-foreground">
-                          {r.lastMoveAt ? formatDate(r.lastMoveAt) : "—"}
+                        <TableCell data-label="Avail. cartons" className="text-right font-medium">
+                          {formatNumber(cartons)}
+                          {loosePieces ? <span className="text-xs text-muted-foreground"> +{formatNumber(loosePieces)}</span> : null}
                         </TableCell>
+                        <TableCell data-label="Avail. pieces" className="text-right font-medium">{formatNumber(r.onHand)}</TableCell>
+                        <TableCell data-label="Reserved" className="text-right text-muted-foreground">{formatNumber(r.reserved)}</TableCell>
+                        <TableCell data-label="Incoming" className="text-right text-muted-foreground">{formatNumber(r.inTransit)}</TableCell>
+                        <TableCell data-label="Outgoing" className="text-right text-muted-foreground">{formatNumber(outgoingByProduct.get(r.productId) ?? 0)}</TableCell>
                         <TableCell data-label="Status">
                           <Badge variant={status.variant}>{status.label}</Badge>
                         </TableCell>

@@ -2,9 +2,10 @@ import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/ui/page-header";
 import { StockRequestForm } from "@/components/field/field-forms";
+import { ConfirmCollectionButton } from "@/components/field/confirm-collection";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Package } from "lucide-react";
+import { Package, MapPin } from "lucide-react";
 import { formatNumber, timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -39,9 +40,14 @@ export default async function RepStockPage() {
       where: { repId: me.id },
       orderBy: { createdAt: "desc" },
       take: 12,
-      include: { items: { include: { product: { select: { name: true } } } } },
+      include: {
+        items: { include: { product: { select: { name: true } } } },
+        warehouse: { select: { name: true, location: true } },
+      },
     }),
   ]);
+
+  const readyForPickup = requests.filter((r) => r.status === "READY");
 
   // Reps only see availability status — never the actual warehouse quantities.
   const productOpts = products.map((p) => {
@@ -65,6 +71,53 @@ export default async function RepStockPage() {
         title="My stock"
         description="Everything the warehouse has issued to you, and what's left in your hands."
       />
+
+      {/* Ready for pickup — collect at the warehouse and confirm in person */}
+      {readyForPickup.length > 0 && (
+        <section>
+          <h2 className="mb-3 font-display text-lg font-semibold">
+            Ready for pickup
+          </h2>
+          <div className="space-y-2">
+            {readyForPickup.map((r) => {
+              const units = r.items.reduce((s, i) => s + i.issuedQty, 0);
+              return (
+                <div key={r.id} className="rounded-2xl border border-info/40 bg-info/[0.05] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-1.5 text-sm font-semibold">
+                        <MapPin className="size-4 text-info" />
+                        Collect at {r.warehouse?.name ?? "the ORA warehouse"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {r.code} · {formatNumber(units)} pcs prepared
+                        {r.warehouse?.location ? ` · ${r.warehouse.location}` : ""}
+                      </p>
+                    </div>
+                    <ConfirmCollectionButton requestId={r.id} />
+                  </div>
+                  <ul className="mt-2.5 space-y-0.5 border-t border-info/20 pt-2.5">
+                    {r.items
+                      .filter((it) => it.issuedQty > 0)
+                      .map((it) => (
+                        <li key={it.id} className="flex items-center justify-between text-sm">
+                          <span className="min-w-0 truncate">{it.product.name}</span>
+                          <span className="shrink-0 font-medium">
+                            {formatNumber(it.issuedQty)} pcs
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Tap &ldquo;Confirm receipt&rdquo; only when the products are in your hands —
+                    that&apos;s when they move into your stock.
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* In hand */}
       <section>

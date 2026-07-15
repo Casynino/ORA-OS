@@ -177,15 +177,32 @@ export async function dispatchTransfer(id: string): Promise<ActionResult> {
       where: { warehouseId: t.fromId, productId: { in: t.items.map((i) => i.productId) } },
     });
     const map = new Map(sourceStock.map((s) => [s.productId, s]));
-    const short = t.items.filter((i) => (map.get(i.productId)?.onHand ?? 0) < i.quantity);
+    // Only free-to-promise units can leave — never dip into pieces reserved
+    // for a rep's prepared collection (would strand the pickup).
+    const short = t.items.filter((i) => {
+      const s = map.get(i.productId);
+      const free = (s?.onHand ?? 0) - (s?.reserved ?? 0);
+      return free < i.quantity;
+    });
     if (short.length > 0) {
       return fail(
-        `Source no longer has enough stock for ${short.map((i) => i.product.name).join(", ")}.`,
+        `Source doesn't have enough unreserved stock for ${short.map((i) => i.product.name).join(", ")} (some units are reserved for a rep pickup).`,
       );
     }
 
     await prisma.$transaction(async (tx) => {
       for (const i of t.items) {
+        // Re-check free-to-promise inside the tx so a reservation that landed
+        // after the pre-check can't be transferred away underneath a pickup.
+        const row = await tx.warehouseStock.findUnique({
+          where: { warehouseId_productId: { warehouseId: t.fromId, productId: i.productId } },
+        });
+        const free = (row?.onHand ?? 0) - (row?.reserved ?? 0);
+        if (free < i.quantity) {
+          throw new Error(
+            `${i.product.name}: only ${Math.max(0, free)} unreserved units available — some are reserved for a rep pickup.`,
+          );
+        }
         await tx.warehouseStock.update({
           where: { warehouseId_productId: { warehouseId: t.fromId, productId: i.productId } },
           data: {

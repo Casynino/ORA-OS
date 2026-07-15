@@ -15,7 +15,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { formatDate, formatNumber } from "@/lib/utils";
 
 export type WhOrderDTO = {
   id: string;
@@ -23,7 +23,6 @@ export type WhOrderDTO = {
   partner: string;
   products: string;
   totalQty: number;
-  total: number | null;
   payment: string;
   status: string;
   date: string;

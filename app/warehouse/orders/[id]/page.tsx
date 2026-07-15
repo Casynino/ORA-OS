@@ -18,7 +18,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { OrderFulfillActions } from "@/components/warehouse/order-fulfill-actions";
-import { formatCurrency, formatDateTime, formatNumber, humanize } from "@/lib/utils";
+import { formatDateTime, formatNumber, humanize } from "@/lib/utils";
 
 const STEPS = ["PRICED", "APPROVED", "IN_TRANSIT", "FULFILLED"] as const;
 const STEP_LABEL: Record<string, string> = {
@@ -44,19 +44,25 @@ export default async function WarehouseOrderDetailPage({
     where: { id },
     include: {
       requester: { select: { name: true, organization: true, phone: true, region: true } },
-      items: { include: { product: { select: { name: true, sku: true } } } },
+      items: {
+        include: {
+          product: { select: { name: true, sku: true, unitsPerCarton: true } },
+        },
+      },
     },
   });
-  // Warehouse staff only see orders routed to their own warehouse.
-  if (!order || (me?.warehouse && order.warehouseName !== me.warehouse.name)) {
+  // Warehouse staff only see orders routed to their own warehouse — an
+  // unassigned account sees nothing — and never before payment clears.
+  if (
+    !order ||
+    !me?.warehouse ||
+    order.warehouseName !== me.warehouse.name ||
+    order.paymentStatus === "UNPAID"
+  ) {
     notFound();
   }
 
   const totalQty = order.items.reduce((s, i) => s + i.quantity, 0);
-  const subtotal = order.items.reduce(
-    (s, i) => s + (i.lineTotal ?? (i.unitPrice ?? 0) * i.quantity),
-    0,
-  );
   const reachedIdx = STEPS.indexOf(order.status as (typeof STEPS)[number]);
 
   return (
@@ -91,7 +97,9 @@ export default async function WarehouseOrderDetailPage({
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Receipt className="size-4" /> Order
             </div>
-            <p className="mt-1.5 font-display text-lg font-semibold">{formatCurrency(order.totalAmount)}</p>
+            <p className="mt-1.5 font-display text-lg font-semibold">
+              {formatNumber(totalQty)} units
+            </p>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <Badge variant={order.paymentType === "CREDIT" ? "accent" : "secondary"}>
                 {humanize(order.paymentType)}
@@ -128,7 +136,6 @@ export default async function WarehouseOrderDetailPage({
               productId: i.productId,
               name: i.product.name,
               quantity: i.quantity,
-              unitPrice: i.unitPrice ?? 0,
             }))}
           />
         </CardContent>
@@ -187,32 +194,37 @@ export default async function WarehouseOrderDetailPage({
             <TableHeader>
               <TableRow>
                 <TableHead>Product</TableHead>
-                <TableHead className="text-right">Qty</TableHead>
-                <TableHead className="text-right">Unit price</TableHead>
-                <TableHead className="text-right">Line total</TableHead>
+                <TableHead className="text-right">Cartons</TableHead>
+                <TableHead className="text-right">Pieces</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {order.items.map((i) => (
-                <TableRow key={i.id}>
-                  <TableCell data-cardtitle>
-                    <div className="flex items-center gap-2.5">
-                      <span className="relative size-8 shrink-0 overflow-hidden rounded-md bg-muted">
-                        <Image src={productMeta(i.product.sku).image} alt={i.product.name} fill className="object-cover" sizes="32px" />
-                      </span>
-                      <span className="text-sm">{i.product.name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell data-label="Qty" className="text-right font-medium">{formatNumber(i.quantity)}</TableCell>
-                  <TableCell data-label="Unit price" className="text-right text-muted-foreground">{formatCurrency(i.unitPrice ?? 0)}</TableCell>
-                  <TableCell data-label="Line total" className="text-right">{formatCurrency(i.lineTotal ?? (i.unitPrice ?? 0) * i.quantity)}</TableCell>
-                </TableRow>
-              ))}
+              {order.items.map((i) => {
+                const meta = productMeta(i.product.sku);
+                const perCarton = i.product.unitsPerCarton || 24;
+                return (
+                  <TableRow key={i.id}>
+                    <TableCell data-cardtitle>
+                      <div className="flex items-center gap-2.5">
+                        <span className="relative size-8 shrink-0 overflow-hidden rounded-md bg-muted">
+                          <Image src={meta.image} alt={i.product.name} fill className="object-cover" sizes="32px" />
+                        </span>
+                        <span className="text-sm">{i.product.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell data-label="Cartons" className="text-right text-muted-foreground">
+                      {formatNumber(Math.floor(i.quantity / perCarton))}
+                      {i.quantity % perCarton ? ` +${formatNumber(i.quantity % perCarton)} pcs` : ""}
+                    </TableCell>
+                    <TableCell data-label="Pieces" className="text-right font-medium">{formatNumber(i.quantity)}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
           <div className="flex justify-between border-t border-border p-4 text-sm font-semibold">
-            <span>Total · {formatNumber(totalQty)} units</span>
-            <span>{formatCurrency(subtotal)}</span>
+            <span>Total to prepare</span>
+            <span>{formatNumber(totalQty)} units</span>
           </div>
         </CardContent>
       </Card>

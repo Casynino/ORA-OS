@@ -15,19 +15,41 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Boxes } from "lucide-react";
 import { formatNumber, formatDateTime, humanize } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 export default async function WarehouseMovementsPage() {
-  await requireRole("WAREHOUSE");
+  const session = await requireRole("WAREHOUSE");
+  const me = await prisma.user.findUnique({
+    where: { id: session.id },
+    include: { warehouse: true },
+  });
+  if (!me?.warehouse) {
+    return (
+      <EmptyState
+        icon={Boxes}
+        title="No warehouse assigned"
+        description="Ask an ORA admin to assign you to a warehouse."
+      />
+    );
+  }
+
+  // Only movements that physically involved this warehouse. Select just the
+  // operational fields — never ship product pricing into the warehouse payload.
   const movements = await prisma.stockMovement.findMany({
+    where: { warehouseName: me.warehouse.name },
     take: 80,
     orderBy: { createdAt: "desc" },
-    include: { product: true, createdBy: true },
+    include: {
+      product: { select: { name: true } },
+      createdBy: { select: { name: true } },
+    },
   });
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Stock movements"
-        description="The immutable ledger of every stock change."
+        description={`Every stock change involving ${me.warehouse.name}.`}
       />
       {movements.length === 0 ? (
         <EmptyState icon={Boxes} title="No movements yet" />
