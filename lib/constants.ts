@@ -21,20 +21,21 @@ export const ORA_CONTACT = {
 } as const;
 
 /**
- * Where partners send order payments. Shown on the order confirmation page.
- * Sample details for now — replace with the real ORA accounts when ready.
+ * Where partners send order payments — fallback shown on the order
+ * confirmation page when no PaymentAccounts are configured yet. The live
+ * source of truth is the PaymentAccount table (Finance → Accounts).
  */
 export const ORA_PAYMENT = {
   mobileMoney: {
-    label: "Mobile money (M-Pesa / Tigo Pesa / Airtel Money)",
-    name: "ORA-Pads",
-    number: "+255 750 849 736",
+    label: "Voda",
+    name: "ORA Sanitary Pads",
+    number: "58198034",
   },
   bank: {
     label: "Bank transfer",
-    bank: "CRDB Bank",
-    name: "ORA-Pads Ltd",
-    account: "0150 123 4567 00",
+    bank: "NMB Bank",
+    name: "ORA Sanitary Pads",
+    account: "24110012629",
   },
   note: "Use your order number (e.g. REQ-XXXX) as the payment reference.",
 } as const;

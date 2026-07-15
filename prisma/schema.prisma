@@ -122,80 +122,80 @@ enum Language {
 // ── Identity ───────────────────────────────────────────────────────────────
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
-  passwordHash String
-  name         String
-  phone        String?
-  role         Role       @default(PARTNER)
-  status       UserStatus @default(ACTIVE)
-  organization String? // business/partner name for partners
-  location     String?
-  creditLimit  Int? // admin-set credit ceiling (whole TSh) for partners
-  creditScore  Int  @default(0) // grows with each successfully repaid credit cycle
-  creditCycles Int  @default(0) // completed borrow→repay-in-full cycles
-  notes        String? // internal admin notes
-  applicationNote String? // applicant-facing: info the ORA team has requested
-  businessType     String? // Agent / Distributor / NGO / School / Retail chain
-  region           String?
-  district         String? // administrative district within the region
-  street           String? // street / physical address line
-  expectedVolume   String? // expected monthly purchase volume
-  preferredPayment String? // Cash / Credit
-  businessLicense  String? // licence number
-  taxId            String? // TIN / tax number
-  paymentTerms     String? // admin-set terms, e.g. "Net 30"
-  preferredName    String? // nickname used in greetings, e.g. "Recy"
-  avatar           String? // profile photo (/uploads/... or blob URL)
-  lastLoginAt      DateTime?
-  sessionVersion   Int      @default(0) // bump to sign the user out everywhere
-  assignedWarehouse String? // partner's fulfilling warehouse (admin-set, denormalised name); orders default here, hidden from the customer
-  warehouse    Warehouse? @relation("WarehouseStaff", fields: [warehouseId], references: [id])
-  warehouseId  String? // for WAREHOUSE staff — the warehouse they operate
-  position     String? // job title for warehouse staff, e.g. "Stock Controller"
+  id                 String     @id @default(cuid())
+  email              String     @unique
+  passwordHash       String
+  name               String
+  phone              String?
+  role               Role       @default(PARTNER)
+  status             UserStatus @default(ACTIVE)
+  organization       String? // business/partner name for partners
+  location           String?
+  creditLimit        Int? // admin-set credit ceiling (whole TSh) for partners
+  creditScore        Int        @default(0) // grows with each successfully repaid credit cycle
+  creditCycles       Int        @default(0) // completed borrow→repay-in-full cycles
+  notes              String? // internal admin notes
+  applicationNote    String? // applicant-facing: info the ORA team has requested
+  businessType       String? // Agent / Distributor / NGO / School / Retail chain
+  region             String?
+  district           String? // administrative district within the region
+  street             String? // street / physical address line
+  expectedVolume     String? // expected monthly purchase volume
+  preferredPayment   String? // Cash / Credit
+  businessLicense    String? // licence number
+  taxId              String? // TIN / tax number
+  paymentTerms       String? // admin-set terms, e.g. "Net 30"
+  preferredName      String? // nickname used in greetings, e.g. "Recy"
+  avatar             String? // profile photo (/uploads/... or blob URL)
+  lastLoginAt        DateTime?
+  sessionVersion     Int        @default(0) // bump to sign the user out everywhere
+  assignedWarehouse  String? // partner's fulfilling warehouse (admin-set, denormalised name); orders default here, hidden from the customer
+  warehouse          Warehouse? @relation("WarehouseStaff", fields: [warehouseId], references: [id])
+  warehouseId        String? // for WAREHOUSE staff — the warehouse they operate
+  position           String? // job title for warehouse staff, e.g. "Stock Controller"
   // Operational permission flags for warehouse staff (admin-configured).
-  canRecordSales     Boolean @default(false)
-  canCreateTransfers Boolean @default(false)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  canRecordSales     Boolean    @default(false)
+  canCreateTransfers Boolean    @default(false)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
-  requestsMade      Request[]         @relation("RequestRequester")
-  requestsReviewed  Request[]         @relation("RequestReviewer")
-  movementsCreated  StockMovement[]   @relation("MovementCreator")
-  donationsMade     Donation[]        @relation("DonationDonor")
-  donationsHandled  Donation[]        @relation("DonationHandler")
-  returnsMade       ReturnRequest[]   @relation("ReturnRequester")
-  returnsReviewed   ReturnRequest[]   @relation("ReturnReviewer")
-  creditAccounts    CreditAccount[]   @relation("CreditAgent")
-  creditsApproved   CreditAccount[]   @relation("CreditApprover")
-  paymentsRecorded  Payment[]         @relation("PaymentRecorder")
-  cycleLogs         CycleLog[]
-  activityLogs      ActivityLog[]     @relation("ActivityActor")
-  educationAuthored EducationContent[] @relation("ContentAuthor")
-  newsAuthored      NewsPost[]         @relation("NewsAuthor")
-  partnerPrices     PartnerPrice[]     @relation("PartnerPrices")
-  transfersCreated  WarehouseTransfer[] @relation("TransferCreator")
-  settlementsSubmitted SettlementRequest[] @relation("SettlementPartner")
-  settlementsReviewed  SettlementRequest[] @relation("SettlementReviewer")
-  contactMessages   ContactMessage[]   @relation("ContactSender")
+  requestsMade          Request[]            @relation("RequestRequester")
+  requestsReviewed      Request[]            @relation("RequestReviewer")
+  movementsCreated      StockMovement[]      @relation("MovementCreator")
+  donationsMade         Donation[]           @relation("DonationDonor")
+  donationsHandled      Donation[]           @relation("DonationHandler")
+  returnsMade           ReturnRequest[]      @relation("ReturnRequester")
+  returnsReviewed       ReturnRequest[]      @relation("ReturnReviewer")
+  creditAccounts        CreditAccount[]      @relation("CreditAgent")
+  creditsApproved       CreditAccount[]      @relation("CreditApprover")
+  paymentsRecorded      Payment[]            @relation("PaymentRecorder")
+  cycleLogs             CycleLog[]
+  activityLogs          ActivityLog[]        @relation("ActivityActor")
+  educationAuthored     EducationContent[]   @relation("ContentAuthor")
+  newsAuthored          NewsPost[]           @relation("NewsAuthor")
+  partnerPrices         PartnerPrice[]       @relation("PartnerPrices")
+  transfersCreated      WarehouseTransfer[]  @relation("TransferCreator")
+  settlementsSubmitted  SettlementRequest[]  @relation("SettlementPartner")
+  settlementsReviewed   SettlementRequest[]  @relation("SettlementReviewer")
+  contactMessages       ContactMessage[]     @relation("ContactSender")
   // Field sales (SALES_REP)
-  repStock          RepStock[]          @relation("RepStockRep")
-  repIssuesReceived RepStockIssue[]     @relation("RepIssueRep")
-  repIssuesGiven    RepStockIssue[]     @relation("RepIssuer")
-  repStockRequests  RepStockRequest[]   @relation("RepStockRequestRep")
-  fieldCustomers    FieldCustomer[]     @relation("RepCustomers")
-  fieldSales        FieldSale[]         @relation("RepSales")
-  fieldPaymentsRecorded FieldPayment[]  @relation("FieldPaymentRecorder")
-  sampleLogs        SampleLog[]         @relation("RepSamples")
-  fieldReports      FieldReport[]       @relation("RepReports")
-  repTargets        RepTarget[]         @relation("RepTargets")
+  repStock              RepStock[]           @relation("RepStockRep")
+  repIssuesReceived     RepStockIssue[]      @relation("RepIssueRep")
+  repIssuesGiven        RepStockIssue[]      @relation("RepIssuer")
+  repStockRequests      RepStockRequest[]    @relation("RepStockRequestRep")
+  fieldCustomers        FieldCustomer[]      @relation("RepCustomers")
+  fieldSales            FieldSale[]          @relation("RepSales")
+  fieldPaymentsRecorded FieldPayment[]       @relation("FieldPaymentRecorder")
+  sampleLogs            SampleLog[]          @relation("RepSamples")
+  fieldReports          FieldReport[]        @relation("RepReports")
+  repTargets            RepTarget[]          @relation("RepTargets")
   // Finance
-  expensesRecorded  Expense[]           @relation("ExpenseRecorder")
-  capitalRecorded   CapitalEntry[]      @relation("CapitalRecorder")
+  expensesRecorded      Expense[]            @relation("ExpenseRecorder")
+  capitalRecorded       CapitalEntry[]       @relation("CapitalRecorder")
   // Impact
-  impactActivities  ImpactActivity[]    @relation("ImpactActivityCreator")
-  loginEvents       LoginEvent[]
-  creditEvents      PartnerCreditEvent[] @relation("PartnerCreditEvents")
+  impactActivities      ImpactActivity[]     @relation("ImpactActivityCreator")
+  loginEvents           LoginEvent[]
+  creditEvents          PartnerCreditEvent[] @relation("PartnerCreditEvents")
 
   @@index([role])
   @@index([status])
@@ -374,33 +374,33 @@ model WarehouseTransferItem {
 // ── Catalogue & inventory ──────────────────────────────────────────────────
 
 model Product {
-  id          String          @id @default(cuid())
-  sku         String          @unique
-  name        String
-  description String?
-  category    ProductCategory @default(PADS)
-  unitLabel   String          @default("pack") // e.g. "pack of 8"
-  iconKey     String          @default("pads") // maps to a UI icon, never an external image
-  unitsPerCarton Int          @default(24) // pieces in one carton — cartons are a display unit, stock is stored in pieces
-  costPrice   Int             @default(0) // internal buying cost per piece (TSh)
-  price       Int             @default(0) // standard selling price per piece (TSh) — never public
-  notForSale  Boolean         @default(false) // e.g. free sample packs — no selling price, excluded from order/sell flows
-  isActive    Boolean         @default(true)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id             String          @id @default(cuid())
+  sku            String          @unique
+  name           String
+  description    String?
+  category       ProductCategory @default(PADS)
+  unitLabel      String          @default("pack") // e.g. "pack of 8"
+  iconKey        String          @default("pads") // maps to a UI icon, never an external image
+  unitsPerCarton Int             @default(24) // pieces in one carton — cartons are a display unit, stock is stored in pieces
+  costPrice      Int             @default(0) // internal buying cost per piece (TSh)
+  price          Int             @default(0) // standard selling price per piece (TSh) — never public
+  notForSale     Boolean         @default(false) // e.g. free sample packs — no selling price, excluded from order/sell flows
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
-  inventory      Inventory?
-  movements      StockMovement[]
-  requestItems   RequestItem[]
-  returnRequests ReturnRequest[]
-  partnerPrices  PartnerPrice[]
-  warehouseStock WarehouseStock[]
-  transferItems  WarehouseTransferItem[]
-  repStock       RepStock[]
-  repIssues      RepStockIssue[]
+  inventory            Inventory?
+  movements            StockMovement[]
+  requestItems         RequestItem[]
+  returnRequests       ReturnRequest[]
+  partnerPrices        PartnerPrice[]
+  warehouseStock       WarehouseStock[]
+  transferItems        WarehouseTransferItem[]
+  repStock             RepStock[]
+  repIssues            RepStockIssue[]
   repStockRequestItems RepStockRequestItem[]
-  fieldSaleItems FieldSaleItem[]
-  sampleLogs     SampleLog[]
+  fieldSaleItems       FieldSaleItem[]
+  sampleLogs           SampleLog[]
 
   @@index([category])
   @@index([isActive])
@@ -431,17 +431,20 @@ enum PaymentAccountType {
 }
 
 model PaymentAccount {
-  id        String             @id @default(cuid())
-  name      String // e.g. "Main Cash Office", "CRDB Bank", "M-Pesa Lipa"
-  type      PaymentAccountType
-  details   String? // account number / lipa number / branch
-  isActive  Boolean            @default(true)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id            String             @id @default(cuid())
+  name          String // provider / location: "NMB Bank", "Voda", "Cash"
+  type          PaymentAccountType
+  accountName   String? // holder shown to payers, e.g. "ORA Sanitary Pads"
+  accountNumber String? // bank account number or Lipa number
+  isActive      Boolean            @default(true)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
-  fieldSales    FieldSale[]
-  fieldPayments FieldPayment[]
-  payments      Payment[]
+  fieldSales         FieldSale[]
+  fieldPayments      FieldPayment[]
+  payments           Payment[]
+  settlementRequests SettlementRequest[]
+  requests           Request[]
 
   @@index([type])
   @@index([isActive])
@@ -470,34 +473,41 @@ model StockMovement {
 // ── Request-based orders ───────────────────────────────────────────────────
 
 model Request {
-  id           String        @id @default(cuid())
-  code         String        @unique
-  type         RequestType
-  status       RequestStatus @default(PENDING)
-  paymentType  PaymentType   @default(IMMEDIATE)
-  requester    User          @relation("RequestRequester", fields: [requesterId], references: [id])
-  requesterId  String
-  note          String? // requester message / special instructions
-  adminNote     String?
-  deliverTo       String? // delivery destination / recipient name
-  deliveryAddress String? // full delivery address
-  contactName     String? // person to contact on delivery
-  contactPhone    String? // contact phone number
-  deliverBy     DateTime? // preferred delivery date
-  warehouseName String? // fulfilling warehouse (denormalized label)
-  discount      Int           @default(0) // whole TSh off the order
-  deliveryCharge Int          @default(0) // whole TSh added for delivery
-  paymentStatus PaymentStatus @default(UNPAID)
+  id               String        @id @default(cuid())
+  code             String        @unique
+  type             RequestType
+  status           RequestStatus @default(PENDING)
+  paymentType      PaymentType   @default(IMMEDIATE)
+  requester        User          @relation("RequestRequester", fields: [requesterId], references: [id])
+  requesterId      String
+  note             String? // requester message / special instructions
+  adminNote        String?
+  deliverTo        String? // delivery destination / recipient name
+  deliveryAddress  String? // full delivery address
+  contactName      String? // person to contact on delivery
+  contactPhone     String? // contact phone number
+  deliverBy        DateTime? // preferred delivery date
+  warehouseName    String? // fulfilling warehouse (denormalized label)
+  discount         Int           @default(0) // whole TSh off the order
+  deliveryCharge   Int           @default(0) // whole TSh added for delivery
+  paymentStatus    PaymentStatus @default(UNPAID)
   paymentClaimedAt DateTime? // customer pressed "I have made payment" — awaiting admin verification
-  invoiceNo     String? // generated on approval
-  deliveredAt   DateTime? // delivery confirmation
-  totalAmount  Int? // computed once priced (whole KES)
-  reviewedBy   User?         @relation("RequestReviewer", fields: [reviewedById], references: [id])
-  reviewedById String?
-  reviewedAt   DateTime?
-  fulfilledAt  DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  // How and where the order's money was received (counter sales record it at
+  // creation; partner orders at admin payment confirmation).
+  paymentMethod    String?
+  paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  paymentAccountId String?
+  paymentReference String?
+  paidAt           DateTime? // when the money was confirmed received
+  invoiceNo        String? // generated on approval
+  deliveredAt      DateTime? // delivery confirmation
+  totalAmount      Int? // computed once priced (whole KES)
+  reviewedBy       User?         @relation("RequestReviewer", fields: [reviewedById], references: [id])
+  reviewedById     String?
+  reviewedAt       DateTime?
+  fulfilledAt      DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   items          RequestItem[]
   creditAccount  CreditAccount?
@@ -548,18 +558,18 @@ model CreditAccount {
 }
 
 model Payment {
-  id              String        @id @default(cuid())
-  creditAccount   CreditAccount @relation(fields: [creditAccountId], references: [id], onDelete: Cascade)
-  creditAccountId String
-  amount          Int
-  method          String? // cash, mobile money, bank
+  id               String          @id @default(cuid())
+  creditAccount    CreditAccount   @relation(fields: [creditAccountId], references: [id], onDelete: Cascade)
+  creditAccountId  String
+  amount           Int
+  method           String? // cash, mobile money, bank
   paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
   paymentAccountId String? // which company account received the funds
-  reference       String? // transaction reference (optional)
-  note            String?
-  recordedBy      User          @relation("PaymentRecorder", fields: [recordedById], references: [id])
-  recordedById    String
-  createdAt       DateTime      @default(now())
+  reference        String? // transaction reference (optional)
+  note             String?
+  recordedBy       User            @relation("PaymentRecorder", fields: [recordedById], references: [id])
+  recordedById     String
+  createdAt        DateTime        @default(now())
 
   @@index([creditAccountId])
   @@index([paymentAccountId])
@@ -574,23 +584,27 @@ enum SettlementStatus {
 // A partner-submitted payment claim against a credit batch. The ORA team
 // confirms it (→ creates a Payment & reduces the balance) or rejects it.
 model SettlementRequest {
-  id              String           @id @default(cuid())
-  code            String           @unique
-  partner         User             @relation("SettlementPartner", fields: [partnerId], references: [id])
-  partnerId       String
-  creditAccount   CreditAccount    @relation(fields: [creditAccountId], references: [id], onDelete: Cascade)
-  creditAccountId String
-  amount          Int
-  method          String?
-  reference       String?
-  note            String?
-  status          SettlementStatus @default(PENDING)
-  reviewedBy      User?            @relation("SettlementReviewer", fields: [reviewedById], references: [id])
-  reviewedById    String?
-  reviewedAt      DateTime?
-  paymentId       String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id               String           @id @default(cuid())
+  code             String           @unique
+  partner          User             @relation("SettlementPartner", fields: [partnerId], references: [id])
+  partnerId        String
+  creditAccount    CreditAccount    @relation(fields: [creditAccountId], references: [id], onDelete: Cascade)
+  creditAccountId  String
+  amount           Int
+  method           String?
+  // Which company account the partner says they paid into — pre-selects the
+  // receiving account when the admin confirms.
+  paymentAccount   PaymentAccount?  @relation(fields: [paymentAccountId], references: [id])
+  paymentAccountId String?
+  reference        String?
+  note             String?
+  status           SettlementStatus @default(PENDING)
+  reviewedBy       User?            @relation("SettlementReviewer", fields: [reviewedById], references: [id])
+  reviewedById     String?
+  reviewedAt       DateTime?
+  paymentId        String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@index([status])
   @@index([partnerId])
@@ -603,17 +617,17 @@ enum ContactStatus {
 
 // Partner → ORA team message thread (one message + optional reply).
 model ContactMessage {
-  id           String        @id @default(cuid())
-  sender       User          @relation("ContactSender", fields: [senderId], references: [id])
-  senderId     String
-  subject      String?
-  body         String
-  status       ContactStatus @default(OPEN)
-  reply        String?
-  repliedById  String?
-  repliedAt    DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id          String        @id @default(cuid())
+  sender      User          @relation("ContactSender", fields: [senderId], references: [id])
+  senderId    String
+  subject     String?
+  body        String
+  status      ContactStatus @default(OPEN)
+  reply       String?
+  repliedById String?
+  repliedAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   @@index([status])
   @@index([senderId])
@@ -622,26 +636,26 @@ model ContactMessage {
 // ── Returns ────────────────────────────────────────────────────────────────
 
 model ReturnRequest {
-  id           String       @id @default(cuid())
-  code         String       @unique
-  request      Request?     @relation(fields: [requestId], references: [id])
-  requestId    String?
-  product      Product      @relation(fields: [productId], references: [id])
-  productId    String
-  requester    User         @relation("ReturnRequester", fields: [requesterId], references: [id])
-  requesterId  String
-  quantity     Int
-  reason       String?
-  reasonType   String?
+  id            String       @id @default(cuid())
+  code          String       @unique
+  request       Request?     @relation(fields: [requestId], references: [id])
+  requestId     String?
+  product       Product      @relation(fields: [productId], references: [id])
+  productId     String
+  requester     User         @relation("ReturnRequester", fields: [requesterId], references: [id])
+  requesterId   String
+  quantity      Int
+  reason        String?
+  reasonType    String?
   warehouseName String?
-  status       ReturnStatus @default(PENDING)
-  reviewedBy   User?        @relation("ReturnReviewer", fields: [reviewedById], references: [id])
-  reviewedById String?
-  reviewedAt   DateTime?
-  receivedAt   DateTime?
-  adminNote    String?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  status        ReturnStatus @default(PENDING)
+  reviewedBy    User?        @relation("ReturnReviewer", fields: [reviewedById], references: [id])
+  reviewedById  String?
+  reviewedAt    DateTime?
+  receivedAt    DateTime?
+  adminNote     String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   @@index([status])
   @@index([requesterId])
@@ -885,7 +899,7 @@ model RepStockRequest {
   reviewedAt   DateTime?
   createdAt    DateTime              @default(now())
 
-  items        RepStockRequestItem[]
+  items RepStockRequestItem[]
 
   @@index([status])
   @@index([repId])
@@ -933,28 +947,28 @@ model FieldCustomer {
 
 /// A field sale (cash or credit). Stock is deducted atomically on creation.
 model FieldSale {
-  id           String             @id @default(cuid())
-  code         String             @unique
-  type         FieldSaleType
-  rep          User               @relation("RepSales", fields: [repId], references: [id])
-  repId        String
-  customer     FieldCustomer?     @relation(fields: [customerId], references: [id])
-  customerId   String? // required for CREDIT
-  customerName String? // optional walk-in name for CASH sales
-  location     String?
-  total        Int // whole TSh
-  amountPaid   Int                @default(0) // CASH ⇒ equals total
-  creditStatus FieldCreditStatus? // null for CASH sales
+  id               String             @id @default(cuid())
+  code             String             @unique
+  type             FieldSaleType
+  rep              User               @relation("RepSales", fields: [repId], references: [id])
+  repId            String
+  customer         FieldCustomer?     @relation(fields: [customerId], references: [id])
+  customerId       String? // required for CREDIT
+  customerName     String? // optional walk-in name for CASH sales
+  location         String?
+  total            Int // whole TSh
+  amountPaid       Int                @default(0) // CASH ⇒ equals total
+  creditStatus     FieldCreditStatus? // null for CASH sales
   paymentMethod    String? // CASH sales: Cash / Bank Transfer / Mobile Money
-  paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  paymentAccount   PaymentAccount?    @relation(fields: [paymentAccountId], references: [id])
   paymentAccountId String? // which company account received the cash
-  reference    String? // transaction reference (optional)
-  dueDate      DateTime?
-  note         String?
-  voided       Boolean            @default(false) // admin correction — restores stock
-  voidReason   String?
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  reference        String? // transaction reference (optional)
+  dueDate          DateTime?
+  note             String?
+  voided           Boolean            @default(false) // admin correction — restores stock
+  voidReason       String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   items    FieldSaleItem[]
   payments FieldPayment[]
@@ -980,18 +994,18 @@ model FieldSaleItem {
 
 /// A collection against a credit sale (rep or admin records it).
 model FieldPayment {
-  id           String    @id @default(cuid())
-  sale         FieldSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  saleId       String
-  amount       Int
-  method       String? // cash, mobile money, bank
+  id               String          @id @default(cuid())
+  sale             FieldSale       @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId           String
+  amount           Int
+  method           String? // cash, mobile money, bank
   paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
   paymentAccountId String? // which company account received the funds
-  reference    String? // transaction reference (optional)
-  note         String?
-  recordedBy   User      @relation("FieldPaymentRecorder", fields: [recordedById], references: [id])
-  recordedById String
-  createdAt    DateTime  @default(now())
+  reference        String? // transaction reference (optional)
+  note             String?
+  recordedBy       User            @relation("FieldPaymentRecorder", fields: [recordedById], references: [id])
+  recordedById     String
+  createdAt        DateTime        @default(now())
 
   @@index([saleId])
   @@index([paymentAccountId])

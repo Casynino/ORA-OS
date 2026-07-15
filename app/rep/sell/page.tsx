@@ -38,7 +38,7 @@ export default async function RepSellPage() {
     prisma.paymentAccount.findMany({
       where: { isActive: true },
       orderBy: [{ type: "asc" }, { name: "asc" }],
-      select: { id: true, name: true, type: true, details: true },
+      select: { id: true, name: true, type: true, accountName: true, accountNumber: true },
     }),
   ]);
 

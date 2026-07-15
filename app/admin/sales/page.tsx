@@ -8,7 +8,7 @@ import { SalesTable, type SaleRow } from "@/components/admin/sales-table";
 import { WALKIN_EMAIL } from "@/lib/constants";
 
 export default async function AdminSalesPage() {
-  const [sales, partners, products, partnerPrices] = await Promise.all([
+  const [sales, partners, products, partnerPrices, receivingAccounts] = await Promise.all([
     prisma.request.findMany({
       where: { status: "FULFILLED" },
       orderBy: { fulfilledAt: "desc" },
@@ -29,6 +29,11 @@ export default async function AdminSalesPage() {
       orderBy: { price: "desc" },
     }),
     prisma.partnerPrice.findMany(),
+    prisma.paymentAccount.findMany({
+      where: { isActive: true },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, type: true, accountName: true, accountNumber: true },
+    }),
   ]);
   const total = sales.reduce((s, r) => s + (r.totalAmount ?? 0), 0);
 
@@ -66,6 +71,7 @@ export default async function AdminSalesPage() {
           partners={partners}
           products={saleProducts}
           priceMap={priceMap}
+          receivingAccounts={receivingAccounts}
         />
       </PageHeader>
       <div className="grid gap-4 sm:grid-cols-2">

@@ -31,7 +31,7 @@ export default async function AgentCreditPage() {
   const me = await prisma.user.findUnique({ where: { id: session.id } });
   if (!me) notFound();
 
-  const [accounts, settlements, creditEvents] = await Promise.all([
+  const [accounts, settlements, creditEvents, receivingAccounts] = await Promise.all([
     prisma.creditAccount.findMany({
       where: { agentId: me.id },
       orderBy: [{ status: "asc" }, { dueDate: "asc" }],
@@ -49,6 +49,11 @@ export default async function AgentCreditPage() {
       where: { partnerId: me.id },
       orderBy: { createdAt: "desc" },
       take: 12,
+    }),
+    prisma.paymentAccount.findMany({
+      where: { isActive: true },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, type: true, accountName: true, accountNumber: true },
     }),
   ]);
 
@@ -117,7 +122,7 @@ export default async function AgentCreditPage() {
         title="Credit & payments"
         description="Your revolving credit facility with ORA — every repayment restores your available credit instantly, and full on-time repayment grows your limit automatically."
       >
-        <SubmitSettlement accounts={openAccounts} />
+        <SubmitSettlement accounts={openAccounts} receivingAccounts={receivingAccounts} />
       </PageHeader>
 
       {/* Standing banner */}

@@ -8,6 +8,7 @@ import { logActivity } from "@/lib/activity";
 import { applyMovement } from "@/lib/services/inventory";
 import { deductWarehouseStock } from "@/lib/services/warehouse-stock";
 import { getPartnerCredit } from "@/lib/services/credit";
+import { resolveReceivingAccount } from "@/lib/payment-methods";
 import { refCode, formatCurrency } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
@@ -1034,6 +1035,7 @@ export async function partnerUpdateOrder(
 export async function confirmOrderPayment(
   requestId: string,
   method?: string,
+  paymentAccountId?: string,
 ): Promise<ActionResult> {
   try {
     const admin = await requireActor(["ADMIN"]);
@@ -1049,9 +1051,20 @@ export async function confirmOrderPayment(
       return fail("This order is not awaiting payment confirmation.");
     }
 
+    // Trace the money: which company account received the order payment.
+    const receiving = await resolveReceivingAccount(
+      prisma,
+      paymentAccountId || null,
+      method,
+    );
     await prisma.request.update({
       where: { id: request.id },
-      data: { paymentStatus: "PAID" },
+      data: {
+        paymentStatus: "PAID",
+        paymentMethod: receiving.method,
+        paymentAccountId: receiving.paymentAccountId,
+        paidAt: new Date(),
+      },
     });
     await logActivity({
       actorId: admin.id,

@@ -36,7 +36,7 @@ export default async function AdminRequestDetailPage({
   });
   if (!r) notFound();
 
-  const [credits, products, partnerPrices] = await Promise.all([
+  const [credits, products, partnerPrices, receivingAccounts] = await Promise.all([
     prisma.creditAccount.aggregate({
       where: { agentId: r.requesterId, status: { not: "SETTLED" } },
       _sum: { principal: true, amountPaid: true },
@@ -47,6 +47,11 @@ export default async function AdminRequestDetailPage({
       select: { id: true, name: true, sku: true, price: true },
     }),
     prisma.partnerPrice.findMany({ where: { partnerId: r.requesterId } }),
+    prisma.paymentAccount.findMany({
+      where: { isActive: true },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, type: true, accountName: true, accountNumber: true },
+    }),
   ]);
 
   const outstanding =
@@ -110,6 +115,7 @@ export default async function AdminRequestDetailPage({
     <AdminRequestDetail
       key={`${r.status}-${r.totalAmount ?? "x"}-${r.items.length}`}
       request={dto}
+      receivingAccounts={receivingAccounts}
     />
   );
 }

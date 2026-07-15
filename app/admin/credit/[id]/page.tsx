@@ -51,7 +51,7 @@ export default async function AdminCreditOrderPage({
   const receivingAccounts = await prisma.paymentAccount.findMany({
     where: { isActive: true },
     orderBy: [{ type: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, type: true, details: true },
+    select: { id: true, name: true, type: true, accountName: true, accountNumber: true },
   });
 
   let running = 0;
@@ -104,6 +104,7 @@ export default async function AdminCreditOrderPage({
       code: s.code,
       amount: s.amount,
       method: s.method,
+      paymentAccountId: s.paymentAccountId,
       reference: s.reference,
       note: s.note,
       status: s.status,

@@ -100,6 +100,7 @@ export type SettlementDTO = {
   batchCode: string;
   amount: number;
   method: string | null;
+  paymentAccountId: string | null;
   reference: string | null;
   status: string;
   createdAt: string;
@@ -478,7 +479,7 @@ function PendingPayments({
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-              <ConfirmSettlement id={s.id} accounts={receivingAccounts} onDone={onRefresh} />
+              <ConfirmSettlement id={s.id} accounts={receivingAccounts} declaredAccountId={s.paymentAccountId} onDone={onRefresh} />
               <Button
                 size="sm"
                 variant="outline"
@@ -1008,6 +1009,7 @@ function SettlementsTable({
                           <ConfirmSettlement
                             id={s.id}
                             accounts={receivingAccounts}
+                            declaredAccountId={s.paymentAccountId}
                             onDone={() => router.refresh()}
                           />
                           <Button
@@ -1539,19 +1541,31 @@ function FieldCollections({ credits }: { credits: FieldCreditDTO[] }) {
   );
 }
 
-/** Confirm a settlement while recording which company account received it. */
+/** Confirm a settlement while recording which company account received it.
+ * Defaults to the account the partner declared when submitting. */
 function ConfirmSettlement({
   id,
   accounts,
+  declaredAccountId,
   onDone,
 }: {
   id: string;
   accounts: ReceivingAccount[];
+  declaredAccountId?: string | null;
   onDone: () => void;
 }) {
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
+  const declared = accounts.find((a) => a.id === declaredAccountId);
+  // Partner declared an account that has since been deactivated — make the
+  // admin consciously pick where the money actually landed.
+  const declaredMissing = !!declaredAccountId && !declared;
+  const [accountId, setAccountId] = useState(declared?.id ?? accounts[0]?.id ?? "");
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5">
+      {declaredMissing && (
+        <span className="w-full text-[11px] text-warning">
+          Declared account is deactivated — pick where the money landed.
+        </span>
+      )}
       {accounts.length > 0 && (
         <select
           value={accountId}

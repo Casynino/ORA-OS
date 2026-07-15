@@ -31,6 +31,7 @@ export default async function AdminCreditPage() {
     batchCode: s.creditAccount.request.code,
     amount: s.amount,
     method: s.method,
+    paymentAccountId: s.paymentAccountId,
     reference: s.reference,
     status: s.status,
     createdAt: s.createdAt.toISOString(),
@@ -151,7 +152,7 @@ export default async function AdminCreditPage() {
   const paymentAccounts = await prisma.paymentAccount.findMany({
     where: { isActive: true },
     orderBy: [{ type: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, type: true, details: true },
+    select: { id: true, name: true, type: true, accountName: true, accountNumber: true },
   });
 
   return (

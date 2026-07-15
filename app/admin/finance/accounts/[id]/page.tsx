@@ -14,6 +14,7 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
+import { WALKIN_EMAIL } from "@/lib/constants";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +34,7 @@ export default async function AccountLedgerPage({
   const account = await prisma.paymentAccount.findUnique({ where: { id } });
   if (!account) notFound();
 
-  const [cashSales, fieldPays, partnerPays] = await Promise.all([
+  const [cashSales, fieldPays, partnerPays, orderPays] = await Promise.all([
     prisma.fieldSale.findMany({
       where: { paymentAccountId: id, voided: false },
       include: {
@@ -65,6 +66,14 @@ export default async function AccountLedgerPage({
             agent: { select: { name: true } },
           },
         },
+      },
+    }),
+    // Paid orders: counter/walk-in sales and confirmed partner order payments.
+    prisma.request.findMany({
+      where: { paymentAccountId: id, paymentStatus: "PAID" },
+      include: {
+        requester: { select: { name: true, email: true } },
+        reviewedBy: { select: { name: true } },
       },
     }),
   ]);
@@ -118,6 +127,22 @@ export default async function AccountLedgerPage({
       saleCode: p.creditAccount.request.code,
       recordedBy: p.recordedBy.name,
     })),
+    ...orderPays.map((r) => ({
+      id: `op-${r.id}`,
+      at: r.paidAt ?? r.createdAt,
+      kind: r.requester.email === WALKIN_EMAIL ? "Counter sale" : "Order payment",
+      customer:
+        r.requester.email === WALKIN_EMAIL
+          ? r.deliverTo?.trim() || "Walk-in customer"
+          : r.requester.name,
+      rep: null,
+      method: r.paymentMethod,
+      amount: r.totalAmount ?? 0,
+      reference: r.paymentReference,
+      saleCode:
+        r.requester.email === WALKIN_EMAIL ? r.code.replace("REQ", "SALE") : r.code,
+      recordedBy: r.reviewedBy?.name ?? "—",
+    })),
   ].sort((a, b) => +b.at - +a.at);
 
   const total = rows.reduce((s, r) => s + r.amount, 0);
@@ -146,7 +171,10 @@ export default async function AccountLedgerPage({
           </h1>
           <p className="text-sm text-muted-foreground">
             {TYPE_LABEL[account.type]}
-            {account.details ? ` · ${account.details}` : ""}
+            {account.accountName ? ` · ${account.accountName}` : ""}
+            {account.accountNumber
+              ? ` · ${account.type === "MOBILE_MONEY" ? "Lipa" : "A/C"} ${account.accountNumber}`
+              : ""}
           </p>
         </div>
       </div>

@@ -18,10 +18,12 @@ import {
   Receipt,
   Smartphone,
   Building2,
+  Banknote,
   CreditCard,
   CheckCircle2,
   Clock,
 } from "lucide-react";
+import type { ReceivingAccount } from "@/components/ui/receiving-account-picker";
 import {
   partnerUpdateOrder,
   cancelRequest,
@@ -78,7 +80,13 @@ const TONE_VARIANT: Record<
 
 type Line = { productId: string; name: string; sku: string; qty: string; price: number };
 
-export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
+export function PartnerOrderDetail({
+  order,
+  receivingAccounts = [],
+}: {
+  order: POrderDTO;
+  receivingAccounts?: ReceivingAccount[];
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const editable = order.status === "PENDING" || order.status === "PRICED";
@@ -225,7 +233,9 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
       {/* Payment panel (cash orders awaiting / under payment) */}
       {order.status === "APPROVED" &&
         order.paymentType === "IMMEDIATE" &&
-        order.paymentStatus === "UNPAID" && <PaymentPanel order={order} />}
+        order.paymentStatus === "UNPAID" && (
+          <PaymentPanel order={order} receivingAccounts={receivingAccounts} />
+        )}
 
       {/* Friendly status message for every other stage */}
       {showStatusMessage && (
@@ -477,7 +487,13 @@ export function PartnerOrderDetail({ order }: { order: POrderDTO }) {
 }
 
 /** Order confirmation + payment panel for an approved cash order. */
-function PaymentPanel({ order }: { order: POrderDTO }) {
+function PaymentPanel({
+  order,
+  receivingAccounts = [],
+}: {
+  order: POrderDTO;
+  receivingAccounts?: ReceivingAccount[];
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const claimed = !!order.paymentClaimedAt;
@@ -535,34 +551,73 @@ function PaymentPanel({ order }: { order: POrderDTO }) {
             . The ORA team confirms it and your order moves into fulfilment.
           </p>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-border bg-card p-3.5">
-              <p className="flex items-center gap-2 text-sm font-semibold">
-                <Smartphone className="size-4 text-primary" /> Mobile money
-              </p>
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                {ORA_PAYMENT.mobileMoney.label}
-              </p>
-              <p className="mt-1 text-sm">
-                {ORA_PAYMENT.mobileMoney.name} ·{" "}
-                <span className="font-medium">
-                  {ORA_PAYMENT.mobileMoney.number}
-                </span>
-              </p>
+          {receivingAccounts.length > 0 ? (
+            // Live company accounts — managed by the ORA team in Finance.
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {receivingAccounts
+                .filter((a) => a.type !== "CASH")
+                .map((a) => (
+                  <div key={a.id} className="rounded-xl border border-border bg-card p-3.5">
+                    <p className="flex items-center gap-2 text-sm font-semibold">
+                      {a.type === "MOBILE_MONEY" ? (
+                        <Smartphone className="size-4 text-primary" />
+                      ) : (
+                        <Building2 className="size-4 text-primary" />
+                      )}
+                      {a.name}
+                    </p>
+                    {a.accountName && (
+                      <p className="mt-1.5 text-xs text-muted-foreground">{a.accountName}</p>
+                    )}
+                    {a.accountNumber && (
+                      <p className="mt-1 text-sm">
+                        {a.type === "MOBILE_MONEY" ? "Lipa Number" : "Account"}:{" "}
+                        <span className="font-medium">{a.accountNumber}</span>
+                      </p>
+                    )}
+                  </div>
+                ))}
+              {receivingAccounts.some((a) => a.type === "CASH") && (
+                <div className="rounded-xl border border-border bg-card p-3.5">
+                  <p className="flex items-center gap-2 text-sm font-semibold">
+                    <Banknote className="size-4 text-primary" /> Cash Payment
+                  </p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Pay in cash on delivery or at the ORA office.
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="rounded-xl border border-border bg-card p-3.5">
-              <p className="flex items-center gap-2 text-sm font-semibold">
-                <Building2 className="size-4 text-primary" /> Bank transfer
-              </p>
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                {ORA_PAYMENT.bank.bank}
-              </p>
-              <p className="mt-1 text-sm">
-                {ORA_PAYMENT.bank.name} ·{" "}
-                <span className="font-medium">{ORA_PAYMENT.bank.account}</span>
-              </p>
+          ) : (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-border bg-card p-3.5">
+                <p className="flex items-center gap-2 text-sm font-semibold">
+                  <Smartphone className="size-4 text-primary" /> {ORA_PAYMENT.mobileMoney.label}
+                </p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {ORA_PAYMENT.mobileMoney.name}
+                </p>
+                <p className="mt-1 text-sm">
+                  Lipa Number:{" "}
+                  <span className="font-medium">
+                    {ORA_PAYMENT.mobileMoney.number}
+                  </span>
+                </p>
+              </div>
+              <div className="rounded-xl border border-border bg-card p-3.5">
+                <p className="flex items-center gap-2 text-sm font-semibold">
+                  <Building2 className="size-4 text-primary" /> {ORA_PAYMENT.bank.bank}
+                </p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {ORA_PAYMENT.bank.name}
+                </p>
+                <p className="mt-1 text-sm">
+                  Account:{" "}
+                  <span className="font-medium">{ORA_PAYMENT.bank.account}</span>
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           <p className="mt-3 text-xs text-muted-foreground">
             {ORA_PAYMENT.note.replace("REQ-XXXX", order.code)}

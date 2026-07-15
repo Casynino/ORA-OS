@@ -9,18 +9,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import {
+  ReceivingAccountPicker,
+  METHOD_LABELS,
+  type ReceivingAccount,
+} from "@/components/ui/receiving-account-picker";
 import { toast } from "@/components/ui/use-toast";
 import { formatCurrency } from "@/lib/utils";
 
 export type SettlementAccount = { id: string; code: string; remaining: number };
 
-export function SubmitSettlement({ accounts }: { accounts: SettlementAccount[] }) {
+export function SubmitSettlement({
+  accounts,
+  receivingAccounts = [],
+}: {
+  accounts: SettlementAccount[];
+  receivingAccounts?: ReceivingAccount[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState("Mobile money");
+  const [method, setMethod] = useState(
+    receivingAccounts[0]?.type ?? "MOBILE_MONEY",
+  );
+  const [payAccountId, setPayAccountId] = useState("");
   const [reference, setReference] = useState("");
 
   const selected = accounts.find((a) => a.id === accountId);
@@ -33,11 +47,14 @@ export function SubmitSettlement({ accounts }: { accounts: SettlementAccount[] }
     if (!amt || amt < 1) return toast({ variant: "error", title: "Enter an amount." });
     if (selected && amt > selected.remaining)
       return toast({ variant: "error", title: `Max ${formatCurrency(selected.remaining)} on this batch.` });
+    if (receivingAccounts.length > 0 && !payAccountId)
+      return toast({ variant: "error", title: "Choose where you paid." });
     start(async () => {
       const res = await submitSettlement({
         creditAccountId: accountId,
         amount: amt,
-        method,
+        method: METHOD_LABELS[method] ?? method,
+        paymentAccountId: payAccountId || undefined,
         reference: reference || undefined,
       });
       if (res.ok) {
@@ -76,36 +93,27 @@ export function SubmitSettlement({ accounts }: { accounts: SettlementAccount[] }
                 ))}
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Amount</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={selected?.remaining}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="mt-1.5"
-                />
-              </div>
-              <div>
-                <Label>Method</Label>
-                <Select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1.5">
-                  <option>Mobile money</option>
-                  <option>Bank transfer</option>
-                  <option>Cash</option>
-                </Select>
-              </div>
-            </div>
             <div>
-              <Label>Reference (optional)</Label>
+              <Label>Amount</Label>
               <Input
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                placeholder="Transaction ID / receipt no."
+                type="number"
+                min={1}
+                max={selected?.remaining}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
                 className="mt-1.5"
               />
             </div>
+            <ReceivingAccountPicker
+              accounts={receivingAccounts}
+              method={method}
+              accountId={payAccountId}
+              reference={reference}
+              onMethod={setMethod}
+              onAccount={setPayAccountId}
+              onReference={setReference}
+              payerView
+            />
             <Button className="w-full" onClick={submit} disabled={pending}>
               {pending ? "Submitting…" : "Submit for confirmation"}
             </Button>
