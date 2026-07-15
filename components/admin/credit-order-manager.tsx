@@ -78,6 +78,7 @@ export type CreditOrderDTO = {
     code: string;
     amount: number;
     method: string | null;
+    paymentAccountId: string | null;
     reference: string | null;
     note: string | null;
     status: string;
@@ -257,6 +258,7 @@ export function CreditOrderManager({
                       <SettleAccountSelect
                         accounts={receivingAccounts}
                         settlementId={s.id}
+                        declaredAccountId={s.paymentAccountId}
                         onDone={() => router.refresh()}
                       />
                     )}
@@ -537,19 +539,31 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Account select + confirm for a pending settlement on the order page. */
+/** Account select + confirm for a pending settlement on the order page.
+ * Defaults to the account the partner declared when submitting. */
 function SettleAccountSelect({
   accounts,
   settlementId,
+  declaredAccountId,
   onDone,
 }: {
   accounts: ReceivingAccount[];
   settlementId: string;
+  declaredAccountId?: string | null;
   onDone: () => void;
 }) {
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
+  const declared = accounts.find((a) => a.id === declaredAccountId);
+  // Partner declared an account that has since been deactivated — make the
+  // admin consciously pick where the money actually landed.
+  const declaredMissing = !!declaredAccountId && !declared;
+  const [accountId, setAccountId] = useState(declared?.id ?? accounts[0]?.id ?? "");
   return (
     <>
+      {declaredMissing && (
+        <span className="w-full text-[11px] text-warning">
+          Declared account is deactivated — pick where the money landed.
+        </span>
+      )}
       <select
         value={accountId}
         onChange={(e) => setAccountId(e.target.value)}

@@ -10,6 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  ReceivingAccountPicker,
+  METHOD_LABELS,
+  type ReceivingAccount,
+} from "@/components/ui/receiving-account-picker";
 import { toast } from "@/components/ui/use-toast";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
@@ -26,11 +31,13 @@ export function RecordCashSale({
   partners,
   products,
   priceMap,
+  receivingAccounts = [],
 }: {
   partners: SalePartner[];
   products: SaleProduct[];
   // keyed `${partnerId}:${productId}` → agreed unit price
   priceMap: Record<string, number>;
+  receivingAccounts?: ReceivingAccount[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -38,7 +45,9 @@ export function RecordCashSale({
   const [partnerId, setPartnerId] = useState("WALKIN");
   const [customerName, setCustomerName] = useState("");
   const [qty, setQty] = useState<Record<string, number>>({});
-  const [method, setMethod] = useState("Cash");
+  const [method, setMethod] = useState(receivingAccounts[0]?.type ?? "CASH");
+  const [accountId, setAccountId] = useState("");
+  const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const isWalkin = partnerId === "WALKIN";
 
@@ -68,7 +77,9 @@ export function RecordCashSale({
   function reset() {
     setQty({});
     setNote("");
-    setMethod("Cash");
+    setMethod(receivingAccounts[0]?.type ?? "CASH");
+    setAccountId("");
+    setReference("");
     setCustomerName("");
   }
 
@@ -81,12 +92,18 @@ export function RecordCashSale({
       toast({ variant: "error", title: "Add at least one product." });
       return;
     }
+    if (receivingAccounts.length > 0 && !accountId) {
+      toast({ variant: "error", title: "Choose the receiving account." });
+      return;
+    }
     start(async () => {
       const res = await recordCashSale({
         partnerId,
         customerName: isWalkin ? customerName || undefined : undefined,
         items: lines.map((l) => ({ productId: l.id, quantity: l.q })),
-        method,
+        method: METHOD_LABELS[method] ?? method,
+        paymentAccountId: accountId || undefined,
+        reference: reference || undefined,
         note: note || undefined,
       });
       if (res.ok) {
@@ -197,28 +214,29 @@ export function RecordCashSale({
               })}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Payment</Label>
-                <Select
-                  value={method}
-                  onChange={(e) => setMethod(e.target.value)}
-                  className="mt-1.5"
-                >
-                  <option>Cash</option>
-                  <option>Mobile money</option>
-                  <option>Bank transfer</option>
-                </Select>
-              </div>
-              <div>
-                <Label>Note (optional)</Label>
-                <Input
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Reference…"
-                  className="mt-1.5"
+            <div>
+              <Label>Payment received</Label>
+              <div className="mt-1.5">
+                <ReceivingAccountPicker
+                  accounts={receivingAccounts}
+                  method={method}
+                  accountId={accountId}
+                  reference={reference}
+                  onMethod={setMethod}
+                  onAccount={setAccountId}
+                  onReference={setReference}
+                  compact
                 />
               </div>
+            </div>
+            <div>
+              <Label>Note (optional)</Label>
+              <Input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Anything worth noting…"
+                className="mt-1.5"
+              />
             </div>
 
             {/* Total */}

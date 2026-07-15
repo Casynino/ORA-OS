@@ -16,7 +16,8 @@ function revalidateAccounts() {
 const createSchema = z.object({
   name: z.string().min(2, "Give the account a name.").max(80),
   type: z.enum(["CASH", "BANK", "MOBILE_MONEY"]),
-  details: z.string().max(120).optional().or(z.literal("")),
+  accountName: z.string().max(120).optional().or(z.literal("")),
+  accountNumber: z.string().max(60).optional().or(z.literal("")),
 });
 
 export async function createPaymentAccount(
@@ -30,7 +31,12 @@ export async function createPaymentAccount(
     }
     const d = parsed.data;
     const account = await prisma.paymentAccount.create({
-      data: { name: d.name.trim(), type: d.type, details: d.details?.trim() || null },
+      data: {
+        name: d.name.trim(),
+        type: d.type,
+        accountName: d.accountName?.trim() || null,
+        accountNumber: d.accountNumber?.trim() || null,
+      },
     });
     await logActivity({
       actorId: admin.id,
@@ -50,7 +56,8 @@ export async function createPaymentAccount(
 const updateSchema = z.object({
   accountId: z.string().min(1),
   name: z.string().min(2).max(80).optional(),
-  details: z.string().max(120).optional(),
+  accountName: z.string().max(120).optional(),
+  accountNumber: z.string().max(60).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -69,8 +76,14 @@ export async function updatePaymentAccount(
       where: { id: accountId },
       data: {
         name: rest.name?.trim() ?? account.name,
-        details:
-          rest.details !== undefined ? rest.details.trim() || null : account.details,
+        accountName:
+          rest.accountName !== undefined
+            ? rest.accountName.trim() || null
+            : account.accountName,
+        accountNumber:
+          rest.accountNumber !== undefined
+            ? rest.accountNumber.trim() || null
+            : account.accountNumber,
         isActive: rest.isActive ?? account.isActive,
       },
     });

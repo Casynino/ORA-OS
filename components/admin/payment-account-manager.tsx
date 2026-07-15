@@ -15,10 +15,42 @@ import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 
 const TYPE_OPTIONS = [
-  { value: "CASH", label: "Cash account (office / petty cash)" },
+  { value: "CASH", label: "Cash (office / collection point)" },
   { value: "BANK", label: "Bank account" },
-  { value: "MOBILE_MONEY", label: "Mobile money (Lipa / merchant)" },
+  { value: "MOBILE_MONEY", label: "Mobile money (Lipa number)" },
 ];
+
+/** Field labels adapt to the account type so admin enters the right things. */
+function fieldLabels(type: string) {
+  if (type === "BANK") {
+    return {
+      name: "Bank name",
+      namePh: "NMB Bank",
+      holder: "Account name",
+      holderPh: "ORA Sanitary Pads",
+      number: "Account number",
+      numberPh: "24110012629",
+    };
+  }
+  if (type === "MOBILE_MONEY") {
+    return {
+      name: "Network",
+      namePh: "Voda",
+      holder: "Display name",
+      holderPh: "ORA Sanitary Pads",
+      number: "Lipa number",
+      numberPh: "58198034",
+    };
+  }
+  return {
+    name: "Name",
+    namePh: "Cash",
+    holder: "Held by (optional)",
+    holderPh: "Main office",
+    number: "Location note (optional)",
+    numberPh: "",
+  };
+}
 
 export function AddAccountButton() {
   const router = useRouter();
@@ -26,20 +58,24 @@ export function AddAccountButton() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState("CASH");
-  const [details, setDetails] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const L = fieldLabels(type);
 
   function submit() {
     start(async () => {
       const res = await createPaymentAccount({
         name,
         type: type as "CASH" | "BANK" | "MOBILE_MONEY",
-        details,
+        accountName,
+        accountNumber,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         setOpen(false);
         setName("");
-        setDetails("");
+        setAccountName("");
+        setAccountNumber("");
         router.refresh();
       } else toast({ variant: "error", title: res.error });
     });
@@ -70,26 +106,29 @@ export function AddAccountButton() {
               </Select>
             </div>
             <div>
-              <Label>Name</Label>
+              <Label>{L.name}</Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={
-                  type === "CASH"
-                    ? "Main Cash Office"
-                    : type === "BANK"
-                      ? "CRDB Bank"
-                      : "M-Pesa Lipa Number"
-                }
+                placeholder={L.namePh}
                 className="mt-1.5"
               />
             </div>
             <div>
-              <Label>Account / Lipa number (optional)</Label>
+              <Label>{L.holder}</Label>
               <Input
-                value={details}
-                onChange={(e) => setDetails(e.target.value)}
-                placeholder={type === "BANK" ? "0150-XXXXXXX" : type === "MOBILE_MONEY" ? "5XXXXXX" : "location / holder"}
+                value={accountName}
+                onChange={(e) => setAccountName(e.target.value)}
+                placeholder={L.holderPh}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label>{L.number}</Label>
+              <Input
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value)}
+                placeholder={L.numberPh}
                 className="mt-1.5"
               />
             </div>
@@ -106,17 +145,31 @@ export function AddAccountButton() {
 export function AccountActions({
   account,
 }: {
-  account: { id: string; name: string; details: string | null; isActive: boolean };
+  account: {
+    id: string;
+    name: string;
+    type: string;
+    accountName: string | null;
+    accountNumber: string | null;
+    isActive: boolean;
+  };
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(account.name);
-  const [details, setDetails] = useState(account.details ?? "");
+  const [accountName, setAccountName] = useState(account.accountName ?? "");
+  const [accountNumber, setAccountNumber] = useState(account.accountNumber ?? "");
+  const L = fieldLabels(account.type);
 
   function save() {
     start(async () => {
-      const res = await updatePaymentAccount({ accountId: account.id, name, details });
+      const res = await updatePaymentAccount({
+        accountId: account.id,
+        name,
+        accountName,
+        accountNumber,
+      });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         setOpen(false);
@@ -155,12 +208,26 @@ export function AccountActions({
         <Modal open onClose={() => setOpen(false)} title={`Edit · ${account.name}`}>
           <div className="space-y-4">
             <div>
-              <Label>Name</Label>
+              <Label>{L.name}</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1.5" />
             </div>
             <div>
-              <Label>Account / Lipa number</Label>
-              <Input value={details} onChange={(e) => setDetails(e.target.value)} className="mt-1.5" />
+              <Label>{L.holder}</Label>
+              <Input
+                value={accountName}
+                onChange={(e) => setAccountName(e.target.value)}
+                placeholder={L.holderPh}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label>{L.number}</Label>
+              <Input
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value)}
+                placeholder={L.numberPh}
+                className="mt-1.5"
+              />
             </div>
             <Button className="w-full" onClick={save} disabled={pending || name.trim().length < 2}>
               {pending ? "Saving…" : "Save"}

@@ -7,6 +7,7 @@ import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { applyMovement } from "@/lib/services/inventory";
 import { deductWarehouseStock } from "@/lib/services/warehouse-stock";
+import { resolveReceivingAccount } from "@/lib/payment-methods";
 import { refCode } from "@/lib/utils";
 import { WALKIN_EMAIL } from "@/lib/constants";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
@@ -24,6 +25,8 @@ const saleSchema = z.object({
     )
     .min(1, "Add at least one product."),
   method: z.string().max(40).optional(),
+  paymentAccountId: z.string().max(60).optional(),
+  reference: z.string().max(120).optional(),
   note: z.string().max(500).optional(),
 });
 
@@ -135,6 +138,12 @@ export async function recordCashSale(
     const buyerLabel = isWalkin ? customerName ?? "Walk-in customer" : partner.name;
 
     const sale = await prisma.$transaction(async (tx) => {
+      // Trace the money: which company account received this sale.
+      const receiving = await resolveReceivingAccount(
+        tx,
+        parsed.data.paymentAccountId || null,
+        parsed.data.method,
+      );
       const created = await tx.request.create({
         data: {
           code: refCode("REQ"),
@@ -150,6 +159,10 @@ export async function recordCashSale(
           invoiceNo: refCode("INV"),
           totalAmount,
           note,
+          paymentMethod: receiving.method,
+          paymentAccountId: receiving.paymentAccountId,
+          paymentReference: parsed.data.reference?.trim() || null,
+          paidAt: now,
           deliverTo: isWalkin ? customerName : null,
           warehouseName: preferWarehouseName ?? null,
           items: { create: itemData },

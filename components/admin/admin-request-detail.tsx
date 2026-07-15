@@ -36,6 +36,10 @@ import { ActionButton } from "@/components/dashboard/action-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import {
+  METHOD_LABELS,
+  type ReceivingAccount,
+} from "@/components/ui/receiving-account-picker";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { toast } from "@/components/ui/use-toast";
@@ -118,8 +122,16 @@ function stepIndex(status: string) {
 
 type Line = { productId: string; name: string; sku: string; qty: string; price: string };
 
-export function AdminRequestDetail({ request }: { request: DetailDTO }) {
+export function AdminRequestDetail({
+  request,
+  receivingAccounts = [],
+}: {
+  request: DetailDTO;
+  receivingAccounts?: ReceivingAccount[];
+}) {
   const router = useRouter();
+  // Which company account received the order payment (confirm-payment flow).
+  const [payAccountId, setPayAccountId] = useState(receivingAccounts[0]?.id ?? "");
   const [pending, start] = useTransition();
 
   const editable = request.status === "PENDING" || request.status === "PRICED";
@@ -572,10 +584,30 @@ export function AdminRequestDetail({ request }: { request: DetailDTO }) {
               <div className="mt-3 space-y-2">
                 {canConfirmPayment && (
                   <>
+                    {receivingAccounts.length > 0 && (
+                      <Select
+                        value={payAccountId}
+                        onChange={(e) => setPayAccountId(e.target.value)}
+                        title="Account that received the money"
+                      >
+                        {receivingAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {METHOD_LABELS[a.type] ?? a.type} — {a.name}
+                            {a.accountNumber ? ` · ${a.accountNumber}` : ""}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
                     <ActionButton
                       className="w-full"
                       variant="success"
-                      action={() => confirmOrderPayment(request.id, "Cash collected")}
+                      action={() =>
+                        confirmOrderPayment(
+                          request.id,
+                          payAccountId ? undefined : "Cash collected",
+                          payAccountId || undefined,
+                        )
+                      }
                       onDone={(res) => res.ok && router.refresh()}
                       pendingText="Confirming…"
                     >

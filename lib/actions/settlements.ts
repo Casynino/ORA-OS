@@ -22,6 +22,7 @@ const submitSchema = z.object({
   creditAccountId: z.string().min(1, "Choose a credit batch."),
   amount: z.number().int().positive().max(1000000000),
   method: z.string().max(40).optional(),
+  paymentAccountId: z.string().max(60).optional(),
   reference: z.string().max(120).optional(),
 });
 
@@ -51,13 +52,22 @@ export async function submitSettlement(
       );
     }
 
+    // If the partner declared which company account they paid into, validate
+    // it and derive the method from the account itself.
+    const receiving = await resolveReceivingAccount(
+      prisma,
+      parsed.data.paymentAccountId || null,
+      parsed.data.method,
+    );
+
     const sr = await prisma.settlementRequest.create({
       data: {
         code: refCode("STL"),
         partnerId: actor.id,
         creditAccountId: account.id,
         amount: parsed.data.amount,
-        method: parsed.data.method?.trim() || null,
+        method: receiving.method,
+        paymentAccountId: receiving.paymentAccountId,
         reference: parsed.data.reference?.trim() || null,
         status: "PENDING",
       },
@@ -141,18 +151,29 @@ export async function confirmSettlement(
           "The account changed while confirming — refresh and review again.",
         );
       }
-      // Record which company account the money landed in (admin's call at
-      // confirmation time — the partner only declares the method).
+      // Record which company account the money landed in. The admin's pick at
+      // confirmation wins; otherwise fall back to the account the partner
+      // declared when submitting — but only while that account is still
+      // active, so a deactivation never blocks confirmation.
+      let accountToCredit = paymentAccountId || null;
+      if (!accountToCredit && sr.paymentAccountId) {
+        const declared = await tx.paymentAccount.findUnique({
+          where: { id: sr.paymentAccountId },
+        });
+        if (declared?.isActive) accountToCredit = declared.id;
+      }
       const receiving = await resolveReceivingAccount(
         tx,
-        paymentAccountId || null,
+        accountToCredit,
         sr.method,
       );
       const payment = await tx.payment.create({
         data: {
           creditAccountId: account.id,
           amount: sr.amount,
-          method: sr.method ?? receiving.method,
+          // Derived from the account that actually received the money;
+          // falls back to the partner-declared method when no account chosen.
+          method: receiving.method,
           paymentAccountId: receiving.paymentAccountId,
           reference: sr.reference,
           note: `Partner settlement ${sr.code}${sr.reference ? ` · ${sr.reference}` : ""}`,

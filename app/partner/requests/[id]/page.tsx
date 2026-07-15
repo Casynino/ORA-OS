@@ -23,12 +23,17 @@ export default async function PartnerOrderPage({
   });
   if (!r || r.requesterId !== user.id) notFound();
 
-  const [partnerPrices, products] = await Promise.all([
+  const [partnerPrices, products, receivingAccounts] = await Promise.all([
     prisma.partnerPrice.findMany({ where: { partnerId: user.id } }),
     prisma.product.findMany({
       where: { isActive: true },
       orderBy: { price: "desc" },
       select: { id: true, name: true, sku: true, price: true },
+    }),
+    prisma.paymentAccount.findMany({
+      where: { isActive: true },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, type: true, accountName: true, accountNumber: true },
     }),
   ]);
 
@@ -64,5 +69,11 @@ export default async function PartnerOrderPage({
     })),
   };
 
-  return <PartnerOrderDetail key={r.status} order={dto} />;
+  return (
+    <PartnerOrderDetail
+      key={r.status}
+      order={dto}
+      receivingAccounts={receivingAccounts}
+    />
+  );
 }

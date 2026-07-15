@@ -31,7 +31,7 @@ export default async function WarehouseSalesPage() {
   }
 
   const whName = me.warehouse?.name ?? "";
-  const [partners, products, partnerPrices, sales] = await Promise.all([
+  const [partners, products, partnerPrices, sales, receivingAccounts] = await Promise.all([
     prisma.user.findMany({
       where: { role: "PARTNER", status: "ACTIVE", email: { not: WALKIN_EMAIL } },
       orderBy: { name: "asc" },
@@ -48,6 +48,11 @@ export default async function WarehouseSalesPage() {
       where: { status: "FULFILLED", warehouseName: whName },
       orderBy: { fulfilledAt: "desc" },
       include: { requester: { select: { name: true, email: true } } },
+    }),
+    prisma.paymentAccount.findMany({
+      where: { isActive: true },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, type: true, accountName: true, accountNumber: true },
     }),
   ]);
 
@@ -85,7 +90,12 @@ export default async function WarehouseSalesPage() {
         title="Sales"
         description={`Cash, field and fulfilled sales at ${whName}. Recording a sale draws stock down here; prices are admin-set.`}
       >
-        <RecordCashSale partners={partners} products={saleProducts} priceMap={priceMap} />
+        <RecordCashSale
+          partners={partners}
+          products={saleProducts}
+          priceMap={priceMap}
+          receivingAccounts={receivingAccounts}
+        />
       </PageHeader>
 
       <div className="grid gap-4 sm:grid-cols-2">

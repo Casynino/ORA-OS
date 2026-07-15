@@ -30,7 +30,7 @@ const TYPE_META = {
 export default async function FinanceAccountsPage() {
   await requireRole("ADMIN");
 
-  const [accounts, cashSales, fieldPays, partnerPays] = await Promise.all([
+  const [accounts, cashSales, fieldPays, partnerPays, orderPays] = await Promise.all([
     prisma.paymentAccount.findMany({
       orderBy: [{ type: "asc" }, { name: "asc" }],
     }),
@@ -45,6 +45,16 @@ export default async function FinanceAccountsPage() {
     prisma.payment.findMany({
       where: { paymentAccountId: { not: null } },
       select: { paymentAccountId: true, amount: true, createdAt: true },
+    }),
+    // Paid orders: counter/walk-in sales and confirmed partner order payments.
+    prisma.request.findMany({
+      where: { paymentAccountId: { not: null }, paymentStatus: "PAID" },
+      select: {
+        paymentAccountId: true,
+        totalAmount: true,
+        paidAt: true,
+        createdAt: true,
+      },
     }),
   ]);
 
@@ -68,6 +78,8 @@ export default async function FinanceAccountsPage() {
   for (const r of cashSales) add(r.paymentAccountId, r.total, r.createdAt);
   for (const r of fieldPays) add(r.paymentAccountId, r.amount, r.createdAt);
   for (const r of partnerPays) add(r.paymentAccountId, r.amount, r.createdAt);
+  for (const r of orderPays)
+    add(r.paymentAccountId, r.totalAmount ?? 0, r.paidAt ?? r.createdAt);
 
   const grandTotal = [...stats.values()].reduce((s, x) => s + x.total, 0);
   const groups = (Object.keys(TYPE_META) as (keyof typeof TYPE_META)[]).map((t) => ({
@@ -131,8 +143,18 @@ export default async function FinanceAccountsPage() {
                               <span className="truncate">{a.name}</span>
                               {!a.isActive && <Badge variant="secondary">inactive</Badge>}
                             </p>
-                            {a.details && (
-                              <p className="text-xs text-muted-foreground">{a.details}</p>
+                            {a.accountName && (
+                              <p className="truncate text-xs text-muted-foreground">
+                                {a.accountName}
+                              </p>
+                            )}
+                            {a.accountNumber && (
+                              <p className="text-xs text-muted-foreground">
+                                {a.type === "MOBILE_MONEY" ? "Lipa" : "A/C"}:{" "}
+                                <span className="font-medium text-foreground">
+                                  {a.accountNumber}
+                                </span>
+                              </p>
                             )}
                           </div>
                           <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
