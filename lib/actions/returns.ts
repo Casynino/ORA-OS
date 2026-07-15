@@ -34,6 +34,24 @@ function revalidateReturns() {
   revalidatePath("/warehouse/returns");
 }
 
+// Warehouse staff may only act on returns routed to their own warehouse;
+// admin is unrestricted. Returns a fail-message string or null.
+async function assertWarehouseReturnAccess(
+  actor: { id: string; role: string },
+  warehouseName: string | null,
+): Promise<string | null> {
+  if (actor.role === "ADMIN") return null;
+  const wu = await prisma.user.findUnique({
+    where: { id: actor.id },
+    select: { warehouse: { select: { name: true } } },
+  });
+  if (!wu?.warehouse) return "You aren't assigned to a warehouse.";
+  if (warehouseName && wu.warehouse.name !== warehouseName) {
+    return "This return isn't routed to your warehouse.";
+  }
+  return null;
+}
+
 export async function createReturn(
   input: z.infer<typeof createSchema>,
 ): Promise<ActionResult<{ code: string }>> {
@@ -114,6 +132,8 @@ export async function approveReturn(
       include: { product: true },
     });
     if (!ret) return fail("Return not found.");
+    const denied = await assertWarehouseReturnAccess(actor, ret.warehouseName);
+    if (denied) return fail(denied);
     if (ret.status !== "PENDING") {
       return fail("Only pending returns can be authorised.");
     }
@@ -163,6 +183,8 @@ export async function completeReturn(returnId: string): Promise<ActionResult> {
       include: { product: true },
     });
     if (!ret) return fail("Return not found.");
+    const denied = await assertWarehouseReturnAccess(actor, ret.warehouseName);
+    if (denied) return fail(denied);
     if (ret.status !== "IN_TRANSIT") {
       return fail("Only authorised returns in transit can be received.");
     }
@@ -175,6 +197,7 @@ export async function completeReturn(returnId: string): Promise<ActionResult> {
         createdById: actor.id,
         reference: ret.code,
         note: "Return received & reconciled",
+        warehouseName: ret.warehouseName,
       });
       // Land the returned units in the receiving warehouse's location ledger.
       await addWarehouseStock(tx, {
@@ -215,6 +238,8 @@ export async function rejectReturn(
       where: { id: returnId },
     });
     if (!ret) return fail("Return not found.");
+    const denied = await assertWarehouseReturnAccess(actor, ret.warehouseName);
+    if (denied) return fail(denied);
     if (ret.status !== "PENDING" && ret.status !== "IN_TRANSIT") {
       return fail("This return can no longer be rejected.");
     }

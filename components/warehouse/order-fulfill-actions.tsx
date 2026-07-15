@@ -14,9 +14,10 @@ import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
-import { formatCurrency, formatNumber } from "@/lib/utils";
+import { formatNumber } from "@/lib/utils";
 
-type Item = { productId: string; name: string; quantity: number; unitPrice: number };
+// Quantities only — the warehouse role never sees pricing.
+type Item = { productId: string; name: string; quantity: number };
 
 export function OrderFulfillActions({
   id,
@@ -121,7 +122,6 @@ function EditOrderModal({
     Object.fromEntries(items.map((i) => [i.productId, i.quantity])),
   );
 
-  const total = items.reduce((s, i) => s + i.unitPrice * (qty[i.productId] ?? 0), 0);
   const totalUnits = items.reduce((s, i) => s + (qty[i.productId] ?? 0), 0);
 
   function submit() {
@@ -150,7 +150,6 @@ function EditOrderModal({
           <div key={i.productId} className="flex items-center gap-3 rounded-lg border border-border p-2.5">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{i.name}</p>
-              <p className="text-xs text-muted-foreground">{formatCurrency(i.unitPrice)} each</p>
             </div>
             <Input
               type="number"
@@ -161,14 +160,12 @@ function EditOrderModal({
               }
               className="h-8 w-20 text-center"
             />
-            <span className="w-24 text-right text-sm font-medium">
-              {formatCurrency(i.unitPrice * (qty[i.productId] ?? 0))}
-            </span>
+            <span className="w-16 text-right text-xs text-muted-foreground">pcs</span>
           </div>
         ))}
         <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-2.5 text-sm">
-          <span className="text-muted-foreground">{formatNumber(totalUnits)} units</span>
-          <span className="font-semibold">{formatCurrency(total)}</span>
+          <span className="text-muted-foreground">Total</span>
+          <span className="font-semibold">{formatNumber(totalUnits)} units</span>
         </div>
         <Button className="w-full" onClick={submit} disabled={pending}>
           {pending ? "Saving…" : "Save changes"}

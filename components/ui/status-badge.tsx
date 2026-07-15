@@ -45,6 +45,7 @@ const MAP: Record<string, Variant> = {
   CREDIT: "accent",
   // Field sales
   ISSUED: "success",
+  READY: "info",
   CASH: "success",
   SELLABLE: "accent",
   SAMPLE: "info",

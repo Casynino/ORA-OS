@@ -54,25 +54,13 @@ export async function recordCashSale(
   input: z.infer<typeof saleSchema>,
 ): Promise<ActionResult<{ code: string }>> {
   try {
-    const admin = await requireActor(["ADMIN", "WAREHOUSE"]);
+    // Sales are a business decision — warehouse staff handle inventory only.
+    const admin = await requireActor(["ADMIN"]);
     const parsed = saleSchema.safeParse(input);
     if (!parsed.success) {
       return fail(parsed.error.issues[0]?.message ?? "Invalid sale.");
     }
-
-    // Warehouse staff may record sales only with permission, scoped to their
-    // own warehouse. Prices always come from the admin-set price list.
-    let preferWarehouseName: string | null | undefined;
-    if (admin.role === "WAREHOUSE") {
-      const wu = await prisma.user.findUnique({
-        where: { id: admin.id },
-        select: { canRecordSales: true, warehouse: { select: { name: true } } },
-      });
-      if (!wu?.canRecordSales) {
-        return fail("You don't have permission to record sales.");
-      }
-      preferWarehouseName = wu.warehouse?.name ?? null;
-    }
+    const preferWarehouseName: string | null | undefined = undefined;
 
     // Merge duplicate lines.
     const merged = new Map<string, number>();

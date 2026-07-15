@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { PackagePlus, Target, Ban, RotateCcw, MapPin, Undo2, PackageCheck } from "lucide-react";
 import {
   issueRepStock,
-  fulfillRepStockRequest,
+  approveRepStockRequest,
   rejectRepStockRequest,
   setRepTarget,
   setRepStatus,
@@ -129,7 +129,8 @@ type FulfillItem = {
   isSample: boolean;
 };
 
-/** Fulfil a whole multi-product request in one go (issue everything at once). */
+/** Approve a whole multi-product request — reserves the pieces for pickup;
+ * stock moves only when the rep collects and confirms at the warehouse. */
 export function FulfillRequestButton({
   requestId,
   repName,
@@ -178,7 +179,7 @@ export function FulfillRequestButton({
 
   function submit() {
     start(async () => {
-      const res = await fulfillRepStockRequest({
+      const res = await approveRepStockRequest({
         requestId,
         lines: lines.map((l) => ({ productId: l.it.productId, quantity: l.total })),
       });
@@ -194,14 +195,14 @@ export function FulfillRequestButton({
     <>
       <Button size="sm" className="rounded-full" onClick={() => setOpen(true)}>
         <PackageCheck className="size-4" />
-        Issue
+        Approve
       </Button>
       {open && (
         <Modal
           open
           onClose={() => setOpen(false)}
-          title={`Issue stock to ${repName}`}
-          description="Confirm or adjust each product, then issue the whole request at once."
+          title={`Approve stock for ${repName}`}
+          description="Confirm or adjust each product. The pieces are reserved for pickup — stock moves when the rep collects and confirms at the warehouse."
         >
           <div className="space-y-3">
             {items.map((it) => {
@@ -285,7 +286,7 @@ export function FulfillRequestButton({
               disabled={pending || !anyPositive || anyOver}
               onClick={submit}
             >
-              {pending ? "Issuing…" : "Issue to rep"}
+              {pending ? "Approving…" : "Approve for collection"}
             </Button>
           </div>
         </Modal>
@@ -294,7 +295,13 @@ export function FulfillRequestButton({
   );
 }
 
-export function RejectStockRequestButton({ id }: { id: string }) {
+export function RejectStockRequestButton({
+  id,
+  label = "Reject",
+}: {
+  id: string;
+  label?: string;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   return (
@@ -312,7 +319,7 @@ export function RejectStockRequestButton({ id }: { id: string }) {
         })
       }
     >
-      Reject
+      {label}
     </Button>
   );
 }

@@ -51,9 +51,12 @@ const TABS = [
 export function ReturnsManager({
   returns,
   detailBase,
+  showValue = true,
 }: {
   returns: ReturnDTO[];
   detailBase?: string;
+  // Warehouse staff are inventory-only — money columns stay admin-side.
+  showValue?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -97,7 +100,7 @@ export function ReturnsManager({
   return (
     <div className="space-y-6">
       {/* Insights */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={`grid gap-4 sm:grid-cols-2 ${showValue ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
         <StatCard
           label="Awaiting action"
           value={formatNumber(counts.open)}
@@ -117,12 +120,14 @@ export function ReturnsManager({
           icon={X}
           accent="primary"
         />
-        <StatCard
-          label="Value restocked"
-          value={formatCurrency(counts.restockedValue)}
-          icon={Truck}
-          accent="info"
-        />
+        {showValue && (
+          <StatCard
+            label="Value restocked"
+            value={formatCurrency(counts.restockedValue)}
+            icon={Truck}
+            accent="info"
+          />
+        )}
       </div>
 
       <Card>
@@ -168,7 +173,7 @@ export function ReturnsManager({
                     <TableHead>Return</TableHead>
                     <TableHead>Product</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Value</TableHead>
+                    {showValue && <TableHead className="text-right">Value</TableHead>}
                     <TableHead>Reason</TableHead>
                     <TableHead>Destination</TableHead>
                     <TableHead>Status</TableHead>
@@ -197,9 +202,11 @@ export function ReturnsManager({
                       <TableCell data-label="Qty" className="text-right font-medium">
                         {formatNumber(r.quantity)}
                       </TableCell>
-                      <TableCell data-label="Value" className="text-right text-sm">
-                        {formatCurrency(r.value)}
-                      </TableCell>
+                      {showValue && (
+                        <TableCell data-label="Value" className="text-right text-sm">
+                          {formatCurrency(r.value)}
+                        </TableCell>
+                      )}
                       <TableCell data-label="Reason" className="text-sm">
                         {r.reasonType ?? "—"}
                         {r.reason ? (

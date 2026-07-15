@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ReturnActions } from "@/components/warehouse/return-actions";
-import { formatCurrency, formatDateTime, formatNumber } from "@/lib/utils";
+import { formatDateTime, formatNumber } from "@/lib/utils";
 
 const STEPS = ["PENDING", "IN_TRANSIT", "COMPLETED"] as const;
 const STEP_LABEL: Record<string, string> = {
@@ -24,27 +24,26 @@ export default async function WarehouseReturnDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireRole("WAREHOUSE");
+  const session = await requireRole("WAREHOUSE");
+  const me = await prisma.user.findUnique({
+    where: { id: session.id },
+    include: { warehouse: true },
+  });
   const { id } = await params;
 
   const ret = await prisma.returnRequest.findUnique({
     where: { id },
     include: {
-      product: { select: { name: true, sku: true, price: true } },
+      product: { select: { name: true, sku: true } },
       requester: { select: { name: true, organization: true, phone: true } },
       reviewedBy: { select: { name: true } },
     },
   });
-  if (!ret) notFound();
+  // Warehouse staff only see returns routed to their own warehouse.
+  if (!ret || !me?.warehouse || ret.warehouseName !== me.warehouse.name) {
+    notFound();
+  }
 
-  const pp = await prisma.partnerPrice.findUnique({
-    where: {
-      partnerId_productId: { partnerId: ret.requesterId, productId: ret.productId },
-    },
-    select: { price: true },
-  });
-  const unit = pp?.price ?? ret.product.price;
-  const value = unit * ret.quantity;
   const reachedIdx = ret.status === "REJECTED" ? -1 : STEPS.indexOf(ret.status as (typeof STEPS)[number]);
 
   return (
@@ -69,7 +68,7 @@ export default async function WarehouseReturnDetailPage({
                 <StatusBadge status={ret.status} />
               </div>
               <p className="text-sm text-muted-foreground">
-                {formatNumber(ret.quantity)} units · {formatCurrency(value)}
+                {formatNumber(ret.quantity)} units
               </p>
             </div>
           </div>

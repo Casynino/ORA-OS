@@ -17,13 +17,25 @@ import {
 import { ReceiveForm } from "@/components/warehouse/receive-form";
 import { formatNumber, formatDateTime } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 export default async function WarehouseReceivePage() {
   const session = await requireRole("WAREHOUSE");
   const me = await prisma.user.findUnique({
     where: { id: session.id },
     include: { warehouse: true },
   });
-  const whId = me?.warehouse?.id ?? "";
+  if (!me?.warehouse) {
+    return (
+      <EmptyState
+        icon={Boxes}
+        title="No warehouse assigned"
+        description="Ask an ORA admin to assign you to a warehouse."
+      />
+    );
+  }
+  const whId = me.warehouse.id;
+  const whName = me.warehouse.name;
 
   const startToday = new Date();
   startToday.setHours(0, 0, 0, 0);
@@ -42,8 +54,9 @@ export default async function WarehouseReceivePage() {
       include: { product: { select: { name: true, sku: true, category: true } } },
       orderBy: { onHand: "desc" },
     }),
+    // Receipts into THIS warehouse only.
     prisma.stockMovement.findMany({
-      where: { type: "INBOUND" },
+      where: { type: "INBOUND", warehouseName: whName },
       orderBy: { createdAt: "desc" },
       take: 15,
       include: {
@@ -52,11 +65,11 @@ export default async function WarehouseReceivePage() {
       },
     }),
     prisma.stockMovement.aggregate({
-      where: { type: "INBOUND", createdAt: { gte: startToday } },
+      where: { type: "INBOUND", warehouseName: whName, createdAt: { gte: startToday } },
       _sum: { quantity: true },
     }),
     prisma.stockMovement.aggregate({
-      where: { type: "INBOUND", createdAt: { gte: startMonth } },
+      where: { type: "INBOUND", warehouseName: whName, createdAt: { gte: startMonth } },
       _sum: { quantity: true },
     }),
   ]);
@@ -67,7 +80,7 @@ export default async function WarehouseReceivePage() {
     <div className="space-y-6">
       <PageHeader
         title="Receive stock"
-        description={`Record incoming deliveries into ${me?.warehouse?.name ?? "the warehouse"}. Every receipt is logged and added to your stock.`}
+        description={`Record incoming deliveries into ${whName}. Every receipt is logged and added to your stock.`}
       />
 
       {/* KPIs */}

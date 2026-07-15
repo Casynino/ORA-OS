@@ -9,6 +9,8 @@ import { applyMovement } from "@/lib/services/inventory";
 import {
   addWarehouseStock,
   deductWarehouseStock,
+  reserveWarehouseStock,
+  releaseWarehouseReservation,
 } from "@/lib/services/warehouse-stock";
 import { resolveReceivingAccount } from "@/lib/payment-methods";
 import { refCode } from "@/lib/utils";
@@ -42,8 +44,37 @@ function revalidateField() {
     "/rep/targets",
     "/admin/reps",
     "/admin",
+    "/warehouse",
+    "/warehouse/rep-requests",
   ])
     revalidatePath(p);
+}
+
+// Resolve which warehouse fulfils a rep request: warehouse staff always use
+// their own assigned warehouse; admin may pass one explicitly, else the main
+// (oldest) active warehouse is used.
+async function resolveFulfillingWarehouse(
+  actor: { id: string; role: string },
+  explicitId?: string | null,
+): Promise<{ id: string; name: string } | null> {
+  if (actor.role === "WAREHOUSE") {
+    const me = await prisma.user.findUnique({
+      where: { id: actor.id },
+      select: { warehouse: { select: { id: true, name: true } } },
+    });
+    return me?.warehouse ?? null;
+  }
+  if (explicitId) {
+    return prisma.warehouse.findUnique({
+      where: { id: explicitId },
+      select: { id: true, name: true },
+    });
+  }
+  return prisma.warehouse.findFirst({
+    where: { isActive: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true },
+  });
 }
 
 // ── Selling ─────────────────────────────────────────────────────────────────
@@ -535,9 +566,9 @@ export async function requestRepStock(
   }
 }
 
-// ── Admin: fulfil a whole multi-product request in one action ───────────────
+// ── Warehouse/Admin: approve & prepare a request for rep collection ─────────
 
-const fulfillSchema = z.object({
+const approveSchema = z.object({
   requestId: z.string().min(1),
   lines: z
     .array(
@@ -547,16 +578,31 @@ const fulfillSchema = z.object({
       }),
     )
     .min(1),
+  warehouseId: z.string().optional(), // admin override; staff always use their own
 });
 
-export async function fulfillRepStockRequest(
-  input: z.infer<typeof fulfillSchema>,
+/**
+ * Approve a rep's stock request and prepare it for collection: quantities are
+ * fixed, the pieces are reserved in the fulfilling warehouse, and the request
+ * goes READY. Nothing leaves the shelf until the rep collects and confirms.
+ */
+export async function approveRepStockRequest(
+  input: z.infer<typeof approveSchema>,
 ): Promise<ActionResult> {
   try {
     const actor = await requireActor(["ADMIN", "WAREHOUSE"]);
-    const parsed = fulfillSchema.safeParse(input);
-    if (!parsed.success) return fail("Invalid stock issue.");
+    const parsed = approveSchema.safeParse(input);
+    if (!parsed.success) return fail("Invalid approval.");
     const d = parsed.data;
+
+    const wh = await resolveFulfillingWarehouse(actor, d.warehouseId);
+    if (!wh) {
+      return fail(
+        actor.role === "WAREHOUSE"
+          ? "Your account isn't linked to a warehouse — ask an admin to assign you."
+          : "No active warehouse found.",
+      );
+    }
 
     const req = await prisma.repStockRequest.findUnique({
       where: { id: d.requestId },
@@ -569,34 +615,123 @@ export async function fulfillRepStockRequest(
     if (rep.role !== "SALES_REP") return fail("Sales rep not found.");
     if (rep.status !== "ACTIVE") return fail(`${rep.name} is not active.`);
 
-    // Only issue quantities against lines that are actually on the request.
-    const issueLines = req.items
+    // Only approve quantities against lines that are actually on the request.
+    const approveLines = req.items
       .map((item) => {
         const override = d.lines.find((l) => l.productId === item.productId);
         const qty = override ? override.quantity : item.quantity;
         return { item, qty: Math.max(0, qty) };
       })
       .filter((x) => x.qty > 0);
-    if (issueLines.length === 0) {
-      return fail("Nothing to issue — every quantity is zero.");
+    if (approveLines.length === 0) {
+      return fail("Nothing to approve — every quantity is zero.");
     }
 
-    const base = refCode("ISS");
     await prisma.$transaction(async (tx) => {
-      // Claim the request atomically. If another admin (or a double click) already
-      // handled it, this matches 0 rows and we abort before moving any stock —
-      // no double deduction, no double credit.
+      // Claim the request atomically — a concurrent approve/reject aborts here.
       const claimed = await tx.repStockRequest.updateMany({
         where: { id: req.id, status: "PENDING" },
-        data: { status: "ISSUED", reviewedById: actor.id, reviewedAt: new Date() },
+        data: {
+          status: "READY",
+          reviewedById: actor.id,
+          reviewedAt: new Date(),
+          warehouseId: wh.id,
+          preparedById: actor.id,
+          preparedAt: new Date(),
+        },
       });
       if (claimed.count === 0) {
         throw new Error("This request was already handled.");
       }
+      for (const { item, qty } of approveLines) {
+        // Hold the pieces in this warehouse until the rep collects them.
+        await reserveWarehouseStock(tx, {
+          productId: item.productId,
+          quantity: qty,
+          warehouseId: wh.id,
+          productName: item.product.name,
+        });
+        await tx.repStockRequestItem.update({
+          where: { id: item.id },
+          data: { issuedQty: qty },
+        });
+      }
+      // Zero out lines the reviewer chose not to send.
+      for (const item of req.items) {
+        if (!approveLines.some((l) => l.item.id === item.id)) {
+          await tx.repStockRequestItem.update({
+            where: { id: item.id },
+            data: { issuedQty: 0 },
+          });
+        }
+      }
+    });
+
+    const totalUnits = approveLines.reduce((s, l) => s + l.qty, 0);
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "REP_STOCK_PREPARED",
+      entity: "RepStockRequest",
+      entityId: req.code,
+      summary: `${actor.name} approved ${req.code} for ${rep.name} — ${totalUnits} pcs reserved at ${wh.name}, awaiting collection.`,
+    });
+    revalidateField();
+    revalidatePath(`/admin/reps/${rep.id}`);
+    return ok(
+      undefined,
+      `Approved — ${rep.name} can now collect at ${wh.name}.`,
+    );
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+// ── Rep: confirm collection at the warehouse — stock actually moves here ────
+
+export async function confirmRepStockCollection(
+  requestId: string,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["SALES_REP"]);
+    const req = await prisma.repStockRequest.findUnique({
+      where: { id: requestId },
+      include: {
+        rep: { select: { id: true, name: true } },
+        warehouse: { select: { id: true, name: true } },
+        preparedBy: { select: { id: true, name: true } },
+        items: { include: { product: true } },
+      },
+    });
+    if (!req || req.repId !== actor.id) return fail("Request not found.");
+    if (req.status !== "READY") {
+      return fail("This request isn't ready for collection.");
+    }
+    // A READY request is always pinned to the warehouse that reserved it — the
+    // collection must consume that exact reservation, never spread org-wide.
+    if (!req.warehouseId) {
+      return fail("This request has no collection warehouse — ask the ORA team to re-prepare it.");
+    }
+
+    const lines = req.items.filter((i) => i.issuedQty > 0);
+    if (lines.length === 0) return fail("Nothing to collect on this request.");
+    const issuerId = req.preparedById ?? actor.id;
+
+    const base = refCode("ISS");
+    await prisma.$transaction(async (tx) => {
+      // Claim atomically — double taps can't double-issue.
+      const claimed = await tx.repStockRequest.updateMany({
+        where: { id: req.id, status: "READY" },
+        data: { status: "ISSUED", collectedAt: new Date() },
+      });
+      if (claimed.count === 0) {
+        throw new Error("This collection was already confirmed.");
+      }
 
       let i = 0;
-      for (const { item, qty } of issueLines) {
+      for (const item of lines) {
         i += 1;
+        const qty = item.issuedQty;
         const inv = await tx.inventory.findUnique({
           where: { productId: item.productId },
         });
@@ -610,20 +745,23 @@ export async function fulfillRepStockRequest(
           productId: item.productId,
           type: "ASSIGNED",
           quantity: qty,
-          createdById: actor.id,
+          createdById: issuerId,
           reference: `${base}-${i}`,
-          note: `Warehouse → ${rep.name} (${item.kind === "SAMPLE" ? "samples" : "selling"}) · ${req.code}`,
+          note: `${req.warehouse?.name ?? "Warehouse"} → ${req.rep.name} (${item.kind === "SAMPLE" ? "samples" : "selling"}) · ${req.code}`,
+          warehouseName: req.warehouse?.name ?? null,
         });
-        // Keep the per-warehouse location ledger in lock-step (invariant:
-        // Σ WarehouseStock.onHand == Inventory.warehouseQty).
+        // Hand over the reservation: onHand and reserved both drop here,
+        // keeping Σ WarehouseStock.onHand == Inventory.warehouseQty.
         await deductWarehouseStock(tx, {
           productId: item.productId,
           quantity: qty,
+          warehouseId: req.warehouseId,
+          consumeReserved: true,
         });
         await tx.repStock.upsert({
-          where: { repId_productId: { repId: rep.id, productId: item.productId } },
+          where: { repId_productId: { repId: req.repId, productId: item.productId } },
           create: {
-            repId: rep.id,
+            repId: req.repId,
             productId: item.productId,
             sellableQty: item.kind === "SELLABLE" ? qty : 0,
             sampleQty: item.kind === "SAMPLE" ? qty : 0,
@@ -639,35 +777,30 @@ export async function fulfillRepStockRequest(
         await tx.repStockIssue.create({
           data: {
             code: `${base}-${i}`,
-            repId: rep.id,
+            repId: req.repId,
             productId: item.productId,
             kind: item.kind,
             quantity: qty,
             note: req.code,
-            issuedById: actor.id,
+            issuedById: issuerId,
+            warehouseName: req.warehouse?.name ?? null,
           },
         });
-        await tx.repStockRequestItem.update({
-          where: { id: item.id },
-          data: { issuedQty: qty },
-        });
       }
-      // The request was already marked ISSUED by the atomic claim above — any
-      // line left un-issued still closes it (the admin decided what to send).
     });
 
-    const totalUnits = issueLines.reduce((s, l) => s + l.qty, 0);
+    const totalUnits = lines.reduce((s, l) => s + l.issuedQty, 0);
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
-      action: "REP_STOCK_ISSUED",
+      action: "REP_STOCK_COLLECTED",
       entity: "RepStockRequest",
       entityId: req.code,
-      summary: `${actor.name} issued ${issueLines.length} product${issueLines.length === 1 ? "" : "s"} (${totalUnits} pcs) to ${rep.name} — ${req.code}.`,
+      summary: `${actor.name} collected ${totalUnits} pcs from ${req.warehouse?.name ?? "the warehouse"} (${req.code}) — issued by ${req.preparedBy?.name ?? "ORA team"}.`,
     });
     revalidateField();
-    revalidatePath(`/admin/reps/${rep.id}`);
-    return ok(undefined, `Stock issued to ${rep.name}.`);
+    revalidatePath(`/admin/reps/${req.repId}`);
+    return ok(undefined, "Collection confirmed — the stock is now in your hand.");
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -697,6 +830,8 @@ export async function issueRepStock(
     if (!rep || rep.role !== "SALES_REP") return fail("Sales rep not found.");
     if (rep.status !== "ACTIVE") return fail(`${rep.name} is not active.`);
 
+    // Every issue leaves a named warehouse for full traceability.
+    const wh = await resolveFulfillingWarehouse(actor);
     const code = refCode("ISS");
     await prisma.$transaction(async (tx) => {
       const inv = await tx.inventory.findUnique({ where: { productId: d.productId } });
@@ -711,13 +846,15 @@ export async function issueRepStock(
         quantity: d.quantity,
         createdById: actor.id,
         reference: code,
-        note: `Warehouse → ${rep.name} (${d.kind === "SAMPLE" ? "samples" : "selling"})`,
+        note: `${wh?.name ?? "Warehouse"} → ${rep.name} (${d.kind === "SAMPLE" ? "samples" : "selling"})`,
+        warehouseName: wh?.name ?? null,
       });
       // Keep the per-warehouse location ledger in lock-step (invariant:
       // Σ WarehouseStock.onHand == Inventory.warehouseQty).
       await deductWarehouseStock(tx, {
         productId: d.productId,
         quantity: d.quantity,
+        preferWarehouseName: wh?.name,
       });
       await tx.repStock.upsert({
         where: { repId_productId: { repId: d.repId, productId: d.productId } },
@@ -744,6 +881,7 @@ export async function issueRepStock(
           quantity: d.quantity,
           note: d.note || null,
           issuedById: actor.id,
+          warehouseName: wh?.name ?? null,
         },
       });
       if (d.requestId) {
@@ -780,28 +918,68 @@ export async function rejectRepStockRequest(
 ): Promise<ActionResult> {
   try {
     const actor = await requireActor(["ADMIN", "WAREHOUSE"]);
-    const req = await prisma.repStockRequest.findUnique({
-      where: { id },
-      include: { rep: { select: { name: true } } },
+    // Warehouse staff's own warehouse, resolved once for the READY-scope check.
+    const myWarehouseId =
+      actor.role === "WAREHOUSE"
+        ? (
+            await prisma.user.findUnique({
+              where: { id: actor.id },
+              select: { warehouseId: true },
+            })
+          )?.warehouseId ?? null
+        : null;
+
+    let wasReady = false;
+    const repName = await prisma.$transaction(async (tx) => {
+      // Read the CURRENT state inside the tx so a concurrent approve can't
+      // slip a now-READY request past a stale pre-tx snapshot (TOCTOU).
+      const req = await tx.repStockRequest.findUnique({
+        where: { id },
+        include: { rep: { select: { name: true } }, items: true },
+      });
+      if (!req) throw new Error("Request not found.");
+      wasReady = req.status === "READY";
+      // A READY request is pinned to a warehouse — a warehouse actor may only
+      // cancel their own. PENDING is the shared intake queue (any warehouse).
+      if (wasReady && myWarehouseId && req.warehouseId !== myWarehouseId) {
+        throw new Error("This prepared request belongs to another warehouse.");
+      }
+      // Atomic guard: a collection that lands first can't be overwritten by a
+      // stale reject — only PENDING or still-uncollected READY can be rejected.
+      const rejected = await tx.repStockRequest.updateMany({
+        where: { id, status: { in: ["PENDING", "READY"] } },
+        data: { status: "REJECTED", reviewedById: actor.id, reviewedAt: new Date() },
+      });
+      if (rejected.count === 0) {
+        throw new Error("This request was already handled.");
+      }
+      // A prepared request holds reservations — put the pieces back on offer.
+      // Both the status check and the release use the same in-tx snapshot, so
+      // a request that became READY concurrently is released, never leaked.
+      if (wasReady && req.warehouseId) {
+        for (const item of req.items) {
+          if (item.issuedQty > 0) {
+            await releaseWarehouseReservation(tx, {
+              productId: item.productId,
+              quantity: item.issuedQty,
+              warehouseId: req.warehouseId,
+            });
+          }
+        }
+      }
+      return req.rep.name;
     });
-    if (!req) return fail("Request not found.");
-    // Atomic guard: only a still-PENDING request can be rejected, so a fulfil
-    // that lands first can't be overwritten by a stale reject.
-    const rejected = await prisma.repStockRequest.updateMany({
-      where: { id, status: "PENDING" },
-      data: { status: "REJECTED", reviewedById: actor.id, reviewedAt: new Date() },
-    });
-    if (rejected.count === 0) return fail("This request was already handled.");
+
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
       action: "REP_STOCK_REJECTED",
       entity: "RepStockRequest",
-      entityId: req.code,
-      summary: `${actor.name} rejected stock request ${req.code} from ${req.rep.name}.`,
+      entityId: id,
+      summary: `${actor.name} ${wasReady ? "cancelled the prepared" : "rejected"} stock request from ${repName}.`,
     });
     revalidateField();
-    return ok(undefined, "Request rejected.");
+    return ok(undefined, wasReady ? "Collection cancelled — reserved stock released." : "Request rejected.");
   } catch (e) {
     return fail(errorMessage(e));
   }

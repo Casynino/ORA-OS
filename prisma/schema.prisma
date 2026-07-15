@@ -183,6 +183,7 @@ model User {
   repIssuesReceived     RepStockIssue[]      @relation("RepIssueRep")
   repIssuesGiven        RepStockIssue[]      @relation("RepIssuer")
   repStockRequests      RepStockRequest[]    @relation("RepStockRequestRep")
+  repRequestsPrepared   RepStockRequest[]    @relation("RepRequestPreparer")
   fieldCustomers        FieldCustomer[]      @relation("RepCustomers")
   fieldSales            FieldSale[]          @relation("RepSales")
   fieldPaymentsRecorded FieldPayment[]       @relation("FieldPaymentRecorder")
@@ -314,10 +315,11 @@ model Warehouse {
   capacity  Int? // total unit capacity for utilisation %
   createdAt DateTime        @default(now())
 
-  staff        User[]              @relation("WarehouseStaff")
-  stock        WarehouseStock[]
-  transfersOut WarehouseTransfer[] @relation("TransferFrom")
-  transfersIn  WarehouseTransfer[] @relation("TransferTo")
+  staff            User[]              @relation("WarehouseStaff")
+  stock            WarehouseStock[]
+  transfersOut     WarehouseTransfer[] @relation("TransferFrom")
+  transfersIn      WarehouseTransfer[] @relation("TransferTo")
+  repStockRequests RepStockRequest[]   @relation("RepRequestWarehouse")
 }
 
 // Per-warehouse location ledger. Seeded from current org-wide totals into the
@@ -452,33 +454,35 @@ model PaymentAccount {
 
 /// Immutable ledger of every physical stock change.
 model StockMovement {
-  id          String       @id @default(cuid())
-  product     Product      @relation(fields: [productId], references: [id])
-  productId   String
-  type        MovementType
-  quantity    Int
-  reference   String? // free-text reference (e.g. delivery note)
-  request     Request?     @relation(fields: [requestId], references: [id])
-  requestId   String?
-  note        String?
-  createdBy   User         @relation("MovementCreator", fields: [createdById], references: [id])
-  createdById String
-  createdAt   DateTime     @default(now())
+  id            String       @id @default(cuid())
+  product       Product      @relation(fields: [productId], references: [id])
+  productId     String
+  type          MovementType
+  quantity      Int
+  reference     String? // free-text reference (e.g. delivery note)
+  request       Request?     @relation(fields: [requestId], references: [id])
+  requestId     String?
+  note          String?
+  warehouseName String? // the warehouse this movement physically involved
+  createdBy     User         @relation("MovementCreator", fields: [createdById], references: [id])
+  createdById   String
+  createdAt     DateTime     @default(now())
 
   @@index([productId])
   @@index([type])
   @@index([createdAt])
+  @@index([warehouseName])
 }
 
 // ── Request-based orders ───────────────────────────────────────────────────
 
 model Request {
-  id               String        @id @default(cuid())
-  code             String        @unique
+  id               String          @id @default(cuid())
+  code             String          @unique
   type             RequestType
-  status           RequestStatus @default(PENDING)
-  paymentType      PaymentType   @default(IMMEDIATE)
-  requester        User          @relation("RequestRequester", fields: [requesterId], references: [id])
+  status           RequestStatus   @default(PENDING)
+  paymentType      PaymentType     @default(IMMEDIATE)
+  requester        User            @relation("RequestRequester", fields: [requesterId], references: [id])
   requesterId      String
   note             String? // requester message / special instructions
   adminNote        String?
@@ -488,9 +492,9 @@ model Request {
   contactPhone     String? // contact phone number
   deliverBy        DateTime? // preferred delivery date
   warehouseName    String? // fulfilling warehouse (denormalized label)
-  discount         Int           @default(0) // whole TSh off the order
-  deliveryCharge   Int           @default(0) // whole TSh added for delivery
-  paymentStatus    PaymentStatus @default(UNPAID)
+  discount         Int             @default(0) // whole TSh off the order
+  deliveryCharge   Int             @default(0) // whole TSh added for delivery
+  paymentStatus    PaymentStatus   @default(UNPAID)
   paymentClaimedAt DateTime? // customer pressed "I have made payment" — awaiting admin verification
   // How and where the order's money was received (counter sales record it at
   // creation; partner orders at admin payment confirmation).
@@ -502,12 +506,12 @@ model Request {
   invoiceNo        String? // generated on approval
   deliveredAt      DateTime? // delivery confirmation
   totalAmount      Int? // computed once priced (whole KES)
-  reviewedBy       User?         @relation("RequestReviewer", fields: [reviewedById], references: [id])
+  reviewedBy       User?           @relation("RequestReviewer", fields: [reviewedById], references: [id])
   reviewedById     String?
   reviewedAt       DateTime?
   fulfilledAt      DateTime?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   items          RequestItem[]
   creditAccount  CreditAccount?
@@ -844,8 +848,9 @@ enum FieldCreditStatus {
 }
 
 enum RepStockRequestStatus {
-  PENDING
-  ISSUED
+  PENDING // waiting for warehouse / admin review
+  READY // approved & prepared — stock reserved, awaiting rep pickup
+  ISSUED // collected and confirmed by the rep — stock transferred
   REJECTED
 }
 
@@ -869,25 +874,27 @@ model RepStock {
 
 /// Immutable record of stock issued from the warehouse to a rep.
 model RepStockIssue {
-  id         String       @id @default(cuid())
-  code       String       @unique
-  rep        User         @relation("RepIssueRep", fields: [repId], references: [id])
-  repId      String
-  product    Product      @relation(fields: [productId], references: [id])
-  productId  String
-  kind       RepStockKind @default(SELLABLE)
-  quantity   Int
-  note       String?
-  issuedBy   User         @relation("RepIssuer", fields: [issuedById], references: [id])
-  issuedById String
-  createdAt  DateTime     @default(now())
+  id            String       @id @default(cuid())
+  code          String       @unique
+  rep           User         @relation("RepIssueRep", fields: [repId], references: [id])
+  repId         String
+  product       Product      @relation(fields: [productId], references: [id])
+  productId     String
+  kind          RepStockKind @default(SELLABLE)
+  quantity      Int
+  note          String?
+  issuedBy      User         @relation("RepIssuer", fields: [issuedById], references: [id])
+  issuedById    String
+  warehouseName String? // where the rep collected (immutable label)
+  createdAt     DateTime     @default(now())
 
   @@index([repId])
   @@index([createdAt])
 }
 
 /// A rep's request for more stock — one request can span several products.
-/// Admin issues (all lines at once) or rejects it.
+/// Warehouse staff (or admin) approve & prepare it (READY, stock reserved);
+/// the rep collects at the warehouse and confirms receipt (ISSUED).
 model RepStockRequest {
   id           String                @id @default(cuid())
   code         String                @unique
@@ -897,12 +904,21 @@ model RepStockRequest {
   status       RepStockRequestStatus @default(PENDING)
   reviewedById String?
   reviewedAt   DateTime?
+  // Collection trail: which warehouse prepared it, who, and when the rep
+  // collected — full traceability of every handover.
+  warehouse    Warehouse?            @relation("RepRequestWarehouse", fields: [warehouseId], references: [id])
+  warehouseId  String?
+  preparedBy   User?                 @relation("RepRequestPreparer", fields: [preparedById], references: [id])
+  preparedById String?
+  preparedAt   DateTime?
+  collectedAt  DateTime?
   createdAt    DateTime              @default(now())
 
   items RepStockRequestItem[]
 
   @@index([status])
   @@index([repId])
+  @@index([warehouseId])
 }
 
 /// One product line within a rep's stock request. Quantities are in PIECES;

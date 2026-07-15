@@ -43,6 +43,7 @@ export async function applyMovement(
     requestId?: string | null;
     reference?: string | null;
     note?: string | null;
+    warehouseName?: string | null;
   },
 ) {
   const delta = movementDelta(input.type, input.quantity);
@@ -70,6 +71,7 @@ export async function applyMovement(
       requestId: input.requestId ?? null,
       reference: input.reference ?? null,
       note: input.note ?? null,
+      warehouseName: input.warehouseName ?? null,
       createdById: input.createdById,
     },
   });

@@ -7,10 +7,10 @@ import {
   Undo2,
   ArrowLeftRight,
   ClipboardList,
-  AlertTriangle,
   CheckCircle2,
   ArrowDownToLine,
-  ArrowUpFromLine,
+  Clock,
+  Users,
   Activity as ActivityIcon,
   ClipboardCheck,
   ChevronRight,
@@ -23,14 +23,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { AreaChart, BarChart } from "@/components/ui/charts";
 import { cn } from "@/lib/utils";
 import { formatNumber, humanize, timeAgo } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
 
 const MOVE_LABEL: Record<string, string> = {
   ASSIGNED: "Reserved for order",
   DISTRIBUTED: "Dispatched to partner",
   RESTOCKED: "Returned to warehouse",
+  INBOUND: "Stock received",
+  ADJUSTMENT: "Stock adjusted",
 };
 
 export default async function WarehouseOverviewPage() {
@@ -57,91 +60,102 @@ export default async function WarehouseOverviewPage() {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
-  const [stock, orders, transfersIn, transfersOut, returns, movements, transfers] =
-    await Promise.all([
-      prisma.warehouseStock.findMany({
-        where: { warehouseId: wh.id },
-        include: { product: { select: { name: true, sku: true } } },
-        orderBy: { onHand: "asc" },
-      }),
-      prisma.request.findMany({
-        where: {
-          warehouseName: whName,
-          status: { in: ["APPROVED", "IN_TRANSIT", "FULFILLED"] },
-          // Only payment-cleared orders ever reach the warehouse view.
-          paymentStatus: { in: ["PAID", "OUTSTANDING"] },
-        },
-        select: { id: true, status: true, fulfilledAt: true },
-      }),
-      prisma.warehouseTransfer.findMany({
-        where: { toId: wh.id },
-        select: { status: true },
-      }),
-      prisma.warehouseTransfer.findMany({
-        where: { fromId: wh.id },
-        select: { status: true },
-      }),
-      prisma.returnRequest.findMany({
-        where: { warehouseName: whName },
-        select: { status: true },
-      }),
-      prisma.stockMovement.findMany({
-        take: 6,
-        orderBy: { createdAt: "desc" },
-        include: { product: { select: { name: true } }, createdBy: { select: { name: true } } },
-      }),
-      prisma.warehouseTransfer.findMany({
-        where: { OR: [{ fromId: wh.id }, { toId: wh.id }] },
-        orderBy: { createdAt: "desc" },
-        take: 6,
-        include: { from: { select: { name: true } }, to: { select: { name: true } }, items: true },
-      }),
-    ]);
-
-  const tenDaysAgo = new Date(startOfToday.getTime() - 10 * 24 * 60 * 60 * 1000);
-  const [topItems, recvTransfers, recvReturns] = await Promise.all([
-    prisma.requestItem.groupBy({
-      by: ["productId"],
+  const [
+    stock,
+    orders,
+    pendingRepRequests,
+    awaitingPickup,
+    transfersIn,
+    returns,
+    receivedTodayAgg,
+    movements,
+    transfers,
+  ] = await Promise.all([
+    prisma.warehouseStock.findMany({
+      where: { warehouseId: wh.id },
+      include: { product: { select: { name: true } } },
+      orderBy: { onHand: "asc" },
+    }),
+    prisma.request.findMany({
       where: {
-        request: {
-          warehouseName: whName,
-          status: { in: ["APPROVED", "IN_TRANSIT", "FULFILLED"] },
-        },
+        warehouseName: whName,
+        status: { in: ["APPROVED", "IN_TRANSIT", "FULFILLED"] },
+        // Only payment-cleared orders ever reach the warehouse view.
+        paymentStatus: { in: ["PAID", "OUTSTANDING"] },
+      },
+      select: { id: true, status: true, fulfilledAt: true },
+    }),
+    // Rep requests waiting for review — any warehouse can approve.
+    prisma.repStockRequest.count({ where: { status: "PENDING" } }),
+    // Prepared rep requests waiting for the rep to collect here.
+    prisma.repStockRequest.count({
+      where: { status: "READY", warehouseId: wh.id },
+    }),
+    prisma.warehouseTransfer.findMany({
+      where: { toId: wh.id },
+      select: { status: true },
+    }),
+    prisma.returnRequest.findMany({
+      where: { warehouseName: whName },
+      select: { status: true },
+    }),
+    prisma.stockMovement.aggregate({
+      where: {
+        type: "INBOUND",
+        warehouseName: whName,
+        createdAt: { gte: startOfToday },
       },
       _sum: { quantity: true },
     }),
-    prisma.warehouseTransfer.findMany({
-      where: { toId: wh.id, status: "COMPLETED", receivedAt: { gte: tenDaysAgo } },
-      select: { receivedAt: true },
+    prisma.stockMovement.findMany({
+      where: { warehouseName: whName },
+      take: 8,
+      orderBy: { createdAt: "desc" },
+      include: {
+        product: { select: { name: true } },
+        createdBy: { select: { name: true } },
+      },
     }),
-    prisma.returnRequest.findMany({
-      where: { warehouseName: whName, status: "COMPLETED", receivedAt: { gte: tenDaysAgo } },
-      select: { receivedAt: true },
+    prisma.warehouseTransfer.findMany({
+      where: { OR: [{ fromId: wh.id }, { toId: wh.id }] },
+      orderBy: { createdAt: "desc" },
+      take: 6,
+      include: { from: { select: { name: true } }, to: { select: { name: true } }, items: true },
     }),
   ]);
 
-  // Analytics
-  const onHand = stock.reduce((s, r) => s + r.onHand, 0);
+  // Operational counts — no money anywhere.
   const lowStock = stock.filter((r) => r.onHand <= r.minLevel);
   const toDispatch = orders.filter((o) => o.status === "APPROVED").length;
-  const inTransitOrders = orders.filter((o) => o.status === "IN_TRANSIT").length;
-  const deliveredToday = orders.filter(
+  const outForDelivery = orders.filter((o) => o.status === "IN_TRANSIT").length;
+  const dispatchedToday = orders.filter(
     (o) => o.status === "FULFILLED" && o.fulfilledAt && o.fulfilledAt >= startOfToday,
   ).length;
   const incomingTransfers = transfersIn.filter((t) => t.status === "IN_TRANSIT").length;
-  const outgoingToDispatch = transfersOut.filter((t) => t.status === "APPROVED").length;
-  const returnsToReceive = returns.filter((r) => r.status === "IN_TRANSIT").length;
-  const returnsCompleted = returns.filter((r) => r.status === "COMPLETED").length;
+  const returnsToInspect = returns.filter((r) => r.status === "IN_TRANSIT").length;
+  const receivedToday = receivedTodayAgg._sum.quantity ?? 0;
+
+  const tiles = [
+    { label: "Pending rep requests", count: pendingRepRequests, href: "/warehouse/rep-requests", icon: ClipboardList, accent: "warning" as const },
+    { label: "Awaiting rep pickup", count: awaitingPickup, href: "/warehouse/rep-requests", icon: Clock, accent: "info" as const },
+    { label: "Partner orders to dispatch", count: toDispatch, href: "/warehouse/orders", icon: Truck, accent: "warning" as const },
+    { label: "Out for delivery", count: outForDelivery, href: "/warehouse/orders", icon: ClipboardList, accent: "info" as const },
+    { label: "Returns to inspect", count: returnsToInspect, href: "/warehouse/returns", icon: Undo2, accent: "warning" as const },
+    { label: "Incoming transfers", count: incomingTransfers, href: "/warehouse/transfers", icon: ArrowDownToLine, accent: "info" as const },
+    { label: "Received today", count: receivedToday, href: "/warehouse/receive", icon: PackagePlus, accent: "success" as const },
+    { label: "Dispatched today", count: dispatchedToday, href: "/warehouse/orders", icon: CheckCircle2, accent: "success" as const },
+  ];
 
   const tasks = [
+    { label: "Rep requests to review", count: pendingRepRequests, href: "/warehouse/rep-requests", icon: ClipboardList },
+    { label: "Reps awaiting pickup", count: awaitingPickup, href: "/warehouse/rep-requests", icon: Users },
     { label: "Orders to dispatch", count: toDispatch, href: "/warehouse/orders", icon: Truck },
-    { label: "Orders in transit", count: inTransitOrders, href: "/warehouse/orders", icon: ClipboardList },
+    { label: "Orders out for delivery", count: outForDelivery, href: "/warehouse/orders", icon: ClipboardList },
     { label: "Incoming transfers to receive", count: incomingTransfers, href: "/warehouse/transfers", icon: ArrowDownToLine },
-    { label: "Transfers awaiting dispatch", count: outgoingToDispatch, href: "/warehouse/transfers", icon: ArrowUpFromLine },
-    { label: "Returns awaiting inspection", count: returnsToReceive, href: "/warehouse/returns", icon: Undo2 },
+    { label: "Returns to inspect", count: returnsToInspect, href: "/warehouse/returns", icon: Undo2 },
   ].filter((t) => t.count > 0);
 
-  // Activity feed (transfers + movements)
+  // Activity feed (transfers + movements at this warehouse).
   type Entry = { id: string; label: string; sub: string; time: Date; status?: string };
   const activity: Entry[] = [
     ...transfers.map((t) => ({
@@ -161,45 +175,6 @@ export default async function WarehouseOverviewPage() {
     .sort((a, b) => b.time.getTime() - a.time.getTime())
     .slice(0, 8);
 
-  // Performance: daily dispatch trend (last 10 days) + most-moved products.
-  const days = 10;
-  const dispatchTrend: number[] = [];
-  const receiptsTrend: number[] = [];
-  const dayLabels: string[] = [];
-  const receiptDates = [
-    ...recvTransfers.map((t) => t.receivedAt),
-    ...recvReturns.map((r) => r.receivedAt),
-  ].filter((d): d is Date => !!d);
-  for (let i = days - 1; i >= 0; i--) {
-    const day = new Date(startOfToday.getTime() - i * 24 * 60 * 60 * 1000);
-    const next = new Date(day.getTime() + 24 * 60 * 60 * 1000);
-    dispatchTrend.push(
-      orders.filter(
-        (o) =>
-          o.status === "FULFILLED" &&
-          o.fulfilledAt &&
-          o.fulfilledAt >= day &&
-          o.fulfilledAt < next,
-      ).length,
-    );
-    receiptsTrend.push(
-      receiptDates.filter((d) => d >= day && d < next).length,
-    );
-    dayLabels.push(day.toLocaleDateString("en", { weekday: "short" }));
-  }
-  const nameByProduct = new Map(stock.map((s) => [s.productId, s.product.name]));
-  const topProducts = topItems
-    .map((t) => ({
-      label: (nameByProduct.get(t.productId) ?? "—").replace("Ora ", ""),
-      value: t._sum.quantity ?? 0,
-    }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 4);
-  const hasPerf =
-    dispatchTrend.some((v) => v > 0) ||
-    receiptsTrend.some((v) => v > 0) ||
-    topProducts.length > 0;
-
   // Greeting based on Tanzania time (EAT, UTC+3).
   const eatHour = Number(
     new Intl.DateTimeFormat("en-GB", {
@@ -215,25 +190,23 @@ export default async function WarehouseOverviewPage() {
         ? "Good afternoon"
         : "Good evening";
 
-  // A warm, natural "what's happening today" summary.
   const naturalList = (items: string[]) =>
     items.length <= 1
       ? items[0] ?? ""
       : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 
   const work: string[] = [];
+  if (pendingRepRequests) work.push(`${pendingRepRequests} rep request${pendingRepRequests > 1 ? "s" : ""} to review`);
   if (toDispatch) work.push(`${toDispatch} order${toDispatch > 1 ? "s" : ""} to dispatch`);
-  if (inTransitOrders) work.push(`${inTransitOrders} order${inTransitOrders > 1 ? "s" : ""} in transit`);
-  if (incomingTransfers) work.push(`${incomingTransfers} transfer${incomingTransfers > 1 ? "s" : ""} arriving`);
-  if (returnsToReceive) work.push(`${returnsToReceive} return${returnsToReceive > 1 ? "s" : ""} to inspect`);
+  if (awaitingPickup) work.push(`${awaitingPickup} pickup${awaitingPickup > 1 ? "s" : ""} waiting`);
+  if (returnsToInspect) work.push(`${returnsToInspect} return${returnsToInspect > 1 ? "s" : ""} to inspect`);
 
   let summary: string;
   if (work.length > 0) {
     summary = `You've got ${naturalList(work)} to keep moving today.`;
-    if (deliveredToday > 0)
-      summary += ` ${deliveredToday} already delivered — nice work.`;
+    if (dispatchedToday > 0) summary += ` ${dispatchedToday} already dispatched — nice work.`;
   } else if (lowStock.length > 0) {
-    summary = `Orders are all clear. Keep an eye on ${lowStock.length} item${lowStock.length > 1 ? "s" : ""} running low on stock.`;
+    summary = `All clear on orders. Keep an eye on ${lowStock.length} item${lowStock.length > 1 ? "s" : ""} running low.`;
   } else {
     summary = "You're all caught up — the warehouse is running clean.";
   }
@@ -243,7 +216,6 @@ export default async function WarehouseOverviewPage() {
       <Reveal>
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-accent to-primary p-5 text-white shadow-glow sm:p-8">
           <div className="absolute inset-0 bg-grid opacity-20" />
-          {/* Animated decorative blobs */}
           <div className="pointer-events-none absolute -right-10 -top-16 size-56 rounded-full bg-white/15 blur-3xl animate-float-slow" />
           <div className="pointer-events-none absolute -bottom-20 right-1/3 size-48 rounded-full bg-white/10 blur-3xl animate-float-slow-rev" />
           <div className="pointer-events-none absolute -left-12 top-1/2 size-40 rounded-full bg-accent/30 blur-3xl animate-float-slow" />
@@ -263,16 +235,13 @@ export default async function WarehouseOverviewPage() {
         </div>
       </Reveal>
 
-      {/* Analytics */}
+      {/* Operational KPIs — counts only, never money. */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Current stock" value={formatNumber(onHand)} hint={`${stock.length} products`} icon={Package} accent="primary" />
-        <StatCard label="Orders to dispatch" value={formatNumber(toDispatch)} icon={Truck} accent="warning" />
-        <StatCard label="In transit" value={formatNumber(inTransitOrders)} icon={ClipboardList} accent="info" />
-        <StatCard label="Delivered today" value={formatNumber(deliveredToday)} icon={CheckCircle2} accent="success" />
-        <StatCard label="Incoming transfers" value={formatNumber(incomingTransfers)} icon={ArrowDownToLine} accent="info" />
-        <StatCard label="Outgoing transfers" value={formatNumber(outgoingToDispatch)} icon={ArrowUpFromLine} accent="info" />
-        <StatCard label="Returns to inspect" value={formatNumber(returnsToReceive)} hint={`${returnsCompleted} completed`} icon={Undo2} accent="warning" />
-        <StatCard label="Low stock" value={formatNumber(lowStock.length)} icon={AlertTriangle} accent={lowStock.length > 0 ? "warning" : "success"} />
+        {tiles.map((t) => (
+          <Link key={t.label} href={t.href} className="transition-transform hover:-translate-y-0.5">
+            <StatCard label={t.label} value={formatNumber(t.count)} icon={t.icon} accent={t.accent} />
+          </Link>
+        ))}
       </div>
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
@@ -318,11 +287,14 @@ export default async function WarehouseOverviewPage() {
                 <CardTitle>Quick actions</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-2.5 sm:grid-cols-2">
-                <Link href="/warehouse/receive" className={buttonVariants()}>
-                  <PackagePlus className="size-4" /> Receive stock
+                <Link href="/warehouse/rep-requests" className={buttonVariants()}>
+                  <ClipboardList className="size-4" /> Rep requests
                 </Link>
                 <Link href="/warehouse/orders" className={cn(buttonVariants({ variant: "outline" }))}>
-                  <Truck className="size-4" /> Fulfill orders
+                  <Truck className="size-4" /> Partner orders
+                </Link>
+                <Link href="/warehouse/receive" className={cn(buttonVariants({ variant: "outline" }))}>
+                  <PackagePlus className="size-4" /> Receive stock
                 </Link>
                 <Link href="/warehouse/transfers" className={cn(buttonVariants({ variant: "outline" }))}>
                   <ArrowLeftRight className="size-4" /> Transfers
@@ -330,13 +302,8 @@ export default async function WarehouseOverviewPage() {
                 <Link href="/warehouse/returns" className={cn(buttonVariants({ variant: "outline" }))}>
                   <Undo2 className="size-4" /> Returns
                 </Link>
-                {me.canRecordSales && (
-                  <Link href="/warehouse/sales" className={cn(buttonVariants({ variant: "outline" }))}>
-                    <Package className="size-4" /> Record sale
-                  </Link>
-                )}
-                <Link href="/warehouse/inventory" className={cn(buttonVariants({ variant: "outline" }), me.canRecordSales ? "" : "sm:col-span-2")}>
-                  <Boxes className="size-4" /> View inventory
+                <Link href="/warehouse/inventory" className={cn(buttonVariants({ variant: "outline" }))}>
+                  <Boxes className="size-4" /> Inventory
                 </Link>
               </CardContent>
             </Card>
@@ -377,70 +344,13 @@ export default async function WarehouseOverviewPage() {
         </Reveal>
       </div>
 
-      {/* Performance */}
-      {hasPerf && (
-        <Reveal>
-          <div className="space-y-6">
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Card className="glass-card">
-                <CardHeader>
-                  <CardTitle>Dispatch trend</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AreaChart data={dispatchTrend} />
-                  <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
-                    {dayLabels.map((d, i) => (
-                      <span key={i} className="flex-1 text-center">{d}</span>
-                    ))}
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Orders delivered per day · last {days} days
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="glass-card">
-                <CardHeader>
-                  <CardTitle>Receipts trend</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AreaChart data={receiptsTrend} color="hsl(145 65% 52%)" />
-                  <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
-                    {dayLabels.map((d, i) => (
-                      <span key={i} className="flex-1 text-center">{d}</span>
-                    ))}
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Transfers & returns received per day · last {days} days
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle>Most-moved products</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {topProducts.length === 0 ? (
-                  <EmptyState icon={Boxes} title="No data yet" />
-                ) : (
-                  <BarChart data={topProducts} />
-                )}
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Units across this warehouse&apos;s orders
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </Reveal>
-      )}
-
       {/* Low stock */}
       {lowStock.length > 0 && (
         <Reveal>
           <Card className="glass-card border-warning/30">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-warning">
-                <AlertTriangle className="size-4" /> Low stock alerts
+                <Package className="size-4" /> Low stock alerts
               </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
