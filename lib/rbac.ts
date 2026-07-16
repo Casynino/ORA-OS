@@ -6,6 +6,8 @@ export function dashboardPath(role?: Role | string | null): string {
   switch (role) {
     case "ADMIN":
       return "/admin";
+    case "FINANCE":
+      return "/finance";
     case "WAREHOUSE":
       return "/warehouse";
     case "SALES_REP":

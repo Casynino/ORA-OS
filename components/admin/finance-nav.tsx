@@ -5,20 +5,27 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
-  { href: "/admin/finance", label: "Overview" },
-  { href: "/admin/finance/expenses", label: "Expenses" },
-  { href: "/admin/finance/capital", label: "Capital" },
-  { href: "/admin/finance/accounts", label: "Accounts" },
-  { href: "/admin/finance/ledger", label: "Ledger" },
+  { path: "", label: "Overview" },
+  { path: "/expenses", label: "Expenses" },
+  { path: "/capital", label: "Capital" },
+  { path: "/accounts", label: "Accounts" },
+  { path: "/petty-cash", label: "Petty cash" },
+  { path: "/payroll", label: "Payroll" },
+  { path: "/ledger", label: "Ledger" },
 ];
 
-export function FinanceNav() {
+export function FinanceNav({
+  basePath = "/admin/finance",
+}: {
+  basePath?: string;
+}) {
   const pathname = usePathname();
   return (
     <div className="flex flex-wrap gap-1.5">
-      {LINKS.map((l) => {
+      {LINKS.map((raw) => {
+        const l = { href: basePath + raw.path, label: raw.label };
         const active =
-          l.href === "/admin/finance"
+          l.href === basePath
             ? pathname === l.href
             : pathname.startsWith(l.href);
         return (

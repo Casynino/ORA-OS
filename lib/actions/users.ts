@@ -199,7 +199,7 @@ export async function setCreditLimit(
   input: z.infer<typeof creditLimitSchema>,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const parsed = creditLimitSchema.safeParse(input);
     if (!parsed.success) return fail("Invalid credit limit.");
     const user = await prisma.user.findUnique({
@@ -239,7 +239,7 @@ const createSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
-  role: z.enum(["ADMIN", "WAREHOUSE", "PARTNER", "SALES_REP"]),
+  role: z.enum(["ADMIN", "FINANCE", "WAREHOUSE", "PARTNER", "SALES_REP"]),
   organization: z.string().optional(),
   location: z.string().optional(),
   phone: z.string().optional(),

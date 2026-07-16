@@ -34,6 +34,7 @@ export const EXPENSE_GROUPS: { label: string; categories: ExpenseCategory[] }[] 
   { label: "Staff", categories: ["SALARIES", "ALLOWANCES", "TRANSPORT_REIMBURSEMENT"] },
   { label: "Logistics", categories: ["DELIVERY", "WAREHOUSE_HANDLING", "TRANSPORT_OF_GOODS"] },
   { label: "Business", categories: ["STOCK_PURCHASE", "IMPORT_COSTS", "PACKAGING", "MARKETING"] },
+  { label: "Statutory & tech", categories: ["TAXES", "INTERNET", "EQUIPMENT"] },
   { label: "Other", categories: ["OTHER"] },
 ];
 
@@ -52,6 +53,9 @@ export const EXPENSE_LABELS: Record<ExpenseCategory, string> = {
   IMPORT_COSTS: "Import costs",
   PACKAGING: "Packaging",
   MARKETING: "Marketing",
+  TAXES: "Taxes",
+  INTERNET: "Internet",
+  EQUIPMENT: "Equipment",
   OTHER: "Miscellaneous",
 };
 
@@ -363,6 +367,8 @@ export async function getFinanceOverview(period: Period) {
       moneyIn: inToday.total,
       moneyOut: exToday.total,
       net: inToday.total - exToday.total,
+      // Customer money only — capital injections aren't "collections".
+      capitalIn: inToday.capital,
     },
     position: {
       cashAvailable,

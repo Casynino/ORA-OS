@@ -14,6 +14,8 @@ import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 function revalidateAll() {
   revalidatePath("/admin");
+  revalidatePath("/finance");
+  revalidatePath("/finance/payments");
   revalidatePath("/admin/requests");
   revalidatePath("/admin/payments");
   revalidatePath("/admin/inventory");
@@ -1042,7 +1044,7 @@ export async function confirmOrderPayment(
   paymentAccountId?: string,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const request = await prisma.request.findUnique({
       where: { id: requestId },
       include: { requester: { select: { name: true } } },
@@ -1061,8 +1063,10 @@ export async function confirmOrderPayment(
       paymentAccountId || null,
       method,
     );
-    await prisma.request.update({
-      where: { id: request.id },
+    // Atomic claim: admin and finance both work this queue — a concurrent
+    // confirm (or reject) matches 0 rows and aborts instead of double-writing.
+    const claimed = await prisma.request.updateMany({
+      where: { id: request.id, status: "APPROVED", paymentStatus: "UNPAID" },
       data: {
         paymentStatus: "PAID",
         paymentMethod: receiving.method,
@@ -1070,6 +1074,9 @@ export async function confirmOrderPayment(
         paidAt: new Date(),
       },
     });
+    if (claimed.count === 0) {
+      return fail("This order was already handled by someone else — refresh to see its latest state.");
+    }
     await logActivity({
       actorId: admin.id,
       actorName: admin.name,
@@ -1093,7 +1100,7 @@ export async function rejectOrderPayment(
   reason?: string,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const request = await prisma.request.findUnique({
       where: { id: requestId },
       include: { requester: { select: { name: true } } },
@@ -1103,13 +1110,17 @@ export async function rejectOrderPayment(
       return fail("This order is not awaiting payment confirmation.");
     }
 
-    await prisma.request.update({
-      where: { id: request.id },
+    // Atomic claim — a concurrent confirm can't be overwritten by a stale reject.
+    const claimed = await prisma.request.updateMany({
+      where: { id: request.id, status: "APPROVED", paymentStatus: "UNPAID" },
       data: {
         status: "PRICED",
         adminNote: reason?.trim() || "Payment not received / rejected.",
       },
     });
+    if (claimed.count === 0) {
+      return fail("This order was already handled by someone else — refresh to see its latest state.");
+    }
     await logActivity({
       actorId: admin.id,
       actorName: admin.name,

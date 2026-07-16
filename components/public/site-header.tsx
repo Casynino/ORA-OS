@@ -18,7 +18,9 @@ const nav = [
 
 function dash(role?: string) {
   if (role === "ADMIN") return "/admin";
+  if (role === "FINANCE") return "/finance";
   if (role === "WAREHOUSE") return "/warehouse";
+  if (role === "SALES_REP") return "/rep";
   return "/partner";
 }
 

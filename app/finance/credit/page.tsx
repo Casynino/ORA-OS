@@ -5,8 +5,10 @@ import { CreditLedger } from "@/components/admin/credit-ledger";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminCreditPage() {
-  await requireRole("ADMIN");
+/** Finance owns accounts receivable — the same live credit ledger the admin
+ * sees, with full settlement and repayment powers. */
+export default async function FinanceCreditPage() {
+  await requireRole("FINANCE");
   const { creditAccounts, settlements, fieldCredits, paymentAccounts } =
     await getCreditWorkspaceData();
 
@@ -14,13 +16,15 @@ export default async function AdminCreditPage() {
     <div className="space-y-6">
       <PageHeader
         title="Credit & Settlements"
-        description="A live financial control ledger — every credit in the company (partners AND rep customers), every repayment, every overdue risk."
+        description="Accounts receivable, live — every credit in the company (partners AND rep customers), every repayment, every overdue risk."
       />
       <CreditLedger
         accounts={creditAccounts}
         settlements={settlements}
         fieldCredits={fieldCredits}
         paymentAccounts={paymentAccounts}
+        detailBase="/finance/credit"
+        fieldCustomerBase=""
       />
     </div>
   );

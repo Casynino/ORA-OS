@@ -5,6 +5,7 @@ const { auth } = NextAuth(authConfig);
 
 function dashboardFor(role?: string) {
   if (role === "ADMIN") return "/admin";
+  if (role === "FINANCE") return "/finance";
   if (role === "WAREHOUSE") return "/warehouse";
   if (role === "SALES_REP") return "/rep";
   return "/partner";
@@ -17,10 +18,11 @@ export default auth((req) => {
   const role = session?.user?.role;
   const path = nextUrl.pathname;
   const inAdmin = path.startsWith("/admin");
+  const inFinance = path.startsWith("/finance");
   const inWarehouse = path.startsWith("/warehouse");
   const inPartner = path.startsWith("/partner");
   const inRep = path.startsWith("/rep");
-  const isProtected = inAdmin || inWarehouse || inPartner || inRep;
+  const isProtected = inAdmin || inFinance || inWarehouse || inPartner || inRep;
 
   // Note: signed-in users are bounced away from /login by the login page
   // itself (Node runtime, DB-validated) — the edge token here can be stale
@@ -36,6 +38,8 @@ export default auth((req) => {
   // Keep each role inside its own area.
   if (isLoggedIn) {
     if (inAdmin && role !== "ADMIN")
+      return Response.redirect(new URL(dashboardFor(role), nextUrl));
+    if (inFinance && role !== "FINANCE")
       return Response.redirect(new URL(dashboardFor(role), nextUrl));
     if (inWarehouse && role !== "WAREHOUSE")
       return Response.redirect(new URL(dashboardFor(role), nextUrl));

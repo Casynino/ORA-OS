@@ -8,6 +8,8 @@ import { logActivity } from "@/lib/activity";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 function revalidateAccounts() {
+  revalidatePath("/finance");
+  revalidatePath("/finance/accounts");
   revalidatePath("/admin/finance/accounts");
   revalidatePath("/admin/finance");
   revalidatePath("/rep/sell");
@@ -24,7 +26,7 @@ export async function createPaymentAccount(
   input: z.infer<typeof createSchema>,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const parsed = createSchema.safeParse(input);
     if (!parsed.success) {
       return fail(parsed.error.issues[0]?.message ?? "Invalid account.");
@@ -65,7 +67,7 @@ export async function updatePaymentAccount(
   input: z.infer<typeof updateSchema>,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const parsed = updateSchema.safeParse(input);
     if (!parsed.success) return fail("Invalid update.");
     const { accountId, ...rest } = parsed.data;

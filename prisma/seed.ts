@@ -39,6 +39,9 @@ async function main() {
   await prisma.user.create({
     data: { name: "Juma Warehouse", email: "warehouse@orapads.org", passwordHash: hash("Warehouse@123"), role: "WAREHOUSE", status: "ACTIVE", warehouseId: mainWarehouse.id },
   });
+  await prisma.user.create({
+    data: { name: "Neema Finance", email: "finance@orapads.org", passwordHash: hash("Finance@123"), role: "FINANCE", status: "ACTIVE", position: "Finance & Accounting" },
+  });
   const partner = await prisma.user.create({
     data: {
       name: "Brian Otieno", email: "partner@orapads.org", passwordHash: hash("Partner@123"),
@@ -173,6 +176,7 @@ async function main() {
   console.log("✅  Seed complete — 3 real products (150/150/200 = 500 units).");
   console.log("   Admin     → admin@orapads.org / Admin@123");
   console.log("   Warehouse → warehouse@orapads.org / Warehouse@123");
+  console.log("   Finance → finance@orapads.org / Finance@123");
   console.log("   Partner   → partner@orapads.org / Partner@123");
 }
 
