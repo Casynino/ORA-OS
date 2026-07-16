@@ -258,7 +258,7 @@ export async function recordFieldCollection(
   input: z.infer<typeof collectSchema>,
 ): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["SALES_REP", "ADMIN"]);
+    const actor = await requireActor(["SALES_REP", "ADMIN", "FINANCE"]);
     const parsed = collectSchema.safeParse(input);
     if (!parsed.success) return fail("Invalid payment.");
     const d = parsed.data;
@@ -1086,7 +1086,7 @@ export async function setFieldCustomerCredit(
   suspended: boolean,
 ): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["ADMIN"]);
+    const actor = await requireActor(["ADMIN", "FINANCE"]);
     const cust = await prisma.fieldCustomer.findUnique({ where: { id: customerId } });
     if (!cust) return fail("Customer not found.");
     await prisma.fieldCustomer.update({

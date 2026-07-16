@@ -51,6 +51,14 @@ const EXPENSE_OPTIONS: { group: string; items: { value: string; label: string }[
       { value: "MARKETING", label: "Marketing" },
     ],
   },
+  {
+    group: "Statutory & tech",
+    items: [
+      { value: "TAXES", label: "Taxes" },
+      { value: "INTERNET", label: "Internet" },
+      { value: "EQUIPMENT", label: "Equipment" },
+    ],
+  },
   { group: "Other", items: [{ value: "OTHER", label: "Miscellaneous" }] },
 ];
 

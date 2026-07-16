@@ -13,6 +13,8 @@ import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 function revalidateCredit() {
   revalidatePath("/admin/credit");
   revalidatePath("/admin");
+  revalidatePath("/finance");
+  revalidatePath("/finance/credit");
   revalidatePath("/partner");
   revalidatePath("/partner/credit");
 }
@@ -31,7 +33,7 @@ export async function recordPayment(
   input: z.infer<typeof paymentSchema>,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const parsed = paymentSchema.safeParse(input);
     if (!parsed.success) return fail("Invalid payment.");
 
@@ -137,7 +139,7 @@ export async function recordPayment(
 
 export async function markOverdue(accountId: string): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const a = await prisma.creditAccount.findUnique({
       where: { id: accountId },
       include: { request: true },
@@ -168,7 +170,7 @@ export async function markOverdue(accountId: string): Promise<ActionResult> {
 
 export async function closeCredit(accountId: string): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const a = await prisma.creditAccount.findUnique({
       where: { id: accountId },
       include: { request: true },
@@ -206,7 +208,7 @@ export async function sendCreditReminder(
   accountId: string,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const a = await prisma.creditAccount.findUnique({
       where: { id: accountId },
       include: { request: true, agent: { select: { name: true } } },
@@ -236,7 +238,7 @@ export async function editCreditTerms(
   input: z.infer<typeof termsSchema>,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const parsed = termsSchema.safeParse(input);
     if (!parsed.success) return fail("Invalid terms.");
     const a = await prisma.creditAccount.findUnique({

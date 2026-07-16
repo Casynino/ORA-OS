@@ -24,7 +24,7 @@ export async function setPartnerPrices(
   input: z.infer<typeof schema>,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const parsed = schema.safeParse(input);
     if (!parsed.success) return fail("Invalid pricing data.");
 

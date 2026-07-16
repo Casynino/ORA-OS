@@ -12,6 +12,8 @@ import { resolveReceivingAccount } from "@/lib/payment-methods";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 function revalidateSettlements() {
+  revalidatePath("/finance");
+  revalidatePath("/finance/credit");
   revalidatePath("/partner/credit");
   revalidatePath("/admin/credit");
   revalidatePath("/admin/payments");
@@ -95,7 +97,7 @@ export async function confirmSettlement(
   paymentAccountId?: string,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const sr = await prisma.settlementRequest.findUnique({
       where: { id },
       include: { creditAccount: true },
@@ -220,7 +222,7 @@ export async function rejectSettlement(
   note?: string,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const sr = await prisma.settlementRequest.findUnique({ where: { id } });
     if (!sr) return fail("Settlement not found.");
     if (sr.status !== "PENDING") return fail("This settlement has already been reviewed.");

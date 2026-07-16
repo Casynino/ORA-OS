@@ -16,6 +16,7 @@ const EXPENSE_CATEGORIES = [
   "SALARIES", "ALLOWANCES", "TRANSPORT_REIMBURSEMENT",
   "DELIVERY", "WAREHOUSE_HANDLING", "TRANSPORT_OF_GOODS",
   "STOCK_PURCHASE", "IMPORT_COSTS", "PACKAGING", "MARKETING",
+  "TAXES", "INTERNET", "EQUIPMENT",
   "OTHER",
 ] as const;
 
@@ -24,7 +25,7 @@ const CAPITAL_TYPES = [
 ] as const;
 
 function revalidateFinance() {
-  for (const p of ["/admin/finance", "/admin/finance/expenses", "/admin/finance/capital", "/admin/finance/ledger", "/admin"])
+  for (const p of ["/admin/finance", "/admin/finance/expenses", "/admin/finance/capital", "/admin/finance/ledger", "/admin", "/finance", "/finance/expenses", "/finance/reports"])
     revalidatePath(p);
 }
 
@@ -41,7 +42,7 @@ export async function recordExpense(
   input: z.infer<typeof expenseSchema>,
 ): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["ADMIN"]);
+    const actor = await requireActor(["ADMIN", "FINANCE"]);
     const parsed = expenseSchema.safeParse(input);
     if (!parsed.success)
       return fail(parsed.error.issues[0]?.message ?? "Invalid expense.");
@@ -76,9 +77,17 @@ export async function recordExpense(
 
 export async function removeExpense(id: string): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["ADMIN"]);
+    const actor = await requireActor(["ADMIN", "FINANCE"]);
     const exp = await prisma.expense.findUnique({ where: { id } });
     if (!exp) return fail("Expense not found.");
+    // System-generated expenses embody an admin approval (petty cash issue,
+    // paid payroll) — finance must not be able to erase that control record.
+    const systemGenerated = /^(Petty cash PC-|Payroll PAY-)/.test(exp.purpose);
+    if (systemGenerated && actor.role !== "ADMIN") {
+      return fail(
+        "This expense was created by an approval workflow (petty cash / payroll) — only the admin can remove it.",
+      );
+    }
     await prisma.expense.delete({ where: { id } });
     await logActivity({
       actorId: actor.id,
@@ -107,7 +116,7 @@ export async function recordCapital(
   input: z.infer<typeof capitalSchema>,
 ): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["ADMIN"]);
+    const actor = await requireActor(["ADMIN", "FINANCE"]);
     const parsed = capitalSchema.safeParse(input);
     if (!parsed.success)
       return fail(parsed.error.issues[0]?.message ?? "Invalid capital entry.");
@@ -141,7 +150,7 @@ export async function recordCapital(
 
 export async function removeCapital(id: string): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["ADMIN"]);
+    const actor = await requireActor(["ADMIN", "FINANCE"]);
     const cap = await prisma.capitalEntry.findUnique({ where: { id } });
     if (!cap) return fail("Capital entry not found.");
     await prisma.capitalEntry.delete({ where: { id } });

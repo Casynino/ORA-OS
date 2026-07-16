@@ -25,6 +25,7 @@ datasource db {
 
 enum Role {
   ADMIN
+  FINANCE // Finance & Accounting dept — daily financial ops, reports to admin
   WAREHOUSE
   PARTNER
   SALES_REP
@@ -193,6 +194,11 @@ model User {
   // Finance
   expensesRecorded      Expense[]            @relation("ExpenseRecorder")
   capitalRecorded       CapitalEntry[]       @relation("CapitalRecorder")
+  pettyCashRequested    PettyCashRequest[]   @relation("PettyCashRequester")
+  pettyCashApproved     PettyCashRequest[]   @relation("PettyCashApprover")
+  pettyCashSpent        PettyCashExpense[]   @relation("PettyCashSpender")
+  payrollCreated        PayrollRun[]         @relation("PayrollCreator")
+  payrollApproved       PayrollRun[]         @relation("PayrollApprover")
   // Impact
   impactActivities      ImpactActivity[]     @relation("ImpactActivityCreator")
   loginEvents           LoginEvent[]
@@ -447,6 +453,8 @@ model PaymentAccount {
   payments           Payment[]
   settlementRequests SettlementRequest[]
   requests           Request[]
+  pettyCashRequests  PettyCashRequest[]
+  payrollRuns        PayrollRun[]
 
   @@index([type])
   @@index([isActive])
@@ -1123,6 +1131,9 @@ enum ExpenseCategory {
   IMPORT_COSTS
   PACKAGING
   MARKETING
+  TAXES
+  INTERNET
+  EQUIPMENT
   OTHER
 }
 
@@ -1132,6 +1143,124 @@ enum CapitalType {
   PROFIT_REINVESTED
   GRANT
   OTHER
+}
+
+// ── Finance & Accounting department ─────────────────────────────────────────
+
+enum PettyCashStatus {
+  PENDING // finance requested, awaiting admin approval
+  APPROVED // admin approved — money issued, expenditures being recorded
+  REJECTED
+  RECONCILED // finance submitted the reconciliation report
+}
+
+/// Petty cash accountability: finance requests an allocation, admin approves
+/// (money leaves as an Expense at that moment), finance records every
+/// expenditure against it, then closes it with a reconciliation report.
+model PettyCashRequest {
+  id               String          @id @default(cuid())
+  code             String          @unique
+  amount           Int // whole TSh allocated
+  purpose          String
+  status           PettyCashStatus @default(PENDING)
+  requestedBy      User            @relation("PettyCashRequester", fields: [requestedById], references: [id])
+  requestedById    String
+  approvedBy       User?           @relation("PettyCashApprover", fields: [approvedById], references: [id])
+  approvedById     String?
+  approvedAt       DateTime?
+  adminNote        String?
+  // Which company account the cash was issued from.
+  paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  paymentAccountId String?
+  reconciledAt     DateTime?
+  reconcileNote    String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  expenses PettyCashExpense[]
+
+  @@index([status])
+}
+
+/// One expenditure recorded against a petty cash allocation.
+model PettyCashExpense {
+  id           String           @id @default(cuid())
+  request      PettyCashRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId    String
+  description  String
+  amount       Int
+  receiptRef   String? // receipt number / reference
+  recordedBy   User             @relation("PettyCashSpender", fields: [recordedById], references: [id])
+  recordedById String
+  createdAt    DateTime         @default(now())
+
+  @@index([requestId])
+}
+
+/// Payroll staff registry — employees are paid people, not system logins.
+model Employee {
+  id         String   @id @default(cuid())
+  name       String
+  position   String?
+  phone      String?
+  baseSalary Int // monthly TSh
+  isActive   Boolean  @default(true)
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  payrollItems PayrollItem[]
+}
+
+enum PayrollStatus {
+  DRAFT // finance building the run
+  PENDING_APPROVAL // submitted to admin
+  APPROVED // admin approved — ready to pay
+  PAID // paid out — an Expense (SALARIES) was recorded
+  REJECTED
+}
+
+/// One salary run (usually monthly). Paying it creates a SALARIES Expense so
+/// payroll flows into every financial report automatically.
+model PayrollRun {
+  id               String          @id @default(cuid())
+  code             String          @unique
+  month            Int // 1-12
+  year             Int
+  status           PayrollStatus   @default(DRAFT)
+  createdBy        User            @relation("PayrollCreator", fields: [createdById], references: [id])
+  createdById      String
+  approvedBy       User?           @relation("PayrollApprover", fields: [approvedById], references: [id])
+  approvedById     String?
+  approvedAt       DateTime?
+  paidAt           DateTime?
+  // Which company account the salaries were paid from.
+  paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  paymentAccountId String?
+  note             String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  items PayrollItem[]
+
+  @@index([status])
+  @@index([year, month])
+}
+
+/// One employee's line on a payroll run (name & amounts snapshotted).
+model PayrollItem {
+  id         String     @id @default(cuid())
+  run        PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId      String
+  employee   Employee   @relation(fields: [employeeId], references: [id])
+  employeeId String
+  name       String // snapshot at run creation
+  gross      Int
+  allowance  Int        @default(0)
+  deduction  Int        @default(0)
+  net        Int
+
+  @@index([runId])
 }
 
 /// Money leaving ORA — always categorised, always tied to the admin who

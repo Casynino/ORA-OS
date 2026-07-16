@@ -167,11 +167,16 @@ export function CreditLedger({
   settlements = [],
   fieldCredits = [],
   paymentAccounts = [],
+  detailBase = "/admin/credit",
+  fieldCustomerBase = "/admin/reps/customers",
 }: {
   accounts: CreditAccountDTO[];
   settlements?: SettlementDTO[];
   fieldCredits?: FieldCreditDTO[];
   paymentAccounts?: ReceivingAccount[];
+  // Route bases so the finance workspace can reuse this whole surface.
+  detailBase?: string;
+  fieldCustomerBase?: string;
 }) {
   const router = useRouter();
   const pendingSettlements = settlements.filter((s) => s.status === "PENDING").length;
@@ -283,6 +288,7 @@ export function CreditLedger({
       <PendingPayments
         settlements={settlements.filter((s) => s.status === "PENDING")}
         receivingAccounts={paymentAccounts}
+        detailBase={detailBase}
         onRefresh={() => router.refresh()}
       />
 
@@ -319,12 +325,13 @@ export function CreditLedger({
       {tab === "CREDITS" && (
         <CreditsTable
           accounts={accounts}
+          detailBase={detailBase}
           onPay={setPayTarget}
           onTerms={setTermsTarget}
           onRefresh={() => router.refresh()}
         />
       )}
-      {tab === "FIELD" && <FieldCreditPanel credits={fieldCredits} />}
+      {tab === "FIELD" && <FieldCreditPanel credits={fieldCredits} customerBase={fieldCustomerBase} />}
       {tab === "SETTLEMENTS" && (
         <>
           <SettlementsTable
@@ -347,7 +354,7 @@ export function CreditLedger({
               <h3 className="font-display text-sm font-semibold text-muted-foreground">
                 Overdue field credit (rep customers)
               </h3>
-              <FieldCreditPanel credits={overdueField} compact />
+              <FieldCreditPanel credits={overdueField} customerBase={fieldCustomerBase} compact />
             </div>
           )}
         </>
@@ -415,10 +422,12 @@ function Kpi({
 function PendingPayments({
   settlements,
   receivingAccounts = [],
+  detailBase = "/admin/credit",
   onRefresh,
 }: {
   settlements: SettlementDTO[];
   receivingAccounts?: ReceivingAccount[];
+  detailBase?: string;
   onRefresh: () => void;
 }) {
   const router = useRouter();
@@ -467,7 +476,7 @@ function PendingPayments({
                   {s.partner}
                 </span>
                 <button
-                  onClick={() => router.push(`/admin/credit/${s.accountId}`)}
+                  onClick={() => router.push(`${detailBase}/${s.accountId}`)}
                   className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                 >
                   {s.batchCode} <ExternalLink className="size-3" />
@@ -500,11 +509,13 @@ function PendingPayments({
 // ── Credits table ─────────────────────────────────────────────────────────
 function CreditsTable({
   accounts,
+  detailBase = "/admin/credit",
   onPay,
   onTerms,
   onRefresh,
 }: {
   accounts: CreditAccountDTO[];
+  detailBase?: string;
   onPay: (a: CreditAccountDTO) => void;
   onTerms: (a: CreditAccountDTO) => void;
   onRefresh: () => void;
@@ -704,7 +715,7 @@ function CreditsTable({
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/admin/credit/${a.id}`);
+                              router.push(`${detailBase}/${a.id}`);
                             }}
                           >
                             <ExternalLink className="size-3.5" />
@@ -1351,9 +1362,12 @@ function TermsModal({
 /** Every rep-recorded credit sale — filterable by rep, customer, status. */
 function FieldCreditPanel({
   credits,
+  customerBase = "/admin/reps/customers",
   compact = false,
 }: {
   credits: FieldCreditDTO[];
+  // Empty string hides the profile link (no equivalent page in that workspace).
+  customerBase?: string;
   compact?: boolean;
 }) {
   const [q, setQ] = useState("");
@@ -1468,9 +1482,9 @@ function FieldCreditPanel({
                         <span className="text-success"> · settled</span>
                       )}
                     </p>
-                    {c.customerId && (
+                    {c.customerId && customerBase && (
                       <Link
-                        href={`/admin/reps/customers/${c.customerId}`}
+                        href={`${customerBase}/${c.customerId}`}
                         className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                       >
                         Customer profile <ExternalLink className="size-3" />
