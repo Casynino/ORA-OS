@@ -10,6 +10,7 @@ import { CustomerFinancialSummary } from "@/components/customers/customer-financ
 import { CustomerInventorySummary } from "@/components/customers/customer-inventory-summary";
 import { CustomerTimeline } from "@/components/customers/customer-timeline";
 import { CreditLimitControl } from "@/components/customers/credit-limit-control";
+import { CustomerEditControls } from "@/components/customers/customer-edit-controls";
 import { CustomerNoteForm } from "@/components/customers/customer-note-form";
 import { FieldCollectionButton } from "@/components/finance/field-collection-button";
 import { cn, formatCurrency, formatDate, timeAgo } from "@/lib/utils";
@@ -101,12 +102,32 @@ export function CustomerProfileView({
       </div>
 
       {canManageCredit && (
-        <CreditLimitControl
-          customerId={profile.id}
-          currentLimit={profile.creditLimit}
-          outstanding={profile.finance.outstanding}
-          suspended={profile.creditSuspended}
-        />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <CreditLimitControl
+            customerId={profile.id}
+            currentLimit={profile.creditLimit}
+            outstanding={profile.finance.outstanding}
+            suspended={profile.creditSuspended}
+          />
+          <CustomerEditControls
+            customer={{
+              id: profile.id,
+              businessName: profile.businessName,
+              email: profile.email,
+              phone: profile.phone,
+              location: profile.location,
+              region: profile.region,
+              district: profile.district,
+              customerType: profile.customerType,
+              expectedVolume: profile.expectedVolume,
+              preferredPayment: profile.preferredPayment,
+              businessLicense: profile.businessLicense,
+              taxId: profile.taxId,
+            }}
+            listHref={backHref}
+            hasSales={profile.sales.length > 0}
+          />
+        </div>
       )}
 
       <CustomerNoteForm customerId={profile.id} />

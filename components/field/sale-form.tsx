@@ -89,7 +89,6 @@ export function FieldSaleForm({
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsBusy, setGpsBusy] = useState(false);
   const [customerName, setCustomerName] = useState(""); // cash walk-in
-  const [location, setLocation] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [note, setNote] = useState("");
 
@@ -236,7 +235,6 @@ export function FieldSaleForm({
         // so the customer's history stays complete.
         customerId: customerId || undefined,
         customerName: type === "CASH" && !customerId ? customerName : "",
-        location,
         note,
         dueDate: type === "CREDIT" ? dueDate : "",
       });
@@ -583,15 +581,9 @@ export function FieldSaleForm({
         </div>
       )}
 
-      <div className="grid gap-2.5 sm:grid-cols-2">
-        <div>
-          <Label className="text-xs text-muted-foreground">Location (optional)</Label>
-          <Input placeholder="e.g. Kariakoo market" value={location} onChange={(e) => setLocation(e.target.value)} className="mt-1.5" />
-        </div>
-        <div>
-          <Label className="text-xs text-muted-foreground">Note (optional)</Label>
-          <Input placeholder="Anything worth noting…" value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" />
-        </div>
+      <div>
+        <Label className="text-xs text-muted-foreground">Note (optional)</Label>
+        <Input placeholder="Anything worth noting…" value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" />
       </div>
 
       <Button
