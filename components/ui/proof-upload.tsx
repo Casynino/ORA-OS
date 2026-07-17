@@ -5,6 +5,43 @@ import { Loader2, ImagePlus, Paperclip, X } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 /**
+ * Shrink a phone photo before upload: decode, scale to a max edge, re-encode as
+ * JPEG. Keeps proof images small (and normalises HEIC/large captures). Falls
+ * back to the original file if the browser can't decode it.
+ */
+async function compressImage(file: File): Promise<Blob> {
+  if (!file.type.startsWith("image/")) return file;
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = url;
+    });
+    const maxEdge = 1600;
+    const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0, w, h);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.72),
+    );
+    // Only use the compressed version if it actually came out smaller.
+    return blob && blob.size < file.size ? blob : file;
+  } catch {
+    return file;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/**
  * Upload a proof image (payment receipt, deposit slip, office-fund receipt) to
  * the shared /api/upload endpoint (Vercel Blob in prod). Controlled: the parent
  * holds the resulting URL string and re-renders a thumbnail + remove button.
@@ -27,10 +64,11 @@ export function ProofUpload({
     if (!file) return;
     setUploading(true);
     try {
+      const compressed = await compressImage(file);
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", compressed, file.name.replace(/\.[^.]+$/, "") + ".jpg");
       const res = await fetch("/api/upload", { method: "POST", body: fd });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok && data.url) {
         onChange(data.url);
         toast({ variant: "success", title: "Proof uploaded." });
