@@ -265,8 +265,25 @@ export function FieldSaleForm({
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
+        // Full reset so the rep can immediately start a fresh sale — clear the
+        // cart, the selected/typed customer, and EVERY payment detail (method,
+        // account, reference, cheque bank/number/date and the attached photo).
+        setType("CASH");
         setQty({});
+        setPrice(Object.fromEntries(products.map((p) => [p.id, String(p.price)])));
+        setCustomerId("");
         setCustomerName("");
+        setSearch("");
+        setListOpen(false);
+        setNewCustomer(false);
+        setDueDate("");
+        setPayMethod(firstMethod);
+        setPayAccountId(accounts.find((a) => a.type === firstMethod)?.id ?? "");
+        setPayReference("");
+        setPayProofUrl("");
+        setChequeBank("");
+        setChequeNumber("");
+        setChequeDate("");
         setNote("");
         router.refresh();
       } else {
