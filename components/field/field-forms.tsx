@@ -10,6 +10,7 @@ import {
   createFieldCustomer,
 } from "@/lib/actions/field";
 import { toast } from "@/components/ui/use-toast";
+import { CUSTOMER_TYPES } from "@/lib/customer-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -510,13 +511,9 @@ export function NewCustomerForm({ startOpen = false }: { startOpen?: boolean }) 
           className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
         >
           <option value="">Business type…</option>
-          <option>Pharmacy</option>
-          <option>Shop</option>
-          <option>Supermarket</option>
-          <option>Kiosk</option>
-          <option>Clinic</option>
-          <option>Wholesaler</option>
-          <option>Other</option>
+          {CUSTOMER_TYPES.map((t) => (
+            <option key={t}>{t}</option>
+          ))}
         </select>
         <select
           value={preferredPayment}

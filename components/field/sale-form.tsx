@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/receiving-account-picker";
 import { ProofUpload } from "@/components/ui/proof-upload";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
+import { CUSTOMER_TYPES } from "@/lib/customer-types";
 
 type ProductRow = {
   id: string;
@@ -38,6 +39,7 @@ type CustomerRow = {
   phone?: string | null;
   location?: string | null;
   creditSuspended: boolean;
+  creditLimit?: number | null;
 };
 
 export function FieldSaleForm({
@@ -62,7 +64,12 @@ export function FieldSaleForm({
   // Direct bank/mobile payments: the rep attaches the customer's receipt so
   // finance can verify the money actually reached ORA's account.
   const [payProofUrl, setPayProofUrl] = useState("");
+  // Cheque payments capture the instrument details for finance to verify.
+  const [chequeBank, setChequeBank] = useState("");
+  const [chequeNumber, setChequeNumber] = useState("");
+  const [chequeDate, setChequeDate] = useState("");
   const isDirectPay = type === "CASH" && payMethod !== "CASH";
+  const isCheque = type === "CASH" && payMethod === "CHEQUE";
   const [qty, setQty] = useState<Record<string, string>>({});
   const [price, setPrice] = useState<Record<string, string>>(
     Object.fromEntries(products.map((p) => [p.id, String(p.price)])),
@@ -216,10 +223,20 @@ export function FieldSaleForm({
         variant: "error",
         title: "Save (or cancel) the new customer first.",
       });
-    if (type === "CASH" && accounts.length > 0 && !payAccountId)
+    if (type === "CREDIT" && !dueDate)
+      return toast({
+        variant: "error",
+        title: "Credit sales need a payment due date.",
+      });
+    if (type === "CASH" && !isCheque && accounts.length > 0 && !payAccountId)
       return toast({
         variant: "error",
         title: "Select which account received the money.",
+      });
+    if (isCheque && (!chequeBank.trim() || !chequeNumber.trim() || !chequeDate))
+      return toast({
+        variant: "error",
+        title: "Enter the cheque bank, number and date.",
       });
 
     start(async () => {
@@ -228,9 +245,12 @@ export function FieldSaleForm({
         items,
         paymentMethod:
           type === "CASH" ? METHOD_LABELS[payMethod] ?? payMethod : "",
-        paymentAccountId: type === "CASH" ? payAccountId : "",
+        paymentAccountId: type === "CASH" && !isCheque ? payAccountId : "",
         reference: type === "CASH" ? payReference : "",
         paymentProofUrl: isDirectPay ? payProofUrl : "",
+        chequeBank: isCheque ? chequeBank : "",
+        chequeNumber: isCheque ? chequeNumber : "",
+        chequeDate: isCheque ? chequeDate : "",
         // A saved customer can be attached to ANY sale — cash included —
         // so the customer's history stays complete.
         customerId: customerId || undefined,
@@ -459,13 +479,9 @@ export function FieldSaleForm({
                 className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
               >
                 <option value="">Business type…</option>
-                <option>Pharmacy</option>
-                <option>Shop</option>
-                <option>Supermarket</option>
-                <option>Kiosk</option>
-                <option>Clinic</option>
-                <option>Wholesaler</option>
-                <option>Other</option>
+                {CUSTOMER_TYPES.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
               </select>
               <select
                 value={ncPayment}
@@ -541,9 +557,20 @@ export function FieldSaleForm({
         )}
 
         {type === "CREDIT" && (
-          <div>
-            <Label className="text-xs text-muted-foreground">Due date (optional)</Label>
-            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="mt-1.5 sm:max-w-52" />
+          <div className="space-y-2">
+            <div>
+              <Label className="text-xs text-muted-foreground">Payment due date *</Label>
+              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="mt-1.5 sm:max-w-52" />
+            </div>
+            {selected?.creditLimit != null && (
+              <p className="text-xs text-muted-foreground">
+                {selected.businessName ?? selected.name}&apos;s credit limit:{" "}
+                <span className="font-medium text-foreground">
+                  TSh {selected.creditLimit.toLocaleString()}
+                </span>{" "}
+                — the sale is blocked if it goes past what&apos;s available.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -563,15 +590,39 @@ export function FieldSaleForm({
             onAccount={setPayAccountId}
             onReference={setPayReference}
           />
+          {isCheque && (
+            <div className="grid gap-2.5 rounded-xl border border-primary/30 bg-primary/[0.03] p-3 sm:grid-cols-3">
+              <div className="sm:col-span-3">
+                <p className="text-xs font-medium text-foreground">Cheque details</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Finance verifies the cheque and confirms receipt before the sale is official.
+                </p>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Bank name *</Label>
+                <Input value={chequeBank} onChange={(e) => setChequeBank(e.target.value)} placeholder="e.g. NMB Bank" className="mt-1 h-9" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Cheque number *</Label>
+                <Input value={chequeNumber} onChange={(e) => setChequeNumber(e.target.value)} placeholder="e.g. 001234" className="mt-1 h-9" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Cheque date *</Label>
+                <Input type="date" value={chequeDate} onChange={(e) => setChequeDate(e.target.value)} className="mt-1 h-9" />
+              </div>
+            </div>
+          )}
           {isDirectPay && (
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">
-                Proof of payment — attach the customer&apos;s receipt / screenshot
+                {isCheque
+                  ? "Cheque photo (optional) — attach a picture of the cheque"
+                  : "Proof of payment — attach the customer's receipt / screenshot"}
               </Label>
               <ProofUpload
                 value={payProofUrl}
                 onChange={setPayProofUrl}
-                label="Attach payment proof"
+                label={isCheque ? "Attach cheque photo" : "Attach payment proof"}
               />
               <p className="text-[11px] text-muted-foreground">
                 Finance verifies this against ORA&apos;s account before the sale becomes official.

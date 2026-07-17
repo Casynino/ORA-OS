@@ -48,6 +48,7 @@ import {
   Wallet,
   ChevronDown,
   UserRound,
+  CalendarClock,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Avatar } from "@/components/ui/avatar";
@@ -94,6 +95,7 @@ const ICONS: Record<string, LucideIcon> = {
   fieldReports: MapPin,
   reps: BadgeCheck,
   finance: Wallet,
+  extensions: CalendarClock,
 };
 
 export type NavItem = { href: string; label: string; icon: string };

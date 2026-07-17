@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
+import { CUSTOMER_TYPES } from "@/lib/customer-types";
 
 type EditableCustomer = {
   id: string;
@@ -133,13 +134,9 @@ export function CustomerEditControls({
               <Label className="text-xs text-muted-foreground">Business type</Label>
               <select value={f.customerType} onChange={set("customerType")} className={selectCls}>
                 <option value="">—</option>
-                <option>Pharmacy</option>
-                <option>Shop</option>
-                <option>Supermarket</option>
-                <option>Kiosk</option>
-                <option>Clinic</option>
-                <option>Wholesaler</option>
-                <option>Other</option>
+                {CUSTOMER_TYPES.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
               </select>
             </div>
             <div>

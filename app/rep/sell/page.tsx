@@ -28,6 +28,7 @@ export default async function RepSellPage() {
         phone: true,
         location: true,
         creditSuspended: true,
+        creditLimit: true,
       },
     }),
     prisma.paymentAccount.findMany({
