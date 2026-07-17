@@ -17,6 +17,15 @@ import { formatNumber, formatDateTime, humanize } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
+// Warehouse-friendly names for the ledger movement types.
+const WH_MOVE_LABEL: Record<string, string> = {
+  INBOUND: "Received",
+  ASSIGNED: "Issued",
+  DISTRIBUTED: "Dispatched",
+  RESTOCKED: "Returned",
+  ADJUSTMENT: "Adjusted",
+};
+
 export default async function WarehouseMovementsPage() {
   const session = await requireRole("WAREHOUSE");
   const me = await prisma.user.findUnique({
@@ -49,7 +58,7 @@ export default async function WarehouseMovementsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Stock movements"
-        description={`Every stock change involving ${me.warehouse.name}.`}
+        description={`The complete audit trail for ${me.warehouse.name} — from opening stock through every issue, dispatch and return.`}
       />
       {movements.length === 0 ? (
         <EmptyState icon={Boxes} title="No movements yet" />
@@ -62,7 +71,7 @@ export default async function WarehouseMovementsPage() {
                   <TableHead>Type</TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
-                  <TableHead>Reference</TableHead>
+                  <TableHead>Details</TableHead>
                   <TableHead>By</TableHead>
                   <TableHead>When</TableHead>
                 </TableRow>
@@ -71,14 +80,17 @@ export default async function WarehouseMovementsPage() {
                 {movements.map((m) => (
                   <TableRow key={m.id}>
                     <TableCell data-label="Type">
-                      <Badge variant="secondary">{humanize(m.type)}</Badge>
+                      <Badge variant="secondary">{WH_MOVE_LABEL[m.type] ?? humanize(m.type)}</Badge>
                     </TableCell>
                     <TableCell data-cardtitle className="font-medium">{m.product.name}</TableCell>
                     <TableCell data-label="Qty" className="text-right">
                       {formatNumber(m.quantity)}
                     </TableCell>
-                    <TableCell data-label="Reference" className="text-sm text-muted-foreground">
-                      {m.reference ?? "—"}
+                    <TableCell data-label="Details" className="text-sm">
+                      <span className="text-foreground">{m.note ?? m.reference ?? "—"}</span>
+                      {m.note && m.reference && (
+                        <span className="block text-xs text-muted-foreground">{m.reference}</span>
+                      )}
                     </TableCell>
                     <TableCell data-label="By" className="text-sm text-muted-foreground">
                       {m.createdBy.name}
