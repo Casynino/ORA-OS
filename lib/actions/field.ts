@@ -111,6 +111,8 @@ const saleSchema = z.object({
   paymentMethod: z.string().max(40).optional().or(z.literal("")),
   paymentAccountId: z.string().optional().or(z.literal("")),
   reference: z.string().max(80).optional().or(z.literal("")),
+  // Direct bank/mobile payments: uploaded customer receipt image URL.
+  paymentProofUrl: z.string().max(500).optional().or(z.literal("")),
 });
 
 export async function recordFieldSale(
@@ -214,6 +216,7 @@ export async function recordFieldSale(
           paymentMethod: receiving.method,
           paymentAccountId: receiving.paymentAccountId,
           reference: d.reference?.trim() || null,
+          paymentProofUrl: d.paymentProofUrl?.trim() || null,
           dueDate,
           note: d.note || null,
           items: {

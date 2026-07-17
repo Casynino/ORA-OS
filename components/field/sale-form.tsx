@@ -20,6 +20,7 @@ import {
   METHOD_LABELS,
   type ReceivingAccount,
 } from "@/components/ui/receiving-account-picker";
+import { ProofUpload } from "@/components/ui/proof-upload";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 
 type ProductRow = {
@@ -58,6 +59,10 @@ export function FieldSaleForm({
     accounts.find((a) => a.type === firstMethod)?.id ?? "",
   );
   const [payReference, setPayReference] = useState("");
+  // Direct bank/mobile payments: the rep attaches the customer's receipt so
+  // finance can verify the money actually reached ORA's account.
+  const [payProofUrl, setPayProofUrl] = useState("");
+  const isDirectPay = type === "CASH" && payMethod !== "CASH";
   const [qty, setQty] = useState<Record<string, string>>({});
   const [price, setPrice] = useState<Record<string, string>>(
     Object.fromEntries(products.map((p) => [p.id, String(p.price)])),
@@ -211,6 +216,7 @@ export function FieldSaleForm({
           type === "CASH" ? METHOD_LABELS[payMethod] ?? payMethod : "",
         paymentAccountId: type === "CASH" ? payAccountId : "",
         reference: type === "CASH" ? payReference : "",
+        paymentProofUrl: isDirectPay ? payProofUrl : "",
         // A saved customer can be attached to ANY sale — cash included —
         // so the customer's history stays complete.
         customerId: customerId || undefined,
@@ -537,6 +543,21 @@ export function FieldSaleForm({
             onAccount={setPayAccountId}
             onReference={setPayReference}
           />
+          {isDirectPay && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">
+                Proof of payment — attach the customer&apos;s receipt / screenshot
+              </Label>
+              <ProofUpload
+                value={payProofUrl}
+                onChange={setPayProofUrl}
+                label="Attach payment proof"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Finance verifies this against ORA&apos;s account before the sale becomes official.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

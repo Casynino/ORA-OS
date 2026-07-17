@@ -38,11 +38,33 @@ export async function approveAgent(userId: string): Promise<ActionResult> {
   }
 }
 
+// Applications are reviewed on both /admin/applications and
+// /finance/applications — revalidate both wherever one changes.
+function revalidateApplications(userId?: string) {
+  for (const p of [
+    "/admin/applications",
+    "/admin/users",
+    "/admin/customers",
+    "/finance",
+    "/finance/applications",
+    "/finance/customers",
+    "/finance/partners",
+  ]) {
+    revalidatePath(p);
+  }
+  if (userId) {
+    revalidatePath(`/admin/customers/${userId}`);
+    revalidatePath(`/admin/applications/${userId}`);
+    revalidatePath(`/finance/applications/${userId}`);
+  }
+}
+
 // Approve a partner application AND set their commercial terms in one step.
 const approveApplicationSchema = z.object({
   userId: z.string().min(1),
   creditLimit: z.number().int().nonnegative().max(1000000000).optional(),
   paymentTerms: z.string().max(120).optional(),
+  financeNotes: z.string().max(1000).optional(),
   prices: z
     .array(
       z.object({
@@ -57,7 +79,7 @@ export async function approveApplication(
   input: z.infer<typeof approveApplicationSchema>,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const parsed = approveApplicationSchema.safeParse(input);
     if (!parsed.success) return fail("Invalid approval data.");
     const user = await prisma.user.findUnique({
@@ -65,6 +87,11 @@ export async function approveApplication(
     });
     if (!user) return fail("Application not found.");
     if (user.role !== "PARTNER") return fail("Not a partner application.");
+    // Guard against a second approval (e.g. admin and finance both reviewing the
+    // same pending application) clobbering the terms already set on activation.
+    if (user.status !== "PENDING") {
+      return fail("This application has already been reviewed.");
+    }
 
     await prisma.$transaction(async (tx) => {
       const newLimit = parsed.data.creditLimit ?? user.creditLimit ?? 0;
@@ -74,6 +101,7 @@ export async function approveApplication(
           status: "ACTIVE",
           creditLimit: newLimit,
           paymentTerms: parsed.data.paymentTerms?.trim() || user.paymentTerms,
+          financeNotes: parsed.data.financeNotes?.trim() || user.financeNotes,
           applicationNote: null, // clear any outstanding info request on approval
         },
       });
@@ -101,14 +129,11 @@ export async function approveApplication(
       action: "AGENT_APPROVED",
       entity: "User",
       entityId: user.id,
-      summary: `${user.name} approved & activated with commercial terms${
+      summary: `${user.name} approved & activated with commercial terms by ${admin.name}${
         user.organization ? ` (${user.organization})` : ""
       }.`,
     });
-    revalidatePath("/admin/applications");
-    revalidatePath("/admin/users");
-    revalidatePath("/admin/customers");
-    revalidatePath(`/admin/customers/${user.id}`);
+    revalidateApplications(user.id);
     return ok(undefined, `${user.name} approved and activated.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -120,7 +145,7 @@ export async function rejectApplication(
   reason?: string,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return fail("Application not found.");
     if (user.status !== "PENDING") {
@@ -141,10 +166,9 @@ export async function rejectApplication(
       action: "AGENT_REJECTED",
       entity: "User",
       entityId: userId,
-      summary: `${user.name}'s application rejected.`,
+      summary: `${user.name}'s application rejected by ${admin.name}.`,
     });
-    revalidatePath("/admin/applications");
-    revalidatePath("/admin/users");
+    revalidateApplications(userId);
     return ok(undefined, `${user.name}'s application rejected.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -229,7 +253,40 @@ export async function setCreditLimit(
       summary: `Credit limit for ${user.name} set to ${parsed.data.creditLimit}.`,
     });
     revalidatePath("/admin/users");
+    revalidatePath("/finance/partners");
     return ok(undefined, "Credit limit updated.");
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+const financeNotesSchema = z.object({
+  userId: z.string().min(1),
+  notes: z.string().max(1000),
+});
+
+/** Finance records/updates its creditworthiness notes on a partner. */
+export async function setPartnerFinanceNotes(
+  input: z.infer<typeof financeNotesSchema>,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["ADMIN", "FINANCE"]);
+    const parsed = financeNotesSchema.safeParse(input);
+    if (!parsed.success) return fail("Invalid notes.");
+    const user = await prisma.user.findUnique({
+      where: { id: parsed.data.userId },
+      select: { id: true, name: true, role: true },
+    });
+    if (!user || user.role !== "PARTNER") return fail("Partner not found.");
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { financeNotes: parsed.data.notes.trim() || null },
+    });
+    revalidatePath("/finance/partners");
+    revalidatePath("/finance/customers");
+    revalidatePath(`/finance/customers/${user.id}`);
+    revalidatePath("/admin/customers");
+    return ok(undefined, "Financial notes saved.");
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -385,12 +442,12 @@ const infoSchema = z.object({
   message: z.string().min(3, "Enter a message for the applicant.").max(1000),
 });
 
-// Admin asks an applicant for more information (keeps them PENDING).
+// Finance/Admin asks an applicant for more information (keeps them PENDING).
 export async function requestApplicationInfo(
   input: z.infer<typeof infoSchema>,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN", "FINANCE"]);
     const parsed = infoSchema.safeParse(input);
     if (!parsed.success) {
       return fail(parsed.error.issues[0]?.message ?? "Invalid request.");
@@ -412,8 +469,7 @@ export async function requestApplicationInfo(
       entityId: parsed.data.userId,
       summary: `${admin.name} requested more information from applicant ${target.name}.`,
     });
-    revalidatePath("/admin/applications");
-    revalidatePath(`/admin/applications/${parsed.data.userId}`);
+    revalidateApplications(parsed.data.userId);
     revalidatePath("/partner");
     return ok(undefined, "Information request sent to the applicant.");
   } catch (e) {

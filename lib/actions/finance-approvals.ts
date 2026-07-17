@@ -46,6 +46,8 @@ export type ConfirmDeposit = {
   depositAccountId?: string;
   // Deposit slip / receipt reference or link — proof of the money.
   proofRef?: string;
+  // Uploaded deposit-slip / receipt image URL.
+  proofUrl?: string;
   note?: string;
 };
 
@@ -58,7 +60,7 @@ export async function approveFieldSale(
 ): Promise<ActionResult> {
   try {
     const actor = await requireActor(["FINANCE", "ADMIN"]);
-    const { depositAccountId, proofRef, note } = input ?? {};
+    const { depositAccountId, proofRef, proofUrl, note } = input ?? {};
     const sale = await prisma.fieldSale.findUnique({
       where: { id },
       include: {
@@ -96,6 +98,9 @@ export async function approveFieldSale(
         financeReviewedAt: new Date(),
         financeNote: note?.trim() || null,
         depositProofRef: proofRef?.trim() || null,
+        // Only overwrite the rep's uploaded proof if finance attaches its own
+        // (e.g. the bank deposit slip for a cash sale).
+        ...(proofUrl?.trim() ? { paymentProofUrl: proofUrl.trim() } : {}),
         ...depositAccountUpdate,
       },
     });
@@ -173,7 +178,7 @@ export async function approveFieldCollection(
 ): Promise<ActionResult> {
   try {
     const actor = await requireActor(["FINANCE", "ADMIN"]);
-    const { depositAccountId, proofRef, note } = input ?? {};
+    const { depositAccountId, proofRef, proofUrl, note } = input ?? {};
     const payment = await prisma.fieldPayment.findUnique({
       where: { id: paymentId },
       include: {
@@ -217,6 +222,7 @@ export async function approveFieldCollection(
           financeReviewedAt: new Date(),
           financeNote: note?.trim() || null,
           depositProofRef: proofRef?.trim() || null,
+          ...(proofUrl?.trim() ? { paymentProofUrl: proofUrl.trim() } : {}),
           ...depositAccountUpdate,
         },
       });

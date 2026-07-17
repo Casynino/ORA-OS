@@ -13,6 +13,12 @@ import { formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
+/** A cash-type sale the customer actually paid straight into a bank/Lipa
+ * account (not physical cash) — finance verifies the uploaded proof. */
+function isDirectPayment(method: string | null): boolean {
+  return !!method && /bank|mobile|lipa|transfer|m-?pesa|tigo|airtel|halo/i.test(method);
+}
+
 /**
  * Finance verification queue — no rep-recorded shilling becomes official
  * company money until it's confirmed here.
@@ -26,7 +32,7 @@ export default async function FinanceSalesApprovalsPage() {
       orderBy: { createdAt: "asc" },
       include: {
         rep: { select: { name: true } },
-        customer: { select: { name: true, businessName: true } },
+        customer: { select: { id: true, name: true, businessName: true, creditSuspended: true } },
         paymentAccount: { select: { id: true, name: true, accountNumber: true } },
         items: { include: { product: { select: { name: true } } } },
       },
@@ -72,6 +78,33 @@ export default async function FinanceSalesApprovalsPage() {
   const cashPending = pendingSales.filter((s) => s.type === "CASH");
   const creditPending = pendingSales.filter((s) => s.type === "CREDIT");
 
+  // Credit context: each customer's existing outstanding across their already
+  // APPROVED credit sales — so finance sees total exposure before approving.
+  const creditCustomerIds = [
+    ...new Set(creditPending.map((s) => s.customer?.id).filter(Boolean)),
+  ] as string[];
+  const priorCredit = creditCustomerIds.length
+    ? await prisma.fieldSale.groupBy({
+        by: ["customerId"],
+        where: {
+          customerId: { in: creditCustomerIds },
+          type: "CREDIT",
+          financeStatus: "APPROVED",
+          voided: false,
+        },
+        _sum: { total: true, amountPaid: true },
+      })
+    : [];
+  const outstandingByCustomer = new Map<string, number>();
+  for (const r of priorCredit) {
+    if (r.customerId) {
+      outstandingByCustomer.set(
+        r.customerId,
+        Math.max(0, (r._sum.total ?? 0) - (r._sum.amountPaid ?? 0)),
+      );
+    }
+  }
+
   const saleCard = (s: (typeof pendingSales)[number]) => (
     <div
       key={s.id}
@@ -91,17 +124,54 @@ export default async function FinanceSalesApprovalsPage() {
           </p>
           <p className="mt-1.5 font-display text-xl font-bold">{formatCurrency(s.total)}</p>
           {s.type === "CASH" ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Declared: {s.paymentMethod ?? "—"}
-              {s.paymentAccount
-                ? ` → ${s.paymentAccount.name}${s.paymentAccount.accountNumber ? ` · ${s.paymentAccount.accountNumber}` : ""}`
-                : ""}
-              {s.reference ? ` · ref ${s.reference}` : ""}
-            </p>
+            <>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Declared: {s.paymentMethod ?? "—"}
+                {s.paymentAccount
+                  ? ` → ${s.paymentAccount.name}${s.paymentAccount.accountNumber ? ` · ${s.paymentAccount.accountNumber}` : ""}`
+                  : ""}
+                {s.reference ? ` · ref ${s.reference}` : ""}
+              </p>
+              {isDirectPayment(s.paymentMethod) && (
+                <p className="mt-1 text-xs font-medium text-warning">
+                  Direct {s.paymentMethod} payment — verify the proof reached ORA&apos;s account before confirming.
+                </p>
+              )}
+              {s.paymentProofUrl ? (
+                <a
+                  href={s.paymentProofUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2 text-xs font-medium text-primary hover:bg-muted/50"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.paymentProofUrl} alt="Payment proof" className="size-12 rounded object-cover" />
+                  View payment proof →
+                </a>
+              ) : (
+                isDirectPayment(s.paymentMethod) && (
+                  <p className="mt-1 text-xs text-destructive">No proof image attached by the rep.</p>
+                )
+              )}
+            </>
           ) : (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Due {s.dueDate ? new Date(s.dueDate).toLocaleDateString("en-GB") : "—"} · verify the customer & terms before approving
-            </p>
+            <>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Due {s.dueDate ? new Date(s.dueDate).toLocaleDateString("en-GB") : "—"} · verify the customer &amp; terms before approving
+              </p>
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                <span className="text-muted-foreground">
+                  Customer owes{" "}
+                  <span className="font-semibold text-foreground">
+                    {formatCurrency(s.customer ? outstandingByCustomer.get(s.customer.id) ?? 0 : 0)}
+                  </span>{" "}
+                  now → {formatCurrency((s.customer ? outstandingByCustomer.get(s.customer.id) ?? 0 : 0) + s.total)} after this sale
+                </span>
+                {s.customer?.creditSuspended && (
+                  <Badge variant="destructive" className="text-[10px]">credit suspended</Badge>
+                )}
+              </p>
+            </>
           )}
           <ul className="mt-2 space-y-0.5 border-t border-border/40 pt-2">
             {s.items.map((i) => (

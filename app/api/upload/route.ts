@@ -9,7 +9,9 @@ const ALLOWED = ["jpg", "jpeg", "png", "webp", "gif"];
 
 export async function POST(req: Request) {
   try {
-    await requireActor(["ADMIN"]);
+    // Admins upload branding/photos; reps attach payment proof at point of
+    // sale; finance attaches deposit slips + office-fund receipts.
+    await requireActor(["ADMIN", "FINANCE", "SALES_REP"]);
   } catch {
     return NextResponse.json({ error: "Not authorized" }, { status: 401 });
   }
