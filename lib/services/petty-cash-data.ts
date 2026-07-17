@@ -32,6 +32,7 @@ export async function getPettyCashData() {
       description: e.description,
       amount: e.amount,
       receiptRef: e.receiptRef,
+      receiptUrl: e.receiptUrl,
       recordedByName: e.recordedBy.name,
       createdAt: e.createdAt.toISOString(),
     }));

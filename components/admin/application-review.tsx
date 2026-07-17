@@ -27,6 +27,7 @@ import {
 } from "@/lib/actions/users";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -54,12 +55,19 @@ export type AppDTO = {
   taxId: string | null;
   creditLimit: number | null;
   paymentTerms: string | null;
+  financeNotes: string | null;
   applicationNote: string | null;
   appliedAt: string;
   products: ProductDTO[];
 };
 
-export function ApplicationReview({ app }: { app: AppDTO }) {
+export function ApplicationReview({
+  app,
+  basePath = "/admin/applications",
+}: {
+  app: AppDTO;
+  basePath?: string;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const pendingApp = app.status === "PENDING";
@@ -71,6 +79,7 @@ export function ApplicationReview({ app }: { app: AppDTO }) {
     String(app.creditLimit ?? 0),
   );
   const [terms, setTerms] = useState(app.paymentTerms ?? "");
+  const [financeNotes, setFinanceNotes] = useState(app.financeNotes ?? "");
 
   function approve() {
     start(async () => {
@@ -78,6 +87,7 @@ export function ApplicationReview({ app }: { app: AppDTO }) {
         userId: app.id,
         creditLimit: Math.max(0, Math.round(Number(creditLimit) || 0)),
         paymentTerms: terms || undefined,
+        financeNotes: financeNotes.trim() || undefined,
         prices: app.products.map((p) => ({
           productId: p.productId,
           price: Math.max(0, Math.round(Number(prices[p.productId]) || 0)),
@@ -85,7 +95,7 @@ export function ApplicationReview({ app }: { app: AppDTO }) {
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
-        router.push("/admin/applications");
+        router.push(basePath);
         router.refresh();
       } else {
         toast({ variant: "error", title: res.error });
@@ -99,7 +109,7 @@ export function ApplicationReview({ app }: { app: AppDTO }) {
       const res = await rejectApplication(app.id, reason);
       if (res.ok) {
         toast({ variant: "success", title: res.message });
-        router.push("/admin/applications");
+        router.push(basePath);
         router.refresh();
       } else {
         toast({ variant: "error", title: res.error });
@@ -133,7 +143,7 @@ export function ApplicationReview({ app }: { app: AppDTO }) {
   return (
     <div className="space-y-6">
       <Link
-        href="/admin/applications"
+        href={basePath}
         className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
@@ -269,6 +279,21 @@ export function ApplicationReview({ app }: { app: AppDTO }) {
                     className="mt-1.5"
                   />
                 </div>
+              </div>
+
+              <div className="border-t border-border pt-4">
+                <Label className="flex items-center gap-1.5 text-xs">
+                  <FileText className="size-3.5" />
+                  Financial notes
+                </Label>
+                <Textarea
+                  value={financeNotes}
+                  onChange={(e) => setFinanceNotes(e.target.value)}
+                  placeholder="Creditworthiness, verification of the business, risk flags…"
+                  disabled={!pendingApp}
+                  rows={3}
+                  className="mt-1.5"
+                />
               </div>
             </div>
 

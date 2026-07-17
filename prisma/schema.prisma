@@ -136,6 +136,7 @@ model User {
   creditScore        Int        @default(0) // grows with each successfully repaid credit cycle
   creditCycles       Int        @default(0) // completed borrow→repay-in-full cycles
   notes              String? // internal admin notes
+  financeNotes       String? // finance's notes on the partner's creditworthiness
   applicationNote    String? // applicant-facing: info the ORA team has requested
   businessType       String? // Agent / Distributor / NGO / School / Retail chain
   region             String?
@@ -668,11 +669,19 @@ model ReturnRequest {
   reviewedAt    DateTime?
   receivedAt    DateTime?
   adminNote     String?
+  // Finance-initiated debt-recovery return: goods taken back to settle an
+  // outstanding field credit sale. On receipt, creditValue is applied to the
+  // linked sale's balance (reduces accounts receivable).
+  financeInitiated Boolean    @default(false)
+  fieldSale     FieldSale?   @relation(fields: [fieldSaleId], references: [id])
+  fieldSaleId   String?
+  creditValue   Int? // TSh recovered off the debt when the return completes
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
   @@index([status])
   @@index([requesterId])
+  @@index([fieldSaleId])
 }
 
 // ── Donations (ARCHIVED) ───────────────────────────────────────────────────
@@ -1009,6 +1018,10 @@ model FieldSale {
   // Proof captured at confirmation: cash → bank deposit slip; direct
   // bank/Lipa payment → customer receipt reference or link.
   depositProofRef     String?
+  // Uploaded proof IMAGE: for a direct bank/Lipa sale the rep attaches the
+  // customer's receipt at point of sale; for a cash sale finance attaches the
+  // bank deposit slip at confirmation.
+  paymentProofUrl     String?
   voided              Boolean            @default(false) // admin correction — restores stock
   voidReason          String?
   createdAt           DateTime           @default(now())
@@ -1016,6 +1029,7 @@ model FieldSale {
 
   items    FieldSaleItem[]
   payments FieldPayment[]
+  returns  ReturnRequest[]
 
   @@index([repId])
   @@index([type])
@@ -1059,6 +1073,8 @@ model FieldPayment {
   financeNote         String?
   // Deposit slip / receipt reference captured when finance verifies.
   depositProofRef     String?
+  // Uploaded proof image (customer receipt / deposit slip).
+  paymentProofUrl     String?
   createdAt           DateTime        @default(now())
 
   @@index([saleId])
@@ -1224,6 +1240,7 @@ model PettyCashExpense {
   description  String
   amount       Int
   receiptRef   String? // receipt number / reference
+  receiptUrl   String? // uploaded receipt / proof image
   recordedBy   User             @relation("PettyCashSpender", fields: [recordedById], references: [id])
   recordedById String
   createdAt    DateTime         @default(now())

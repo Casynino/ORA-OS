@@ -19,6 +19,13 @@ const REASON_TYPES = [
   "Other",
 ] as const;
 
+/** Credit status of a field sale after a balance change (mirrors field.ts). */
+function fieldCreditStatusFor(total: number, paid: number, dueDate: Date | null) {
+  if (paid >= total) return "PAID" as const;
+  if (dueDate && dueDate < new Date()) return "OVERDUE" as const;
+  return paid > 0 ? ("PARTIAL" as const) : ("PENDING" as const);
+}
+
 const createSchema = z.object({
   productId: z.string().min(1, "Choose a product."),
   quantity: z.number().int().positive().max(100000),
@@ -114,6 +121,88 @@ export async function createReturn(
   }
 }
 
+// ── Finance-initiated debt-recovery return ──────────────────────────────────
+//  Finance takes goods back from a field customer to settle an outstanding
+//  credit sale. The return goes through the same authorise → receive lifecycle;
+//  on receipt the credit value is applied to the sale's balance.
+const financeReturnSchema = z.object({
+  fieldSaleId: z.string().min(1),
+  productId: z.string().min(1),
+  quantity: z.number().int().positive().max(100000),
+  creditValue: z.number().int().positive().max(1000000000),
+  reason: z.string().max(500).optional().or(z.literal("")),
+});
+
+export async function createFinanceReturn(
+  input: z.infer<typeof financeReturnSchema>,
+): Promise<ActionResult<{ code: string }>> {
+  try {
+    const actor = await requireActor(["ADMIN", "FINANCE"]);
+    const parsed = financeReturnSchema.safeParse(input);
+    if (!parsed.success) {
+      return fail(parsed.error.issues[0]?.message ?? "Invalid return.");
+    }
+    const d = parsed.data;
+
+    const sale = await prisma.fieldSale.findUnique({
+      where: { id: d.fieldSaleId },
+      include: {
+        customer: { select: { name: true } },
+        items: { include: { product: { select: { name: true } } } },
+      },
+    });
+    if (!sale) return fail("Sale not found.");
+    if (sale.voided) return fail("This sale was voided.");
+    if (sale.type !== "CREDIT" || sale.financeStatus !== "APPROVED") {
+      return fail("Returns for debt recovery apply to approved credit sales only.");
+    }
+    const outstanding = sale.total - sale.amountPaid;
+    if (outstanding <= 0) return fail("This sale is already fully paid.");
+    if (d.creditValue > outstanding) {
+      return fail(
+        `Credit value can't exceed the outstanding balance (TSh ${outstanding.toLocaleString()}).`,
+      );
+    }
+    const line = sale.items.find((i) => i.productId === d.productId);
+    if (!line) return fail("That product isn't on this sale.");
+    if (d.quantity > line.quantity) {
+      return fail(`At most ${line.quantity} unit(s) of ${line.product.name} were sold on this order.`);
+    }
+
+    const ret = await prisma.returnRequest.create({
+      data: {
+        code: refCode("RET"),
+        productId: d.productId,
+        requesterId: sale.repId, // the rep who owns the customer relationship
+        quantity: d.quantity,
+        reasonType: "Other",
+        reason: d.reason?.trim() || `Debt recovery on ${sale.code}`,
+        warehouseName: null,
+        financeInitiated: true,
+        fieldSaleId: sale.id,
+        creditValue: d.creditValue,
+        status: "PENDING",
+      },
+    });
+
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "FINANCE_RETURN_INITIATED",
+      entity: "ReturnRequest",
+      entityId: ret.id,
+      summary: `${actor.name} initiated a debt-recovery return (${ret.code}) — ${d.quantity} × ${line.product.name} from ${sale.customer?.name ?? "customer"} to recover TSh ${d.creditValue.toLocaleString()} on ${sale.code}.`,
+    });
+
+    revalidateReturns();
+    revalidatePath("/finance/returns");
+    revalidatePath("/finance/credit");
+    return ok({ code: ret.code }, `${ret.code} created — awaiting receipt at the warehouse.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
 // ── Step 2: ORA team authorises the return. No stock moves yet — the partner
 // ships the units back and the warehouse confirms receipt before reconciling. ──
 const authorizeSchema = z.object({
@@ -180,7 +269,7 @@ export async function completeReturn(returnId: string): Promise<ActionResult> {
     const actor = await requireActor(["ADMIN", "WAREHOUSE"]);
     const ret = await prisma.returnRequest.findUnique({
       where: { id: returnId },
-      include: { product: true },
+      include: { product: true, fieldSale: { select: { code: true } } },
     });
     if (!ret) return fail("Return not found.");
     const denied = await assertWarehouseReturnAccess(actor, ret.warehouseName);
@@ -189,7 +278,18 @@ export async function completeReturn(returnId: string): Promise<ActionResult> {
       return fail("Only authorised returns in transit can be received.");
     }
 
+    let recovered = 0;
     await prisma.$transaction(async (tx) => {
+      // Atomically claim the receipt FIRST — two concurrent completions (a
+      // double-click, or a return reachable from both the admin and warehouse
+      // queues) must not both restock the goods or both recover the debt.
+      const claimed = await tx.returnRequest.updateMany({
+        where: { id: ret.id, status: "IN_TRANSIT" },
+        data: { status: "COMPLETED", receivedAt: new Date() },
+      });
+      if (claimed.count === 0) {
+        throw new Error("This return has already been received.");
+      }
       await applyMovement(tx, {
         productId: ret.productId,
         type: "RESTOCKED",
@@ -205,24 +305,53 @@ export async function completeReturn(returnId: string): Promise<ActionResult> {
         quantity: ret.quantity,
         warehouseName: ret.warehouseName,
       });
-      await tx.returnRequest.update({
-        where: { id: ret.id },
-        data: { status: "COMPLETED", receivedAt: new Date() },
-      });
+
+      // Debt-recovery return: apply the returned goods' value to the linked
+      // credit sale, reducing accounts receivable. Guarded compare-and-swap on
+      // amountPaid so a concurrent collection can't double-apply.
+      if (ret.financeInitiated && ret.fieldSaleId && ret.creditValue) {
+        const fs = await tx.fieldSale.findUnique({ where: { id: ret.fieldSaleId } });
+        if (fs && !fs.voided) {
+          recovered = Math.min(ret.creditValue, Math.max(0, fs.total - fs.amountPaid));
+          if (recovered > 0) {
+            const newPaid = fs.amountPaid + recovered;
+            const claimed = await tx.fieldSale.updateMany({
+              where: { id: fs.id, amountPaid: fs.amountPaid, voided: false },
+              data: {
+                amountPaid: newPaid,
+                creditStatus: fieldCreditStatusFor(fs.total, newPaid, fs.dueDate),
+              },
+            });
+            if (claimed.count === 0) {
+              throw new Error("The sale balance changed while receiving — retry.");
+            }
+          }
+        }
+      }
     });
 
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
-      action: "RETURN_COMPLETED",
+      action: recovered > 0 ? "RETURN_DEBT_RECOVERED" : "RETURN_COMPLETED",
       entity: "ReturnRequest",
       entityId: ret.id,
-      summary: `Return ${ret.code} received — ${ret.quantity} × ${ret.product.name} reconciled into the warehouse.`,
+      summary:
+        recovered > 0
+          ? `Return ${ret.code} received — ${ret.quantity} × ${ret.product.name} restocked and TSh ${recovered.toLocaleString()} recovered off ${ret.fieldSale?.code ?? "the debt"}.`
+          : `Return ${ret.code} received — ${ret.quantity} × ${ret.product.name} reconciled into the warehouse.`,
     });
 
     revalidateReturns();
     revalidatePath("/admin/inventory");
-    return ok(undefined, `Return ${ret.code} received and reconciled.`);
+    revalidatePath("/finance/returns");
+    revalidatePath("/finance/credit");
+    return ok(
+      undefined,
+      recovered > 0
+        ? `Return ${ret.code} received — TSh ${recovered.toLocaleString()} recovered off the debt.`
+        : `Return ${ret.code} received and reconciled.`,
+    );
   } catch (e) {
     return fail(errorMessage(e));
   }

@@ -25,6 +25,16 @@ const FINANCIAL_ACTIONS = [
   "PETTY_CASH_APPROVED",
   "PETTY_CASH_SPENT",
   "PETTY_CASH_RECONCILED",
+  // Customer & partner-credit approvals — the CEO sees who Finance let in and
+  // on what terms, without having to approve it.
+  "AGENT_APPROVED", // partner/agent application approved & activated
+  "AGENT_REJECTED",
+  "USER_STATUS_CHANGED",
+  "CREDIT_LIMIT_SET",
+  "CREDIT_TERMS_UPDATED",
+  // Finance-initiated debt-recovery returns.
+  "FINANCE_RETURN_INITIATED",
+  "RETURN_DEBT_RECOVERED",
 ];
 import { getWarehouseSummaries } from "@/lib/warehouse-data";
 

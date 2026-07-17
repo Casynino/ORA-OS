@@ -170,6 +170,7 @@ const spendSchema = z.object({
   description: z.string().min(2, "What was bought?").max(300),
   amount: z.number().int().positive().max(100000000),
   receiptRef: z.string().max(120).optional().or(z.literal("")),
+  receiptUrl: z.string().max(500).optional().or(z.literal("")),
 });
 
 /** Finance records one expenditure against an approved allocation. */
@@ -210,6 +211,7 @@ export async function recordPettyCashExpense(
           description: d.description.trim(),
           amount: d.amount,
           receiptRef: d.receiptRef?.trim() || null,
+          receiptUrl: d.receiptUrl?.trim() || null,
           recordedById: actor.id,
         },
       });

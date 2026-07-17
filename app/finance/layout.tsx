@@ -11,12 +11,20 @@ import {
 const nav: NavGroup[] = [
   { items: [{ href: "/finance", label: "Dashboard", icon: "dashboard" }] },
   {
-    label: "Collections",
+    label: "Customers & credit",
+    items: [
+      { href: "/finance/applications", label: "Partner applications", icon: "customers" },
+      { href: "/finance/customers", label: "Customer database", icon: "customers" },
+      { href: "/finance/partners", label: "Partner accounts", icon: "customers" },
+      { href: "/finance/credit", label: "Debt & settlements", icon: "credit" },
+    ],
+  },
+  {
+    label: "Verification",
     items: [
       { href: "/finance/sales-approvals", label: "Sales approvals", icon: "sales" },
       { href: "/finance/payments", label: "Payment confirmations", icon: "payments" },
-      { href: "/finance/credit", label: "Debt & settlements", icon: "credit" },
-      { href: "/finance/partners", label: "Customer accounts", icon: "customers" },
+      { href: "/finance/returns", label: "Returns", icon: "warehouses" },
     ],
   },
   {

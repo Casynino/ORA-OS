@@ -12,6 +12,7 @@ import {
   reconcilePettyCash,
 } from "@/lib/actions/petty-cash";
 import { OFFICE_FUND_CATEGORIES, EXPENSE_LABELS } from "@/lib/expense-categories";
+import { ProofUpload } from "@/components/ui/proof-upload";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ export type PettyCashExpenseDTO = {
   description: string;
   amount: number;
   receiptRef: string | null;
+  receiptUrl: string | null;
   recordedByName: string;
   createdAt: string; // ISO
 };
@@ -443,6 +445,14 @@ function ExpensesList({
           <span className="min-w-0 truncate">
             {formatDateTime(e.createdAt)} · {e.description}
             {e.receiptRef ? ` · ref ${e.receiptRef}` : ""} · by {e.recordedByName}
+            {e.receiptUrl && (
+              <>
+                {" · "}
+                <a href={e.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  receipt
+                </a>
+              </>
+            )}
           </span>
           <span className="shrink-0 font-medium text-destructive">
             −{formatCurrency(e.amount)}
@@ -467,6 +477,7 @@ function ExpenseForm({
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [receiptRef, setReceiptRef] = useState("");
+  const [receiptUrl, setReceiptUrl] = useState("");
 
   function submit() {
     start(async () => {
@@ -475,47 +486,52 @@ function ExpenseForm({
         description,
         amount: Math.round(Number(amount) || 0),
         receiptRef,
+        receiptUrl,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message ?? "Expenditure recorded." });
         setDescription("");
         setAmount("");
         setReceiptRef("");
+        setReceiptUrl("");
         onDone();
       } else toast({ variant: "error", title: res.error });
     });
   }
 
   return (
-    <div className="grid gap-2 sm:grid-cols-[1fr_7rem_7rem_auto]">
-      <Input
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="What was bought?"
-        className="h-9 text-sm"
-      />
-      <Input
-        type="number"
-        min={1}
-        max={remaining}
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        placeholder="Amount"
-        className="h-9 text-sm"
-      />
-      <Input
-        value={receiptRef}
-        onChange={(e) => setReceiptRef(e.target.value)}
-        placeholder="Receipt ref"
-        className="h-9 text-sm"
-      />
-      <Button
-        size="sm"
-        onClick={submit}
-        disabled={pending || description.trim().length < 2 || !(Number(amount) > 0)}
-      >
-        {pending ? "…" : "Record"}
-      </Button>
+    <div className="space-y-2">
+      <div className="grid gap-2 sm:grid-cols-[1fr_7rem_7rem_auto]">
+        <Input
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="What was bought?"
+          className="h-9 text-sm"
+        />
+        <Input
+          type="number"
+          min={1}
+          max={remaining}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="Amount"
+          className="h-9 text-sm"
+        />
+        <Input
+          value={receiptRef}
+          onChange={(e) => setReceiptRef(e.target.value)}
+          placeholder="Receipt ref"
+          className="h-9 text-sm"
+        />
+        <Button
+          size="sm"
+          onClick={submit}
+          disabled={pending || description.trim().length < 2 || !(Number(amount) > 0)}
+        >
+          {pending ? "…" : "Record"}
+        </Button>
+      </div>
+      <ProofUpload value={receiptUrl} onChange={setReceiptUrl} label="Attach receipt (optional)" />
     </div>
   );
 }

@@ -16,8 +16,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { ProofUpload } from "@/components/ui/proof-upload";
 import { toast } from "@/components/ui/use-toast";
 import type { ActionResult } from "@/lib/types";
+
+// Structured verification-failure reasons for direct/cash payments.
+const REJECT_REASONS = [
+  "Payment not received",
+  "Incorrect amount",
+  "Invalid receipt",
+  "Duplicate receipt",
+  "Other",
+] as const;
 
 export type DepositAccount = {
   id: string;
@@ -26,17 +36,68 @@ export type DepositAccount = {
   accountNumber: string | null;
 };
 
-// Ask for a rejection reason; a Cancel (null) aborts so nothing is rejected.
-function promptReject(
-  run: (note?: string) => Promise<ActionResult>,
-): () => Promise<ActionResult> {
-  return () => {
-    const note = window.prompt("Reason for rejecting (the rep will see this)");
-    if (note === null) {
-      return Promise.resolve({ ok: false, error: "Cancelled — nothing changed." });
-    }
-    return run(note.trim() || undefined);
-  };
+/** Verification-failure modal — finance picks a structured reason (+ optional
+ * detail) so the rep knows exactly what to fix. */
+function RejectModal({
+  title,
+  onReject,
+  onClose,
+}: {
+  title: string;
+  onReject: (note: string) => Promise<ActionResult>;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [reason, setReason] = useState<string>(REJECT_REASONS[0]);
+  const [detail, setDetail] = useState("");
+
+  function submit() {
+    const note = detail.trim() ? `${reason} — ${detail.trim()}` : reason;
+    start(async () => {
+      const res = await onReject(note);
+      if (res.ok) {
+        toast({ variant: "success", title: res.message });
+        onClose();
+        router.refresh();
+      } else {
+        toast({ variant: "error", title: res.error });
+      }
+    });
+  }
+
+  return (
+    <Modal open onClose={onClose} title={title} description="The rep is notified to follow up with the customer.">
+      <div className="space-y-4">
+        <div>
+          <Label>Reason</Label>
+          <Select value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1.5">
+            {REJECT_REASONS.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </Select>
+        </div>
+        <div>
+          <Label>Detail (optional)</Label>
+          <Input
+            value={detail}
+            onChange={(e) => setDetail(e.target.value)}
+            placeholder="What the rep should check / correct…"
+            className="mt-1.5"
+          />
+        </div>
+        <Button
+          className="w-full text-destructive-foreground"
+          variant="destructive"
+          onClick={submit}
+          disabled={pending}
+        >
+          <X className="size-4" />
+          {pending ? "Rejecting…" : "Reject — verification failed"}
+        </Button>
+      </div>
+    </Modal>
+  );
 }
 
 /**
@@ -69,6 +130,7 @@ function DepositModal({
     "";
   const [accountId, setAccountId] = useState(defaultAcc);
   const [proofRef, setProofRef] = useState("");
+  const [proofUrl, setProofUrl] = useState("");
   const [note, setNote] = useState("");
 
   function submit() {
@@ -80,6 +142,7 @@ function DepositModal({
       const res = await onConfirm({
         depositAccountId: accountId || undefined,
         proofRef: proofRef || undefined,
+        proofUrl: proofUrl || undefined,
         note: note || undefined,
       });
       if (res.ok) {
@@ -133,6 +196,10 @@ function DepositModal({
           />
         </div>
         <div>
+          <Label className="mb-1.5 block">Upload deposit slip / receipt</Label>
+          <ProofUpload value={proofUrl} onChange={setProofUrl} label="Attach slip / receipt image" />
+        </div>
+        <div>
           <Label>Note (optional)</Label>
           <Input
             value={note}
@@ -167,6 +234,7 @@ export function SaleApprovalActions({
 }) {
   const router = useRouter();
   const [depositOpen, setDepositOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
 
   return (
     <div className="flex shrink-0 items-center gap-1.5">
@@ -185,16 +253,14 @@ export function SaleApprovalActions({
           <Check className="size-3.5" /> Approve credit
         </ActionButton>
       )}
-      <ActionButton
+      <Button
         size="sm"
         variant="outline"
         className="text-destructive hover:bg-destructive/10"
-        action={promptReject((note) => rejectFieldSale(saleId, note))}
-        onDone={() => router.refresh()}
-        pendingText="…"
+        onClick={() => setRejectOpen(true)}
       >
         <X className="size-3.5" />
-      </ActionButton>
+      </Button>
       {depositOpen && (
         <DepositModal
           title="Confirm cash deposit"
@@ -203,6 +269,13 @@ export function SaleApprovalActions({
           suggestedAccountId={suggestedAccountId}
           onConfirm={(input) => approveFieldSale(saleId, input)}
           onClose={() => setDepositOpen(false)}
+        />
+      )}
+      {rejectOpen && (
+        <RejectModal
+          title={kind === "CASH" ? "Payment verification failed" : "Reject credit sale"}
+          onReject={(note) => rejectFieldSale(saleId, note)}
+          onClose={() => setRejectOpen(false)}
         />
       )}
     </div>
@@ -221,23 +294,21 @@ export function CollectionApprovalActions({
   accounts: DepositAccount[];
   suggestedAccountId?: string | null;
 }) {
-  const router = useRouter();
   const [depositOpen, setDepositOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
   return (
     <div className="flex shrink-0 items-center gap-1.5">
       <Button size="sm" variant="success" onClick={() => setDepositOpen(true)}>
         <Check className="size-3.5" /> Confirm & post
       </Button>
-      <ActionButton
+      <Button
         size="sm"
         variant="outline"
         className="text-destructive hover:bg-destructive/10"
-        action={promptReject((note) => rejectFieldCollection(paymentId, note))}
-        onDone={() => router.refresh()}
-        pendingText="…"
+        onClick={() => setRejectOpen(true)}
       >
         <X className="size-3.5" />
-      </ActionButton>
+      </Button>
       {depositOpen && (
         <DepositModal
           title="Confirm collection deposit"
@@ -246,6 +317,13 @@ export function CollectionApprovalActions({
           suggestedAccountId={suggestedAccountId}
           onConfirm={(input) => approveFieldCollection(paymentId, input)}
           onClose={() => setDepositOpen(false)}
+        />
+      )}
+      {rejectOpen && (
+        <RejectModal
+          title="Reject collection"
+          onReject={(note) => rejectFieldCollection(paymentId, note)}
+          onClose={() => setRejectOpen(false)}
         />
       )}
     </div>
