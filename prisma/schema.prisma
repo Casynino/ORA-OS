@@ -972,6 +972,7 @@ model FieldCustomer {
   preferredPayment String? // Cash / Credit
   businessLicense String? // licence number (optional)
   taxId           String? // TIN / tax number (optional)
+  creditLimit     Int? // per-customer credit cap, set by ADMIN/FINANCE only (null = uncapped). Enforced on credit sales.
   gpsLat          Float? // captured on creation when the device allows it
   gpsLng          Float?
   notes           String?

@@ -179,6 +179,31 @@ export async function recordFieldSale(
           throw new Error("That customer isn't in your book.");
         if (d.type === "CREDIT" && cust.creditSuspended)
           throw new Error(`${cust.name}'s credit access is suspended.`);
+        // Admin/Finance-set credit cap: a rep can't push a customer past it.
+        if (d.type === "CREDIT" && cust.creditLimit != null) {
+          // Lock the customer row so two concurrent credit sales can't both read
+          // the same outstanding and both slip under the cap (released at commit).
+          await tx.$executeRaw`SELECT id FROM "FieldCustomer" WHERE id = ${customerId} FOR UPDATE`;
+          const openCredit = await tx.fieldSale.findMany({
+            where: {
+              customerId,
+              type: "CREDIT",
+              voided: false,
+              financeStatus: { not: "REJECTED" },
+            },
+            select: { total: true, amountPaid: true },
+          });
+          const owed = openCredit.reduce(
+            (a, s) => a + Math.max(0, s.total - s.amountPaid),
+            0,
+          );
+          if (owed + total > cust.creditLimit) {
+            const available = Math.max(0, cust.creditLimit - owed);
+            throw new Error(
+              `${cust.businessName ?? cust.name}'s credit limit is TSh ${cust.creditLimit.toLocaleString()} — only TSh ${available.toLocaleString()} available. Collect a payment or ask admin/finance to raise the limit.`,
+            );
+          }
+        }
         soldTo = cust.name;
       }
 
@@ -1182,6 +1207,78 @@ export async function setFieldCustomerCredit(
     });
     revalidateField();
     return ok(undefined, `Credit ${suspended ? "suspended" : "restored"} for ${cust.name}.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+/** ADMIN/FINANCE set the per-customer credit cap — the rep can never set it.
+ * Pass null (or a blank) to remove the cap. */
+export async function setFieldCustomerCreditLimit(
+  customerId: string,
+  limit: number | null,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["ADMIN", "FINANCE"]);
+    const cust = await prisma.fieldCustomer.findUnique({ where: { id: customerId } });
+    if (!cust) return fail("Customer not found.");
+    const clean =
+      limit == null || Number.isNaN(limit) || limit < 0 ? null : Math.round(limit);
+    await prisma.fieldCustomer.update({
+      where: { id: customerId },
+      data: { creditLimit: clean },
+    });
+    const who = cust.businessName ?? cust.name;
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "FIELD_CREDIT_LIMIT_SET",
+      entity: "FieldCustomer",
+      entityId: customerId,
+      summary:
+        clean == null
+          ? `${actor.name} removed the credit limit for ${who}.`
+          : `${actor.name} set ${who}'s credit limit to TSh ${clean.toLocaleString()}.`,
+    });
+    revalidateField();
+    revalidatePath("/admin/reps/customers");
+    revalidatePath("/finance/customers");
+    return ok(
+      undefined,
+      clean == null
+        ? `Credit limit removed for ${who}.`
+        : `Credit limit set to TSh ${clean.toLocaleString()} for ${who}.`,
+    );
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+/** A dated note on the customer — visible to rep, admin and finance, and it
+ * lands on the customer's activity timeline. */
+export async function addFieldCustomerNote(
+  customerId: string,
+  note: string,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["SALES_REP", "ADMIN", "FINANCE"]);
+    const text = note.trim();
+    if (text.length < 2) return fail("Write a note first.");
+    if (text.length > 500) return fail("Notes must be 500 characters or fewer.");
+    const cust = await prisma.fieldCustomer.findUnique({ where: { id: customerId } });
+    if (!cust) return fail("Customer not found.");
+    if (actor.role === "SALES_REP" && cust.repId !== actor.id)
+      return fail("That customer isn't in your book.");
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "FIELD_CUSTOMER_NOTE",
+      entity: "FieldCustomer",
+      entityId: customerId,
+      summary: `${actor.name}: ${text}`,
+    });
+    revalidateField();
+    return ok(undefined, "Note added.");
   } catch (e) {
     return fail(errorMessage(e));
   }
