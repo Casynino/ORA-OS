@@ -169,6 +169,7 @@ export function CreditLedger({
   paymentAccounts = [],
   detailBase = "/admin/credit",
   fieldCustomerBase = "/admin/reps/customers",
+  fieldDetailBase = "/admin/credit/sale",
 }: {
   accounts: CreditAccountDTO[];
   settlements?: SettlementDTO[];
@@ -177,6 +178,8 @@ export function CreditLedger({
   // Route bases so the finance workspace can reuse this whole surface.
   detailBase?: string;
   fieldCustomerBase?: string;
+  // Where each field-credit debt opens its full detail (collected, proofs…).
+  fieldDetailBase?: string;
 }) {
   const router = useRouter();
   const pendingSettlements = settlements.filter((s) => s.status === "PENDING").length;
@@ -331,7 +334,13 @@ export function CreditLedger({
           onRefresh={() => router.refresh()}
         />
       )}
-      {tab === "FIELD" && <FieldCreditPanel credits={fieldCredits} customerBase={fieldCustomerBase} />}
+      {tab === "FIELD" && (
+        <FieldCreditPanel
+          credits={fieldCredits}
+          customerBase={fieldCustomerBase}
+          detailBase={fieldDetailBase}
+        />
+      )}
       {tab === "SETTLEMENTS" && (
         <>
           <SettlementsTable
@@ -354,7 +363,7 @@ export function CreditLedger({
               <h3 className="font-display text-sm font-semibold text-muted-foreground">
                 Overdue field credit (rep customers)
               </h3>
-              <FieldCreditPanel credits={overdueField} customerBase={fieldCustomerBase} compact />
+              <FieldCreditPanel credits={overdueField} customerBase={fieldCustomerBase} detailBase={fieldDetailBase} compact />
             </div>
           )}
         </>
@@ -1363,11 +1372,14 @@ function TermsModal({
 function FieldCreditPanel({
   credits,
   customerBase = "/admin/reps/customers",
+  detailBase = "",
   compact = false,
 }: {
   credits: FieldCreditDTO[];
   // Empty string hides the profile link (no equivalent page in that workspace).
   customerBase?: string;
+  // Where each debt opens its full detail (collected / proofs / record payment).
+  detailBase?: string;
   compact?: boolean;
 }) {
   const [q, setQ] = useState("");
@@ -1382,19 +1394,30 @@ function FieldCreditPanel({
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return credits.filter((c) => {
-      if (rep !== "ALL" && c.repName !== rep) return false;
-      if (status !== "ALL" && c.status !== status) return false;
-      if (overdueOnly && c.status !== "OVERDUE") return false;
-      if (
-        needle &&
-        ![c.customerName, c.customerBusiness, c.customerLocation, c.repName, c.code]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(needle))
-      )
-        return false;
-      return true;
-    });
+    return credits
+      .filter((c) => {
+        if (rep !== "ALL" && c.repName !== rep) return false;
+        if (status !== "ALL" && c.status !== status) return false;
+        if (overdueOnly && c.status !== "OVERDUE") return false;
+        if (
+          needle &&
+          ![c.customerName, c.customerBusiness, c.customerLocation, c.repName, c.code]
+            .filter(Boolean)
+            .some((v) => String(v).toLowerCase().includes(needle))
+        )
+          return false;
+        return true;
+      })
+      // Most urgent first: still-owing debts sorted by soonest due date, then
+      // settled ones last — so finance chases what's about to be overdue.
+      .sort((a, b) => {
+        const ao = fieldOwing(a) > 0 ? 0 : 1;
+        const bo = fieldOwing(b) > 0 ? 0 : 1;
+        if (ao !== bo) return ao - bo;
+        const ad = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const bd = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        return ad - bd;
+      });
   }, [credits, q, rep, status, overdueOnly]);
 
   return (
@@ -1445,6 +1468,8 @@ function FieldCreditPanel({
         <div className="space-y-2">
           {rows.map((c) => {
             const owing = Math.max(0, c.total - c.amountPaid);
+            const due = c.dueDate ? new Date(c.dueDate) : null;
+            const dtd = due ? Math.ceil((due.getTime() - Date.now()) / DAY) : null;
             return (
               <div
                 key={c.id}
@@ -1461,6 +1486,14 @@ function FieldCreditPanel({
                       )}
                       <StatusBadge status={c.status} />
                       <Badge variant="secondary">rep: {c.repName}</Badge>
+                      {owing > 0 && dtd != null && dtd < 0 && (
+                        <Badge variant="destructive">{Math.abs(dtd)}d overdue</Badge>
+                      )}
+                      {owing > 0 && dtd != null && dtd >= 0 && dtd <= 7 && (
+                        <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-semibold text-warning">
+                          due in {dtd}d
+                        </span>
+                      )}
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {c.code} · {formatDate(c.createdAt)}
@@ -1482,14 +1515,24 @@ function FieldCreditPanel({
                         <span className="text-success"> · settled</span>
                       )}
                     </p>
-                    {c.customerId && customerBase && (
-                      <Link
-                        href={`${customerBase}/${c.customerId}`}
-                        className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                      >
-                        Customer profile <ExternalLink className="size-3" />
-                      </Link>
-                    )}
+                    <div className="mt-1 flex flex-wrap items-center justify-end gap-x-3 gap-y-0.5">
+                      {detailBase && (
+                        <Link
+                          href={`${detailBase}/${c.id}`}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                        >
+                          Open &amp; collect <ExternalLink className="size-3" />
+                        </Link>
+                      )}
+                      {c.customerId && customerBase && (
+                        <Link
+                          href={`${customerBase}/${c.customerId}`}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                        >
+                          Customer profile
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 </div>
                 {c.payments.length > 0 && (
