@@ -962,10 +962,16 @@ model FieldCustomer {
   id              String   @id @default(cuid())
   name            String
   businessName    String? // trading name, e.g. "ABC Pharmacy"
+  email           String?
   phone           String?
-  location        String?
+  location        String? // street / physical address — default delivery address
   region          String? // administrative region, e.g. "Dar es Salaam"
+  district        String? // administrative district within the region
   customerType    String? // Pharmacy / Shop / Supermarket / Kiosk / …
+  expectedVolume  String? // expected monthly purchase volume, e.g. "500 packs"
+  preferredPayment String? // Cash / Credit
+  businessLicense String? // licence number (optional)
+  taxId           String? // TIN / tax number (optional)
   gpsLat          Float? // captured on creation when the device allows it
   gpsLng          Float?
   notes           String?
