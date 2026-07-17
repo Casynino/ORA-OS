@@ -31,8 +31,10 @@ export default async function AdminCustomersPage() {
       orderBy: { createdAt: "desc" },
       include: {
         rep: { select: { id: true, name: true } },
+        // CEO/admin master view shows verified figures only — finance-approved
+        // field sales, not unverified (PENDING) or rejected records.
         sales: {
-          where: { voided: false },
+          where: { voided: false, financeStatus: "APPROVED" },
           select: { total: true, amountPaid: true, type: true },
         },
       },

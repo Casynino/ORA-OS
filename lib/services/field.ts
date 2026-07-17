@@ -37,7 +37,9 @@ export async function getRepOverview(repId: string) {
   await refreshOverdueFieldCredit();
   const now = new Date();
   const [today, week, month] = [startOfDay(now), startOfWeek(now), startOfMonth(now)];
-  const live = { repId, voided: false } as const;
+  // Rep-personal view keeps PENDING (finance not-yet-verified) visible so the
+  // rep sees their own submitted work, but never counts REJECTED records.
+  const live = { repId, voided: false, financeStatus: { not: "REJECTED" } } as const;
 
   const [
     salesTodayRows,
@@ -82,7 +84,11 @@ export async function getRepOverview(repId: string) {
     }),
     prisma.fieldPayment.aggregate({
       _sum: { amount: true },
-      where: { sale: { repId, voided: false }, createdAt: { gte: month } },
+      where: {
+        sale: { repId, voided: false },
+        financeStatus: { not: "REJECTED" },
+        createdAt: { gte: month },
+      },
     }),
     prisma.sampleLog.aggregate({ _sum: { quantity: true }, where: { repId, createdAt: { gte: month } } }),
     prisma.repStock.findMany({
@@ -183,12 +189,12 @@ export async function getRepsPerformance(): Promise<RepPerformanceRow[]> {
     prisma.fieldSale.groupBy({
       by: ["repId", "type"],
       _sum: { total: true },
-      where: { repId: { in: ids }, voided: false, createdAt: { gte: month } },
+      where: { repId: { in: ids }, voided: false, financeStatus: { not: "REJECTED" }, createdAt: { gte: month } },
     }),
     prisma.fieldSaleItem.groupBy({
       by: ["saleId"],
       _sum: { quantity: true },
-      where: { sale: { repId: { in: ids }, voided: false, createdAt: { gte: month } } },
+      where: { sale: { repId: { in: ids }, voided: false, financeStatus: { not: "REJECTED" }, createdAt: { gte: month } } },
     }).then(async (rows) => {
       // saleId → repId mapping for unit sums
       const saleIds = rows.map((r) => r.saleId);
@@ -210,6 +216,7 @@ export async function getRepsPerformance(): Promise<RepPerformanceRow[]> {
       where: {
         repId: { in: ids },
         voided: false,
+        financeStatus: { not: "REJECTED" },
         type: "CREDIT",
         creditStatus: { in: ["PENDING", "PARTIAL", "OVERDUE"] },
       },

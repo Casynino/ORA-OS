@@ -18,8 +18,10 @@ export default async function AdminFieldCustomersPage() {
     orderBy: { createdAt: "desc" },
     include: {
       rep: { select: { id: true, name: true } },
+      // Rep-management view keeps PENDING visible but never counts finance-
+      // REJECTED sales toward revenue/owed.
       sales: {
-        where: { voided: false },
+        where: { voided: false, financeStatus: { not: "REJECTED" } },
         select: { total: true, amountPaid: true, type: true },
       },
     },

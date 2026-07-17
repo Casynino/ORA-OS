@@ -36,14 +36,14 @@ export default async function AccountLedgerPage({
 
   const [cashSales, fieldPays, partnerPays, orderPays] = await Promise.all([
     prisma.fieldSale.findMany({
-      where: { paymentAccountId: id, voided: false },
+      where: { paymentAccountId: id, voided: false, financeStatus: "APPROVED" },
       include: {
         rep: { select: { name: true } },
         customer: { select: { name: true } },
       },
     }),
     prisma.fieldPayment.findMany({
-      where: { paymentAccountId: id, sale: { voided: false } },
+      where: { paymentAccountId: id, financeStatus: "APPROVED", sale: { voided: false } },
       include: {
         recordedBy: { select: { name: true } },
         sale: {

@@ -234,10 +234,14 @@ export async function recordFieldSale(
       action: d.type === "CASH" ? "FIELD_SALE_CASH" : "FIELD_SALE_CREDIT",
       entity: "FieldSale",
       entityId: code,
-      summary: `${actor.name} recorded a ${d.type.toLowerCase()} sale ${code} of TSh ${total.toLocaleString()}.`,
+      summary: `${actor.name} recorded a ${d.type.toLowerCase()} sale ${code} of TSh ${total.toLocaleString()} — awaiting finance confirmation.`,
     });
     revalidateField();
-    return ok({ code }, `Sale ${code} recorded.`);
+    revalidatePath("/finance/sales-approvals");
+    return ok(
+      { code },
+      `Sale ${code} submitted — finance will ${d.type === "CASH" ? "verify the payment" : "review the credit terms"} and confirm it.`,
+    );
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -273,8 +277,30 @@ export async function recordFieldCollection(
     if (sale.voided) return fail("This sale was voided.");
     const balance = sale.total - sale.amountPaid;
     if (balance <= 0) return fail("This sale is already fully paid.");
-    if (d.amount > balance)
-      return fail(`Amount exceeds the outstanding balance (TSh ${balance.toLocaleString()}).`);
+
+    // Finance is the control point: a rep's collection is a CLAIM until
+    // finance verifies the money — it doesn't touch the sale balance yet.
+    // Finance/admin recording it themselves IS the verification.
+    const isRepClaim = actor.role === "SALES_REP";
+
+    // A rep's PENDING claims don't reduce amountPaid, so validate against the
+    // balance NET of what they've already claimed — otherwise several pending
+    // claims could sum past the outstanding total and over-post on approval.
+    let claimable = balance;
+    if (isRepClaim) {
+      const pending = await prisma.fieldPayment.aggregate({
+        _sum: { amount: true },
+        where: { saleId: sale.id, financeStatus: "PENDING" },
+      });
+      claimable = balance - (pending._sum.amount ?? 0);
+      if (claimable <= 0) {
+        return fail(
+          "You've already submitted collections covering this sale's outstanding balance — awaiting finance confirmation.",
+        );
+      }
+    }
+    if (d.amount > claimable)
+      return fail(`Amount exceeds the outstanding balance (TSh ${claimable.toLocaleString()}).`);
 
     const newPaid = sale.amountPaid + d.amount;
     await prisma.$transaction(async (tx) => {
@@ -283,18 +309,20 @@ export async function recordFieldCollection(
         d.paymentAccountId || null,
         d.method,
       );
-      // Atomic claim on the exact balance we validated — a concurrent
-      // collection makes this match 0 rows and abort instead of losing an
-      // update (payment rows and amountPaid must never drift apart).
-      const claimed = await tx.fieldSale.updateMany({
-        where: { id: sale.id, amountPaid: sale.amountPaid, voided: false },
-        data: {
-          amountPaid: newPaid,
-          creditStatus: creditStatusFor(sale.total, newPaid, sale.dueDate),
-        },
-      });
-      if (claimed.count === 0) {
-        throw new Error("This sale changed while recording — refresh and try again.");
+      if (!isRepClaim) {
+        // Atomic claim on the exact balance we validated — a concurrent
+        // collection makes this match 0 rows and abort instead of losing an
+        // update (payment rows and amountPaid must never drift apart).
+        const claimed = await tx.fieldSale.updateMany({
+          where: { id: sale.id, amountPaid: sale.amountPaid, voided: false },
+          data: {
+            amountPaid: newPaid,
+            creditStatus: creditStatusFor(sale.total, newPaid, sale.dueDate),
+          },
+        });
+        if (claimed.count === 0) {
+          throw new Error("This sale changed while recording — refresh and try again.");
+        }
       }
       await tx.fieldPayment.create({
         data: {
@@ -305,6 +333,10 @@ export async function recordFieldCollection(
           reference: d.reference?.trim() || null,
           note: d.note || null,
           recordedById: actor.id,
+          financeStatus: isRepClaim ? "PENDING" : "APPROVED",
+          ...(isRepClaim
+            ? {}
+            : { financeReviewedById: actor.id, financeReviewedAt: new Date() }),
         },
       });
     });
@@ -312,14 +344,21 @@ export async function recordFieldCollection(
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
-      action: "FIELD_CREDIT_COLLECTED",
+      action: isRepClaim ? "FIELD_COLLECTION_SUBMITTED" : "FIELD_CREDIT_COLLECTED",
       entity: "FieldSale",
       entityId: sale.code,
-      summary: `${actor.name} collected TSh ${d.amount.toLocaleString()} on ${sale.code}${sale.customer ? ` (${sale.customer.name})` : ""}.`,
+      summary: isRepClaim
+        ? `${actor.name} submitted a TSh ${d.amount.toLocaleString()} collection on ${sale.code}${sale.customer ? ` (${sale.customer.name})` : ""} — awaiting finance verification.`
+        : `${actor.name} collected TSh ${d.amount.toLocaleString()} on ${sale.code}${sale.customer ? ` (${sale.customer.name})` : ""}.`,
     });
     revalidateField();
     revalidatePath(`/rep/customers`);
-    return ok(undefined, "Payment recorded.");
+    return ok(
+      undefined,
+      isRepClaim
+        ? "Collection submitted — finance will verify the money and post it."
+        : "Payment recorded.",
+    );
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -1155,6 +1194,17 @@ export async function voidFieldSale(
       await tx.fieldSale.update({
         where: { id: sale.id },
         data: { voided: true, voidReason: reason || null },
+      });
+      // Any collections a rep claimed against this sale are now moot — reject
+      // the still-pending ones so they don't linger in the finance queue.
+      await tx.fieldPayment.updateMany({
+        where: { saleId: sale.id, financeStatus: "PENDING" },
+        data: {
+          financeStatus: "REJECTED",
+          financeReviewedById: actor.id,
+          financeReviewedAt: new Date(),
+          financeNote: `Sale voided: ${reason || "no reason given"}`,
+        },
       });
     });
 

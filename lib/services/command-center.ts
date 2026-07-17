@@ -1,4 +1,30 @@
 import { prisma } from "@/lib/db";
+
+// Money events the CEO should see in the financial activity feed —
+// confirmations, expenses, payroll, petty cash, settlements, credit.
+const FINANCIAL_ACTIONS = [
+  "FIELD_SALE_CONFIRMED",
+  "FIELD_CREDIT_APPROVED",
+  "FIELD_SALE_REJECTED",
+  "FIELD_COLLECTION_CONFIRMED",
+  "FIELD_COLLECTION_REJECTED",
+  "FIELD_CREDIT_COLLECTED",
+  "PAYMENT_CONFIRMED",
+  "PAYMENT_REJECTED",
+  "CASH_SALE_RECORDED", // admin/office over-the-counter cash sale (official money in)
+  "SETTLEMENT_CONFIRMED",
+  "SETTLEMENT_REJECTED",
+  "CREDIT_PAYMENT_RECORDED",
+  "EXPENSE_RECORDED",
+  "EXPENSE_REMOVED",
+  "CAPITAL_RECORDED",
+  "PAYROLL_SUBMITTED",
+  "PAYROLL_APPROVED",
+  "PAYROLL_PAID",
+  "PETTY_CASH_REQUESTED",
+  "PETTY_CASH_APPROVED",
+  "PETTY_CASH_RECONCILED",
+];
 import { getWarehouseSummaries } from "@/lib/warehouse-data";
 
 /**
@@ -83,6 +109,7 @@ export async function getCommandCenter() {
     requestsByProduct,
     statusGroups,
     recentActivity,
+    financialActivity,
     warehouseSummaries,
     whValueRows,
     fulfilledHistory,
@@ -185,6 +212,12 @@ export async function getCommandCenter() {
     }),
     prisma.request.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.activityLog.findMany({ take: 9, orderBy: { createdAt: "desc" } }),
+    // CEO financial activity feed — every verified money event, newest first.
+    prisma.activityLog.findMany({
+      where: { action: { in: FINANCIAL_ACTIONS } },
+      take: 10,
+      orderBy: { createdAt: "desc" },
+    }),
     getWarehouseSummaries(),
     prisma.warehouseStock.findMany({
       select: {
@@ -223,19 +256,19 @@ export async function getCommandCenter() {
       by: ["type"],
       _sum: { total: true },
       _count: { _all: true },
-      where: { voided: false, createdAt: { gte: startToday } },
+      where: { voided: false, financeStatus: "APPROVED", createdAt: { gte: startToday } },
     }),
     prisma.fieldSale.groupBy({
       by: ["type"],
       _sum: { total: true },
       _count: { _all: true },
-      where: { voided: false, createdAt: { gte: startWeek } },
+      where: { voided: false, financeStatus: "APPROVED", createdAt: { gte: startWeek } },
     }),
     prisma.fieldSale.groupBy({
       by: ["type"],
       _sum: { total: true },
       _count: { _all: true },
-      where: { voided: false, createdAt: { gte: startMonth } },
+      where: { voided: false, financeStatus: "APPROVED", createdAt: { gte: startMonth } },
     }),
     // Partner cash orders per period (today's version already exists above).
     prisma.request.aggregate({
@@ -256,22 +289,22 @@ export async function getCommandCenter() {
     }),
     prisma.fieldPayment.aggregate({
       _sum: { amount: true },
-      where: { createdAt: { gte: startToday } },
+      where: { financeStatus: "APPROVED", sale: { voided: false }, createdAt: { gte: startToday } },
     }),
     prisma.fieldPayment.aggregate({
       _sum: { amount: true },
-      where: { createdAt: { gte: startMonth } },
+      where: { financeStatus: "APPROVED", sale: { voided: false }, createdAt: { gte: startMonth } },
     }),
     prisma.fieldSale.aggregate({
       _sum: { total: true, amountPaid: true },
-      where: { voided: false, type: "CREDIT" },
+      where: { voided: false, type: "CREDIT", financeStatus: "APPROVED" },
     }),
     prisma.fieldSale.aggregate({
       _sum: { total: true, amountPaid: true },
-      where: { voided: false, type: "CREDIT", creditStatus: "OVERDUE" },
+      where: { voided: false, type: "CREDIT", financeStatus: "APPROVED", creditStatus: "OVERDUE" },
     }),
     prisma.fieldSale.findMany({
-      where: { voided: false, createdAt: { gte: sixMonthsAgo } },
+      where: { voided: false, financeStatus: "APPROVED", createdAt: { gte: sixMonthsAgo } },
       select: { createdAt: true, total: true },
     }),
   ]);
@@ -573,6 +606,7 @@ export async function getCommandCenter() {
     trends: { sales: salesTrend, collections: collectionsTrend, partners: partnerTrend },
     statusPipeline,
     recentActivity,
+    financialActivity,
     todaysOrders,
     alerts,
   };

@@ -107,13 +107,15 @@ export async function getCreditWorkspaceData() {
   // Field credit — every rep-recorded credit sale is a company credit record,
   // visible alongside partner credit (single source of truth).
   const fieldSales = await prisma.fieldSale.findMany({
-    where: { type: "CREDIT", voided: false },
+    // Only finance-approved credit sales are official receivables.
+    where: { type: "CREDIT", voided: false, financeStatus: "APPROVED" },
     orderBy: [{ creditStatus: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
     include: {
       rep: { select: { id: true, name: true } },
       customer: { select: { id: true, name: true, businessName: true, location: true, region: true, phone: true } },
       items: { include: { product: { select: { name: true } } } },
       payments: {
+        where: { financeStatus: "APPROVED" },
         orderBy: { createdAt: "asc" },
         include: { recordedBy: { select: { name: true } } },
       },

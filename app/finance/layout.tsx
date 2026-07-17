@@ -12,6 +12,7 @@ const nav: NavGroup[] = [
   {
     label: "Money",
     items: [
+      { href: "/finance/sales-approvals", label: "Sales approvals", icon: "sales" },
       { href: "/finance/payments", label: "Payment confirmations", icon: "payments" },
       { href: "/finance/accounts", label: "Company accounts", icon: "finance" },
       { href: "/finance/expenses", label: "Expenses", icon: "finance" },

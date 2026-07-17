@@ -83,12 +83,14 @@ async function cashIn(start: Date | null) {
         where: {
           type: "CASH",
           voided: false,
+          financeStatus: "APPROVED",
           ...(start ? { createdAt: { gte: start } } : {}),
         },
       }),
       prisma.fieldPayment.aggregate({
         _sum: { amount: true },
         where: {
+          financeStatus: "APPROVED",
           sale: { voided: false },
           ...(start ? { createdAt: { gte: start } } : {}),
         },
@@ -135,7 +137,11 @@ async function revenueAndCogs(start: Date | null) {
     }),
     prisma.fieldSaleItem.findMany({
       where: {
-        sale: { voided: false, ...(start ? { createdAt: { gte: start } } : {}) },
+        sale: {
+          voided: false,
+          financeStatus: "APPROVED",
+          ...(start ? { createdAt: { gte: start } } : {}),
+        },
       },
       select: {
         quantity: true,
@@ -210,6 +216,7 @@ export async function getFinanceOverview(period: Period) {
       where: {
         type: "CREDIT",
         voided: false,
+        financeStatus: "APPROVED",
         creditStatus: { in: ["PENDING", "PARTIAL", "OVERDUE"] },
       },
       select: { total: true, amountPaid: true, creditStatus: true },
@@ -232,6 +239,7 @@ export async function getFinanceOverview(period: Period) {
       where: {
         type: "CREDIT",
         voided: false,
+        financeStatus: "APPROVED",
         ...(start ? { createdAt: { gte: start } } : {}),
       },
     }),
@@ -295,11 +303,11 @@ export async function getFinanceOverview(period: Period) {
         select: { amount: true, createdAt: true },
       }),
       prisma.fieldSale.findMany({
-        where: { type: "CASH", voided: false, createdAt: { gte: spanStart } },
+        where: { type: "CASH", voided: false, financeStatus: "APPROVED", createdAt: { gte: spanStart } },
         select: { total: true, createdAt: true },
       }),
       prisma.fieldPayment.findMany({
-        where: { createdAt: { gte: spanStart }, sale: { voided: false } },
+        where: { financeStatus: "APPROVED", createdAt: { gte: spanStart }, sale: { voided: false } },
         select: { amount: true, createdAt: true },
       }),
       prisma.expense.findMany({
@@ -435,7 +443,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
         },
       }),
       prisma.fieldSale.findMany({
-        where: { type: "CASH", voided: false, ...(dateW ? { createdAt: dateW } : {}) },
+        where: { type: "CASH", voided: false, financeStatus: "APPROVED", ...(dateW ? { createdAt: dateW } : {}) },
         orderBy: { createdAt: "desc" },
         take,
         select: {
@@ -444,7 +452,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
         },
       }),
       prisma.fieldPayment.findMany({
-        where: { sale: { voided: false }, ...(dateW ? { createdAt: dateW } : {}) },
+        where: { financeStatus: "APPROVED", sale: { voided: false }, ...(dateW ? { createdAt: dateW } : {}) },
         orderBy: { createdAt: "desc" },
         take,
         include: {
