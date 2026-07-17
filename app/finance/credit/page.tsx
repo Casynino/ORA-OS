@@ -24,7 +24,8 @@ export default async function FinanceCreditPage() {
         fieldCredits={fieldCredits}
         paymentAccounts={paymentAccounts}
         detailBase="/finance/credit"
-        fieldCustomerBase=""
+        fieldCustomerBase="/finance/customers"
+        fieldDetailBase="/finance/credit/sale"
       />
     </div>
   );
