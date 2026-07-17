@@ -6,11 +6,10 @@ import { cn } from "@/lib/utils";
 
 const LINKS = [
   { path: "", label: "Overview" },
-  { path: "/expenses", label: "Expenses" },
+  { path: "/operational-fund", label: "Operational Fund" },
   { path: "/capital", label: "Capital" },
   { path: "/accounts", label: "Accounts" },
   { path: "/cash", label: "Cash & deposits" },
-  { path: "/petty-cash", label: "Office fund" },
   { path: "/payroll", label: "Payroll" },
   { path: "/ledger", label: "Ledger" },
 ];

@@ -12,6 +12,7 @@ import {
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { getFinanceOverview } from "@/lib/services/finance";
+import { getOperationalFundBalance } from "@/lib/services/operational-fund";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import {
@@ -31,7 +32,7 @@ export default async function FinanceReportsPage() {
   await requireRole("FINANCE");
 
   const yearStart = new Date(new Date().getFullYear(), 0, 1);
-  const [d, approvedPayroll, pendingPayroll, openPettyCash, taxesThisYear] =
+  const [d, approvedPayroll, pendingPayroll, opFund, taxesThisYear] =
     await Promise.all([
       getFinanceOverview("month"),
       // Approved but unpaid salary runs — money already committed.
@@ -44,11 +45,8 @@ export default async function FinanceReportsPage() {
         where: { status: "PENDING_APPROVAL" },
         select: { items: { select: { net: true } } },
       }),
-      // Approved petty cash allocations not yet fully spent/reconciled.
-      prisma.pettyCashRequest.findMany({
-        where: { status: "APPROVED" },
-        select: { amount: true, expenses: { select: { amount: true } } },
-      }),
+      // Operational Fund balance (CEO-approved allocation not yet spent).
+      getOperationalFundBalance(),
       prisma.expense.aggregate({
         _sum: { amount: true },
         where: { category: "TAXES", expenseDate: { gte: yearStart } },
@@ -62,16 +60,12 @@ export default async function FinanceReportsPage() {
     r.items.reduce((s, i) => s + i.net, 0);
   const payrollApproved = approvedPayroll.reduce((s, r) => s + runNet(r), 0);
   const payrollAwaiting = pendingPayroll.reduce((s, r) => s + runNet(r), 0);
-  const pettyCashOpen = openPettyCash.reduce(
-    (s, r) =>
-      s + Math.max(0, r.amount - r.expenses.reduce((t, e) => t + e.amount, 0)),
-    0,
-  );
+  const pettyCashOpen = opFund.balance;
   const taxesPaid = taxesThisYear._sum.amount ?? 0;
 
   // Liabilities are committed money only — pending approvals are excluded.
-  // Petty cash floats were already expensed at issue — cash with the
-  // custodian, not money owed. Payables = committed payroll only.
+  // The Operational Fund balance is cash held by finance (an asset/float), not
+  // money owed — never a payable. Payables = committed payroll only.
   const payables = payrollApproved;
   const receivables = p.creditOutstanding;
   const assets = p.cashAvailable + receivables + p.stockValue;
@@ -317,9 +311,9 @@ export default async function FinanceReportsPage() {
                     <Banknote className="size-4" />
                   </span>
                   <span>
-                    Office fund float (informational)
+                    Operational Fund balance (informational)
                     <span className="block text-xs font-normal text-muted-foreground">
-                      {openPettyCash.length} open allocation{openPettyCash.length === 1 ? "" : "s"} — already expensed at issue, held by finance
+                      cash allocated to finance, not yet spent — an asset, not a payable
                     </span>
                   </span>
                 </span>

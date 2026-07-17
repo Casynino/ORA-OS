@@ -32,8 +32,7 @@ const nav: NavGroup[] = [
     items: [
       { href: "/finance/accounts", label: "Company accounts", icon: "finance" },
       { href: "/finance/cash", label: "Cash on hand & deposits", icon: "settlements" },
-      { href: "/finance/expenses", label: "Expenses", icon: "finance" },
-      { href: "/finance/petty-cash", label: "Office expense fund", icon: "finance" },
+      { href: "/finance/operational-fund", label: "Operational Fund", icon: "finance" },
     ],
   },
   {

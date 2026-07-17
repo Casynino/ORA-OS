@@ -1294,6 +1294,14 @@ enum CapitalType {
   OTHER
 }
 
+/// Where an Expense row originated — lets the Operational Fund net only its own
+/// spend, and reports still count every Expense once as money-out.
+enum ExpenseSource {
+  DIRECT // a plain company expense (or legacy)
+  OPERATIONAL_FUND // spent from the CEO-allocated Operational Fund
+  PAYROLL // auto-created when a payroll run is paid
+}
+
 // ── Finance & Accounting department ─────────────────────────────────────────
 
 enum PettyCashStatus {
@@ -1315,6 +1323,7 @@ model PettyCashRequest {
   // under the right ledger category (defaults to OFFICE for older rows).
   category         ExpenseCategory @default(OFFICE)
   status           PettyCashStatus @default(PENDING)
+  note             String? // requester's notes on the funding request
   requestedBy      User            @relation("PettyCashRequester", fields: [requestedById], references: [id])
   requestedById    String
   approvedBy       User?           @relation("PettyCashApprover", fields: [approvedById], references: [id])
@@ -1439,8 +1448,12 @@ model Expense {
   code          String          @unique
   category      ExpenseCategory
   amount        Int // whole TSh
-  purpose       String
+  purpose       String // description of the spend
   paymentMethod String? // cash, mobile money, bank
+  source        ExpenseSource   @default(DIRECT) // where it came from (fund / payroll / direct)
+  vendor        String? // vendor / recipient (optional)
+  receiptRef    String? // receipt / invoice / voucher number
+  receiptUrl    String? // uploaded supporting document
   expenseDate   DateTime        @default(now())
   note          String?
   recordedBy    User            @relation("ExpenseRecorder", fields: [recordedById], references: [id])
@@ -1449,6 +1462,7 @@ model Expense {
   updatedAt     DateTime        @updatedAt
 
   @@index([category])
+  @@index([source])
   @@index([expenseDate])
 }
 

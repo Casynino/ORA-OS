@@ -1,0 +1,229 @@
+"use server";
+
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/db";
+import { requireActor } from "@/lib/rbac";
+import { logActivity } from "@/lib/activity";
+import { refCode, formatCurrency } from "@/lib/utils";
+import { EXPENSE_CATEGORY_VALUES, EXPENSE_LABELS } from "@/lib/expense-categories";
+import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Operational Fund — the single pool the CEO allocates to Finance for daily
+//  operations. Finance requests funds → CEO approves (adds to the balance) →
+//  Finance records spending (auto-reduces the balance) → when low, request more.
+//  Funding never creates an Expense; only actual spend does (source =
+//  OPERATIONAL_FUND), so reports count each shilling exactly once.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function revalidateFund() {
+  for (const p of [
+    "/finance",
+    "/finance/operational-fund",
+    "/finance/reports",
+    "/admin",
+    "/admin/finance",
+    "/admin/finance/operational-fund",
+    "/admin/finance/ledger",
+  ])
+    revalidatePath(p);
+}
+
+
+// ── Funding requests ────────────────────────────────────────────────────────
+
+const requestSchema = z.object({
+  amount: z.number().int().positive("Enter an amount.").max(1000000000),
+  purpose: z.string().trim().min(3, "What are the funds for?").max(300),
+  category: z.enum(EXPENSE_CATEGORY_VALUES).default("OFFICE"),
+  note: z.string().max(500).optional().or(z.literal("")),
+});
+
+/** Finance requests an allocation to the Operational Fund — goes to the CEO. */
+export async function requestOperationalFunds(
+  input: z.infer<typeof requestSchema>,
+): Promise<ActionResult<{ code: string }>> {
+  try {
+    const actor = await requireActor(["FINANCE", "ADMIN"]);
+    const parsed = requestSchema.safeParse(input);
+    if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid request.");
+    const d = parsed.data;
+    const req = await prisma.pettyCashRequest.create({
+      data: {
+        code: refCode("OF"),
+        amount: d.amount,
+        purpose: d.purpose,
+        category: d.category,
+        note: d.note?.trim() || null,
+        requestedById: actor.id,
+      },
+    });
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "OPERATIONAL_FUND_REQUESTED",
+      entity: "PettyCashRequest",
+      entityId: req.code,
+      summary: `${actor.name} requested ${formatCurrency(d.amount)} for the Operational Fund (${req.code}, ${EXPENSE_LABELS[d.category]}) — awaiting CEO approval.`,
+    });
+    revalidateFund();
+    return ok({ code: req.code }, `${req.code} sent to the CEO for approval.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+/** CEO approves — the amount is added to the Operational Fund balance. Creates
+ *  NO expense; funding only tops up the pool that spending draws from. */
+export async function approveOperationalFundRequest(id: string): Promise<ActionResult> {
+  try {
+    const admin = await requireActor(["ADMIN"]);
+    const req = await prisma.pettyCashRequest.findUnique({
+      where: { id },
+      include: { requestedBy: { select: { name: true } } },
+    });
+    if (!req) return fail("Request not found.");
+    const claimed = await prisma.pettyCashRequest.updateMany({
+      where: { id, status: "PENDING" },
+      data: { status: "APPROVED", approvedById: admin.id, approvedAt: new Date() },
+    });
+    if (claimed.count === 0) return fail("This request was already reviewed.");
+    await logActivity({
+      actorId: admin.id,
+      actorName: admin.name,
+      action: "OPERATIONAL_FUND_APPROVED",
+      entity: "PettyCashRequest",
+      entityId: req.code,
+      summary: `CEO approved ${formatCurrency(req.amount)} for the Operational Fund (${req.code}) — added to the balance for ${req.requestedBy.name}.`,
+    });
+    revalidateFund();
+    return ok(undefined, `${req.code} approved — ${formatCurrency(req.amount)} added to the Operational Fund.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+export async function rejectOperationalFundRequest(id: string, note?: string): Promise<ActionResult> {
+  try {
+    const admin = await requireActor(["ADMIN"]);
+    const req = await prisma.pettyCashRequest.findUnique({ where: { id } });
+    if (!req) return fail("Request not found.");
+    const rejected = await prisma.pettyCashRequest.updateMany({
+      where: { id, status: "PENDING" },
+      data: { status: "REJECTED", approvedById: admin.id, approvedAt: new Date(), adminNote: note?.trim() || null },
+    });
+    if (rejected.count === 0) return fail("This request was already reviewed.");
+    await logActivity({
+      actorId: admin.id,
+      actorName: admin.name,
+      action: "OPERATIONAL_FUND_REJECTED",
+      entity: "PettyCashRequest",
+      entityId: req.code,
+      summary: `CEO rejected Operational Fund request ${req.code}${note?.trim() ? ` — ${note.trim()}` : ""}.`,
+    });
+    revalidateFund();
+    return ok(undefined, "Request rejected.");
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+// ── Spending ────────────────────────────────────────────────────────────────
+
+const spendSchema = z.object({
+  amount: z.number().int().positive("Enter the amount spent.").max(1000000000),
+  category: z.enum(EXPENSE_CATEGORY_VALUES).default("OFFICE"),
+  description: z.string().trim().min(3, "What was this spent on?").max(300),
+  vendor: z.string().max(160).optional().or(z.literal("")),
+  expenseDate: z.string().optional().or(z.literal("")), // ISO date
+  receiptRef: z.string().max(120).optional().or(z.literal("")),
+  receiptUrl: z.string().max(15000000).optional().or(z.literal("")),
+  note: z.string().max(500).optional().or(z.literal("")),
+});
+
+/** Finance records money spent from the Operational Fund — one Expense
+ *  (source OPERATIONAL_FUND) that auto-reduces the balance. */
+export async function recordOperationalExpense(
+  input: z.infer<typeof spendSchema>,
+): Promise<ActionResult<{ code: string }>> {
+  try {
+    const actor = await requireActor(["FINANCE", "ADMIN"]);
+    const parsed = spendSchema.safeParse(input);
+    if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid expense.");
+    const d = parsed.data;
+    if (d.expenseDate && Number.isNaN(new Date(d.expenseDate).getTime()))
+      return fail("The expense date is invalid.");
+
+    const code = refCode("EXP");
+    let remaining = 0;
+    await prisma.$transaction(async (tx) => {
+      // Serialize every fund spend so two concurrent expenses can't each slip
+      // under the balance and overspend the CEO's allocation.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('operational_fund'))`;
+      const [funded, spent] = await Promise.all([
+        tx.pettyCashRequest.aggregate({ _sum: { amount: true }, where: { status: "APPROVED" } }),
+        tx.expense.aggregate({ _sum: { amount: true }, where: { source: "OPERATIONAL_FUND" } }),
+      ]);
+      const balance = (funded._sum.amount ?? 0) - (spent._sum.amount ?? 0);
+      // Can't spend money the fund doesn't have.
+      if (d.amount > balance)
+        throw new Error(
+          `The Operational Fund only has ${formatCurrency(Math.max(0, balance))} left — request more funds before recording this.`,
+        );
+      remaining = balance - d.amount;
+      await tx.expense.create({
+        data: {
+          code,
+          source: "OPERATIONAL_FUND",
+          category: d.category,
+          amount: d.amount,
+          purpose: d.description,
+          vendor: d.vendor?.trim() || null,
+          receiptRef: d.receiptRef?.trim() || null,
+          receiptUrl: d.receiptUrl?.trim() || null,
+          expenseDate: d.expenseDate ? new Date(d.expenseDate) : new Date(),
+          note: d.note?.trim() || null,
+          recordedById: actor.id,
+        },
+      });
+    });
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "OPERATIONAL_EXPENSE_RECORDED",
+      entity: "Expense",
+      entityId: code,
+      summary: `${actor.name} spent ${formatCurrency(d.amount)} from the Operational Fund — ${d.description} (${EXPENSE_LABELS[d.category]})${d.vendor?.trim() ? ` · ${d.vendor.trim()}` : ""}.`,
+    });
+    revalidateFund();
+    return ok({ code }, `Expense ${code} recorded — ${formatCurrency(remaining)} left in the fund.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+/** Delete an operational-fund expense (a correction). Finance can remove its own
+ *  fund spending; payroll-sourced rows stay CEO-only. */
+export async function removeOperationalExpense(id: string): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["FINANCE", "ADMIN"]);
+    const exp = await prisma.expense.findUnique({ where: { id } });
+    if (!exp) return fail("Expense not found.");
+    if (exp.source === "PAYROLL" && actor.role !== "ADMIN")
+      return fail("Payroll expenses are a CEO control record — only the admin can remove them.");
+    await prisma.expense.delete({ where: { id } });
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "OPERATIONAL_EXPENSE_REMOVED",
+      entity: "Expense",
+      entityId: exp.code,
+      summary: `${actor.name} removed expense ${exp.code} (${formatCurrency(exp.amount)} — ${exp.purpose}).`,
+    });
+    revalidateFund();
+    return ok(undefined, `Expense ${exp.code} removed.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}

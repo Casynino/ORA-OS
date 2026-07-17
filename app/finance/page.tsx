@@ -16,6 +16,7 @@ import {
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { getFinanceOverview, getLedger } from "@/lib/services/finance";
+import { getOperationalFundBalance } from "@/lib/services/operational-fund";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -43,7 +44,7 @@ export default async function FinanceDashboardPage() {
     pendingCashSales,
     pendingCreditSales,
     pendingRepCollections,
-    openPettyCash,
+    opFund,
   ] = await Promise.all([
     getFinanceOverview("month"),
     getLedger("month", 8),
@@ -64,19 +65,13 @@ export default async function FinanceDashboardPage() {
     prisma.fieldPayment.count({
       where: { financeStatus: "PENDING", sale: { voided: false } },
     }),
-    prisma.pettyCashRequest.findMany({
-      where: { status: "APPROVED" },
-      include: { expenses: { select: { amount: true } } },
-    }),
+    getOperationalFundBalance(),
   ]);
 
-  // Office expense fund balance = unspent money across every CEO-approved
-  // allocation. The CEO funds it; finance spends it down without per-expense
-  // approval and accounts for every shilling.
-  const fundBalance = openPettyCash.reduce(
-    (s, r) => s + Math.max(0, r.amount - r.expenses.reduce((x, e) => x + e.amount, 0)),
-    0,
-  );
+  // Operational Fund balance = CEO-approved funding − operational spend. One
+  // shared pool the CEO tops up and finance spends down, accounting for every
+  // shilling.
+  const fundBalance = opFund.balance;
 
   // Weekly cash flow — bucket the ledger into the last 7 days.
   const days: { label: string; in: number; out: number }[] = [];
@@ -179,11 +174,11 @@ export default async function FinanceDashboardPage() {
             icon={ArrowDownToLine}
             accent="success"
           />
-          <Link href="/finance/petty-cash" className="transition-transform hover:-translate-y-0.5">
+          <Link href="/finance/operational-fund" className="transition-transform hover:-translate-y-0.5">
             <StatCard
-              label="Office expense fund"
+              label="Operational Fund"
               value={formatCurrency(fundBalance)}
-              hint="unspent, CEO-approved balance"
+              hint="available balance to spend"
               icon={Wallet}
               accent={fundBalance > 0 ? "primary" : "info"}
             />

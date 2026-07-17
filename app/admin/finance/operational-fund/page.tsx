@@ -1,0 +1,26 @@
+import { requireRole } from "@/lib/rbac";
+import { getOperationalFund } from "@/lib/services/operational-fund";
+import { PageHeader } from "@/components/ui/page-header";
+import { FinanceNav } from "@/components/admin/finance-nav";
+import { OperationalFundManager } from "@/components/finance/operational-fund-manager";
+
+export const dynamic = "force-dynamic";
+
+/** CEO oversight of the Operational Fund — approve funding requests, and monitor
+ *  the balance and every expense (with receipts). No per-expense approval. */
+export default async function AdminOperationalFundPage() {
+  await requireRole("ADMIN");
+  const fund = await getOperationalFund();
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Operational Fund"
+        description="The single fund you allocate to Finance for daily operations. Approve funding requests, then monitor the balance and every recorded expense — full transparency, no per-expense sign-off."
+      >
+        <FinanceNav />
+      </PageHeader>
+      <OperationalFundManager fund={fund} canApprove />
+    </div>
+  );
+}
