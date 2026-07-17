@@ -26,7 +26,7 @@ export async function createPaymentAccount(
   input: z.infer<typeof createSchema>,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN", "FINANCE"]);
+    const admin = await requireActor(["ADMIN"]);
     const parsed = createSchema.safeParse(input);
     if (!parsed.success) {
       return fail(parsed.error.issues[0]?.message ?? "Invalid account.");
@@ -67,7 +67,7 @@ export async function updatePaymentAccount(
   input: z.infer<typeof updateSchema>,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN", "FINANCE"]);
+    const admin = await requireActor(["ADMIN"]);
     const parsed = updateSchema.safeParse(input);
     if (!parsed.success) return fail("Invalid update.");
     const { accountId, ...rest } = parsed.data;

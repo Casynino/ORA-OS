@@ -81,12 +81,12 @@ export function PettyCashManager({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-lg font-semibold">
-            {mode === "finance" ? "Petty cash allocations" : "Petty cash approvals"}
+            {mode === "finance" ? "Office fund allocations" : "Office fund requests"}
           </h2>
           <p className="text-sm text-muted-foreground">
             {mode === "finance"
-              ? "Request an allocation, record every expenditure against it, then close it with a reconciliation report."
-              : "Approving issues the money immediately as an expense from the chosen company account — finance accounts for every shilling after."}
+              ? "Request funds from the CEO, spend from the approved fund on office costs, then close each allocation with a reconciliation report."
+              : "Approving issues the money immediately as an office expense from the chosen company account — finance accounts for every shilling after."}
           </p>
         </div>
         {mode === "finance" && <RequestPettyCashButton />}
@@ -95,11 +95,11 @@ export function PettyCashManager({
       {requests.length === 0 ? (
         <EmptyState
           icon={Wallet}
-          title="No petty cash requests yet"
+          title="No office fund requests yet"
           description={
             mode === "finance"
-              ? "Request an allocation to cover small day-to-day spending — the admin approves it and you account for every expenditure."
-              : "When finance requests a petty cash allocation it lands here for your approval."
+              ? "Request an office fund to cover day-to-day spending — the CEO approves it and you account for every expenditure."
+              : "When finance requests an office fund it lands here for your approval."
           }
         />
       ) : (
@@ -184,14 +184,14 @@ function RequestPettyCashButton() {
     <>
       <Button className="rounded-full" onClick={() => setOpen(true)}>
         <Plus className="size-4" />
-        Request petty cash
+        Request office fund
       </Button>
       {open && (
         <Modal
           open
           onClose={() => setOpen(false)}
-          title="Request petty cash"
-          description="Goes to the admin for approval — the money is issued from a company account the moment it is approved."
+          title="Request office fund"
+          description="Goes to the CEO for approval — the money is issued from a company account the moment it is approved."
         >
           <div className="space-y-4">
             <div>

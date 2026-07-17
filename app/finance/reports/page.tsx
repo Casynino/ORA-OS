@@ -317,9 +317,9 @@ export default async function FinanceReportsPage() {
                     <Banknote className="size-4" />
                   </span>
                   <span>
-                    Petty cash float (informational)
+                    Office fund float (informational)
                     <span className="block text-xs font-normal text-muted-foreground">
-                      {openPettyCash.length} open allocation{openPettyCash.length === 1 ? "" : "s"} — already expensed at issue, held by the custodian
+                      {openPettyCash.length} open allocation{openPettyCash.length === 1 ? "" : "s"} — already expensed at issue, held by finance
                     </span>
                   </span>
                 </span>

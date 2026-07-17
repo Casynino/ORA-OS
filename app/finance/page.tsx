@@ -43,11 +43,9 @@ export default async function FinanceDashboardPage() {
     accountReceipts,
     pendingPayments,
     claimedPayments,
-    pendingSettlements,
-    pendingRepSales,
+    pendingCashSales,
+    pendingCreditSales,
     pendingRepCollections,
-    approvedPayroll,
-    pendingPayroll,
     openPettyCash,
   ] = await Promise.all([
     getFinanceOverview("month"),
@@ -90,18 +88,10 @@ export default async function FinanceDashboardPage() {
         paymentClaimedAt: { not: null },
       },
     }),
-    prisma.settlementRequest.count({ where: { status: "PENDING" } }),
-    prisma.fieldSale.count({ where: { financeStatus: "PENDING", voided: false } }),
+    prisma.fieldSale.count({ where: { financeStatus: "PENDING", voided: false, type: "CASH" } }),
+    prisma.fieldSale.count({ where: { financeStatus: "PENDING", voided: false, type: "CREDIT" } }),
     prisma.fieldPayment.count({
       where: { financeStatus: "PENDING", sale: { voided: false } },
-    }),
-    prisma.payrollRun.findMany({
-      where: { status: "APPROVED" },
-      include: { items: { select: { net: true } } },
-    }),
-    prisma.payrollRun.findMany({
-      where: { status: "PENDING_APPROVAL" },
-      include: { items: { select: { net: true } } },
     }),
     prisma.pettyCashRequest.findMany({
       where: { status: "APPROVED" },
@@ -121,22 +111,13 @@ export default async function FinanceDashboardPage() {
       .filter((a) => a.type === type)
       .reduce((s, a) => s + (receivedByAccount.get(a.id) ?? 0), 0);
 
-  // Accounts payable = approved-but-unpaid payroll (a real committed
-  // liability). Petty cash floats were already expensed at issue — they're
-  // cash sitting with the custodian, not money owed.
-  const payrollDue = approvedPayroll.reduce(
-    (s, r) => s + r.items.reduce((x, i) => x + i.net, 0),
-    0,
-  );
-  const payrollAwaiting = pendingPayroll.reduce(
-    (s, r) => s + r.items.reduce((x, i) => x + i.net, 0),
-    0,
-  );
-  const pettyCashOpen = openPettyCash.reduce(
+  // Office expense fund balance = unspent money across every CEO-approved
+  // allocation. The CEO funds it; finance spends it down without per-expense
+  // approval and accounts for every shilling.
+  const fundBalance = openPettyCash.reduce(
     (s, r) => s + Math.max(0, r.amount - r.expenses.reduce((x, e) => x + e.amount, 0)),
     0,
   );
-  const accountsPayable = payrollDue;
 
   // Weekly cash flow — bucket the ledger into the last 7 days.
   const days: { label: string; in: number; out: number }[] = [];
@@ -163,56 +144,95 @@ export default async function FinanceDashboardPage() {
     }
   }
 
-  const pendingCreditReviews = pendingSettlements + overview.position.overdueCount;
+  const todayCollections = overview.today.moneyIn - overview.today.capitalIn;
 
   return (
     <div className="space-y-7">
       <PageHeader
         title={`Karibu, ${me.name?.split(" ")[0] ?? "Finance"}`}
-        description="ORA's money at a glance — cash, collections, credit and what needs your confirmation today."
+        description="You collect, verify, deposit and follow up ORA's money — the CEO owns the accounts. Here's what needs you today."
       />
 
-      {/* Attention strip */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Link href="/finance/sales-approvals" className="transition-transform hover:-translate-y-0.5">
+      {/* ── Needs your attention — the finance operations queue ── */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground">Needs your attention</h2>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Link href="/finance/sales-approvals" className="transition-transform hover:-translate-y-0.5">
+            <StatCard
+              label="Pending cash confirmations"
+              value={formatNumber(pendingCashSales)}
+              hint="rep cash sales to receive & bank"
+              icon={Banknote}
+              accent={pendingCashSales > 0 ? "warning" : "success"}
+            />
+          </Link>
+          <Link href="/finance/sales-approvals" className="transition-transform hover:-translate-y-0.5">
+            <StatCard
+              label="Pending credit confirmations"
+              value={formatNumber(pendingCreditSales)}
+              hint="rep credit sales to approve"
+              icon={CreditCard}
+              accent={pendingCreditSales > 0 ? "warning" : "success"}
+            />
+          </Link>
+          <Link href="/finance/payments" className="transition-transform hover:-translate-y-0.5">
+            <StatCard
+              label="Pending customer payments"
+              value={formatNumber(pendingPayments)}
+              hint={claimedPayments > 0 ? `${claimedPayments} claimed — verify the receipt` : "direct payments to verify"}
+              icon={ClipboardCheck}
+              accent={pendingPayments > 0 ? "warning" : "success"}
+            />
+          </Link>
+          <Link href="/finance/sales-approvals" className="transition-transform hover:-translate-y-0.5">
+            <StatCard
+              label="Deposits waiting to be verified"
+              value={formatNumber(pendingRepCollections)}
+              hint="rep-collected repayments to post"
+              icon={Landmark}
+              accent={pendingRepCollections > 0 ? "warning" : "success"}
+            />
+          </Link>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Link href="/finance/credit" className="transition-transform hover:-translate-y-0.5">
+            <StatCard
+              label="Outstanding debts"
+              value={formatCurrency(overview.position.creditOutstanding)}
+              hint="customer credit still owed"
+              icon={CreditCard}
+              accent={overview.position.creditOutstanding > 0 ? "info" : "success"}
+            />
+          </Link>
+          <Link href="/finance/credit" className="transition-transform hover:-translate-y-0.5">
+            <StatCard
+              label="Overdue customers"
+              value={formatNumber(overview.position.overdueCount)}
+              hint="past due — chase for settlement"
+              icon={AlertTriangle}
+              accent={overview.position.overdueCount > 0 ? "warning" : "success"}
+            />
+          </Link>
           <StatCard
-            label="Rep sales awaiting verification"
-            value={formatNumber(pendingRepSales + pendingRepCollections)}
-            hint={`${formatNumber(pendingRepSales)} sales · ${formatNumber(pendingRepCollections)} collections`}
-            icon={ClipboardCheck}
-            accent={pendingRepSales + pendingRepCollections > 0 ? "warning" : "success"}
+            label="Today's collections"
+            value={formatCurrency(todayCollections)}
+            hint="customer money in today"
+            icon={ArrowDownToLine}
+            accent="success"
           />
-        </Link>
-        <Link href="/finance/payments" className="transition-transform hover:-translate-y-0.5">
-          <StatCard
-            label="Pending payment confirmations"
-            value={formatNumber(pendingPayments)}
-            hint={claimedPayments > 0 ? `${claimedPayments} claimed by customers` : "orders awaiting payment"}
-            icon={ClipboardCheck}
-            accent={pendingPayments > 0 ? "warning" : "success"}
-          />
-        </Link>
-        <Link href="/finance/credit" className="transition-transform hover:-translate-y-0.5">
-          <StatCard
-            label="Pending credit reviews"
-            value={formatNumber(pendingCreditReviews)}
-            hint={`${pendingSettlements} settlements · ${overview.position.overdueCount} overdue`}
-            icon={CreditCard}
-            accent={pendingCreditReviews > 0 ? "warning" : "success"}
-          />
-        </Link>
-        <Link href="/finance/payroll" className="transition-transform hover:-translate-y-0.5">
-          <StatCard
-            label="Accounts payable"
-            value={formatCurrency(accountsPayable)}
-            hint={`approved payroll · ${formatCurrency(payrollAwaiting)} more awaiting approval · ${formatCurrency(pettyCashOpen)} petty cash float`}
-            icon={ArrowUpFromLine}
-            accent={accountsPayable > 0 ? "info" : "success"}
-          />
-        </Link>
-      </div>
+          <Link href="/finance/petty-cash" className="transition-transform hover:-translate-y-0.5">
+            <StatCard
+              label="Office expense fund"
+              value={formatCurrency(fundBalance)}
+              hint="unspent, CEO-approved balance"
+              icon={Wallet}
+              accent={fundBalance > 0 ? "primary" : "info"}
+            />
+          </Link>
+        </div>
+      </section>
 
-      {/* Money position */}
+      {/* Money position — where the CEO's money currently sits */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Cash available" value={formatCurrency(overview.position.cashAvailable)} hint="all money in − all money out" icon={Wallet} accent="primary" />
         <StatCard label="Cash received" value={formatCurrency(receivedByType("CASH"))} hint="via cash accounts, to date" icon={Banknote} accent="success" />
@@ -220,10 +240,9 @@ export default async function FinanceDashboardPage() {
         <StatCard label="Mobile money received" value={formatCurrency(receivedByType("MOBILE_MONEY"))} hint="via Lipa numbers, to date" icon={Smartphone} accent="accent" />
       </div>
 
-      {/* Today + month */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Today's collections" value={formatCurrency(overview.today.moneyIn - overview.today.capitalIn)} hint="customer money in" icon={ArrowDownToLine} accent="success" />
-        <StatCard label="Today's payments" value={formatCurrency(overview.today.moneyOut)} icon={ArrowUpFromLine} accent="warning" />
+      {/* This month */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <StatCard label="Today's payments" value={formatCurrency(overview.today.moneyOut)} hint="money out today" icon={ArrowUpFromLine} accent="warning" />
         <StatCard label="Revenue this month" value={formatCurrency(overview.window.revenue)} hint={`collected ${formatCurrency(overview.window.income.total - overview.window.income.capital)}`} icon={TrendingUp} accent="primary" />
         <StatCard
           label="Expenses this month"
@@ -302,12 +321,12 @@ export default async function FinanceDashboardPage() {
       <Card className="glass-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Receipt className="size-4" /> Recent transactions
+            <Receipt className="size-4" /> Recent financial activity
           </CardTitle>
         </CardHeader>
         <CardContent>
           {recent.length === 0 ? (
-            <EmptyState icon={Receipt} title="No transactions yet" description="Money movements appear here as they happen." />
+            <EmptyState icon={Receipt} title="No activity yet" description="Money movements appear here as they happen." />
           ) : (
             <ul className="divide-y divide-border/60">
               {recent.map((e) => (

@@ -34,7 +34,7 @@ export async function createEmployee(
   input: z.infer<typeof employeeSchema>,
 ): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["FINANCE", "ADMIN"]);
+    const actor = await requireActor(["ADMIN"]);
     const parsed = employeeSchema.safeParse(input);
     if (!parsed.success) {
       return fail(parsed.error.issues[0]?.message ?? "Invalid employee.");
@@ -73,7 +73,7 @@ export async function updateEmployee(
   input: z.infer<typeof employeeUpdateSchema>,
 ): Promise<ActionResult> {
   try {
-    await requireActor(["FINANCE", "ADMIN"]);
+    await requireActor(["ADMIN"]);
     const parsed = employeeUpdateSchema.safeParse(input);
     if (!parsed.success) return fail("Invalid update.");
     const { employeeId, ...rest } = parsed.data;
@@ -120,7 +120,7 @@ export async function createPayrollRun(
   input: z.infer<typeof runSchema>,
 ): Promise<ActionResult<{ code: string }>> {
   try {
-    const actor = await requireActor(["FINANCE", "ADMIN"]);
+    const actor = await requireActor(["ADMIN"]);
     const parsed = runSchema.safeParse(input);
     if (!parsed.success) {
       return fail(parsed.error.issues[0]?.message ?? "Invalid payroll run.");
@@ -256,7 +256,7 @@ export async function payPayrollRun(
   paymentAccountId?: string,
 ): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["FINANCE", "ADMIN"]);
+    const actor = await requireActor(["ADMIN"]);
     const run = await prisma.payrollRun.findUnique({
       where: { id },
       include: { items: { select: { net: true } } },

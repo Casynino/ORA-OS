@@ -1,4 +1,4 @@
-import { Coins, Clock, CalendarClock } from "lucide-react";
+import { Wallet, Clock, CalendarClock } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import { getPettyCashData } from "@/lib/services/petty-cash-data";
 import { PageHeader } from "@/components/ui/page-header";
@@ -8,12 +8,14 @@ import { formatCurrency, formatNumber } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function FinancePettyCashPage() {
+export default async function FinanceOfficeFundPage() {
   await requireRole("FINANCE");
   const { requests, receivingAccounts } = await getPettyCashData();
 
   const open = requests.filter((r) => r.status === "APPROVED");
   const pending = requests.filter((r) => r.status === "PENDING");
+  // Fund balance = unspent money across every open (CEO-approved) allocation.
+  const fundBalance = open.reduce((s, r) => s + r.remaining, 0);
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
@@ -25,19 +27,19 @@ export default async function FinancePettyCashPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Petty cash"
-        description="Request allocations, record every expenditure, and close each one with a reconciliation report."
+        title="Office expense fund"
+        description="Request funds from the CEO, then spend from the approved fund on day-to-day office costs — every expense appears on the CEO dashboard instantly."
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
-          label="Open allocations"
-          value={formatNumber(open.length)}
-          hint={`${formatCurrency(open.reduce((s, r) => s + r.remaining, 0))} unspent`}
-          icon={Coins}
-          accent={open.length > 0 ? "info" : "success"}
+          label="Fund balance"
+          value={formatCurrency(fundBalance)}
+          hint={`${open.length} open allocation${open.length === 1 ? "" : "s"}`}
+          icon={Wallet}
+          accent={fundBalance > 0 ? "success" : "info"}
         />
         <StatCard
-          label="Awaiting admin approval"
+          label="Awaiting CEO approval"
           value={formatNumber(pending.length)}
           hint={formatCurrency(pending.reduce((s, r) => s + r.amount, 0))}
           icon={Clock}

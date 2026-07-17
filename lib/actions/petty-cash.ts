@@ -179,6 +179,7 @@ export async function recordPettyCashExpense(
     }
     const d = parsed.data;
 
+    let reqCode = "";
     await prisma.$transaction(async (tx) => {
       // Lock the allocation row so concurrent expenditures (and a concurrent
       // reconcile) serialize — the sum-check below is race-free.
@@ -191,6 +192,7 @@ export async function recordPettyCashExpense(
       if (req.status !== "APPROVED") {
         throw new Error("Expenditures can only be recorded against an approved, open allocation.");
       }
+      reqCode = req.code;
       const spent = req.expenses.reduce((s, e) => s + e.amount, 0);
       if (spent + d.amount > req.amount) {
         throw new Error(
@@ -206,6 +208,17 @@ export async function recordPettyCashExpense(
           recordedById: actor.id,
         },
       });
+    });
+
+    // Every office-fund expense streams to the CEO's financial activity feed —
+    // finance spends without per-expense approval but nothing is hidden.
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "PETTY_CASH_SPENT",
+      entity: "PettyCashRequest",
+      entityId: d.requestId,
+      summary: `Office fund ${reqCode}: spent ${formatCurrency(d.amount)} — ${d.description.trim()}${d.receiptRef?.trim() ? ` · receipt ${d.receiptRef.trim()}` : ""}.`,
     });
     revalidatePettyCash();
     return ok(undefined, "Expenditure recorded.");

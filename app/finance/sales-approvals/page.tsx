@@ -20,14 +20,14 @@ export const dynamic = "force-dynamic";
 export default async function FinanceSalesApprovalsPage() {
   await requireRole("FINANCE");
 
-  const [pendingSales, pendingCollections, recentReviewed] = await Promise.all([
+  const [pendingSales, pendingCollections, recentReviewed, accounts] = await Promise.all([
     prisma.fieldSale.findMany({
       where: { financeStatus: "PENDING", voided: false },
       orderBy: { createdAt: "asc" },
       include: {
         rep: { select: { name: true } },
         customer: { select: { name: true, businessName: true } },
-        paymentAccount: { select: { name: true, accountNumber: true } },
+        paymentAccount: { select: { id: true, name: true, accountNumber: true } },
         items: { include: { product: { select: { name: true } } } },
       },
     }),
@@ -36,7 +36,7 @@ export default async function FinanceSalesApprovalsPage() {
       orderBy: { createdAt: "asc" },
       include: {
         recordedBy: { select: { name: true } },
-        paymentAccount: { select: { name: true, accountNumber: true } },
+        paymentAccount: { select: { id: true, name: true, accountNumber: true } },
         sale: {
           include: {
             rep: { select: { name: true } },
@@ -60,6 +60,12 @@ export default async function FinanceSalesApprovalsPage() {
         customer: { select: { name: true } },
         financeReviewedBy: { select: { name: true } },
       },
+    }),
+    // Company accounts finance can deposit into (the CEO owns them).
+    prisma.paymentAccount.findMany({
+      where: { isActive: true },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, type: true, accountNumber: true },
     }),
   ]);
 
@@ -106,7 +112,13 @@ export default async function FinanceSalesApprovalsPage() {
             ))}
           </ul>
         </div>
-        <SaleApprovalActions saleId={s.id} kind={s.type as "CASH" | "CREDIT"} />
+        <SaleApprovalActions
+          saleId={s.id}
+          kind={s.type as "CASH" | "CREDIT"}
+          amount={formatCurrency(s.total)}
+          accounts={accounts}
+          suggestedAccountId={s.paymentAccount?.id ?? null}
+        />
       </div>
     </div>
   );
@@ -193,7 +205,12 @@ export default async function FinanceSalesApprovalsPage() {
                       outstanding on sale: {formatCurrency(Math.max(0, p.sale.total - p.sale.amountPaid))}
                     </p>
                   </div>
-                  <CollectionApprovalActions paymentId={p.id} />
+                  <CollectionApprovalActions
+                    paymentId={p.id}
+                    amount={formatCurrency(p.amount)}
+                    accounts={accounts}
+                    suggestedAccountId={p.paymentAccount?.id ?? null}
+                  />
                 </div>
               </div>
             ))}
