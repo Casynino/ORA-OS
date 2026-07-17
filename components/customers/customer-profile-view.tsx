@@ -13,6 +13,8 @@ import { CreditLimitControl } from "@/components/customers/credit-limit-control"
 import { CustomerEditControls } from "@/components/customers/customer-edit-controls";
 import { CustomerNoteForm } from "@/components/customers/customer-note-form";
 import { FieldCollectionButton } from "@/components/finance/field-collection-button";
+import { RequestExtensionButton } from "@/components/finance/request-extension-button";
+import { CustomerExtensionHistory } from "@/components/customers/customer-extension-history";
 import { cn, formatCurrency, formatDate, timeAgo } from "@/lib/utils";
 
 /**
@@ -167,7 +169,16 @@ export function CustomerProfileView({
                   {s.dueDate ? ` · due ${formatDate(s.dueDate)}` : ""}
                 </p>
                 {s.type === "CREDIT" && s.balance > 0 && (
-                  <div className="mt-3 flex justify-end border-t border-border/60 pt-3">
+                  <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-3">
+                    {canManageCredit && (
+                      <RequestExtensionButton
+                        saleId={s.id}
+                        saleCode={s.code}
+                        owing={s.balance}
+                        currentDueDate={s.dueDate ? s.dueDate.toISOString().slice(0, 10) : null}
+                        hasPendingExtension={s.hasPendingExtension}
+                      />
+                    )}
                     <FieldCollectionButton
                       saleId={s.id}
                       saleCode={s.code}
@@ -181,6 +192,12 @@ export function CustomerProfileView({
             ))}
           </div>
         )}
+      </section>
+
+      {/* Credit extension history */}
+      <section className="space-y-3">
+        <h2 className="font-display text-lg font-semibold">Credit extension history</h2>
+        <CustomerExtensionHistory extensions={profile.extensions} />
       </section>
 
       {/* Activity timeline */}

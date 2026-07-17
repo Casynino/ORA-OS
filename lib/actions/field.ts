@@ -120,6 +120,10 @@ const saleSchema = z.object({
   // Direct bank/mobile payments: uploaded customer receipt image URL. Allows a
   // long inline data URL (used when object storage isn't configured).
   paymentProofUrl: z.string().max(15000000).optional().or(z.literal("")),
+  // Cheque payments: the instrument details finance verifies before receipt.
+  chequeBank: z.string().max(80).optional().or(z.literal("")),
+  chequeNumber: z.string().max(40).optional().or(z.literal("")),
+  chequeDate: z.string().optional().or(z.literal("")), // ISO date
 });
 
 export async function recordFieldSale(
@@ -140,7 +144,18 @@ export async function recordFieldSale(
     if (d.type === "CREDIT") {
       if (!customerId && !d.newCustomer)
         return fail("Credit sales need a customer — pick or create one.");
+      // Every credit sale carries a payment due date so the debt is trackable.
+      if (!d.dueDate) return fail("Credit sales need a payment due date.");
     }
+
+    // Cheque payments carry structured instrument details for finance to verify.
+    const isCheque = d.type === "CASH" && d.paymentMethod === "Cheque";
+    if (isCheque && (!d.chequeBank?.trim() || !d.chequeNumber?.trim() || !d.chequeDate))
+      return fail("Enter the cheque bank, number and date.");
+    if (isCheque && Number.isNaN(new Date(d.chequeDate!).getTime()))
+      return fail("The cheque date is invalid.");
+    if (d.dueDate && Number.isNaN(new Date(d.dueDate).getTime()))
+      return fail("The payment due date is invalid.");
 
     const code = refCode("FS");
     const dueDate = d.dueDate ? new Date(d.dueDate) : null;
@@ -258,6 +273,9 @@ export async function recordFieldSale(
           paymentAccountId: receiving.paymentAccountId,
           reference: d.reference?.trim() || null,
           paymentProofUrl: d.paymentProofUrl?.trim() || null,
+          chequeBank: isCheque ? d.chequeBank!.trim() : null,
+          chequeNumber: isCheque ? d.chequeNumber!.trim() : null,
+          chequeDate: isCheque ? new Date(d.chequeDate!) : null,
           dueDate,
           note: d.note || null,
           items: {
@@ -302,6 +320,10 @@ const collectSchema = z.object({
   note: z.string().max(300).optional().or(z.literal("")),
   // Uploaded proof of the payment (receipt / screenshot) — long data URLs ok.
   paymentProofUrl: z.string().max(15000000).optional().or(z.literal("")),
+  // Cheque collections carry the instrument details finance verifies.
+  chequeBank: z.string().max(80).optional().or(z.literal("")),
+  chequeNumber: z.string().max(40).optional().or(z.literal("")),
+  chequeDate: z.string().optional().or(z.literal("")), // ISO date
 });
 
 export async function recordFieldCollection(
@@ -350,6 +372,12 @@ export async function recordFieldCollection(
     if (d.amount > claimable)
       return fail(`Amount exceeds the outstanding balance (TSh ${claimable.toLocaleString()}).`);
 
+    const isCheque = d.method === "Cheque";
+    if (isCheque && (!d.chequeBank?.trim() || !d.chequeNumber?.trim() || !d.chequeDate))
+      return fail("Enter the cheque bank, number and date.");
+    if (isCheque && Number.isNaN(new Date(d.chequeDate!).getTime()))
+      return fail("The cheque date is invalid.");
+
     const newPaid = sale.amountPaid + d.amount;
     await prisma.$transaction(async (tx) => {
       const receiving = await resolveReceivingAccount(
@@ -380,6 +408,9 @@ export async function recordFieldCollection(
           paymentAccountId: receiving.paymentAccountId,
           reference: d.reference?.trim() || null,
           paymentProofUrl: d.paymentProofUrl?.trim() || null,
+          chequeBank: isCheque ? d.chequeBank!.trim() : null,
+          chequeNumber: isCheque ? d.chequeNumber!.trim() : null,
+          chequeDate: isCheque ? new Date(d.chequeDate!) : null,
           note: d.note || null,
           recordedById: actor.id,
           financeStatus: isRepClaim ? "PENDING" : "APPROVED",

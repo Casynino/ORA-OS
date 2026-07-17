@@ -48,6 +48,10 @@ export function FieldCollectionButton({
   );
   const [reference, setReference] = useState("");
   const [proofUrl, setProofUrl] = useState("");
+  const [chequeBank, setChequeBank] = useState("");
+  const [chequeNumber, setChequeNumber] = useState("");
+  const [chequeDate, setChequeDate] = useState("");
+  const isCheque = method === "CHEQUE";
 
   const amt = Math.round(Number(amount) || 0);
 
@@ -60,8 +64,12 @@ export function FieldCollectionButton({
       toast({ variant: "error", title: `That's more than the ${formatCurrency(owing)} owed.` });
       return;
     }
-    if (accounts.length > 0 && !accountId) {
+    if (!isCheque && accounts.length > 0 && !accountId) {
       toast({ variant: "error", title: "Choose which account received the money." });
+      return;
+    }
+    if (isCheque && (!chequeBank.trim() || !chequeNumber.trim() || !chequeDate)) {
+      toast({ variant: "error", title: "Enter the cheque bank, number and date." });
       return;
     }
     start(async () => {
@@ -69,9 +77,12 @@ export function FieldCollectionButton({
         saleId,
         amount: amt,
         method: METHOD_LABELS[method] ?? method,
-        paymentAccountId: accountId || undefined,
+        paymentAccountId: isCheque ? undefined : accountId || undefined,
         reference: reference || undefined,
         paymentProofUrl: proofUrl || undefined,
+        chequeBank: isCheque ? chequeBank : undefined,
+        chequeNumber: isCheque ? chequeNumber : undefined,
+        chequeDate: isCheque ? chequeDate : undefined,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message ?? "Payment recorded." });
@@ -120,9 +131,33 @@ export function FieldCollectionButton({
               onAccount={setAccountId}
               onReference={setReference}
             />
+            {isCheque && (
+              <div className="grid gap-2.5 rounded-xl border border-primary/30 bg-primary/[0.03] p-3 sm:grid-cols-3">
+                <div className="sm:col-span-3">
+                  <p className="text-xs font-medium text-foreground">Cheque details</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Finance verifies the cheque before it clears the balance.
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Bank name *</Label>
+                  <Input value={chequeBank} onChange={(e) => setChequeBank(e.target.value)} placeholder="e.g. NMB Bank" className="mt-1 h-9" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Cheque number *</Label>
+                  <Input value={chequeNumber} onChange={(e) => setChequeNumber(e.target.value)} placeholder="e.g. 001234" className="mt-1 h-9" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Cheque date *</Label>
+                  <Input type="date" value={chequeDate} onChange={(e) => setChequeDate(e.target.value)} className="mt-1 h-9" />
+                </div>
+              </div>
+            )}
             <div>
-              <Label className="mb-1.5 block">Payment proof (optional)</Label>
-              <ProofUpload value={proofUrl} onChange={setProofUrl} label="Attach receipt / screenshot" />
+              <Label className="mb-1.5 block">
+                {isCheque ? "Cheque photo (optional)" : "Payment proof (optional)"}
+              </Label>
+              <ProofUpload value={proofUrl} onChange={setProofUrl} label={isCheque ? "Attach cheque photo" : "Attach receipt / screenshot"} />
             </div>
             <Button className="w-full" onClick={submit} disabled={pending}>
               {pending ? "Recording…" : "Record payment"}

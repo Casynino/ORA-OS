@@ -77,9 +77,30 @@ export type CustomerProfile = {
     financeStatus: string;
     dueDate: Date | null;
     createdAt: Date;
+    settledDate: Date | null;
+    hasPendingExtension: boolean;
     items: { name: string; quantity: number }[];
   }[];
+  extensions: ExtensionEntry[];
   timeline: TimelineEntry[];
+};
+
+export type ExtensionEntry = {
+  id: string;
+  saleId: string;
+  saleCode: string;
+  saleDate: Date;
+  originalDueDate: Date | null;
+  requestedDueDate: Date;
+  outstanding: number;
+  reason: string;
+  financeNotes: string | null;
+  status: string;
+  adminNote: string | null;
+  requestedByName: string;
+  reviewedByName: string | null;
+  reviewedAt: Date | null;
+  createdAt: Date;
 };
 
 const ACTIVE_WINDOW_DAYS = 90;
@@ -178,6 +199,14 @@ export async function getFieldCustomerProfile(
             items: { include: { product: { select: { name: true } } } },
             payments: { orderBy: { createdAt: "desc" } },
             returns: { select: { code: true, quantity: true, creditValue: true, status: true, createdAt: true } },
+          },
+        },
+        creditExtensions: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            sale: { select: { code: true, createdAt: true } },
+            requestedBy: { select: { name: true } },
+            reviewedBy: { select: { name: true } },
           },
         },
       },
@@ -323,7 +352,52 @@ export async function getFieldCustomerProfile(
       });
     }
   }
+
+  // ── Credit extension requests (their own history + timeline entries) ──
+  const extensions: ExtensionEntry[] = customer.creditExtensions.map((x) => ({
+    id: x.id,
+    saleId: x.saleId,
+    saleCode: x.sale.code,
+    saleDate: x.sale.createdAt,
+    originalDueDate: x.originalDueDate,
+    requestedDueDate: x.requestedDueDate,
+    outstanding: x.outstanding,
+    reason: x.reason,
+    financeNotes: x.financeNotes,
+    status: x.status,
+    adminNote: x.adminNote,
+    requestedByName: x.requestedBy.name,
+    reviewedByName: x.reviewedBy?.name ?? null,
+    reviewedAt: x.reviewedAt,
+    createdAt: x.createdAt,
+  }));
+  const pendingExtSaleIds = new Set(
+    customer.creditExtensions.filter((x) => x.status === "PENDING").map((x) => x.saleId),
+  );
+  for (const x of customer.creditExtensions) {
+    const verb =
+      x.status === "APPROVED" ? "approved" : x.status === "REJECTED" ? "rejected" : "requested";
+    timeline.push({
+      id: `ext-${x.id}`,
+      kind: "credit-event",
+      label: `Credit extension ${verb} on ${x.sale.code}`,
+      detail: `New date ${x.requestedDueDate.toLocaleDateString()} · ${x.reason}`,
+      amount: x.outstanding,
+      date: x.status === "PENDING" ? x.createdAt : x.reviewedAt ?? x.createdAt,
+      status: x.status,
+    });
+  }
   timeline.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  // A credit sale's settlement date = when the last non-rejected payment cleared
+  // its balance (only meaningful once fully paid).
+  const settledDateFor = (s: (typeof live)[number]): Date | null => {
+    if (s.type !== "CREDIT" || s.total - s.amountPaid > 0) return null;
+    const dates = s.payments
+      .filter((p) => p.financeStatus !== "REJECTED")
+      .map((p) => p.createdAt.getTime());
+    return dates.length ? new Date(Math.max(...dates)) : null;
+  };
 
   return {
     id: customer.id,
@@ -369,8 +443,11 @@ export async function getFieldCustomerProfile(
       financeStatus: s.financeStatus,
       dueDate: s.dueDate,
       createdAt: s.createdAt,
+      settledDate: settledDateFor(s),
+      hasPendingExtension: pendingExtSaleIds.has(s.id),
       items: s.items.map((i) => ({ name: i.product.name, quantity: i.quantity })),
     })),
+    extensions,
     timeline,
   };
 }

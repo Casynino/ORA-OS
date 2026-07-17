@@ -191,6 +191,8 @@ model User {
   fieldPaymentsRecorded FieldPayment[]       @relation("FieldPaymentRecorder")
   fieldSalesReviewed    FieldSale[]          @relation("FieldSaleReviewer")
   fieldPaymentsReviewed FieldPayment[]       @relation("FieldPaymentReviewer")
+  extensionsRequested   CreditExtensionRequest[] @relation("ExtensionRequester")
+  extensionsReviewed    CreditExtensionRequest[] @relation("ExtensionReviewer")
   sampleLogs            SampleLog[]          @relation("RepSamples")
   fieldReports          FieldReport[]        @relation("RepReports")
   repTargets            RepTarget[]          @relation("RepTargets")
@@ -982,7 +984,8 @@ model FieldCustomer {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  sales FieldSale[]
+  sales            FieldSale[]
+  creditExtensions CreditExtensionRequest[]
 
   @@index([repId])
 }
@@ -1014,6 +1017,10 @@ model FieldSale {
   paymentAccount      PaymentAccount?    @relation(fields: [paymentAccountId], references: [id])
   paymentAccountId    String? // which company account received the cash
   reference           String? // transaction reference (optional)
+  // CHEQUE payments capture the instrument details for finance to verify.
+  chequeBank          String?
+  chequeNumber        String?
+  chequeDate          DateTime?
   dueDate             DateTime?
   note                String?
   // Finance verification — the gate between a rep's record and company money.
@@ -1034,9 +1041,10 @@ model FieldSale {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
-  items    FieldSaleItem[]
-  payments FieldPayment[]
-  returns  ReturnRequest[]
+  items            FieldSaleItem[]
+  payments         FieldPayment[]
+  returns          ReturnRequest[]
+  creditExtensions CreditExtensionRequest[]
 
   @@index([repId])
   @@index([type])
@@ -1068,6 +1076,9 @@ model FieldPayment {
   paymentAccount      PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
   paymentAccountId    String? // which company account received the funds
   reference           String? // transaction reference (optional)
+  chequeBank          String? // CHEQUE collections capture instrument details
+  chequeNumber        String?
+  chequeDate          DateTime?
   note                String?
   recordedBy          User            @relation("FieldPaymentRecorder", fields: [recordedById], references: [id])
   recordedById        String
@@ -1087,6 +1098,40 @@ model FieldPayment {
   @@index([saleId])
   @@index([financeStatus])
   @@index([paymentAccountId])
+}
+
+/// A finance-raised request to extend a credit sale's due date. Finance creates
+/// it after reviewing the customer; ADMIN approves/rejects. On approval the
+/// sale's dueDate moves and its credit status is recomputed. History is kept.
+enum ExtensionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CreditExtensionRequest {
+  id               String          @id @default(cuid())
+  sale             FieldSale       @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId           String
+  customer         FieldCustomer?  @relation(fields: [customerId], references: [id])
+  customerId       String?
+  originalDueDate  DateTime?
+  outstanding      Int // TSh outstanding when the extension was requested
+  reason           String
+  requestedDueDate DateTime
+  financeNotes     String?
+  status           ExtensionStatus @default(PENDING)
+  requestedBy      User            @relation("ExtensionRequester", fields: [requestedById], references: [id])
+  requestedById    String
+  reviewedBy       User?           @relation("ExtensionReviewer", fields: [reviewedById], references: [id])
+  reviewedById     String?
+  reviewedAt       DateTime?
+  adminNote        String?
+  createdAt        DateTime        @default(now())
+
+  @@index([saleId])
+  @@index([customerId])
+  @@index([status])
 }
 
 /// Free-sample distribution record — deducts the rep's sample stock.

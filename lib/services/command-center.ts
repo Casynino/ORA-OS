@@ -129,6 +129,7 @@ export async function getCommandCenter() {
     todaysPartnerOrders,
     repStockAgg,
     pendingRepRequests,
+    pendingExtensions,
     fieldTodayRows,
     fieldWeekRows,
     fieldMonthRows,
@@ -262,6 +263,8 @@ export async function getCommandCenter() {
     // Stock physically in sales reps' hands (their own field inventory).
     prisma.repStock.aggregate({ _sum: { sellableQty: true, sampleQty: true } }),
     prisma.repStockRequest.count({ where: { status: "PENDING" } }),
+    // Finance-raised credit extensions waiting on the CEO's decision.
+    prisma.creditExtensionRequest.count({ where: { status: "PENDING" } }),
     // ── Field sales (sales reps) — split CASH vs CREDIT per period ──────────
     prisma.fieldSale.groupBy({
       by: ["type"],
@@ -538,6 +541,8 @@ export async function getCommandCenter() {
     alerts.push({ tone: "warning", text: `${pendingPayments} order payment${pendingPayments === 1 ? "" : "s"} to confirm`, href: "/admin/requests" });
   if (pendingSettlements > 0)
     alerts.push({ tone: "info", text: `${pendingSettlements} credit repayment${pendingSettlements === 1 ? "" : "s"} to confirm`, href: "/admin/credit" });
+  if (pendingExtensions > 0)
+    alerts.push({ tone: "warning", text: `${pendingExtensions} credit extension${pendingExtensions === 1 ? "" : "s"} awaiting approval`, href: "/admin/credit/extensions" });
   if (pendingApplications > 0)
     alerts.push({ tone: "info", text: `${pendingApplications} new partner application${pendingApplications === 1 ? "" : "s"}`, href: "/admin/users" });
   if (overdueCount > 0)

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { Banknote, Landmark, Smartphone } from "lucide-react";
+import { Banknote, Landmark, Smartphone, FileText } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -18,18 +18,25 @@ const METHODS: { key: string; label: string }[] = [
   { key: "CASH", label: "Cash" },
   { key: "BANK", label: "Bank" },
   { key: "MOBILE_MONEY", label: "Mobile Money" },
+  { key: "CHEQUE", label: "Cheque" },
 ];
 
 export const METHOD_LABELS: Record<string, string> = {
   CASH: "Cash",
   BANK: "Bank Transfer",
   MOBILE_MONEY: "Mobile Money",
+  CHEQUE: "Cheque",
 };
+
+// A cheque isn't a company account — it's captured with its own details and
+// verified by finance, so it's always selectable (never "not available").
+const NO_ACCOUNT_METHODS = new Set(["CHEQUE"]);
 
 const METHOD_ICON = {
   CASH: Banknote,
   BANK: Landmark,
   MOBILE_MONEY: Smartphone,
+  CHEQUE: FileText,
 } as const;
 
 /**
@@ -162,10 +169,11 @@ export function ReceivingAccountPicker({
           >
             {METHODS.map((m) => {
               const n = accounts.filter((a) => a.type === m.key).length;
+              const noAccountNeeded = NO_ACCOUNT_METHODS.has(m.key);
               return (
-                <option key={m.key} value={m.key} disabled={n === 0}>
+                <option key={m.key} value={m.key} disabled={n === 0 && !noAccountNeeded}>
                   {m.label}
-                  {n === 0 ? " — not available" : ""}
+                  {n === 0 && !noAccountNeeded ? " — not available" : ""}
                 </option>
               );
             })}
