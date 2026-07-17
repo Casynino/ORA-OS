@@ -7,6 +7,7 @@ import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { resolveReceivingAccount } from "@/lib/payment-methods";
 import { refCode, formatCurrency } from "@/lib/utils";
+import { EXPENSE_CATEGORY_VALUES, EXPENSE_LABELS } from "@/lib/expense-categories";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,6 +25,9 @@ function revalidatePettyCash() {
 const requestSchema = z.object({
   amount: z.number().int().positive().max(100000000),
   purpose: z.string().min(3, "What is this allocation for?").max(300),
+  // Which office-spend category this fund covers — defaults to OFFICE so older
+  // callers (and a blank pick) still validate.
+  category: z.enum(EXPENSE_CATEGORY_VALUES).default("OFFICE"),
 });
 
 /** Finance requests a petty cash allocation — goes to admin for approval. */
@@ -41,6 +45,7 @@ export async function createPettyCashRequest(
         code: refCode("PC"),
         amount: parsed.data.amount,
         purpose: parsed.data.purpose.trim(),
+        category: parsed.data.category,
         requestedById: actor.id,
       },
     });
@@ -50,7 +55,7 @@ export async function createPettyCashRequest(
       action: "PETTY_CASH_REQUESTED",
       entity: "PettyCashRequest",
       entityId: req.id,
-      summary: `${actor.name} requested ${formatCurrency(req.amount)} petty cash (${req.code}) — awaiting admin approval.`,
+      summary: `${actor.name} requested ${formatCurrency(req.amount)} office fund for ${EXPENSE_LABELS[req.category]} (${req.code}) — awaiting CEO approval.`,
     });
     revalidatePettyCash();
     return ok({ code: req.code }, `${req.code} sent to the admin for approval.`);
@@ -102,9 +107,9 @@ export async function approvePettyCashRequest(
       await tx.expense.create({
         data: {
           code: refCode("EXP"),
-          category: "OFFICE",
+          category: req.category,
           amount: req.amount,
-          purpose: `Petty cash ${req.code} — ${req.purpose}`,
+          purpose: `Office fund ${req.code} — ${req.purpose}`,
           paymentMethod: receiving.method,
           note: `Issued to ${req.requestedBy.name}`,
           recordedById: admin.id,
@@ -118,7 +123,7 @@ export async function approvePettyCashRequest(
       action: "PETTY_CASH_APPROVED",
       entity: "PettyCashRequest",
       entityId: req.id,
-      summary: `Petty cash ${req.code} approved — ${formatCurrency(req.amount)} issued to ${req.requestedBy.name}.`,
+      summary: `Office fund ${req.code} (${EXPENSE_LABELS[req.category]}) approved — ${formatCurrency(req.amount)} issued to ${req.requestedBy.name}.`,
     });
     revalidatePettyCash();
     return ok(undefined, `${req.code} approved — ${formatCurrency(req.amount)} issued.`);
@@ -151,7 +156,7 @@ export async function rejectPettyCashRequest(
       action: "PETTY_CASH_REJECTED",
       entity: "PettyCashRequest",
       entityId: req.id,
-      summary: `Petty cash ${req.code} rejected.`,
+      summary: `Office fund ${req.code} rejected.`,
     });
     revalidatePettyCash();
     return ok(undefined, "Request rejected.");
@@ -270,9 +275,9 @@ export async function reconcilePettyCash(
         await tx.expense.create({
           data: {
             code: refCode("EXP"),
-            category: "OFFICE",
+            category: req.category,
             amount: -remaining,
-            purpose: `Petty cash ${req.code} — unspent ${formatCurrency(remaining)} returned`,
+            purpose: `Office fund ${req.code} — unspent ${formatCurrency(remaining)} returned`,
             paymentMethod: "Cash",
             recordedById: actor.id,
           },
@@ -286,7 +291,7 @@ export async function reconcilePettyCash(
       action: "PETTY_CASH_RECONCILED",
       entity: "PettyCashRequest",
       entityId: id,
-      summary: `Petty cash ${reqCode} reconciled — ${formatCurrency(spent)} spent, ${formatCurrency(remaining)} remaining/returned.`,
+      summary: `Office fund ${reqCode} reconciled — ${formatCurrency(spent)} spent, ${formatCurrency(remaining)} remaining/returned.`,
     });
     revalidatePettyCash();
     return ok(undefined, `${reqCode} reconciled — ${formatCurrency(remaining)} returned to the books.`);

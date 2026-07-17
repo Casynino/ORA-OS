@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Check, X, Wallet, ClipboardCheck } from "lucide-react";
+import type { ExpenseCategory } from "@prisma/client";
 import {
   createPettyCashRequest,
   approvePettyCashRequest,
@@ -10,10 +11,13 @@ import {
   recordPettyCashExpense,
   reconcilePettyCash,
 } from "@/lib/actions/petty-cash";
+import { OFFICE_FUND_CATEGORIES, EXPENSE_LABELS } from "@/lib/expense-categories";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Progress } from "@/components/ui/progress";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -35,6 +39,7 @@ export type PettyCashDTO = {
   code: string;
   amount: number;
   purpose: string;
+  category: ExpenseCategory;
   status: "PENDING" | "APPROVED" | "REJECTED" | "RECONCILED";
   requestedByName: string;
   approvedByName: string | null;
@@ -162,18 +167,21 @@ function RequestPettyCashButton() {
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState<ExpenseCategory>("OFFICE");
   const [purpose, setPurpose] = useState("");
 
   function submit() {
     start(async () => {
       const res = await createPettyCashRequest({
         amount: Math.round(Number(amount) || 0),
+        category,
         purpose,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         setOpen(false);
         setAmount("");
+        setCategory("OFFICE");
         setPurpose("");
         router.refresh();
       } else toast({ variant: "error", title: res.error });
@@ -206,7 +214,24 @@ function RequestPettyCashButton() {
               />
             </div>
             <div>
-              <Label>Purpose</Label>
+              <Label>Category</Label>
+              <Select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
+                className="mt-1.5"
+              >
+                {OFFICE_FUND_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {EXPENSE_LABELS[c]}
+                  </option>
+                ))}
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pick the closest expense type — pick “{EXPENSE_LABELS.OTHER}” for anything else and describe it below.
+              </p>
+            </div>
+            <div>
+              <Label>Purpose / details</Label>
               <Input
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
@@ -247,6 +272,7 @@ function PendingCard({
           <p className="flex flex-wrap items-center gap-2">
             <span className="font-display font-semibold">{req.code}</span>
             <StatusBadge status={req.status} />
+            <Badge variant="secondary">{EXPENSE_LABELS[req.category]}</Badge>
           </p>
           <p className="mt-0.5 text-sm text-muted-foreground">{req.purpose}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -358,6 +384,7 @@ function OpenAllocationCard({
           <p className="flex flex-wrap items-center gap-2">
             <span className="font-display font-semibold">{req.code}</span>
             <StatusBadge status={req.status} />
+            <Badge variant="secondary">{EXPENSE_LABELS[req.category]}</Badge>
           </p>
           <p className="mt-0.5 text-sm text-muted-foreground">{req.purpose}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -527,6 +554,7 @@ function HistoryRow({ req }: { req: PettyCashDTO }) {
         <span className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{req.code}</span>
           <StatusBadge status={req.status} />
+          <Badge variant="secondary">{EXPENSE_LABELS[req.category]}</Badge>
           <span className="truncate text-muted-foreground">{req.purpose}</span>
         </span>
         {req.status === "RECONCILED" && req.reconcileNote && (

@@ -1193,6 +1193,9 @@ model PettyCashRequest {
   code             String          @unique
   amount           Int // whole TSh allocated
   purpose          String
+  // What kind of office spend this fund is for — files the resulting expense
+  // under the right ledger category (defaults to OFFICE for older rows).
+  category         ExpenseCategory @default(OFFICE)
   status           PettyCashStatus @default(PENDING)
   requestedBy      User            @relation("PettyCashRequester", fields: [requestedById], references: [id])
   requestedById    String
