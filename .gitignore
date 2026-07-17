@@ -37,3 +37,5 @@ yarn-error.log*
 
 # Dev image uploads (production uses Vercel Blob)
 /public/uploads/
+
+.claude/
