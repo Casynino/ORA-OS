@@ -27,11 +27,15 @@ export function FieldCollectionButton({
   saleCode,
   owing,
   accounts,
+  claim = false,
 }: {
   saleId: string;
   saleCode: string;
   owing: number;
   accounts: ReceivingAccount[];
+  /** A rep's collection is a CLAIM — it only reduces the balance once finance
+   * verifies it. Admin/Finance collections post immediately. */
+  claim?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -89,7 +93,11 @@ export function FieldCollectionButton({
           open
           onClose={() => setOpen(false)}
           title={`Record payment · ${saleCode}`}
-          description={`Money the customer paid — it posts to their balance immediately (owing ${formatCurrency(owing)}).`}
+          description={
+            claim
+              ? `Money the customer paid — finance verifies it, then it reduces the balance (owing ${formatCurrency(owing)}).`
+              : `Money the customer paid — it posts to their balance immediately (owing ${formatCurrency(owing)}).`
+          }
         >
           <div className="space-y-4">
             <div>
