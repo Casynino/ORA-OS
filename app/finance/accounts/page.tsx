@@ -11,10 +11,6 @@ import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import {
-  AddAccountButton,
-  AccountActions,
-} from "@/components/admin/payment-account-manager";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -91,21 +87,19 @@ export default async function FinanceAccountsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Company accounts"
-        description="Where ORA money physically sits — every receiving account, live and traceable."
+        description="The CEO owns every company account — you record deposits and verify what came in. This is your read-only view of where ORA money sits."
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="font-display text-lg font-semibold">Receiving accounts</h2>
-          <p className="text-sm text-muted-foreground">
-            Every payment is traced to the exact account that received it —{" "}
-            <span className="font-medium text-foreground">
-              {formatCurrency(grandTotal)}
-            </span>{" "}
-            received across {accounts.length} account{accounts.length === 1 ? "" : "s"}.
-          </p>
-        </div>
-        <AddAccountButton />
+      <div>
+        <h2 className="font-display text-lg font-semibold">Receiving accounts</h2>
+        <p className="text-sm text-muted-foreground">
+          Every payment is traced to the exact account that received it —{" "}
+          <span className="font-medium text-foreground">
+            {formatCurrency(grandTotal)}
+          </span>{" "}
+          received across {accounts.length} account{accounts.length === 1 ? "" : "s"}. Adding
+          or editing accounts is a CEO responsibility.
+        </p>
       </div>
 
       {accounts.length === 0 ? (
@@ -173,9 +167,6 @@ export default async function FinanceAccountsPage() {
                             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">This month</p>
                             <p className="font-semibold">{formatCurrency(s.month)}</p>
                           </div>
-                        </div>
-                        <div className="mt-2.5 border-t border-border/60 pt-2">
-                          <AccountActions account={a} />
                         </div>
                       </Link>
                     );

@@ -9,7 +9,7 @@ const LINKS = [
   { path: "/expenses", label: "Expenses" },
   { path: "/capital", label: "Capital" },
   { path: "/accounts", label: "Accounts" },
-  { path: "/petty-cash", label: "Petty cash" },
+  { path: "/petty-cash", label: "Office fund" },
   { path: "/payroll", label: "Payroll" },
   { path: "/ledger", label: "Ledger" },
 ];

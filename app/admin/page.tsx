@@ -358,10 +358,10 @@ export default async function AdminCommandCenter() {
                   <div className="flex items-center gap-2">
                     <Wallet className="size-4 shrink-0 text-warning" />
                     <p className="truncate text-sm font-medium">
-                      {pettyPendingCount} petty cash request{pettyPendingCount === 1 ? "" : "s"} pending
+                      {pettyPendingCount} office fund request{pettyPendingCount === 1 ? "" : "s"} pending
                     </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">Cash allocations waiting for your approval</p>
+                  <p className="text-xs text-muted-foreground">Office fund allocations waiting for your approval</p>
                 </div>
                 <span className="shrink-0 font-display font-semibold">{formatCurrency(pettyPendingSum)}</span>
               </Link>
@@ -450,7 +450,7 @@ export default async function AdminCommandCenter() {
             </h3>
             {d.financialActivity.length === 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">
-                Confirmed sales, expenses, payroll and petty cash events will stream here.
+                Confirmed sales, deposits, expenses and office fund events will stream here.
               </p>
             ) : (
               <ol className="relative mt-4 space-y-3.5 pl-5">
@@ -489,7 +489,7 @@ export default async function AdminCommandCenter() {
             </div>
             <div className="glass-card rounded-2xl p-5">
               <h3 className="flex items-center gap-2 font-display font-semibold">
-                <Wallet className="size-4" /> Petty cash floats
+                <Wallet className="size-4" /> Office fund floats
               </h3>
               {openFloats.length === 0 ? (
                 <p className="mt-3 text-sm text-muted-foreground">No open allocations.</p>
@@ -519,7 +519,7 @@ export default async function AdminCommandCenter() {
                     );
                   })}
                   <Link href="/admin/finance/petty-cash" className="inline-block text-xs font-medium text-primary hover:underline">
-                    All petty cash →
+                    All office fund →
                   </Link>
                 </div>
               )}

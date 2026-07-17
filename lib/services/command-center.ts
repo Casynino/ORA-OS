@@ -23,6 +23,7 @@ const FINANCIAL_ACTIONS = [
   "PAYROLL_PAID",
   "PETTY_CASH_REQUESTED",
   "PETTY_CASH_APPROVED",
+  "PETTY_CASH_SPENT",
   "PETTY_CASH_RECONCILED",
 ];
 import { getWarehouseSummaries } from "@/lib/warehouse-data";

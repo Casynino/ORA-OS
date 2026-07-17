@@ -4,27 +4,27 @@ import {
   type NavGroup,
 } from "@/components/dashboard/dashboard-shell";
 
-// Finance & Accounting — daily financial operations. Reports to the admin:
-// money in, money out, credit, accounts and financial reporting. No user
-// management, system settings or warehouse operations.
+// Finance & Accounting — the CEO's financial operations team. Finance
+// collects, verifies, deposits and documents money and manages customer
+// debt; the CEO owns all company accounts. No account management, no
+// payroll (handled by the CEO), no user/system/warehouse control.
 const nav: NavGroup[] = [
   { items: [{ href: "/finance", label: "Dashboard", icon: "dashboard" }] },
   {
-    label: "Money",
+    label: "Collections",
     items: [
       { href: "/finance/sales-approvals", label: "Sales approvals", icon: "sales" },
       { href: "/finance/payments", label: "Payment confirmations", icon: "payments" },
-      { href: "/finance/accounts", label: "Company accounts", icon: "finance" },
-      { href: "/finance/expenses", label: "Expenses", icon: "finance" },
-      { href: "/finance/petty-cash", label: "Petty cash", icon: "finance" },
-      { href: "/finance/payroll", label: "Payroll", icon: "users" },
+      { href: "/finance/credit", label: "Debt & settlements", icon: "credit" },
+      { href: "/finance/partners", label: "Customer accounts", icon: "customers" },
     ],
   },
   {
-    label: "Credit",
+    label: "Operations",
     items: [
-      { href: "/finance/credit", label: "Credit & settlements", icon: "credit" },
-      { href: "/finance/partners", label: "Partner accounts", icon: "customers" },
+      { href: "/finance/accounts", label: "Company accounts", icon: "finance" },
+      { href: "/finance/expenses", label: "Expenses", icon: "finance" },
+      { href: "/finance/petty-cash", label: "Office expense fund", icon: "finance" },
     ],
   },
   {

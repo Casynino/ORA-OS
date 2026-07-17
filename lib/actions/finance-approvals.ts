@@ -39,14 +39,26 @@ function creditStatusFor(
   return paid > 0 ? "PARTIAL" : "PENDING";
 }
 
-/** Finance confirms a rep sale — cash verified in the channel, or credit
- * terms validated. Only now does it count as company money. */
+export type ConfirmDeposit = {
+  // For CASH: the official ORA account the cash was deposited into (or the
+  // account a direct bank/Lipa payment landed in). Updates where the money
+  // is traced. Ignored for CREDIT (no money moves at approval).
+  depositAccountId?: string;
+  // Deposit slip / receipt reference or link — proof of the money.
+  proofRef?: string;
+  note?: string;
+};
+
+/** Finance confirms a rep sale. For a CASH sale finance records where the
+ * money was banked and attaches proof (deposit slip / receipt); for a CREDIT
+ * sale it validates the terms. Only now does it count as company money. */
 export async function approveFieldSale(
   id: string,
-  note?: string,
+  input?: ConfirmDeposit,
 ): Promise<ActionResult> {
   try {
     const actor = await requireActor(["FINANCE", "ADMIN"]);
+    const { depositAccountId, proofRef, note } = input ?? {};
     const sale = await prisma.fieldSale.findUnique({
       where: { id },
       include: {
@@ -57,6 +69,24 @@ export async function approveFieldSale(
     if (!sale) return fail("Sale not found.");
     if (sale.voided) return fail("This sale was voided.");
 
+    // For cash, record which company account the money was deposited into.
+    let depositAccountUpdate: { paymentAccountId?: string } = {};
+    if (sale.type === "CASH") {
+      if (depositAccountId) {
+        const acc = await prisma.paymentAccount.findUnique({
+          where: { id: depositAccountId },
+        });
+        if (!acc || !acc.isActive) {
+          return fail("Choose a valid company account to deposit into.");
+        }
+        depositAccountUpdate = { paymentAccountId: acc.id };
+      } else if (await prisma.paymentAccount.count({ where: { isActive: true } })) {
+        // The CEO owns the accounts — cash has to be traced into one of them.
+        // (If none are configured yet we allow confirmation rather than lock it.)
+        return fail("Choose the company account the cash was deposited into.");
+      }
+    }
+
     // Atomic claim — two reviewers can't both confirm it.
     const claimed = await prisma.fieldSale.updateMany({
       where: { id, financeStatus: "PENDING", voided: false },
@@ -65,6 +95,8 @@ export async function approveFieldSale(
         financeReviewedById: actor.id,
         financeReviewedAt: new Date(),
         financeNote: note?.trim() || null,
+        depositProofRef: proofRef?.trim() || null,
+        ...depositAccountUpdate,
       },
     });
     if (claimed.count === 0) return fail("This sale was already reviewed.");
@@ -78,7 +110,7 @@ export async function approveFieldSale(
       entityId: sale.code,
       summary:
         sale.type === "CASH"
-          ? `Finance confirmed TSh ${sale.total.toLocaleString()} cash received from ${who} (${sale.code}, rep ${sale.rep.name}).`
+          ? `Finance confirmed TSh ${sale.total.toLocaleString()} cash received from ${who} (${sale.code}, rep ${sale.rep.name})${proofRef?.trim() ? ` · deposit ref ${proofRef.trim()}` : ""}.`
           : `Finance approved a credit sale of TSh ${sale.total.toLocaleString()} to ${who} (${sale.code}, rep ${sale.rep.name}).`,
     });
     revalidateApprovals();
@@ -137,10 +169,11 @@ export async function rejectFieldSale(
  * customer's outstanding balance and count as money in. */
 export async function approveFieldCollection(
   paymentId: string,
-  note?: string,
+  input?: ConfirmDeposit,
 ): Promise<ActionResult> {
   try {
     const actor = await requireActor(["FINANCE", "ADMIN"]);
+    const { depositAccountId, proofRef, note } = input ?? {};
     const payment = await prisma.fieldPayment.findUnique({
       where: { id: paymentId },
       include: {
@@ -161,6 +194,18 @@ export async function approveFieldCollection(
       );
     }
 
+    // Record which company account this collection was deposited into.
+    let depositAccountUpdate: { paymentAccountId?: string } = {};
+    if (depositAccountId) {
+      const acc = await prisma.paymentAccount.findUnique({
+        where: { id: depositAccountId },
+      });
+      if (!acc || !acc.isActive) {
+        return fail("Choose a valid company account to deposit into.");
+      }
+      depositAccountUpdate = { paymentAccountId: acc.id };
+    }
+
     const newPaid = sale.amountPaid + payment.amount;
     await prisma.$transaction(async (tx) => {
       // Claim the payment — double approvals can't double-post.
@@ -171,6 +216,8 @@ export async function approveFieldCollection(
           financeReviewedById: actor.id,
           financeReviewedAt: new Date(),
           financeNote: note?.trim() || null,
+          depositProofRef: proofRef?.trim() || null,
+          ...depositAccountUpdate,
         },
       });
       if (claimedPayment.count === 0) {

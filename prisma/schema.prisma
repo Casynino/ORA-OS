@@ -1006,6 +1006,9 @@ model FieldSale {
   financeReviewedById String?
   financeReviewedAt   DateTime?
   financeNote         String? // approval / rejection comment
+  // Proof captured at confirmation: cash → bank deposit slip; direct
+  // bank/Lipa payment → customer receipt reference or link.
+  depositProofRef     String?
   voided              Boolean            @default(false) // admin correction — restores stock
   voidReason          String?
   createdAt           DateTime           @default(now())
@@ -1054,6 +1057,8 @@ model FieldPayment {
   financeReviewedById String?
   financeReviewedAt   DateTime?
   financeNote         String?
+  // Deposit slip / receipt reference captured when finance verifies.
+  depositProofRef     String?
   createdAt           DateTime        @default(now())
 
   @@index([saleId])
