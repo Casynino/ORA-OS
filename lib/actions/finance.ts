@@ -6,19 +6,11 @@ import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { refCode } from "@/lib/utils";
+import { EXPENSE_CATEGORY_VALUES } from "@/lib/expense-categories";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 // Every shilling leaving ORA is recorded, categorised and tied to the admin
 // who approved it. No expense without a record; no income without a source.
-
-const EXPENSE_CATEGORIES = [
-  "RENT", "UTILITIES", "STATIONERY", "OFFICE",
-  "SALARIES", "ALLOWANCES", "TRANSPORT_REIMBURSEMENT",
-  "DELIVERY", "WAREHOUSE_HANDLING", "TRANSPORT_OF_GOODS",
-  "STOCK_PURCHASE", "IMPORT_COSTS", "PACKAGING", "MARKETING",
-  "TAXES", "INTERNET", "EQUIPMENT",
-  "OTHER",
-] as const;
 
 const CAPITAL_TYPES = [
   "FOUNDER_INVESTMENT", "INVESTMENT", "PROFIT_REINVESTED", "GRANT", "OTHER",
@@ -30,7 +22,7 @@ function revalidateFinance() {
 }
 
 const expenseSchema = z.object({
-  category: z.enum(EXPENSE_CATEGORIES),
+  category: z.enum(EXPENSE_CATEGORY_VALUES),
   amount: z.number().int().positive().max(1000000000),
   purpose: z.string().min(3, "What was this expense for?").max(200),
   paymentMethod: z.string().max(40).optional().or(z.literal("")),

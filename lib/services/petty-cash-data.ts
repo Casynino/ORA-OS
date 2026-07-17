@@ -41,6 +41,7 @@ export async function getPettyCashData() {
       code: r.code,
       amount: r.amount,
       purpose: r.purpose,
+      category: r.category,
       status: r.status,
       requestedByName: r.requestedBy.name,
       approvedByName: r.approvedBy?.name ?? null,

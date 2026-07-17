@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db";
-import type { ExpenseCategory } from "@prisma/client";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Finance read models.
@@ -29,35 +28,11 @@ export function periodStart(period: Period, now = new Date()): Date | null {
   return null;
 }
 
-export const EXPENSE_GROUPS: { label: string; categories: ExpenseCategory[] }[] = [
-  { label: "Operational", categories: ["RENT", "UTILITIES", "STATIONERY", "OFFICE"] },
-  { label: "Staff", categories: ["SALARIES", "ALLOWANCES", "TRANSPORT_REIMBURSEMENT"] },
-  { label: "Logistics", categories: ["DELIVERY", "WAREHOUSE_HANDLING", "TRANSPORT_OF_GOODS"] },
-  { label: "Business", categories: ["STOCK_PURCHASE", "IMPORT_COSTS", "PACKAGING", "MARKETING"] },
-  { label: "Statutory & tech", categories: ["TAXES", "INTERNET", "EQUIPMENT"] },
-  { label: "Other", categories: ["OTHER"] },
-];
-
-export const EXPENSE_LABELS: Record<ExpenseCategory, string> = {
-  RENT: "Office rent",
-  UTILITIES: "Utilities",
-  STATIONERY: "Stationery",
-  OFFICE: "Office expenses",
-  SALARIES: "Salaries",
-  ALLOWANCES: "Rep allowances",
-  TRANSPORT_REIMBURSEMENT: "Transport reimbursement",
-  DELIVERY: "Delivery costs",
-  WAREHOUSE_HANDLING: "Warehouse handling",
-  TRANSPORT_OF_GOODS: "Transport of goods",
-  STOCK_PURCHASE: "Stock purchase",
-  IMPORT_COSTS: "Import costs",
-  PACKAGING: "Packaging",
-  MARKETING: "Marketing",
-  TAXES: "Taxes",
-  INTERNET: "Internet",
-  EQUIPMENT: "Equipment",
-  OTHER: "Miscellaneous",
-};
+// Category labels/groups are shared with client components (the office-fund
+// request form) — kept in a server-free module and re-exported here so
+// existing importers of this service keep working unchanged.
+import { EXPENSE_GROUPS, EXPENSE_LABELS } from "@/lib/expense-categories";
+export { EXPENSE_GROUPS, EXPENSE_LABELS };
 
 type DateFilter = { gte?: Date };
 const since = (start: Date | null): DateFilter | undefined =>
