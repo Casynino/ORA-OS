@@ -111,8 +111,9 @@ const saleSchema = z.object({
   paymentMethod: z.string().max(40).optional().or(z.literal("")),
   paymentAccountId: z.string().optional().or(z.literal("")),
   reference: z.string().max(80).optional().or(z.literal("")),
-  // Direct bank/mobile payments: uploaded customer receipt image URL.
-  paymentProofUrl: z.string().max(500).optional().or(z.literal("")),
+  // Direct bank/mobile payments: uploaded customer receipt image URL. Allows a
+  // long inline data URL (used when object storage isn't configured).
+  paymentProofUrl: z.string().max(15000000).optional().or(z.literal("")),
 });
 
 export async function recordFieldSale(

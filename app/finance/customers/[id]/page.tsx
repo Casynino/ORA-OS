@@ -15,13 +15,14 @@ import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { CustomerCreditToggle } from "@/components/admin/rep-controls";
+import { FieldCollectionButton } from "@/components/finance/field-collection-button";
 import { formatCurrency, formatDate, formatNumber, timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 /** Finance view of one field customer — profile, credit standing and full
- *  APPROVED sales history. Finance can suspend/restore credit as a collection
- *  lever; it cannot edit the rep relationship. */
+ *  APPROVED sales history. Finance can suspend/restore credit and collect
+ *  payments against each loan; it cannot edit the rep relationship. */
 export default async function FinanceFieldCustomerPage({
   params,
 }: {
@@ -30,24 +31,32 @@ export default async function FinanceFieldCustomerPage({
   await requireRole("FINANCE");
   const { id } = await params;
 
-  const customer = await prisma.fieldCustomer.findUnique({
-    where: { id },
-    include: {
-      rep: { select: { id: true, name: true, region: true } },
-      sales: {
-        // Finance works from verified figures — approved, non-voided sales.
-        where: { voided: false, financeStatus: "APPROVED" },
-        orderBy: { createdAt: "desc" },
-        include: {
-          items: { include: { product: { select: { name: true } } } },
-          payments: {
-            where: { financeStatus: "APPROVED" },
-            orderBy: { createdAt: "desc" },
+  const [customer, accounts] = await Promise.all([
+    prisma.fieldCustomer.findUnique({
+      where: { id },
+      include: {
+        rep: { select: { id: true, name: true, region: true } },
+        sales: {
+          // Finance works from verified figures — approved, non-voided sales.
+          where: { voided: false, financeStatus: "APPROVED" },
+          orderBy: { createdAt: "desc" },
+          include: {
+            items: { include: { product: { select: { name: true } } } },
+            payments: {
+              where: { financeStatus: "APPROVED" },
+              orderBy: { createdAt: "desc" },
+            },
           },
         },
       },
-    },
-  });
+    }),
+    // Official ORA accounts a collection can be received into.
+    prisma.paymentAccount.findMany({
+      where: { isActive: true },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, type: true, accountName: true, accountNumber: true },
+    }),
+  ]);
   if (!customer) notFound();
 
   const revenue = customer.sales.reduce((s, x) => s + x.total, 0);
@@ -167,6 +176,16 @@ export default async function FinanceFieldCustomerPage({
                     ? ` · ${s.payments.length} payment${s.payments.length === 1 ? "" : "s"}`
                     : ""}
                 </p>
+                {s.type === "CREDIT" && s.total - s.amountPaid > 0 && (
+                  <div className="mt-3 border-t border-border/50 pt-3">
+                    <FieldCollectionButton
+                      saleId={s.id}
+                      saleCode={s.code}
+                      owing={s.total - s.amountPaid}
+                      accounts={accounts}
+                    />
+                  </div>
+                )}
               </div>
             ))}
           </div>

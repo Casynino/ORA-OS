@@ -207,7 +207,8 @@ const spendSchema = z.object({
   description: z.string().min(2, "What was bought?").max(300),
   amount: z.number().int().positive().max(100000000),
   receiptRef: z.string().max(120).optional().or(z.literal("")),
-  receiptUrl: z.string().max(500).optional().or(z.literal("")),
+  // Allows a long inline data URL when object storage isn't configured.
+  receiptUrl: z.string().max(15000000).optional().or(z.literal("")),
 });
 
 /** Finance records one expenditure against an approved allocation. */
