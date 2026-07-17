@@ -118,16 +118,18 @@ export default async function FinanceAccountsPage() {
           description='Add your cash office, bank accounts and Lipa numbers — they appear instantly in every sale and payment form.'
         />
       ) : (
-        groups.map(
-          (g) =>
-            g.accounts.length > 0 && (
-              <section key={g.type} className="space-y-3">
-                <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  <g.icon className={`size-4 ${g.accent}`} />
-                  {g.label}
-                </h3>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {g.accounts.map((a) => {
+        // Type-groups as columns: side-by-side on laptop, stacked on phone.
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
+          {groups.map(
+            (g) =>
+              g.accounts.length > 0 && (
+                <section key={g.type} className="space-y-3">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                    <g.icon className={`size-4 ${g.accent}`} />
+                    {g.label}
+                  </h3>
+                  <div className="space-y-3">
+                    {g.accounts.map((a) => {
                     const s = stats.get(a.id) ?? { total: 0, today: 0, month: 0, count: 0 };
                     return (
                       <Link
@@ -181,10 +183,11 @@ export default async function FinanceAccountsPage() {
                       </Link>
                     );
                   })}
-                </div>
-              </section>
-            ),
-        )
+                  </div>
+                </section>
+              ),
+          )}
+        </div>
       )}
     </div>
   );
