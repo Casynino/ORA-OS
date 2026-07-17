@@ -36,7 +36,7 @@ type FieldRow = {
   creditSuspended: boolean;
   createdAt: Date;
   rep: { id: string; name: string };
-  sales: { total: number; amountPaid: number; type: string }[];
+  sales: { total: number; amountPaid: number; type: string; financeStatus: string }[];
 };
 
 /** Master customer tables (partners + field customers). Link targets are
@@ -146,10 +146,14 @@ export function MasterCustomersTables({
                 </TableHeader>
                 <TableBody>
                   {fieldCustomers.map((c) => {
-                    const revenue = c.sales.reduce((s, x) => s + x.total, 0);
-                    const owed = c.sales
+                    // Verified figures come from APPROVED sales only.
+                    const approved = c.sales.filter((x) => x.financeStatus === "APPROVED");
+                    const pending = c.sales.filter((x) => x.financeStatus === "PENDING");
+                    const revenue = approved.reduce((s, x) => s + x.total, 0);
+                    const owed = approved
                       .filter((x) => x.type === "CREDIT")
                       .reduce((s, x) => s + Math.max(0, x.total - x.amountPaid), 0);
+                    const pendingAmount = pending.reduce((s, x) => s + x.total, 0);
                     return (
                       <TableRow key={c.id}>
                         <TableCell data-cardtitle>
@@ -177,6 +181,11 @@ export function MasterCustomersTables({
                         </TableCell>
                         <TableCell data-label="Lifetime sales" className="text-right">
                           {revenue > 0 ? formatCurrency(revenue) : "—"}
+                          {pending.length > 0 && (
+                            <span className="mt-0.5 block text-[11px] font-medium text-warning">
+                              {formatCurrency(pendingAmount)} awaiting approval
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell data-label="Outstanding" className="text-right font-medium">
                           {owed > 0 ? <span className="text-warning">{formatCurrency(owed)}</span> : "—"}
