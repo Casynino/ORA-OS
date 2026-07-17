@@ -423,7 +423,6 @@ export function NewCustomerForm() {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [phone, setPhone] = useState("");
   const [location, setLocation] = useState("");
@@ -453,9 +452,12 @@ export function NewCustomerForm() {
   }
 
   function submit() {
+    if (businessName.trim().length < 2) {
+      toast({ variant: "error", title: "Enter the customer's business name." });
+      return;
+    }
     start(async () => {
       const res = await createFieldCustomer({
-        name,
         businessName,
         phone,
         location,
@@ -468,7 +470,7 @@ export function NewCustomerForm() {
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         setOpen(false);
-        setName(""); setBusinessName(""); setPhone(""); setLocation("");
+        setBusinessName(""); setPhone(""); setLocation("");
         setRegion(""); setCustomerType(""); setGps(null);
         router.refresh();
       } else toast({ variant: "error", title: res.error });
@@ -485,8 +487,7 @@ export function NewCustomerForm() {
   return (
     <div className="w-full space-y-2.5 rounded-xl border border-border p-3">
       <div className="grid gap-2.5 sm:grid-cols-2">
-        <Input placeholder="Customer name *" value={name} onChange={(e) => setName(e.target.value)} className="h-9" />
-        <Input placeholder="Business name (optional)" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="h-9" />
+        <Input placeholder="Business name *" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="h-9 sm:col-span-2" />
         <Input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-9" />
         <select
           value={customerType}
@@ -518,7 +519,7 @@ export function NewCustomerForm() {
           {gpsBusy ? "Getting GPS…" : gps ? "✓ GPS captured" : "Capture GPS location"}
         </button>
         <div className="ml-auto flex gap-2">
-          <Button size="sm" className="rounded-full" disabled={pending || name.trim().length < 2} onClick={submit}>
+          <Button size="sm" className="rounded-full" disabled={pending || businessName.trim().length < 2} onClick={submit}>
             {pending ? "Saving…" : "Save customer"}
           </Button>
           <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setOpen(false)}>

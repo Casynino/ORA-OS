@@ -67,7 +67,6 @@ export function CreditSaleDetail({
           </div>
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
             <span className="font-medium text-foreground">{sale.code}</span>
-            {sale.customerBusiness && <span>{sale.customerBusiness}</span>}
             {sale.customerPhone && (
               <span className="inline-flex items-center gap-1.5">
                 <Phone className="size-3.5" /> {sale.customerPhone}

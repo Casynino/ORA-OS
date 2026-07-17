@@ -43,7 +43,10 @@ export default async function RepCustomerDetailPage({
   ]);
   if (!customer || customer.repId !== me.id) notFound();
 
-  const live = customer.sales.filter((s) => !s.voided);
+  // Finance-rejected sales never happened — exclude them from every total.
+  const live = customer.sales.filter(
+    (s) => !s.voided && s.financeStatus !== "REJECTED",
+  );
   const owed = live
     .filter((s) => s.type === "CREDIT")
     .reduce((s, x) => s + (x.total - x.amountPaid), 0);
@@ -95,7 +98,12 @@ export default async function RepCustomerDetailPage({
             customer.sales.map((s) => {
               const balance = s.total - s.amountPaid;
               return (
-                <div key={s.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+                <div
+                  key={s.id}
+                  className={`rounded-2xl border border-border bg-card p-4 shadow-soft${
+                    s.voided || s.financeStatus === "REJECTED" ? " opacity-60" : ""
+                  }`}
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-semibold">{s.code}</span>
@@ -118,7 +126,7 @@ export default async function RepCustomerDetailPage({
                     {s.dueDate ? ` · due ${formatDate(s.dueDate)}` : ""}
                   </p>
 
-                  {s.type === "CREDIT" && !s.voided && (
+                  {s.type === "CREDIT" && !s.voided && s.financeStatus !== "REJECTED" && (
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
                       <p className="text-sm">
                         Paid{" "}

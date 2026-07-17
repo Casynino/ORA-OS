@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Phone,
   MapPin,
-  Building2,
   BadgeCheck,
   Wallet,
   Banknote,
@@ -44,7 +43,10 @@ export default async function AdminFieldCustomerPage({
   });
   if (!customer) notFound();
 
-  const live = customer.sales.filter((s) => !s.voided);
+  // Finance-rejected sales never happened — exclude them from every total.
+  const live = customer.sales.filter(
+    (s) => !s.voided && s.financeStatus !== "REJECTED",
+  );
   const revenue = live.reduce((s, x) => s + x.total, 0);
   const paid = live.reduce((s, x) => s + x.amountPaid, 0);
   const owed = live
@@ -66,7 +68,7 @@ export default async function AdminFieldCustomerPage({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-              {customer.name}
+              {customer.businessName ?? customer.name}
             </h1>
             {customer.customerType && (
               <Badge variant="secondary">{customer.customerType}</Badge>
@@ -76,11 +78,6 @@ export default async function AdminFieldCustomerPage({
             )}
           </div>
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            {customer.businessName && (
-              <span className="inline-flex items-center gap-1.5">
-                <Building2 className="size-3.5" /> {customer.businessName}
-              </span>
-            )}
             {customer.phone && (
               <span className="inline-flex items-center gap-1.5">
                 <Phone className="size-3.5" /> {customer.phone}
@@ -151,18 +148,21 @@ export default async function AdminFieldCustomerPage({
             {customer.sales.map((s) => (
               <div
                 key={s.id}
-                className={`rounded-2xl border bg-card p-4 ${s.voided ? "border-border opacity-60" : "border-border"}`}
+                className={`rounded-2xl border bg-card p-4 ${s.voided || s.financeStatus === "REJECTED" ? "border-border opacity-60" : "border-border"}`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-display font-semibold">{s.code}</span>
                     <StatusBadge status={s.type} />
-                    {s.creditStatus && <StatusBadge status={s.creditStatus} />}
+                    {s.creditStatus && s.financeStatus !== "REJECTED" && <StatusBadge status={s.creditStatus} />}
                     {s.voided && <Badge variant="destructive">voided</Badge>}
+                    {!s.voided && s.financeStatus === "REJECTED" && (
+                      <Badge variant="destructive">rejected by finance</Badge>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">{formatCurrency(s.total)}</p>
-                    {s.type === "CREDIT" && !s.voided && (
+                    {s.type === "CREDIT" && !s.voided && s.financeStatus !== "REJECTED" && (
                       <p className="text-xs text-muted-foreground">
                         paid {formatCurrency(s.amountPaid)}
                         {s.total - s.amountPaid > 0

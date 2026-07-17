@@ -1480,10 +1480,7 @@ function FieldCreditPanel({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-display font-semibold">{c.customerName}</span>
-                      {c.customerBusiness && (
-                        <span className="text-sm text-muted-foreground">· {c.customerBusiness}</span>
-                      )}
+                      <span className="font-display font-semibold">{c.customerBusiness ?? c.customerName}</span>
                       <StatusBadge status={c.status} />
                       <Badge variant="secondary">rep: {c.repName}</Badge>
                       {owing > 0 && dtd != null && dtd < 0 && (

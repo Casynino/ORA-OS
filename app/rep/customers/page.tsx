@@ -21,7 +21,8 @@ export default async function RepCustomersPage() {
     orderBy: { name: "asc" },
     include: {
       sales: {
-        where: { voided: false },
+        // Rejected sales don't count toward the customer's totals.
+        where: { voided: false, financeStatus: { not: "REJECTED" } },
         select: { total: true, amountPaid: true, type: true, creditStatus: true },
       },
     },
@@ -71,12 +72,7 @@ export default async function RepCustomersPage() {
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="truncate font-semibold">{c.name}</p>
-                  {c.businessName && (
-                    <span className="truncate text-sm text-muted-foreground">
-                      · {c.businessName}
-                    </span>
-                  )}
+                  <p className="truncate font-semibold">{c.businessName ?? c.name}</p>
                   {c.customerType && <Badge variant="secondary">{c.customerType}</Badge>}
                   {c.overdue && <Badge variant="destructive">Overdue</Badge>}
                   {c.creditSuspended && <Badge variant="secondary">Credit off</Badge>}

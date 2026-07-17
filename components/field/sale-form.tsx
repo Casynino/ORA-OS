@@ -75,7 +75,6 @@ export function FieldSaleForm({
   const [search, setSearch] = useState("");
   const [listOpen, setListOpen] = useState(false);
   const [savingCustomer, startSaveCustomer] = useTransition();
-  const [ncName, setNcName] = useState("");
   const [ncBusiness, setNcBusiness] = useState("");
   const [ncPhone, setNcPhone] = useState("");
   const [ncLocation, setNcLocation] = useState("");
@@ -109,14 +108,14 @@ export function FieldSaleForm({
   }, [allCustomers, search]);
 
   function saveNewCustomer() {
-    if (ncName.trim().length < 2) {
-      toast({ variant: "error", title: "Enter the customer's name." });
+    const biz = ncBusiness.trim();
+    if (biz.length < 2) {
+      toast({ variant: "error", title: "Enter the customer's business name." });
       return;
     }
     startSaveCustomer(async () => {
       const res = await createFieldCustomer({
-        name: ncName,
-        businessName: ncBusiness,
+        businessName: biz,
         phone: ncPhone,
         location: ncLocation,
         region: ncRegion,
@@ -129,8 +128,8 @@ export function FieldSaleForm({
         // Saved for real — confirm, show them in the book, and select them.
         const saved: CustomerRow = {
           id: res.data.id,
-          name: ncName.trim(),
-          businessName: ncBusiness.trim() || null,
+          name: biz,
+          businessName: biz,
           phone: ncPhone.trim() || null,
           location: ncLocation.trim() || null,
           creditSuspended: false,
@@ -138,9 +137,9 @@ export function FieldSaleForm({
         setAdded((a) => [...a, saved]);
         setCustomerId(saved.id);
         setNewCustomer(false);
-        setNcName(""); setNcBusiness(""); setNcPhone(""); setNcLocation("");
+        setNcBusiness(""); setNcPhone(""); setNcLocation("");
         setNcRegion(""); setNcType(""); setGps(null);
-        toast({ variant: "success", title: `${saved.name} saved & selected.` });
+        toast({ variant: "success", title: `${biz} saved & selected.` });
         router.refresh();
       } else if (!res.ok) {
         toast({ variant: "error", title: res.error });
@@ -338,12 +337,7 @@ export function FieldSaleForm({
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 truncate text-sm font-medium">
                 <Check className="size-4 shrink-0 text-success" />
-                {selected.name}
-                {selected.businessName && (
-                  <span className="truncate font-normal text-muted-foreground">
-                    · {selected.businessName}
-                  </span>
-                )}
+                {selected.businessName ?? selected.name}
               </p>
               {(selected.phone || selected.location) && (
                 <p className="ml-[22px] text-xs text-muted-foreground">
@@ -374,7 +368,7 @@ export function FieldSaleForm({
                 placeholder={
                   allCustomers.length === 0
                     ? "No saved customers yet — add one below"
-                    : "Search your customers — name, business, phone…"
+                    : "Search your customers — business, phone…"
                 }
                 className="pl-9"
               />
@@ -407,12 +401,7 @@ export function FieldSaleForm({
                       >
                         <span className="min-w-0">
                           <span className="block truncate font-medium">
-                            {c.name}
-                            {c.businessName ? (
-                              <span className="font-normal text-muted-foreground">
-                                {" "}· {c.businessName}
-                              </span>
-                            ) : null}
+                            {c.businessName ?? c.name}
                           </span>
                           {(c.phone || c.location) && (
                             <span className="block truncate text-xs text-muted-foreground">
@@ -437,7 +426,7 @@ export function FieldSaleForm({
         {/* Walk-in fallback (cash only, nothing selected) */}
         {!selected && !newCustomer && type === "CASH" && (
           <Input
-            placeholder="Walk-in customer name (optional)"
+            placeholder="Walk-in business name (optional)"
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
           />
@@ -447,8 +436,7 @@ export function FieldSaleForm({
         {newCustomer && (
           <div className="space-y-2.5 rounded-xl border border-primary/30 p-3">
             <div className="grid gap-2.5 sm:grid-cols-2">
-              <Input placeholder="Customer name *" value={ncName} onChange={(e) => setNcName(e.target.value)} />
-              <Input placeholder="Business name (optional)" value={ncBusiness} onChange={(e) => setNcBusiness(e.target.value)} />
+              <Input placeholder="Business name *" value={ncBusiness} onChange={(e) => setNcBusiness(e.target.value)} className="sm:col-span-2" />
               <Input placeholder="Phone" value={ncPhone} onChange={(e) => setNcPhone(e.target.value)} />
               <select
                 value={ncType}
@@ -486,7 +474,7 @@ export function FieldSaleForm({
                   type="button"
                   size="sm"
                   className="rounded-full"
-                  disabled={savingCustomer || ncName.trim().length < 2}
+                  disabled={savingCustomer || ncBusiness.trim().length < 2}
                   onClick={saveNewCustomer}
                 >
                   {savingCustomer ? "Saving…" : "Save customer"}

@@ -5,6 +5,7 @@ import type { FieldCreditStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
+import { applyMovement } from "@/lib/services/inventory";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -140,20 +141,69 @@ export async function rejectFieldSale(
     const actor = await requireActor(["FINANCE", "ADMIN"]);
     const sale = await prisma.fieldSale.findUnique({
       where: { id },
-      include: { rep: { select: { name: true } } },
+      include: { items: true, rep: { select: { id: true, name: true } } },
     });
     if (!sale) return fail("Sale not found.");
 
-    const claimed = await prisma.fieldSale.updateMany({
-      where: { id, financeStatus: "PENDING", voided: false },
-      data: {
-        financeStatus: "REJECTED",
-        financeReviewedById: actor.id,
-        financeReviewedAt: new Date(),
-        financeNote: note?.trim() || "Rejected by finance",
-      },
+    await prisma.$transaction(async (tx) => {
+      // Claim the review atomically — only a still-pending sale can be rejected.
+      const claimed = await tx.fieldSale.updateMany({
+        where: { id, financeStatus: "PENDING", voided: false },
+        data: {
+          financeStatus: "REJECTED",
+          financeReviewedById: actor.id,
+          financeReviewedAt: new Date(),
+          financeNote: note?.trim() || "Rejected by finance",
+        },
+      });
+      if (claimed.count === 0) throw new Error("This sale was already reviewed.");
+
+      // A rejected sale never happened: the units the rep recorded as sold go
+      // back into their hands (mirror of voidFieldSale) so a corrected
+      // re-record doesn't double-deduct their stock, and the org ledger and
+      // the rep's own totals stay accurate.
+      for (const item of sale.items) {
+        await applyMovement(tx, {
+          productId: item.productId,
+          type: "RESTOCKED",
+          quantity: item.quantity,
+          createdById: actor.id,
+          reference: `REJECT ${sale.code}`,
+          note: `Customer → ${sale.rep.name} (sale rejected by finance)`,
+        });
+        await applyMovement(tx, {
+          productId: item.productId,
+          type: "ASSIGNED",
+          quantity: item.quantity,
+          createdById: actor.id,
+          reference: `REJECT ${sale.code}`,
+          note: `Stock back in ${sale.rep.name}'s hands`,
+        });
+        await tx.repStock.update({
+          where: { repId_productId: { repId: sale.repId, productId: item.productId } },
+          data: {
+            sellableQty: { increment: item.quantity },
+            soldQty: { decrement: item.quantity },
+          },
+        });
+      }
+
+      // Any collections against this sale are moot now. Reject EVERY
+      // non-rejected payment (not just pending): a finance/admin direct
+      // collection posts as APPROVED, and unless we clear it here it would
+      // stay attached to this now-rejected sale and leak into cash totals
+      // (finance.ts / command-center / account balances count APPROVED
+      // payments whose sale isn't voided).
+      await tx.fieldPayment.updateMany({
+        where: { saleId: sale.id, financeStatus: { not: "REJECTED" } },
+        data: {
+          financeStatus: "REJECTED",
+          financeReviewedById: actor.id,
+          financeReviewedAt: new Date(),
+          financeNote: `Sale rejected: ${note?.trim() || "no reason given"}`,
+        },
+      });
     });
-    if (claimed.count === 0) return fail("This sale was already reviewed.");
 
     await logActivity({
       actorId: actor.id,
@@ -161,10 +211,10 @@ export async function rejectFieldSale(
       action: "FIELD_SALE_REJECTED",
       entity: "FieldSale",
       entityId: sale.code,
-      summary: `Finance rejected ${sale.type.toLowerCase()} sale ${sale.code} (rep ${sale.rep.name})${note?.trim() ? ` — ${note.trim()}` : ""}.`,
+      summary: `Finance rejected ${sale.type.toLowerCase()} sale ${sale.code} (rep ${sale.rep.name})${note?.trim() ? ` — ${note.trim()}` : ""}. Stock returned to ${sale.rep.name}.`,
     });
     revalidateApprovals();
-    return ok(undefined, `${sale.code} rejected — the rep can see your comment.`);
+    return ok(undefined, `${sale.code} rejected — stock returned to ${sale.rep.name}; the rep can see your comment and re-record it.`);
   } catch (e) {
     return fail(errorMessage(e));
   }
