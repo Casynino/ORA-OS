@@ -17,7 +17,7 @@ const CAPITAL_TYPES = [
 ] as const;
 
 function revalidateFinance() {
-  for (const p of ["/admin/finance", "/admin/finance/expenses", "/admin/finance/capital", "/admin/finance/ledger", "/admin", "/finance", "/finance/expenses", "/finance/reports"])
+  for (const p of ["/admin/finance", "/admin/finance/operational-fund", "/admin/finance/capital", "/admin/finance/ledger", "/admin", "/finance", "/finance/operational-fund", "/finance/reports"])
     revalidatePath(p);
 }
 
@@ -72,12 +72,11 @@ export async function removeExpense(id: string): Promise<ActionResult> {
     const actor = await requireActor(["ADMIN", "FINANCE"]);
     const exp = await prisma.expense.findUnique({ where: { id } });
     if (!exp) return fail("Expense not found.");
-    // System-generated expenses embody an admin approval (petty cash issue,
-    // paid payroll) — finance must not be able to erase that control record.
-    const systemGenerated = /^(Petty cash PC-|Payroll PAY-)/.test(exp.purpose);
-    if (systemGenerated && actor.role !== "ADMIN") {
+    // A paid-payroll expense embodies an admin approval — finance must not be
+    // able to erase that control record.
+    if (exp.source === "PAYROLL" && actor.role !== "ADMIN") {
       return fail(
-        "This expense was created by an approval workflow (petty cash / payroll) — only the admin can remove it.",
+        "This expense was created by the payroll workflow — only the admin can remove it.",
       );
     }
     await prisma.expense.delete({ where: { id } });

@@ -36,6 +36,7 @@ import {
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { getCommandCenter } from "@/lib/services/command-center";
+import { getOperationalFund } from "@/lib/services/operational-fund";
 import { productMeta } from "@/lib/product-meta";
 import { KpiCard } from "@/components/admin/kpi-card";
 import { Reveal } from "@/components/ui/reveal";
@@ -101,7 +102,7 @@ export default async function AdminCommandCenter() {
     pendingSalesByType,
     pendingCollectionsAgg,
     lastPaidPayroll,
-    openFloats,
+    opFund,
   ] = await Promise.all([
     prisma.pettyCashRequest.aggregate({
       _count: true,
@@ -135,13 +136,8 @@ export default async function AdminCommandCenter() {
       orderBy: { paidAt: "desc" },
       include: { items: { select: { net: true } } },
     }),
-    prisma.pettyCashRequest.findMany({
-      where: { status: "APPROVED" },
-      include: {
-        requestedBy: { select: { name: true } },
-        expenses: { orderBy: { createdAt: "desc" }, take: 3 },
-      },
-    }),
+    // CEO visibility: the single Operational Fund — balance + recent spend.
+    getOperationalFund(),
   ]);
   const pendingCashSales = pendingSalesByType.find((g) => g.type === "CASH");
   const pendingCreditSales = pendingSalesByType.find((g) => g.type === "CREDIT");
@@ -353,15 +349,15 @@ export default async function AdminCommandCenter() {
         ) : (
           <div className="space-y-2">
             {pettyPendingCount > 0 && (
-              <Link href="/admin/finance/petty-cash" className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-muted/30">
+              <Link href="/admin/finance/operational-fund" className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-muted/30">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <Wallet className="size-4 shrink-0 text-warning" />
                     <p className="truncate text-sm font-medium">
-                      {pettyPendingCount} office fund request{pettyPendingCount === 1 ? "" : "s"} pending
+                      {pettyPendingCount} operational fund request{pettyPendingCount === 1 ? "" : "s"} pending
                     </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">Office fund allocations waiting for your approval</p>
+                  <p className="text-xs text-muted-foreground">Operational Fund allocations waiting for your approval</p>
                 </div>
                 <span className="shrink-0 font-display font-semibold">{formatCurrency(pettyPendingSum)}</span>
               </Link>
@@ -423,7 +419,7 @@ export default async function AdminCommandCenter() {
               </div>
             )}
             {largeExpenseCount > 0 && (
-              <Link href="/admin/finance/expenses" className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-muted/30">
+              <Link href="/admin/finance/ledger" className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-muted/30">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <Receipt className="size-4 shrink-0 text-destructive" />
@@ -489,40 +485,30 @@ export default async function AdminCommandCenter() {
             </div>
             <div className="glass-card rounded-2xl p-5">
               <h3 className="flex items-center gap-2 font-display font-semibold">
-                <Wallet className="size-4" /> Office fund floats
+                <Wallet className="size-4" /> Operational Fund
               </h3>
-              {openFloats.length === 0 ? (
-                <p className="mt-3 text-sm text-muted-foreground">No open allocations.</p>
+              <div className="mt-3 flex items-baseline justify-between gap-2">
+                <span className="text-sm text-muted-foreground">Current balance</span>
+                <span className="font-display text-xl font-bold">{formatCurrency(opFund.balance)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {formatCurrency(opFund.funded)} allocated · {formatCurrency(opFund.spent)} spent
+              </p>
+              {opFund.expenses.length === 0 ? (
+                <p className="mt-3 text-sm text-muted-foreground">No spending recorded yet.</p>
               ) : (
-                <div className="mt-3 space-y-2.5">
-                  {openFloats.map((f) => {
-                    const spent = f.expenses.reduce((s, e) => s + e.amount, 0);
-                    return (
-                      <div key={f.id} className="rounded-xl border border-border/60 p-3 text-sm">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="min-w-0 truncate font-medium">
-                            {f.code} · {f.requestedBy.name}
-                          </span>
-                          <span className="shrink-0 font-semibold">
-                            {formatCurrency(Math.max(0, f.amount - spent))} left
-                          </span>
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {formatCurrency(spent)} of {formatCurrency(f.amount)} spent · {f.purpose}
-                        </p>
-                        {f.expenses.map((e) => (
-                          <p key={e.id} className="mt-1 truncate text-xs text-muted-foreground">
-                            − {formatCurrency(e.amount)} · {e.description}
-                          </p>
-                        ))}
-                      </div>
-                    );
-                  })}
-                  <Link href="/admin/finance/petty-cash" className="inline-block text-xs font-medium text-primary hover:underline">
-                    All office fund →
-                  </Link>
+                <div className="mt-3 space-y-1.5">
+                  {opFund.expenses.slice(0, 4).map((e) => (
+                    <p key={e.id} className="flex items-center justify-between gap-2 truncate text-xs text-muted-foreground">
+                      <span className="min-w-0 truncate">− {e.description}</span>
+                      <span className="shrink-0 font-medium">{formatCurrency(e.amount)}</span>
+                    </p>
+                  ))}
                 </div>
               )}
+              <Link href="/admin/finance/operational-fund" className="mt-3 inline-block text-xs font-medium text-primary hover:underline">
+                Operational Fund →
+              </Link>
             </div>
           </div>
         </div>

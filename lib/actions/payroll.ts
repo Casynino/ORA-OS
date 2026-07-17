@@ -291,6 +291,7 @@ export async function payPayrollRun(
           amount: total,
           purpose: `Payroll ${run.code} — ${run.month}/${run.year}`,
           paymentMethod: receiving.method,
+          source: "PAYROLL",
           recordedById: actor.id,
         },
       });

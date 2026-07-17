@@ -21,10 +21,11 @@ const FINANCIAL_ACTIONS = [
   "PAYROLL_SUBMITTED",
   "PAYROLL_APPROVED",
   "PAYROLL_PAID",
-  "PETTY_CASH_REQUESTED",
-  "PETTY_CASH_APPROVED",
-  "PETTY_CASH_SPENT",
-  "PETTY_CASH_RECONCILED",
+  "OPERATIONAL_FUND_REQUESTED",
+  "OPERATIONAL_FUND_APPROVED",
+  "OPERATIONAL_FUND_REJECTED",
+  "OPERATIONAL_EXPENSE_RECORDED",
+  "OPERATIONAL_EXPENSE_REMOVED",
   // Customer & partner-credit approvals — the CEO sees who Finance let in and
   // on what terms, without having to approve it.
   "AGENT_APPROVED", // partner/agent application approved & activated

@@ -222,8 +222,8 @@ export default async function AdminFinancePage({
         <section className="rounded-2xl border border-border bg-card p-5 shadow-soft">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-lg font-semibold">Top expenses <span className="text-sm font-normal text-muted-foreground">· {PERIOD_LABEL[period]}</span></h2>
-            <Link href="/admin/finance/expenses" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-              Manage <ArrowRight className="size-4" />
+            <Link href="/admin/finance/ledger" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+              View all <ArrowRight className="size-4" />
             </Link>
           </div>
           <div className="mt-3 space-y-2.5">
