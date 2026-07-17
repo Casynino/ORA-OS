@@ -73,7 +73,7 @@ export default async function WarehouseOverviewPage() {
   ] = await Promise.all([
     prisma.warehouseStock.findMany({
       where: { warehouseId: wh.id },
-      include: { product: { select: { name: true } } },
+      include: { product: { select: { name: true, unitsPerCarton: true } } },
       orderBy: { onHand: "asc" },
     }),
     prisma.request.findMany({
@@ -126,6 +126,8 @@ export default async function WarehouseOverviewPage() {
 
   // Operational counts — no money anywhere.
   const lowStock = stock.filter((r) => r.onHand <= r.minLevel);
+  const totalOnHand = stock.reduce((s, r) => s + r.onHand, 0);
+  const totalReserved = stock.reduce((s, r) => s + r.reserved, 0);
   const toDispatch = orders.filter((o) => o.status === "APPROVED").length;
   const outForDelivery = orders.filter((o) => o.status === "IN_TRANSIT").length;
   const dispatchedToday = orders.filter(
@@ -233,6 +235,82 @@ export default async function WarehouseOverviewPage() {
             <p className="mt-2 max-w-2xl text-sm text-white/90 sm:text-base">{summary}</p>
           </div>
         </div>
+      </Reveal>
+
+      {/* Available stock — the first thing the warehouse sees on open. */}
+      <Reveal>
+        <Card className="glass-card">
+          <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+            <CardTitle className="flex items-center gap-2">
+              <Boxes className="size-4" /> Available stock
+            </CardTitle>
+            <div className="flex shrink-0 items-center gap-2">
+              <Link
+                href="/warehouse/receive"
+                className={cn(buttonVariants({ size: "sm", variant: "outline" }), "rounded-full")}
+              >
+                <PackagePlus className="size-3.5" /> Receive
+              </Link>
+              <Link
+                href="/warehouse/inventory"
+                className={cn(buttonVariants({ size: "sm", variant: "ghost" }), "rounded-full")}
+              >
+                Full inventory <ChevronRight className="size-3.5" />
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {stock.length === 0 ? (
+              <EmptyState icon={Boxes} title="No stock yet" description="Receive stock to get started." />
+            ) : (
+              <>
+                <p className="mb-3 text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground">{formatNumber(totalOnHand)}</span>{" "}
+                  units on hand across {stock.length} product{stock.length > 1 ? "s" : ""}
+                  {totalReserved > 0 && <> · {formatNumber(totalReserved)} reserved for pickup</>}
+                  {lowStock.length > 0 && (
+                    <>
+                      {" · "}
+                      <span className="font-medium text-warning">{lowStock.length} running low</span>
+                    </>
+                  )}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {stock.map((r) => {
+                    const perCarton = r.product.unitsPerCarton || 24;
+                    const cartons = Math.floor(r.onHand / perCarton);
+                    const loose = r.onHand % perCarton;
+                    const s =
+                      r.onHand <= 0
+                        ? { label: "Out", cls: "text-destructive", ring: "border-destructive/40" }
+                        : r.onHand <= r.minLevel
+                          ? { label: "Low", cls: "text-warning", ring: "border-warning/40" }
+                          : { label: "In stock", cls: "text-success", ring: "border-border" };
+                    return (
+                      <div key={r.id} className={cn("rounded-xl border p-3", s.ring)}>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-medium leading-tight">{r.product.name}</p>
+                          <span className={cn("shrink-0 text-[10px] font-semibold uppercase", s.cls)}>
+                            {s.label}
+                          </span>
+                        </div>
+                        <p className="mt-2 font-display text-2xl font-bold leading-none">
+                          {formatNumber(cartons)}
+                          <span className="ml-1 text-sm font-medium text-muted-foreground">cartons</span>
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatNumber(r.onHand)} pcs
+                          {loose ? ` · ${formatNumber(loose)} loose` : ""}
+                          {r.reserved > 0 ? ` · ${formatNumber(r.reserved)} reserved` : ""}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </Reveal>
 
       {/* Operational KPIs — counts only, never money. */}
@@ -344,28 +422,6 @@ export default async function WarehouseOverviewPage() {
         </Reveal>
       </div>
 
-      {/* Low stock */}
-      {lowStock.length > 0 && (
-        <Reveal>
-          <Card className="glass-card border-warning/30">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-warning">
-                <Package className="size-4" /> Low stock alerts
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {lowStock.map((r) => (
-                <div key={r.id} className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-                  <span className="text-sm">{r.product.name}</span>
-                  <span className="text-sm font-semibold text-warning">
-                    {formatNumber(r.onHand)} / {formatNumber(r.minLevel)}
-                  </span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </Reveal>
-      )}
     </div>
   );
 }
