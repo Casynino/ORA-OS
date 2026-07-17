@@ -13,6 +13,7 @@ export async function getPettyCashData() {
       include: {
         requestedBy: { select: { name: true } },
         approvedBy: { select: { name: true } },
+        items: { orderBy: { createdAt: "asc" } },
         expenses: {
           orderBy: { createdAt: "desc" },
           include: { recordedBy: { select: { name: true } } },
@@ -43,6 +44,11 @@ export async function getPettyCashData() {
       amount: r.amount,
       purpose: r.purpose,
       category: r.category,
+      items: r.items.map((i) => ({
+        category: i.category,
+        description: i.description,
+        amount: i.amount,
+      })),
       status: r.status,
       requestedByName: r.requestedBy.name,
       approvedByName: r.approvedBy?.name ?? null,

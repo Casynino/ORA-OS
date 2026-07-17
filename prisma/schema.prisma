@@ -1227,9 +1227,25 @@ model PettyCashRequest {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
+  items    PettyCashRequestItem[]
   expenses PettyCashExpense[]
 
   @@index([status])
+}
+
+/// One planned line item on an office-fund request (the "cart"). The request's
+/// amount is the sum; each item carries its own category so the issued expense
+/// is filed correctly per line.
+model PettyCashRequestItem {
+  id          String           @id @default(cuid())
+  request     PettyCashRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId   String
+  category    ExpenseCategory  @default(OFFICE)
+  description String
+  amount      Int
+  createdAt   DateTime         @default(now())
+
+  @@index([requestId])
 }
 
 /// One expenditure recorded against a petty cash allocation.

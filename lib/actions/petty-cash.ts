@@ -23,14 +23,22 @@ function revalidatePettyCash() {
 }
 
 const requestSchema = z.object({
-  amount: z.number().int().positive().max(100000000),
-  purpose: z.string().min(3, "What is this allocation for?").max(300),
-  // Which office-spend category this fund covers — defaults to OFFICE so older
-  // callers (and a blank pick) still validate.
-  category: z.enum(EXPENSE_CATEGORY_VALUES).default("OFFICE"),
+  // The "cart" — one or more planned expense lines, each with its own category
+  // so the issued expense is filed correctly per line.
+  items: z
+    .array(
+      z.object({
+        category: z.enum(EXPENSE_CATEGORY_VALUES).default("OFFICE"),
+        description: z.string().min(2, "Describe each expense.").max(200),
+        amount: z.number().int().positive().max(100000000),
+      }),
+    )
+    .min(1, "Add at least one expense.")
+    .max(30),
 });
 
-/** Finance requests a petty cash allocation — goes to admin for approval. */
+/** Finance requests an office-fund allocation (a cart of expense lines) — goes
+ * to the CEO for approval. */
 export async function createPettyCashRequest(
   input: z.infer<typeof requestSchema>,
 ): Promise<ActionResult<{ code: string }>> {
@@ -40,13 +48,25 @@ export async function createPettyCashRequest(
     if (!parsed.success) {
       return fail(parsed.error.issues[0]?.message ?? "Invalid request.");
     }
+    const items = parsed.data.items.map((i) => ({
+      category: i.category,
+      description: i.description.trim(),
+      amount: i.amount,
+    }));
+    const total = items.reduce((s, i) => s + i.amount, 0);
+    if (total > 100000000) return fail("That total is too large.");
+    // A short human label + the primary (largest) category for the badge.
+    const purpose = items.map((i) => i.description).join(" · ").slice(0, 300);
+    const primary = [...items].sort((a, b) => b.amount - a.amount)[0].category;
+
     const req = await prisma.pettyCashRequest.create({
       data: {
         code: refCode("PC"),
-        amount: parsed.data.amount,
-        purpose: parsed.data.purpose.trim(),
-        category: parsed.data.category,
+        amount: total,
+        purpose,
+        category: primary,
         requestedById: actor.id,
+        items: { create: items },
       },
     });
     await logActivity({
@@ -55,7 +75,7 @@ export async function createPettyCashRequest(
       action: "PETTY_CASH_REQUESTED",
       entity: "PettyCashRequest",
       entityId: req.id,
-      summary: `${actor.name} requested ${formatCurrency(req.amount)} office fund for ${EXPENSE_LABELS[req.category]} (${req.code}) — awaiting CEO approval.`,
+      summary: `${actor.name} requested ${formatCurrency(total)} office fund (${items.length} item${items.length === 1 ? "" : "s"}, ${req.code}) — awaiting CEO approval.`,
     });
     revalidatePettyCash();
     return ok({ code: req.code }, `${req.code} sent to the admin for approval.`);
@@ -74,7 +94,7 @@ export async function approvePettyCashRequest(
     const admin = await requireActor(["ADMIN"]);
     const req = await prisma.pettyCashRequest.findUnique({
       where: { id },
-      include: { requestedBy: { select: { name: true } } },
+      include: { requestedBy: { select: { name: true } }, items: true },
     });
     if (!req) return fail("Request not found.");
 
@@ -102,19 +122,36 @@ export async function approvePettyCashRequest(
           data: { paymentAccountId: receiving.paymentAccountId },
         });
       }
-      // Money leaves the company at issue time — one expense for the whole
-      // allocation, so it flows into every financial report immediately.
-      await tx.expense.create({
-        data: {
-          code: refCode("EXP"),
-          category: req.category,
-          amount: req.amount,
-          purpose: `Office fund ${req.code} — ${req.purpose}`,
-          paymentMethod: receiving.method,
-          note: `Issued to ${req.requestedBy.name}`,
-          recordedById: admin.id,
-        },
-      });
+      // Money leaves the company at issue time — book one expense PER line
+      // item so each lands under its own ledger category. Falls back to a
+      // single expense for older itemless requests.
+      const lines =
+        req.items.length > 0
+          ? req.items.map((i) => ({
+              category: i.category,
+              amount: i.amount,
+              purpose: `Office fund ${req.code} — ${i.description}`,
+            }))
+          : [
+              {
+                category: req.category,
+                amount: req.amount,
+                purpose: `Office fund ${req.code} — ${req.purpose}`,
+              },
+            ];
+      for (const line of lines) {
+        await tx.expense.create({
+          data: {
+            code: refCode("EXP"),
+            category: line.category,
+            amount: line.amount,
+            purpose: line.purpose,
+            paymentMethod: receiving.method,
+            note: `Issued to ${req.requestedBy.name}`,
+            recordedById: admin.id,
+          },
+        });
+      }
     });
 
     await logActivity({
