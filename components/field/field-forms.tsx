@@ -418,11 +418,12 @@ export function CollectForm({
   );
 }
 
-/** Add a customer to the rep's book — full profile, auto-owned by this rep. */
-export function NewCustomerForm() {
+/** Add a customer to the rep's book — full profile, auto-owned by this rep.
+ * `startOpen` renders the form expanded (for the dedicated Register page). */
+export function NewCustomerForm({ startOpen = false }: { startOpen?: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
