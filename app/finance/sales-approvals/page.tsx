@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ProofViewer } from "@/components/ui/proof-viewer";
 import {
   SaleApprovalActions,
   CollectionApprovalActions,
@@ -138,16 +139,9 @@ export default async function FinanceSalesApprovalsPage() {
                 </p>
               )}
               {s.paymentProofUrl ? (
-                <a
-                  href={s.paymentProofUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2 text-xs font-medium text-primary hover:bg-muted/50"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={s.paymentProofUrl} alt="Payment proof" className="size-12 rounded object-cover" />
-                  View payment proof →
-                </a>
+                <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2">
+                  <ProofViewer url={s.paymentProofUrl} label="View payment proof" />
+                </div>
               ) : (
                 isDirectPayment(s.paymentMethod) && (
                   <p className="mt-1 text-xs text-destructive">No proof image attached by the rep.</p>

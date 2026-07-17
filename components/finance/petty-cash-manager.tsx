@@ -13,6 +13,7 @@ import {
 } from "@/lib/actions/petty-cash";
 import { OFFICE_FUND_CATEGORIES, EXPENSE_LABELS } from "@/lib/expense-categories";
 import { ProofUpload } from "@/components/ui/proof-upload";
+import { ProofViewer } from "@/components/ui/proof-viewer";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -516,9 +517,7 @@ function ExpensesList({
             {e.receiptUrl && (
               <>
                 {" · "}
-                <a href={e.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                  receipt
-                </a>
+                <ProofViewer url={e.receiptUrl} label="receipt" compact />
               </>
             )}
           </span>

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, ImagePlus, Paperclip, X } from "lucide-react";
+import { Loader2, ImagePlus, X } from "lucide-react";
+import { ProofViewer } from "@/components/ui/proof-viewer";
 import { toast } from "@/components/ui/use-toast";
 
 /**
@@ -85,18 +86,8 @@ export function ProofUpload({
 
   if (value) {
     return (
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-2.5">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={value} alt="Proof" className="size-14 shrink-0 rounded-md object-cover" />
-        <a
-          href={value}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="min-w-0 flex-1 truncate text-sm font-medium text-primary hover:underline"
-        >
-          <Paperclip className="mr-1 inline size-3.5" />
-          View uploaded proof
-        </a>
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-2.5">
+        <ProofViewer url={value} label="View uploaded proof" />
         <button
           type="button"
           onClick={() => onChange("")}
