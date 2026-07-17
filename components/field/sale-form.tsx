@@ -100,7 +100,9 @@ export function FieldSaleForm({
   }, [customers, added]);
   const selected = allCustomers.find((c) => c.id === customerId) ?? null;
 
-  // Live search across name, business name, phone and location.
+  // Live search across name, business name, phone and location. With no search
+  // the rep can scroll the whole book — every customer, sorted A→Z — for when
+  // they can't remember the exact name.
   const matches = useMemo(() => {
     const q = search.trim().toLowerCase();
     const pool = q
@@ -110,7 +112,8 @@ export function FieldSaleForm({
             .some((v) => String(v).toLowerCase().includes(q)),
         )
       : allCustomers;
-    return pool.slice(0, 8);
+    const label = (c: CustomerRow) => (c.businessName ?? c.name ?? "").toLowerCase();
+    return [...pool].sort((a, b) => label(a).localeCompare(label(b)));
   }, [allCustomers, search]);
 
   function saveNewCustomer() {
@@ -381,13 +384,13 @@ export function FieldSaleForm({
                 placeholder={
                   allCustomers.length === 0
                     ? "No saved customers yet — add one below"
-                    : "Search your customers — business, phone…"
+                    : "Search or scroll your customers (A–Z)…"
                 }
                 className="pl-9"
               />
             </div>
             {listOpen && allCustomers.length > 0 && (
-              <div className="mt-1.5 overflow-hidden rounded-xl border border-border bg-card shadow-soft">
+              <div className="mt-1.5 max-h-72 overflow-y-auto rounded-xl border border-border bg-card shadow-soft">
                 {matches.length === 0 ? (
                   <p className="px-3 py-2.5 text-sm text-muted-foreground">
                     No customer matches “{search}” — add them below.
