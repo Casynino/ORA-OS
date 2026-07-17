@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   Banknote,
   Landmark,
-  Smartphone,
   Wallet,
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -39,8 +38,6 @@ export default async function FinanceDashboardPage() {
     overview,
     recent,
     weekLedger,
-    accounts,
-    accountReceipts,
     pendingPayments,
     claimedPayments,
     pendingCashSales,
@@ -51,32 +48,6 @@ export default async function FinanceDashboardPage() {
     getFinanceOverview("month"),
     getLedger("month", 8),
     getLedger("week", 2000),
-    prisma.paymentAccount.findMany({
-      where: { isActive: true },
-      orderBy: [{ type: "asc" }, { name: "asc" }],
-    }),
-    Promise.all([
-      prisma.fieldSale.groupBy({
-        by: ["paymentAccountId"],
-        where: { voided: false, financeStatus: "APPROVED", type: "CASH", paymentAccountId: { not: null } },
-        _sum: { total: true },
-      }),
-      prisma.fieldPayment.groupBy({
-        by: ["paymentAccountId"],
-        where: { financeStatus: "APPROVED", paymentAccountId: { not: null }, sale: { voided: false } },
-        _sum: { amount: true },
-      }),
-      prisma.payment.groupBy({
-        by: ["paymentAccountId"],
-        where: { paymentAccountId: { not: null } },
-        _sum: { amount: true },
-      }),
-      prisma.request.groupBy({
-        by: ["paymentAccountId"],
-        where: { paymentAccountId: { not: null }, paymentStatus: "PAID" },
-        _sum: { totalAmount: true },
-      }),
-    ]),
     prisma.request.count({
       where: { status: "APPROVED", paymentType: "IMMEDIATE", paymentStatus: "UNPAID" },
     }),
@@ -98,18 +69,6 @@ export default async function FinanceDashboardPage() {
       include: { expenses: { select: { amount: true } } },
     }),
   ]);
-
-  // Received-to-date per account type (the money-in trace per account).
-  const receivedByAccount = new Map<string, number>();
-  const [fs, fp, pp, op] = accountReceipts;
-  for (const r of fs) receivedByAccount.set(r.paymentAccountId!, (receivedByAccount.get(r.paymentAccountId!) ?? 0) + (r._sum.total ?? 0));
-  for (const r of fp) receivedByAccount.set(r.paymentAccountId!, (receivedByAccount.get(r.paymentAccountId!) ?? 0) + (r._sum.amount ?? 0));
-  for (const r of pp) receivedByAccount.set(r.paymentAccountId!, (receivedByAccount.get(r.paymentAccountId!) ?? 0) + (r._sum.amount ?? 0));
-  for (const r of op) receivedByAccount.set(r.paymentAccountId!, (receivedByAccount.get(r.paymentAccountId!) ?? 0) + (r._sum.totalAmount ?? 0));
-  const receivedByType = (type: string) =>
-    accounts
-      .filter((a) => a.type === type)
-      .reduce((s, a) => s + (receivedByAccount.get(a.id) ?? 0), 0);
 
   // Office expense fund balance = unspent money across every CEO-approved
   // allocation. The CEO funds it; finance spends it down without per-expense
@@ -231,14 +190,6 @@ export default async function FinanceDashboardPage() {
           </Link>
         </div>
       </section>
-
-      {/* Money position — where the CEO's money currently sits */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Cash available" value={formatCurrency(overview.position.cashAvailable)} hint="all money in − all money out" icon={Wallet} accent="primary" />
-        <StatCard label="Cash received" value={formatCurrency(receivedByType("CASH"))} hint="via cash accounts, to date" icon={Banknote} accent="success" />
-        <StatCard label="Bank received" value={formatCurrency(receivedByType("BANK"))} hint="via bank accounts, to date" icon={Landmark} accent="info" />
-        <StatCard label="Mobile money received" value={formatCurrency(receivedByType("MOBILE_MONEY"))} hint="via Lipa numbers, to date" icon={Smartphone} accent="accent" />
-      </div>
 
       {/* This month */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

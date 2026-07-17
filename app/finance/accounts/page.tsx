@@ -1,17 +1,9 @@
-import Link from "next/link";
-import {
-  Landmark,
-  Smartphone,
-  Banknote,
-  ChevronRight,
-  Wallet,
-} from "lucide-react";
+import { Landmark, Smartphone, Banknote, Wallet } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatCurrency, formatNumber } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -21,62 +13,19 @@ const TYPE_META = {
   MOBILE_MONEY: { label: "Mobile money accounts", icon: Smartphone, accent: "text-primary" },
 } as const;
 
-/** Balances by receiving account — where ORA's money physically sits. */
+/**
+ * Finance's reference list of ORA's receiving accounts — the destinations they
+ * deposit collected money into. The CEO owns the accounts and sees the
+ * balances; Finance only needs to know which account received a payment, so
+ * NO balances / totals are shown here (Finance never sees account balances).
+ */
 export default async function FinanceAccountsPage() {
   await requireRole("FINANCE");
 
-  const [accounts, cashSales, fieldPays, partnerPays, orderPays] = await Promise.all([
-    prisma.paymentAccount.findMany({
-      orderBy: [{ type: "asc" }, { name: "asc" }],
-    }),
-    prisma.fieldSale.findMany({
-      where: { voided: false, financeStatus: "APPROVED", type: "CASH", paymentAccountId: { not: null } },
-      select: { paymentAccountId: true, total: true, createdAt: true },
-    }),
-    prisma.fieldPayment.findMany({
-      where: { financeStatus: "APPROVED", paymentAccountId: { not: null }, sale: { voided: false } },
-      select: { paymentAccountId: true, amount: true, createdAt: true },
-    }),
-    prisma.payment.findMany({
-      where: { paymentAccountId: { not: null } },
-      select: { paymentAccountId: true, amount: true, createdAt: true },
-    }),
-    // Paid orders: counter/walk-in sales and confirmed partner order payments.
-    prisma.request.findMany({
-      where: { paymentAccountId: { not: null }, paymentStatus: "PAID" },
-      select: {
-        paymentAccountId: true,
-        totalAmount: true,
-        paidAt: true,
-        createdAt: true,
-      },
-    }),
-  ]);
+  const accounts = await prisma.paymentAccount.findMany({
+    orderBy: [{ type: "asc" }, { name: "asc" }],
+  });
 
-  // Bucket every receipt per account: all-time / today / this month / count.
-  const now = new Date();
-  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const stats = new Map<
-    string,
-    { total: number; today: number; month: number; count: number }
-  >();
-  const add = (accountId: string | null, amount: number, at: Date) => {
-    if (!accountId) return;
-    const s = stats.get(accountId) ?? { total: 0, today: 0, month: 0, count: 0 };
-    s.total += amount;
-    s.count += 1;
-    if (at >= startToday) s.today += amount;
-    if (at >= startMonth) s.month += amount;
-    stats.set(accountId, s);
-  };
-  for (const r of cashSales) add(r.paymentAccountId, r.total, r.createdAt);
-  for (const r of fieldPays) add(r.paymentAccountId, r.amount, r.createdAt);
-  for (const r of partnerPays) add(r.paymentAccountId, r.amount, r.createdAt);
-  for (const r of orderPays)
-    add(r.paymentAccountId, r.totalAmount ?? 0, r.paidAt ?? r.createdAt);
-
-  const grandTotal = [...stats.values()].reduce((s, x) => s + x.total, 0);
   const groups = (Object.keys(TYPE_META) as (keyof typeof TYPE_META)[]).map((t) => ({
     type: t,
     ...TYPE_META[t],
@@ -87,18 +36,14 @@ export default async function FinanceAccountsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Company accounts"
-        description="The CEO owns every company account — you record deposits and verify what came in. This is your read-only view of where ORA money sits."
+        description="The accounts you deposit collected money into. The CEO owns them and sees the balances — you just record which account received each payment."
       />
 
       <div>
         <h2 className="font-display text-lg font-semibold">Receiving accounts</h2>
         <p className="text-sm text-muted-foreground">
-          Every payment is traced to the exact account that received it —{" "}
-          <span className="font-medium text-foreground">
-            {formatCurrency(grandTotal)}
-          </span>{" "}
-          received across {accounts.length} account{accounts.length === 1 ? "" : "s"}. Adding
-          or editing accounts is a CEO responsibility.
+          Deposit cash and confirm direct payments into these official ORA accounts. Adding or
+          editing accounts — and viewing balances — is a CEO responsibility.
         </p>
       </div>
 
@@ -106,10 +51,9 @@ export default async function FinanceAccountsPage() {
         <EmptyState
           icon={Wallet}
           title="No receiving accounts yet"
-          description='Add your cash office, bank accounts and Lipa numbers — they appear instantly in every sale and payment form.'
+          description="The CEO adds ORA's cash office, bank accounts and Lipa numbers — they appear here and in every payment form."
         />
       ) : (
-        // Type-groups as columns: side-by-side on laptop, stacked on phone.
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
           {groups.map(
             (g) =>
@@ -120,57 +64,30 @@ export default async function FinanceAccountsPage() {
                     {g.label}
                   </h3>
                   <div className="space-y-3">
-                    {g.accounts.map((a) => {
-                    const s = stats.get(a.id) ?? { total: 0, today: 0, month: 0, count: 0 };
-                    return (
-                      <Link
+                    {g.accounts.map((a) => (
+                      <div
                         key={a.id}
-                        href={`/finance/accounts/${a.id}`}
-                        className={`group rounded-2xl border bg-card p-4 shadow-soft transition-colors hover:border-primary/40 ${
+                        className={`rounded-2xl border bg-card p-4 shadow-soft ${
                           a.isActive ? "border-border" : "border-border opacity-60"
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="flex items-center gap-2 font-display font-semibold">
-                              <span className="truncate">{a.name}</span>
-                              {!a.isActive && <Badge variant="secondary">inactive</Badge>}
-                            </p>
-                            {a.accountName && (
-                              <p className="truncate text-xs text-muted-foreground">
-                                {a.accountName}
-                              </p>
-                            )}
-                            {a.accountNumber && (
-                              <p className="text-xs text-muted-foreground">
-                                {a.type === "MOBILE_MONEY" ? "Lipa" : "A/C"}:{" "}
-                                <span className="font-medium text-foreground">
-                                  {a.accountNumber}
-                                </span>
-                              </p>
-                            )}
-                          </div>
-                          <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                        </div>
-                        <p className="mt-3 font-display text-2xl font-bold">
-                          {formatCurrency(s.total)}
+                        <p className="flex items-center gap-2 font-display font-semibold">
+                          <span className="truncate">{a.name}</span>
+                          {!a.isActive && <Badge variant="secondary">inactive</Badge>}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          received all-time · {formatNumber(s.count)} transaction{s.count === 1 ? "" : "s"}
-                        </p>
-                        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border/60 pt-2.5 text-sm">
-                          <div>
-                            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Today</p>
-                            <p className="font-semibold">{formatCurrency(s.today)}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">This month</p>
-                            <p className="font-semibold">{formatCurrency(s.month)}</p>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
+                        {a.accountName && (
+                          <p className="truncate text-xs text-muted-foreground">{a.accountName}</p>
+                        )}
+                        {a.accountNumber && (
+                          <p className="mt-1 text-sm">
+                            <span className="text-muted-foreground">
+                              {a.type === "MOBILE_MONEY" ? "Lipa" : "A/C"}:{" "}
+                            </span>
+                            <span className="font-medium">{a.accountNumber}</span>
+                          </p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </section>
               ),
