@@ -1284,6 +1284,106 @@ export async function addFieldCustomerNote(
   }
 }
 
+// ── Edit / delete a customer — ADMIN/FINANCE only (never the rep) ────────────
+
+const editCustomerSchema = z.object({
+  businessName: z.string().trim().min(2, "Business name is required.").max(120),
+  email: z.string().trim().max(120).optional().or(z.literal("")),
+  phone: z.string().trim().max(30).optional().or(z.literal("")),
+  location: z.string().trim().max(160).optional().or(z.literal("")),
+  region: z.string().trim().max(60).optional().or(z.literal("")),
+  district: z.string().trim().max(60).optional().or(z.literal("")),
+  customerType: z.string().trim().max(40).optional().or(z.literal("")),
+  expectedVolume: z.string().trim().max(60).optional().or(z.literal("")),
+  preferredPayment: z.string().trim().max(20).optional().or(z.literal("")),
+  businessLicense: z.string().trim().max(60).optional().or(z.literal("")),
+  taxId: z.string().trim().max(60).optional().or(z.literal("")),
+});
+
+/** ADMIN/FINANCE edit a field customer's details — including the address, which
+ * is the customer's single delivery address. Reps can never edit customers. */
+export async function updateFieldCustomer(
+  id: string,
+  input: z.infer<typeof editCustomerSchema>,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["ADMIN", "FINANCE"]);
+    const parsed = editCustomerSchema.safeParse(input);
+    if (!parsed.success)
+      return fail(parsed.error.issues[0]?.message ?? "Invalid details.");
+    const d = parsed.data;
+    const cust = await prisma.fieldCustomer.findUnique({ where: { id } });
+    if (!cust) return fail("Customer not found.");
+    const biz = d.businessName.trim();
+    await prisma.fieldCustomer.update({
+      where: { id },
+      data: {
+        // Business name stays the sole identity — `name` mirrors it.
+        name: biz,
+        businessName: biz,
+        email: d.email || null,
+        phone: d.phone || null,
+        location: d.location || null,
+        region: d.region || null,
+        district: d.district || null,
+        customerType: d.customerType || null,
+        expectedVolume: d.expectedVolume || null,
+        preferredPayment: d.preferredPayment || null,
+        businessLicense: d.businessLicense || null,
+        taxId: d.taxId || null,
+      },
+    });
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "FIELD_CUSTOMER_UPDATED",
+      entity: "FieldCustomer",
+      entityId: id,
+      summary: `${actor.name} updated ${biz}'s details.`,
+    });
+    revalidateField();
+    revalidatePath("/admin/reps/customers");
+    revalidatePath("/finance/customers");
+    return ok(undefined, `${biz} updated.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+/** ADMIN/FINANCE delete a field customer — only when they have no sales, so we
+ * never destroy financial history. Reps can never delete customers. */
+export async function deleteFieldCustomer(id: string): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["ADMIN", "FINANCE"]);
+    const cust = await prisma.fieldCustomer.findUnique({ where: { id } });
+    if (!cust) return fail("Customer not found.");
+    const sales = await prisma.fieldSale.count({ where: { customerId: id } });
+    if (sales > 0)
+      return fail(
+        "This customer has sales history and can't be deleted — suspend their credit instead.",
+      );
+    const who = cust.businessName ?? cust.name;
+    await prisma.$transaction([
+      prisma.activityLog.deleteMany({ where: { entity: "FieldCustomer", entityId: id } }),
+      prisma.fieldCustomer.delete({ where: { id } }),
+    ]);
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "FIELD_CUSTOMER_DELETED",
+      entity: "FieldCustomer",
+      entityId: id,
+      summary: `${actor.name} deleted customer ${who}.`,
+    });
+    revalidateField();
+    revalidatePath("/admin/reps/customers");
+    revalidatePath("/finance/customers");
+    return ok(undefined, `${who} deleted.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
 export async function voidFieldSale(
   saleId: string,
   reason: string,
