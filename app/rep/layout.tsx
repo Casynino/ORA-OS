@@ -5,23 +5,44 @@ import {
 } from "@/components/dashboard/dashboard-shell";
 
 const nav: NavGroup[] = [
-  { items: [{ href: "/rep", label: "Overview", icon: "dashboard" }] },
+  { items: [{ href: "/rep", label: "Dashboard", icon: "dashboard" }] },
   {
-    label: "Field work",
+    label: "Customers",
     items: [
-      { href: "/rep/sell", label: "Record sale", icon: "sales" },
-      { href: "/rep/samples", label: "Samples", icon: "samples" },
-      { href: "/rep/reports", label: "Field reports", icon: "fieldReports" },
+      { href: "/rep/customers", label: "My customers", icon: "customers" },
+      { href: "/rep/customers/new", label: "Register customer", icon: "newRequest" },
     ],
   },
   {
-    label: "My book",
+    label: "Sales",
+    items: [
+      { href: "/rep/sell", label: "Record sale", icon: "sales" },
+      { href: "/rep/sales", label: "Sales history", icon: "reports" },
+      { href: "/rep/samples", label: "Samples", icon: "samples" },
+    ],
+  },
+  {
+    label: "Stock",
     items: [
       { href: "/rep/stock", label: "My stock", icon: "inventory" },
-      { href: "/rep/customers", label: "Customers & credit", icon: "customers" },
+      { href: "/rep/stock/request", label: "Request stock", icon: "newRequest" },
+      { href: "/rep/stock/requests", label: "Request history", icon: "requests" },
+    ],
+  },
+  {
+    label: "Collections",
+    items: [
+      { href: "/rep/collections", label: "Credit customers", icon: "credit" },
+    ],
+  },
+  {
+    label: "Reports",
+    items: [
+      { href: "/rep/reports", label: "Daily reports", icon: "fieldReports" },
       { href: "/rep/targets", label: "My targets", icon: "targets" },
     ],
   },
+  { items: [{ href: "/rep/profile", label: "Profile", icon: "profile" }] },
 ];
 
 export default async function RepLayout({

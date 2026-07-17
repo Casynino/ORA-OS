@@ -53,6 +53,7 @@ export async function getRepOverview(repId: string) {
     target,
     recentSales,
     pendingStockRequests,
+    customersCount,
   ] = await Promise.all([
     // Split every period by CASH vs CREDIT — the totals stay honest and the
     // rep (and admin) always see how a figure is composed.
@@ -106,6 +107,7 @@ export async function getRepOverview(repId: string) {
       include: { customer: { select: { name: true } }, items: { select: { quantity: true } } },
     }),
     prisma.repStockRequest.count({ where: { repId, status: "PENDING" } }),
+    prisma.fieldCustomer.count({ where: { repId } }),
   ]);
 
   // Cash vs credit composition per period.
@@ -147,6 +149,9 @@ export async function getRepOverview(repId: string) {
     target,
     recentSales,
     pendingStockRequests,
+    customersCount,
+    // Open credit sales still to collect on — "pending credit collections".
+    openCreditCount: creditOpen.length,
   };
 }
 
