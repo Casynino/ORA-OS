@@ -188,6 +188,8 @@ model User {
   fieldCustomers        FieldCustomer[]      @relation("RepCustomers")
   fieldSales            FieldSale[]          @relation("RepSales")
   fieldPaymentsRecorded FieldPayment[]       @relation("FieldPaymentRecorder")
+  fieldSalesReviewed    FieldSale[]          @relation("FieldSaleReviewer")
+  fieldPaymentsReviewed FieldPayment[]       @relation("FieldPaymentReviewer")
   sampleLogs            SampleLog[]          @relation("RepSamples")
   fieldReports          FieldReport[]        @relation("RepReports")
   repTargets            RepTarget[]          @relation("RepTargets")
@@ -970,29 +972,44 @@ model FieldCustomer {
 }
 
 /// A field sale (cash or credit). Stock is deducted atomically on creation.
+/// Finance is the financial control point: rep-recorded money is PENDING
+/// until finance verifies it landed (cash) or the credit terms hold (credit).
+/// Only APPROVED rows count as official revenue / receivables anywhere.
+enum FinanceApproval {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model FieldSale {
-  id               String             @id @default(cuid())
-  code             String             @unique
-  type             FieldSaleType
-  rep              User               @relation("RepSales", fields: [repId], references: [id])
-  repId            String
-  customer         FieldCustomer?     @relation(fields: [customerId], references: [id])
-  customerId       String? // required for CREDIT
-  customerName     String? // optional walk-in name for CASH sales
-  location         String?
-  total            Int // whole TSh
-  amountPaid       Int                @default(0) // CASH ⇒ equals total
-  creditStatus     FieldCreditStatus? // null for CASH sales
-  paymentMethod    String? // CASH sales: Cash / Bank Transfer / Mobile Money
-  paymentAccount   PaymentAccount?    @relation(fields: [paymentAccountId], references: [id])
-  paymentAccountId String? // which company account received the cash
-  reference        String? // transaction reference (optional)
-  dueDate          DateTime?
-  note             String?
-  voided           Boolean            @default(false) // admin correction — restores stock
-  voidReason       String?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  id                  String             @id @default(cuid())
+  code                String             @unique
+  type                FieldSaleType
+  rep                 User               @relation("RepSales", fields: [repId], references: [id])
+  repId               String
+  customer            FieldCustomer?     @relation(fields: [customerId], references: [id])
+  customerId          String? // required for CREDIT
+  customerName        String? // optional walk-in name for CASH sales
+  location            String?
+  total               Int // whole TSh
+  amountPaid          Int                @default(0) // CASH ⇒ equals total
+  creditStatus        FieldCreditStatus? // null for CASH sales
+  paymentMethod       String? // CASH sales: Cash / Bank Transfer / Mobile Money
+  paymentAccount      PaymentAccount?    @relation(fields: [paymentAccountId], references: [id])
+  paymentAccountId    String? // which company account received the cash
+  reference           String? // transaction reference (optional)
+  dueDate             DateTime?
+  note                String?
+  // Finance verification — the gate between a rep's record and company money.
+  financeStatus       FinanceApproval    @default(PENDING)
+  financeReviewedBy   User?              @relation("FieldSaleReviewer", fields: [financeReviewedById], references: [id])
+  financeReviewedById String?
+  financeReviewedAt   DateTime?
+  financeNote         String? // approval / rejection comment
+  voided              Boolean            @default(false) // admin correction — restores stock
+  voidReason          String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   items    FieldSaleItem[]
   payments FieldPayment[]
@@ -1000,6 +1017,7 @@ model FieldSale {
   @@index([repId])
   @@index([type])
   @@index([creditStatus])
+  @@index([financeStatus])
   @@index([createdAt])
 }
 
@@ -1018,20 +1036,28 @@ model FieldSaleItem {
 
 /// A collection against a credit sale (rep or admin records it).
 model FieldPayment {
-  id               String          @id @default(cuid())
-  sale             FieldSale       @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  saleId           String
-  amount           Int
-  method           String? // cash, mobile money, bank
-  paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
-  paymentAccountId String? // which company account received the funds
-  reference        String? // transaction reference (optional)
-  note             String?
-  recordedBy       User            @relation("FieldPaymentRecorder", fields: [recordedById], references: [id])
-  recordedById     String
-  createdAt        DateTime        @default(now())
+  id                  String          @id @default(cuid())
+  sale                FieldSale       @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId              String
+  amount              Int
+  method              String? // cash, mobile money, bank
+  paymentAccount      PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  paymentAccountId    String? // which company account received the funds
+  reference           String? // transaction reference (optional)
+  note                String?
+  recordedBy          User            @relation("FieldPaymentRecorder", fields: [recordedById], references: [id])
+  recordedById        String
+  // Rep-recorded collections stay PENDING (and unapplied to the sale balance)
+  // until finance verifies the money; finance/admin records auto-approve.
+  financeStatus       FinanceApproval @default(PENDING)
+  financeReviewedBy   User?           @relation("FieldPaymentReviewer", fields: [financeReviewedById], references: [id])
+  financeReviewedById String?
+  financeReviewedAt   DateTime?
+  financeNote         String?
+  createdAt           DateTime        @default(now())
 
   @@index([saleId])
+  @@index([financeStatus])
   @@index([paymentAccountId])
 }
 

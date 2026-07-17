@@ -251,6 +251,12 @@ export default async function RepOverviewPage() {
                       <StatusBadge status={s.type} />
                       {s.creditStatus && <StatusBadge status={s.creditStatus} />}
                       {s.voided && <Badge variant="destructive">Voided</Badge>}
+                      {!s.voided && s.financeStatus === "PENDING" && (
+                        <Badge variant="warning">Awaiting finance</Badge>
+                      )}
+                      {!s.voided && s.financeStatus === "REJECTED" && (
+                        <Badge variant="destructive">Rejected by finance</Badge>
+                      )}
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {s.customer?.name ?? s.customerName ?? "Walk-in"} ·{" "}

@@ -56,8 +56,9 @@ export default async function AdminRepDetailPage({
       where: { repId: id },
       orderBy: { name: "asc" },
       include: {
+        // Owed totals exclude finance-rejected sales (PENDING stays visible).
         sales: {
-          where: { voided: false, type: "CREDIT" },
+          where: { voided: false, type: "CREDIT", financeStatus: { not: "REJECTED" } },
           select: { id: true, total: true, amountPaid: true, creditStatus: true },
         },
       },

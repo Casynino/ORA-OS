@@ -102,6 +102,12 @@ export default async function RepCustomerDetailPage({
                       <StatusBadge status={s.type} />
                       {s.creditStatus && <StatusBadge status={s.creditStatus} />}
                       {s.voided && <Badge variant="destructive">Voided</Badge>}
+                      {!s.voided && s.financeStatus === "PENDING" && (
+                        <Badge variant="warning">Awaiting finance</Badge>
+                      )}
+                      {!s.voided && s.financeStatus === "REJECTED" && (
+                        <Badge variant="destructive">Rejected by finance</Badge>
+                      )}
                     </div>
                     <span className="text-sm font-semibold">{formatCurrency(s.total)}</span>
                   </div>

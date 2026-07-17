@@ -94,23 +94,57 @@ export default async function AdminCommandCenter() {
 
   // Executive approvals — finance items waiting on the admin's sign-off.
   const weekAgo = new Date(Date.now() - 7 * 86400000);
-  const [pettyPendingAgg, payrollPendingRuns, largeExpensesAgg] =
-    await Promise.all([
-      prisma.pettyCashRequest.aggregate({
-        _count: true,
-        _sum: { amount: true },
-        where: { status: "PENDING" },
-      }),
-      prisma.payrollRun.findMany({
-        where: { status: "PENDING_APPROVAL" },
-        select: { items: { select: { net: true } } },
-      }),
-      prisma.expense.aggregate({
-        _count: true,
-        _sum: { amount: true },
-        where: { amount: { gte: 1_000_000 }, expenseDate: { gte: weekAgo } },
-      }),
-    ]);
+  const [
+    pettyPendingAgg,
+    payrollPendingRuns,
+    largeExpensesAgg,
+    pendingSalesByType,
+    pendingCollectionsAgg,
+    lastPaidPayroll,
+    openFloats,
+  ] = await Promise.all([
+    prisma.pettyCashRequest.aggregate({
+      _count: true,
+      _sum: { amount: true },
+      where: { status: "PENDING" },
+    }),
+    prisma.payrollRun.findMany({
+      where: { status: "PENDING_APPROVAL" },
+      select: { items: { select: { net: true } } },
+    }),
+    prisma.expense.aggregate({
+      _count: true,
+      _sum: { amount: true },
+      where: { amount: { gte: 1_000_000 }, expenseDate: { gte: weekAgo } },
+    }),
+    // Rep money awaiting finance verification — shown as chips, never in KPIs.
+    prisma.fieldSale.groupBy({
+      by: ["type"],
+      _count: { _all: true },
+      _sum: { total: true },
+      where: { financeStatus: "PENDING", voided: false },
+    }),
+    prisma.fieldPayment.aggregate({
+      _count: true,
+      _sum: { amount: true },
+      where: { financeStatus: "PENDING", sale: { voided: false } },
+    }),
+    // CEO visibility: latest processed payroll + open petty cash floats.
+    prisma.payrollRun.findFirst({
+      where: { status: "PAID" },
+      orderBy: { paidAt: "desc" },
+      include: { items: { select: { net: true } } },
+    }),
+    prisma.pettyCashRequest.findMany({
+      where: { status: "APPROVED" },
+      include: {
+        requestedBy: { select: { name: true } },
+        expenses: { orderBy: { createdAt: "desc" }, take: 3 },
+      },
+    }),
+  ]);
+  const pendingCashSales = pendingSalesByType.find((g) => g.type === "CASH");
+  const pendingCreditSales = pendingSalesByType.find((g) => g.type === "CREDIT");
   const pettyPendingCount = pettyPendingAgg._count;
   const pettyPendingSum = pettyPendingAgg._sum.amount ?? 0;
   const payrollPendingCount = payrollPendingRuns.length;
@@ -312,7 +346,7 @@ export default async function AdminCommandCenter() {
       {/* ── Executive approvals ──────────────────────────────── */}
       <section>
         <SectionLabel>Executive approvals</SectionLabel>
-        {pettyPendingCount === 0 && payrollPendingCount === 0 && largeExpenseCount === 0 ? (
+        {pettyPendingCount === 0 && payrollPendingCount === 0 && largeExpenseCount === 0 && !pendingCashSales && !pendingCreditSales && pendingCollectionsAgg._count === 0 ? (
           <p className="rounded-xl border border-dashed border-border p-3 text-sm text-muted-foreground">
             Nothing awaiting your approval.
           </p>
@@ -346,6 +380,48 @@ export default async function AdminCommandCenter() {
                 <span className="shrink-0 font-display font-semibold">{formatCurrency(payrollPendingSum)}</span>
               </Link>
             )}
+            {(pendingCashSales?._count._all ?? 0) > 0 && (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-warning/40 bg-warning/[0.04] p-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Banknote className="size-4 shrink-0 text-warning" />
+                    <p className="truncate text-sm font-medium">
+                      {pendingCashSales!._count._all} sale{pendingCashSales!._count._all === 1 ? "" : "s"} awaiting finance confirmation
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Not counted in your KPIs until finance verifies the money</p>
+                </div>
+                <span className="shrink-0 font-display font-semibold">{formatCurrency(pendingCashSales!._sum.total ?? 0)}</span>
+              </div>
+            )}
+            {(pendingCreditSales?._count._all ?? 0) > 0 && (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-warning/40 bg-warning/[0.04] p-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="size-4 shrink-0 text-warning" />
+                    <p className="truncate text-sm font-medium">
+                      {pendingCreditSales!._count._all} credit sale{pendingCreditSales!._count._all === 1 ? "" : "s"} pending finance review
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Become official receivables once finance approves the terms</p>
+                </div>
+                <span className="shrink-0 font-display font-semibold">{formatCurrency(pendingCreditSales!._sum.total ?? 0)}</span>
+              </div>
+            )}
+            {pendingCollectionsAgg._count > 0 && (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-warning/40 bg-warning/[0.04] p-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Banknote className="size-4 shrink-0 text-warning" />
+                    <p className="truncate text-sm font-medium">
+                      {pendingCollectionsAgg._count} collection{pendingCollectionsAgg._count === 1 ? "" : "s"} awaiting verification
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Rep-collected repayments finance still has to verify</p>
+                </div>
+                <span className="shrink-0 font-display font-semibold">{formatCurrency(pendingCollectionsAgg._sum.amount ?? 0)}</span>
+              </div>
+            )}
             {largeExpenseCount > 0 && (
               <Link href="/admin/finance/expenses" className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-muted/30">
                 <div className="min-w-0">
@@ -362,6 +438,94 @@ export default async function AdminCommandCenter() {
             )}
           </div>
         )}
+      </section>
+
+      {/* ── Financial oversight — verified activity, payroll, petty cash ── */}
+      <section>
+        <SectionLabel>Financial oversight</SectionLabel>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          <div className="glass-card rounded-2xl p-5">
+            <h3 className="flex items-center gap-2 font-display font-semibold">
+              <Banknote className="size-4" /> Financial activity
+            </h3>
+            {d.financialActivity.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Confirmed sales, expenses, payroll and petty cash events will stream here.
+              </p>
+            ) : (
+              <ol className="relative mt-4 space-y-3.5 pl-5">
+                <span className="absolute left-[5px] top-1 h-[calc(100%-0.5rem)] w-px bg-border" />
+                {d.financialActivity.map((a) => (
+                  <li key={a.id} className="relative">
+                    <span className="absolute -left-5 top-1.5 size-2.5 rounded-full bg-success/70" />
+                    <p className="text-sm">{a.summary}</p>
+                    <p className="text-[11px] text-muted-foreground">{timeAgo(a.createdAt)}</p>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+          <div className="space-y-4">
+            <div className="glass-card rounded-2xl p-5">
+              <h3 className="flex items-center gap-2 font-display font-semibold">
+                <Users className="size-4" /> Latest payroll
+              </h3>
+              {lastPaidPayroll ? (
+                <div className="mt-3 space-y-1.5 text-sm">
+                  <p className="font-display text-2xl font-bold">
+                    {formatCurrency(lastPaidPayroll.items.reduce((s, i) => s + i.net, 0))}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {lastPaidPayroll.month}/{lastPaidPayroll.year} · {lastPaidPayroll.items.length} employee{lastPaidPayroll.items.length === 1 ? "" : "s"} paid
+                    {lastPaidPayroll.paidAt ? ` · ${timeAgo(lastPaidPayroll.paidAt)}` : ""}
+                  </p>
+                  <Link href="/admin/finance/payroll" className="inline-block text-xs font-medium text-primary hover:underline">
+                    Payroll history →
+                  </Link>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-muted-foreground">No payroll processed yet.</p>
+              )}
+            </div>
+            <div className="glass-card rounded-2xl p-5">
+              <h3 className="flex items-center gap-2 font-display font-semibold">
+                <Wallet className="size-4" /> Petty cash floats
+              </h3>
+              {openFloats.length === 0 ? (
+                <p className="mt-3 text-sm text-muted-foreground">No open allocations.</p>
+              ) : (
+                <div className="mt-3 space-y-2.5">
+                  {openFloats.map((f) => {
+                    const spent = f.expenses.reduce((s, e) => s + e.amount, 0);
+                    return (
+                      <div key={f.id} className="rounded-xl border border-border/60 p-3 text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 truncate font-medium">
+                            {f.code} · {f.requestedBy.name}
+                          </span>
+                          <span className="shrink-0 font-semibold">
+                            {formatCurrency(Math.max(0, f.amount - spent))} left
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {formatCurrency(spent)} of {formatCurrency(f.amount)} spent · {f.purpose}
+                        </p>
+                        {f.expenses.map((e) => (
+                          <p key={e.id} className="mt-1 truncate text-xs text-muted-foreground">
+                            − {formatCurrency(e.amount)} · {e.description}
+                          </p>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  <Link href="/admin/finance/petty-cash" className="inline-block text-xs font-medium text-primary hover:underline">
+                    All petty cash →
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* ── Quick actions ────────────────────────────────────── */}

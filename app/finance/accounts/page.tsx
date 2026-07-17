@@ -34,11 +34,11 @@ export default async function FinanceAccountsPage() {
       orderBy: [{ type: "asc" }, { name: "asc" }],
     }),
     prisma.fieldSale.findMany({
-      where: { voided: false, type: "CASH", paymentAccountId: { not: null } },
+      where: { voided: false, financeStatus: "APPROVED", type: "CASH", paymentAccountId: { not: null } },
       select: { paymentAccountId: true, total: true, createdAt: true },
     }),
     prisma.fieldPayment.findMany({
-      where: { paymentAccountId: { not: null }, sale: { voided: false } },
+      where: { financeStatus: "APPROVED", paymentAccountId: { not: null }, sale: { voided: false } },
       select: { paymentAccountId: true, amount: true, createdAt: true },
     }),
     prisma.payment.findMany({

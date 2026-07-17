@@ -44,6 +44,8 @@ export default async function FinanceDashboardPage() {
     pendingPayments,
     claimedPayments,
     pendingSettlements,
+    pendingRepSales,
+    pendingRepCollections,
     approvedPayroll,
     pendingPayroll,
     openPettyCash,
@@ -58,12 +60,12 @@ export default async function FinanceDashboardPage() {
     Promise.all([
       prisma.fieldSale.groupBy({
         by: ["paymentAccountId"],
-        where: { voided: false, type: "CASH", paymentAccountId: { not: null } },
+        where: { voided: false, financeStatus: "APPROVED", type: "CASH", paymentAccountId: { not: null } },
         _sum: { total: true },
       }),
       prisma.fieldPayment.groupBy({
         by: ["paymentAccountId"],
-        where: { paymentAccountId: { not: null }, sale: { voided: false } },
+        where: { financeStatus: "APPROVED", paymentAccountId: { not: null }, sale: { voided: false } },
         _sum: { amount: true },
       }),
       prisma.payment.groupBy({
@@ -89,6 +91,10 @@ export default async function FinanceDashboardPage() {
       },
     }),
     prisma.settlementRequest.count({ where: { status: "PENDING" } }),
+    prisma.fieldSale.count({ where: { financeStatus: "PENDING", voided: false } }),
+    prisma.fieldPayment.count({
+      where: { financeStatus: "PENDING", sale: { voided: false } },
+    }),
     prisma.payrollRun.findMany({
       where: { status: "APPROVED" },
       include: { items: { select: { net: true } } },
@@ -167,7 +173,16 @@ export default async function FinanceDashboardPage() {
       />
 
       {/* Attention strip */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Link href="/finance/sales-approvals" className="transition-transform hover:-translate-y-0.5">
+          <StatCard
+            label="Rep sales awaiting verification"
+            value={formatNumber(pendingRepSales + pendingRepCollections)}
+            hint={`${formatNumber(pendingRepSales)} sales · ${formatNumber(pendingRepCollections)} collections`}
+            icon={ClipboardCheck}
+            accent={pendingRepSales + pendingRepCollections > 0 ? "warning" : "success"}
+          />
+        </Link>
         <Link href="/finance/payments" className="transition-transform hover:-translate-y-0.5">
           <StatCard
             label="Pending payment confirmations"
