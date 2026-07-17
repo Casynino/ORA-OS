@@ -72,6 +72,10 @@ export function FieldCollectionButton({
       toast({ variant: "error", title: "Enter the cheque bank, number and date." });
       return;
     }
+    if (isCheque && !proofUrl) {
+      toast({ variant: "error", title: "Attach a photo of the cheque." });
+      return;
+    }
     start(async () => {
       const res = await recordFieldCollection({
         saleId,
@@ -155,7 +159,7 @@ export function FieldCollectionButton({
             )}
             <div>
               <Label className="mb-1.5 block">
-                {isCheque ? "Cheque photo (optional)" : "Payment proof (optional)"}
+                {isCheque ? "Cheque photo *" : "Payment proof (optional)"}
               </Label>
               <ProofUpload value={proofUrl} onChange={setProofUrl} label={isCheque ? "Attach cheque photo" : "Attach receipt / screenshot"} />
             </div>

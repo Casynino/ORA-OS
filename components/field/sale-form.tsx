@@ -238,6 +238,11 @@ export function FieldSaleForm({
         variant: "error",
         title: "Enter the cheque bank, number and date.",
       });
+    if (isCheque && !payProofUrl)
+      return toast({
+        variant: "error",
+        title: "Attach a photo of the cheque.",
+      });
 
     start(async () => {
       const res = await recordFieldSale({
@@ -616,7 +621,7 @@ export function FieldSaleForm({
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">
                 {isCheque
-                  ? "Cheque photo (optional) — attach a picture of the cheque"
+                  ? "Cheque photo * — attach a picture of the cheque"
                   : "Proof of payment — attach the customer's receipt / screenshot"}
               </Label>
               <ProofUpload
