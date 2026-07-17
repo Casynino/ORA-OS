@@ -51,8 +51,8 @@ export function RegisterForm() {
       )}
 
       <div>
-        <Label htmlFor="name">Full name</Label>
-        <Input id="name" name="name" required className="mt-1.5" />
+        <Label htmlFor="organization">Business / organisation name</Label>
+        <Input id="organization" name="organization" required className="mt-1.5" />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -61,27 +61,21 @@ export function RegisterForm() {
           <Input id="email" name="email" type="email" required className="mt-1.5" />
         </div>
         <div>
-          <Label htmlFor="phone">Phone (optional)</Label>
-          <Input id="phone" name="phone" className="mt-1.5" />
+          <Label htmlFor="phone">Phone</Label>
+          <Input id="phone" name="phone" type="tel" required className="mt-1.5" />
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="organization">Business / organisation</Label>
-          <Input id="organization" name="organization" className="mt-1.5" />
-        </div>
-        <div>
-          <Label htmlFor="businessType">Business type</Label>
-          <Select id="businessType" name="businessType" defaultValue="Agent" className="mt-1.5">
-            <option>Agent</option>
-            <option>Distributor</option>
-            <option>NGO</option>
-            <option>School</option>
-            <option>Retail chain</option>
-            <option>Other</option>
-          </Select>
-        </div>
+      <div>
+        <Label htmlFor="businessType">Business type</Label>
+        <Select id="businessType" name="businessType" defaultValue="Agent" className="mt-1.5">
+          <option>Agent</option>
+          <option>Distributor</option>
+          <option>NGO</option>
+          <option>School</option>
+          <option>Retail chain</option>
+          <option>Other</option>
+        </Select>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

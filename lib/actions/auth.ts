@@ -65,11 +65,12 @@ export async function loginAction(
 }
 
 const registerSchema = z.object({
-  name: z.string().min(2, "Enter your full name."),
+  // Partners are identified by their business/organisation name only — no
+  // personal full name. Phone is required so we can always reach them.
+  organization: z.string().trim().min(2, "Enter your business or organisation name."),
   email: z.string().email("Enter a valid email address."),
   password: z.string().min(8, "Password must be at least 8 characters."),
-  phone: z.string().optional(),
-  organization: z.string().optional(),
+  phone: z.string().trim().min(7, "Enter a valid phone number.").max(30),
   region: z.string().optional(),
   district: z.string().optional(),
   street: z.string().optional(),
@@ -112,15 +113,16 @@ export async function registerAction(
   // The address provided at registration becomes the default delivery address.
   const location = [street, district, region].filter(Boolean).join(", ") || null;
 
+  const org = data.organization.trim();
   const user = await prisma.user.create({
     data: {
-      name: data.name.trim(),
+      name: org, // partners are known by their business/organisation name only
       email,
       passwordHash: await bcrypt.hash(data.password, 10),
-      phone: data.phone?.trim() || null,
+      phone: data.phone.trim(),
       role: "PARTNER",
       status: "PENDING",
-      organization: data.organization?.trim() || null,
+      organization: org,
       region,
       district,
       street,
