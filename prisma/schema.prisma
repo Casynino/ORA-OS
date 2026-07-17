@@ -161,53 +161,54 @@ model User {
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
-  requestsMade          Request[]            @relation("RequestRequester")
-  requestsReviewed      Request[]            @relation("RequestReviewer")
-  movementsCreated      StockMovement[]      @relation("MovementCreator")
-  donationsMade         Donation[]           @relation("DonationDonor")
-  donationsHandled      Donation[]           @relation("DonationHandler")
-  returnsMade           ReturnRequest[]      @relation("ReturnRequester")
-  returnsReviewed       ReturnRequest[]      @relation("ReturnReviewer")
-  creditAccounts        CreditAccount[]      @relation("CreditAgent")
-  creditsApproved       CreditAccount[]      @relation("CreditApprover")
-  paymentsRecorded      Payment[]            @relation("PaymentRecorder")
+  requestsMade          Request[]                @relation("RequestRequester")
+  requestsReviewed      Request[]                @relation("RequestReviewer")
+  movementsCreated      StockMovement[]          @relation("MovementCreator")
+  donationsMade         Donation[]               @relation("DonationDonor")
+  donationsHandled      Donation[]               @relation("DonationHandler")
+  returnsMade           ReturnRequest[]          @relation("ReturnRequester")
+  returnsReviewed       ReturnRequest[]          @relation("ReturnReviewer")
+  creditAccounts        CreditAccount[]          @relation("CreditAgent")
+  creditsApproved       CreditAccount[]          @relation("CreditApprover")
+  paymentsRecorded      Payment[]                @relation("PaymentRecorder")
   cycleLogs             CycleLog[]
-  activityLogs          ActivityLog[]        @relation("ActivityActor")
-  educationAuthored     EducationContent[]   @relation("ContentAuthor")
-  newsAuthored          NewsPost[]           @relation("NewsAuthor")
-  partnerPrices         PartnerPrice[]       @relation("PartnerPrices")
-  transfersCreated      WarehouseTransfer[]  @relation("TransferCreator")
-  settlementsSubmitted  SettlementRequest[]  @relation("SettlementPartner")
-  settlementsReviewed   SettlementRequest[]  @relation("SettlementReviewer")
-  contactMessages       ContactMessage[]     @relation("ContactSender")
+  activityLogs          ActivityLog[]            @relation("ActivityActor")
+  educationAuthored     EducationContent[]       @relation("ContentAuthor")
+  newsAuthored          NewsPost[]               @relation("NewsAuthor")
+  partnerPrices         PartnerPrice[]           @relation("PartnerPrices")
+  transfersCreated      WarehouseTransfer[]      @relation("TransferCreator")
+  settlementsSubmitted  SettlementRequest[]      @relation("SettlementPartner")
+  settlementsReviewed   SettlementRequest[]      @relation("SettlementReviewer")
+  contactMessages       ContactMessage[]         @relation("ContactSender")
   // Field sales (SALES_REP)
-  repStock              RepStock[]           @relation("RepStockRep")
-  repIssuesReceived     RepStockIssue[]      @relation("RepIssueRep")
-  repIssuesGiven        RepStockIssue[]      @relation("RepIssuer")
-  repStockRequests      RepStockRequest[]    @relation("RepStockRequestRep")
-  repRequestsPrepared   RepStockRequest[]    @relation("RepRequestPreparer")
-  fieldCustomers        FieldCustomer[]      @relation("RepCustomers")
-  fieldSales            FieldSale[]          @relation("RepSales")
-  fieldPaymentsRecorded FieldPayment[]       @relation("FieldPaymentRecorder")
-  fieldSalesReviewed    FieldSale[]          @relation("FieldSaleReviewer")
-  fieldPaymentsReviewed FieldPayment[]       @relation("FieldPaymentReviewer")
+  repStock              RepStock[]               @relation("RepStockRep")
+  repIssuesReceived     RepStockIssue[]          @relation("RepIssueRep")
+  repIssuesGiven        RepStockIssue[]          @relation("RepIssuer")
+  repStockRequests      RepStockRequest[]        @relation("RepStockRequestRep")
+  repRequestsPrepared   RepStockRequest[]        @relation("RepRequestPreparer")
+  fieldCustomers        FieldCustomer[]          @relation("RepCustomers")
+  fieldSales            FieldSale[]              @relation("RepSales")
+  fieldPaymentsRecorded FieldPayment[]           @relation("FieldPaymentRecorder")
+  fieldSalesReviewed    FieldSale[]              @relation("FieldSaleReviewer")
+  fieldPaymentsReviewed FieldPayment[]           @relation("FieldPaymentReviewer")
+  cashDeposits          CashDeposit[]            @relation("CashDepositCreator")
   extensionsRequested   CreditExtensionRequest[] @relation("ExtensionRequester")
   extensionsReviewed    CreditExtensionRequest[] @relation("ExtensionReviewer")
-  sampleLogs            SampleLog[]          @relation("RepSamples")
-  fieldReports          FieldReport[]        @relation("RepReports")
-  repTargets            RepTarget[]          @relation("RepTargets")
+  sampleLogs            SampleLog[]              @relation("RepSamples")
+  fieldReports          FieldReport[]            @relation("RepReports")
+  repTargets            RepTarget[]              @relation("RepTargets")
   // Finance
-  expensesRecorded      Expense[]            @relation("ExpenseRecorder")
-  capitalRecorded       CapitalEntry[]       @relation("CapitalRecorder")
-  pettyCashRequested    PettyCashRequest[]   @relation("PettyCashRequester")
-  pettyCashApproved     PettyCashRequest[]   @relation("PettyCashApprover")
-  pettyCashSpent        PettyCashExpense[]   @relation("PettyCashSpender")
-  payrollCreated        PayrollRun[]         @relation("PayrollCreator")
-  payrollApproved       PayrollRun[]         @relation("PayrollApprover")
+  expensesRecorded      Expense[]                @relation("ExpenseRecorder")
+  capitalRecorded       CapitalEntry[]           @relation("CapitalRecorder")
+  pettyCashRequested    PettyCashRequest[]       @relation("PettyCashRequester")
+  pettyCashApproved     PettyCashRequest[]       @relation("PettyCashApprover")
+  pettyCashSpent        PettyCashExpense[]       @relation("PettyCashSpender")
+  payrollCreated        PayrollRun[]             @relation("PayrollCreator")
+  payrollApproved       PayrollRun[]             @relation("PayrollApprover")
   // Impact
-  impactActivities      ImpactActivity[]     @relation("ImpactActivityCreator")
+  impactActivities      ImpactActivity[]         @relation("ImpactActivityCreator")
   loginEvents           LoginEvent[]
-  creditEvents          PartnerCreditEvent[] @relation("PartnerCreditEvents")
+  creditEvents          PartnerCreditEvent[]     @relation("PartnerCreditEvents")
 
   @@index([role])
   @@index([status])
@@ -460,6 +461,7 @@ model PaymentAccount {
   requests           Request[]
   pettyCashRequests  PettyCashRequest[]
   payrollRuns        PayrollRun[]
+  cashDeposits       CashDeposit[]
 
   @@index([type])
   @@index([isActive])
@@ -653,33 +655,33 @@ model ContactMessage {
 // ── Returns ────────────────────────────────────────────────────────────────
 
 model ReturnRequest {
-  id            String       @id @default(cuid())
-  code          String       @unique
-  request       Request?     @relation(fields: [requestId], references: [id])
-  requestId     String?
-  product       Product      @relation(fields: [productId], references: [id])
-  productId     String
-  requester     User         @relation("ReturnRequester", fields: [requesterId], references: [id])
-  requesterId   String
-  quantity      Int
-  reason        String?
-  reasonType    String?
-  warehouseName String?
-  status        ReturnStatus @default(PENDING)
-  reviewedBy    User?        @relation("ReturnReviewer", fields: [reviewedById], references: [id])
-  reviewedById  String?
-  reviewedAt    DateTime?
-  receivedAt    DateTime?
-  adminNote     String?
+  id               String       @id @default(cuid())
+  code             String       @unique
+  request          Request?     @relation(fields: [requestId], references: [id])
+  requestId        String?
+  product          Product      @relation(fields: [productId], references: [id])
+  productId        String
+  requester        User         @relation("ReturnRequester", fields: [requesterId], references: [id])
+  requesterId      String
+  quantity         Int
+  reason           String?
+  reasonType       String?
+  warehouseName    String?
+  status           ReturnStatus @default(PENDING)
+  reviewedBy       User?        @relation("ReturnReviewer", fields: [reviewedById], references: [id])
+  reviewedById     String?
+  reviewedAt       DateTime?
+  receivedAt       DateTime?
+  adminNote        String?
   // Finance-initiated debt-recovery return: goods taken back to settle an
   // outstanding field credit sale. On receipt, creditValue is applied to the
   // linked sale's balance (reduces accounts receivable).
-  financeInitiated Boolean    @default(false)
-  fieldSale     FieldSale?   @relation(fields: [fieldSaleId], references: [id])
-  fieldSaleId   String?
-  creditValue   Int? // TSh recovered off the debt when the return completes
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  financeInitiated Boolean      @default(false)
+  fieldSale        FieldSale?   @relation(fields: [fieldSaleId], references: [id])
+  fieldSaleId      String?
+  creditValue      Int? // TSh recovered off the debt when the return completes
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   @@index([status])
   @@index([requesterId])
@@ -861,6 +863,14 @@ enum FieldSaleType {
   CREDIT
 }
 
+/// Lifecycle of PHYSICAL cash after finance confirms receipt from a rep.
+/// Only set for cash-method transactions; bank/mobile/cheque money lands
+/// straight in an account and never enters cash-on-hand (stays null).
+enum CashStatus {
+  RECEIVED // finance confirmed the cash in hand — revenue recognised, awaiting deposit
+  DEPOSITED // batched into a CashDeposit and banked
+}
+
 enum FieldCreditStatus {
   PENDING // credit sale, nothing (or only part) collected yet
   PARTIAL
@@ -961,28 +971,28 @@ model RepStockRequestItem {
 /// A rep's field customer. Each customer belongs to exactly ONE sales rep
 /// (the rep who created them) — customer books are never shared between reps.
 model FieldCustomer {
-  id              String   @id @default(cuid())
-  name            String
-  businessName    String? // trading name, e.g. "ABC Pharmacy"
-  email           String?
-  phone           String?
-  location        String? // street / physical address — default delivery address
-  region          String? // administrative region, e.g. "Dar es Salaam"
-  district        String? // administrative district within the region
-  customerType    String? // Pharmacy / Shop / Supermarket / Kiosk / …
-  expectedVolume  String? // expected monthly purchase volume, e.g. "500 packs"
+  id               String   @id @default(cuid())
+  name             String
+  businessName     String? // trading name, e.g. "ABC Pharmacy"
+  email            String?
+  phone            String?
+  location         String? // street / physical address — default delivery address
+  region           String? // administrative region, e.g. "Dar es Salaam"
+  district         String? // administrative district within the region
+  customerType     String? // Pharmacy / Shop / Supermarket / Kiosk / …
+  expectedVolume   String? // expected monthly purchase volume, e.g. "500 packs"
   preferredPayment String? // Cash / Credit
-  businessLicense String? // licence number (optional)
-  taxId           String? // TIN / tax number (optional)
-  creditLimit     Int? // per-customer credit cap, set by ADMIN/FINANCE only (null = uncapped). Enforced on credit sales.
-  gpsLat          Float? // captured on creation when the device allows it
-  gpsLng          Float?
-  notes           String?
-  rep             User     @relation("RepCustomers", fields: [repId], references: [id])
-  repId           String
-  creditSuspended Boolean  @default(false) // admin can cut off credit access
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  businessLicense  String? // licence number (optional)
+  taxId            String? // TIN / tax number (optional)
+  creditLimit      Int? // per-customer credit cap, set by ADMIN/FINANCE only (null = uncapped). Enforced on credit sales.
+  gpsLat           Float? // captured on creation when the device allows it
+  gpsLng           Float?
+  notes            String?
+  rep              User     @relation("RepCustomers", fields: [repId], references: [id])
+  repId            String
+  creditSuspended  Boolean  @default(false) // admin can cut off credit access
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   sales            FieldSale[]
   creditExtensions CreditExtensionRequest[]
@@ -1036,6 +1046,13 @@ model FieldSale {
   // customer's receipt at point of sale; for a cash sale finance attaches the
   // bank deposit slip at confirmation.
   paymentProofUrl     String?
+  // Physical-cash lifecycle (CASH-method sales only). null until finance
+  // confirms cash received; RECEIVED = cash on hand; DEPOSITED = banked via a
+  // CashDeposit. Bank/mobile/cheque money stays null (it's in an account).
+  cashStatus          CashStatus?
+  cashDeposit         CashDeposit?       @relation(fields: [cashDepositId], references: [id])
+  cashDepositId       String?
+  cashReceivedAt      DateTime? // when finance confirmed the cash in hand
   voided              Boolean            @default(false) // admin correction — restores stock
   voidReason          String?
   createdAt           DateTime           @default(now())
@@ -1050,6 +1067,8 @@ model FieldSale {
   @@index([type])
   @@index([creditStatus])
   @@index([financeStatus])
+  @@index([cashStatus])
+  @@index([cashDepositId])
   @@index([createdAt])
 }
 
@@ -1093,11 +1112,18 @@ model FieldPayment {
   depositProofRef     String?
   // Uploaded proof image (customer receipt / deposit slip).
   paymentProofUrl     String?
+  // Physical-cash lifecycle (cash collections only) — mirrors FieldSale.
+  cashStatus          CashStatus?
+  cashDeposit         CashDeposit?    @relation(fields: [cashDepositId], references: [id])
+  cashDepositId       String?
+  cashReceivedAt      DateTime?
   createdAt           DateTime        @default(now())
 
   @@index([saleId])
   @@index([financeStatus])
   @@index([paymentAccountId])
+  @@index([cashStatus])
+  @@index([cashDepositId])
 }
 
 /// A finance-raised request to extend a credit sale's due date. Finance creates
@@ -1132,6 +1158,30 @@ model CreditExtensionRequest {
   @@index([saleId])
   @@index([customerId])
   @@index([status])
+}
+
+/// A weekly/monthly bank deposit that banks a BATCH of already-received cash.
+/// Finance selects cash sales + collections that are RECEIVED (on hand) and
+/// deposits them together into one company account, attaching the deposit slip.
+model CashDeposit {
+  id               String         @id @default(cuid())
+  code             String         @unique // e.g. DEP-3F7K2Q
+  depositAccount   PaymentAccount @relation(fields: [depositAccountId], references: [id])
+  depositAccountId String // the company bank account the cash was banked into
+  total            Int // whole TSh — sum of the linked cash (computed server-side)
+  depositDate      DateTime // date the cash was physically banked
+  slipRef          String? // deposit slip number / bank reference
+  slipUrl          String? // uploaded deposit-slip image
+  note             String?
+  depositedBy      User           @relation("CashDepositCreator", fields: [depositedById], references: [id])
+  depositedById    String
+  createdAt        DateTime       @default(now())
+
+  fieldSales    FieldSale[]
+  fieldPayments FieldPayment[]
+
+  @@index([depositAccountId])
+  @@index([depositDate])
 }
 
 /// Free-sample distribution record — deducts the rep's sample stock.
