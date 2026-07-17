@@ -1477,7 +1477,7 @@ function FieldCreditPanel({
                   c.status === "OVERDUE" ? "border-destructive/40" : "border-border"
                 }`}
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-display font-semibold">{c.customerBusiness ?? c.customerName}</span>
@@ -1502,7 +1502,7 @@ function FieldCreditPanel({
                       {c.items.map((i) => `${i.quantity} × ${i.name}`).join(" · ")}
                     </p>
                   </div>
-                  <div className="shrink-0 text-right">
+                  <div className="shrink-0 sm:text-right">
                     <p className="font-display font-bold">{formatCurrency(c.total)}</p>
                     <p className="text-xs text-muted-foreground">
                       paid {formatCurrency(c.amountPaid)}
@@ -1512,7 +1512,7 @@ function FieldCreditPanel({
                         <span className="text-success"> · settled</span>
                       )}
                     </p>
-                    <div className="mt-1 flex flex-wrap items-center justify-end gap-x-3 gap-y-0.5">
+                    <div className="mt-1 flex flex-wrap items-center justify-start gap-x-3 gap-y-0.5 sm:justify-end">
                       {detailBase && (
                         <Link
                           href={`${detailBase}/${c.id}`}
