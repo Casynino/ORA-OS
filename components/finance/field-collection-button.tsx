@@ -13,6 +13,7 @@ import {
   METHOD_LABELS,
   type ReceivingAccount,
 } from "@/components/ui/receiving-account-picker";
+import { ProofUpload } from "@/components/ui/proof-upload";
 import { toast } from "@/components/ui/use-toast";
 import { formatCurrency } from "@/lib/utils";
 
@@ -42,6 +43,7 @@ export function FieldCollectionButton({
     accounts.find((a) => a.type === firstMethod)?.id ?? accounts[0]?.id ?? "",
   );
   const [reference, setReference] = useState("");
+  const [proofUrl, setProofUrl] = useState("");
 
   const amt = Math.round(Number(amount) || 0);
 
@@ -65,6 +67,7 @@ export function FieldCollectionButton({
         method: METHOD_LABELS[method] ?? method,
         paymentAccountId: accountId || undefined,
         reference: reference || undefined,
+        paymentProofUrl: proofUrl || undefined,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message ?? "Payment recorded." });
@@ -109,6 +112,10 @@ export function FieldCollectionButton({
               onAccount={setAccountId}
               onReference={setReference}
             />
+            <div>
+              <Label className="mb-1.5 block">Payment proof (optional)</Label>
+              <ProofUpload value={proofUrl} onChange={setProofUrl} label="Attach receipt / screenshot" />
+            </div>
             <Button className="w-full" onClick={submit} disabled={pending}>
               {pending ? "Recording…" : "Record payment"}
             </Button>

@@ -260,6 +260,8 @@ const collectSchema = z.object({
   paymentAccountId: z.string().optional().or(z.literal("")),
   reference: z.string().max(80).optional().or(z.literal("")),
   note: z.string().max(300).optional().or(z.literal("")),
+  // Uploaded proof of the payment (receipt / screenshot) — long data URLs ok.
+  paymentProofUrl: z.string().max(15000000).optional().or(z.literal("")),
 });
 
 export async function recordFieldCollection(
@@ -335,6 +337,7 @@ export async function recordFieldCollection(
           method: receiving.method,
           paymentAccountId: receiving.paymentAccountId,
           reference: d.reference?.trim() || null,
+          paymentProofUrl: d.paymentProofUrl?.trim() || null,
           note: d.note || null,
           recordedById: actor.id,
           financeStatus: isRepClaim ? "PENDING" : "APPROVED",
