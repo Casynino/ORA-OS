@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Phone,
   MapPin,
-  Building2,
   BadgeCheck,
   Wallet,
   Banknote,
@@ -79,7 +78,7 @@ export default async function FinanceFieldCustomerPage({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-              {customer.name}
+              {customer.businessName ?? customer.name}
             </h1>
             {customer.customerType && (
               <Badge variant="secondary">{customer.customerType}</Badge>
@@ -89,11 +88,6 @@ export default async function FinanceFieldCustomerPage({
             )}
           </div>
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            {customer.businessName && (
-              <span className="inline-flex items-center gap-1.5">
-                <Building2 className="size-3.5" /> {customer.businessName}
-              </span>
-            )}
             {customer.phone && (
               <span className="inline-flex items-center gap-1.5">
                 <Phone className="size-3.5" /> {customer.phone}

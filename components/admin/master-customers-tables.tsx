@@ -154,10 +154,10 @@ export function MasterCustomersTables({
                       <TableRow key={c.id}>
                         <TableCell data-cardtitle>
                           <Link href={fieldHref(c.id)} className="font-medium hover:text-primary">
-                            {c.name}
+                            {c.businessName ?? c.name}
                           </Link>
                           <div className="text-xs text-muted-foreground">
-                            {[c.businessName, c.customerType, c.phone].filter(Boolean).join(" · ") || "—"}
+                            {[c.customerType, c.phone].filter(Boolean).join(" · ") || "—"}
                             {c.creditSuspended && (
                               <Badge variant="destructive" className="ml-2 text-[10px]">credit off</Badge>
                             )}

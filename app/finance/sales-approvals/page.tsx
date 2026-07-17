@@ -121,7 +121,6 @@ export default async function FinanceSalesApprovalsPage() {
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {s.code} · rep {s.rep.name} · {timeAgo(s.createdAt)}
-            {s.customer?.businessName ? ` · ${s.customer.businessName}` : ""}
           </p>
           <p className="mt-1.5 font-display text-xl font-bold">{formatCurrency(s.total)}</p>
           {s.type === "CASH" ? (

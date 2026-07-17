@@ -93,8 +93,8 @@ const saleSchema = z.object({
   customerId: z.string().optional(),
   newCustomer: z
     .object({
-      name: z.string().min(2),
-      businessName: z.string().max(120).optional().or(z.literal("")),
+      // Customers are identified by their business/trading name only.
+      businessName: z.string().trim().min(2, "Business name is required.").max(120),
       phone: z.string().max(30).optional().or(z.literal("")),
       location: z.string().max(120).optional().or(z.literal("")),
       region: z.string().max(60).optional().or(z.literal("")),
@@ -141,10 +141,13 @@ export async function recordFieldSale(
 
     await prisma.$transaction(async (tx) => {
       if (!customerId && d.newCustomer) {
+        const biz = d.newCustomer.businessName.trim();
         const c = await tx.fieldCustomer.create({
           data: {
-            name: d.newCustomer.name,
-            businessName: d.newCustomer.businessName || null,
+            // Business name is the sole identity; `name` mirrors it because the
+            // column is NOT NULL and every display reads `.name`.
+            name: biz,
+            businessName: biz,
             phone: d.newCustomer.phone || null,
             location: d.newCustomer.location || null,
             region: d.newCustomer.region || null,
@@ -281,6 +284,8 @@ export async function recordFieldCollection(
     if (actor.role === "SALES_REP" && sale.repId !== actor.id)
       return fail("That sale belongs to another rep.");
     if (sale.voided) return fail("This sale was voided.");
+    if (sale.financeStatus === "REJECTED")
+      return fail("This sale was rejected by finance — record a corrected sale instead of collecting on it.");
     const balance = sale.total - sale.amountPaid;
     if (balance <= 0) return fail("This sale is already fully paid.");
 
@@ -489,8 +494,9 @@ export async function submitFieldReport(
 // ── Customers ───────────────────────────────────────────────────────────────
 
 const customerSchema = z.object({
-  name: z.string().min(2, "Customer name is required.").max(120),
-  businessName: z.string().max(120).optional().or(z.literal("")),
+  // Customers are identified by their business/trading name only — we never
+  // capture a personal contact name (it can compromise the customer).
+  businessName: z.string().trim().min(2, "Business name is required.").max(120),
   phone: z.string().max(30).optional().or(z.literal("")),
   location: z.string().max(120).optional().or(z.literal("")),
   region: z.string().max(60).optional().or(z.literal("")),
@@ -509,10 +515,13 @@ export async function createFieldCustomer(
     if (!parsed.success)
       return fail(parsed.error.issues[0]?.message ?? "Invalid customer.");
     const d = parsed.data;
+    const biz = d.businessName.trim();
     const c = await prisma.fieldCustomer.create({
       data: {
-        name: d.name,
-        businessName: d.businessName || null,
+        // Business name is the sole identity; `name` mirrors it (NOT NULL column
+        // that every display reads).
+        name: biz,
+        businessName: biz,
         phone: d.phone || null,
         location: d.location || null,
         region: d.region || null,
@@ -524,7 +533,7 @@ export async function createFieldCustomer(
       },
     });
     revalidateField();
-    return ok({ id: c.id }, `${d.name} added to your customers.`);
+    return ok({ id: c.id }, `${biz} added to your customers.`);
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -1166,8 +1175,20 @@ export async function voidFieldSale(
     });
     if (!sale) return fail("Sale not found.");
     if (sale.voided) return fail("This sale is already voided.");
+    if (sale.financeStatus === "REJECTED")
+      return fail("This sale was already rejected by finance — its stock is back with the rep.");
 
     await prisma.$transaction(async (tx) => {
+      // Atomic claim: a sale can only be voided once, and never after finance
+      // rejected it (rejection already returned its stock — a second restore
+      // would corrupt inventory). This guards against concurrent void/reject.
+      const claimed = await tx.fieldSale.updateMany({
+        where: { id: sale.id, voided: false, financeStatus: { not: "REJECTED" } },
+        data: { voided: true, voidReason: reason || null },
+      });
+      if (claimed.count === 0)
+        throw new Error("This sale was already voided or rejected.");
+
       for (const item of sale.items) {
         // Put the units back in the rep's hands and reconcile the org ledger:
         // RESTOCKED (+warehouse, -distributed) then ASSIGNED (-warehouse, +assigned)
@@ -1198,12 +1219,10 @@ export async function voidFieldSale(
           },
         });
       }
-      await tx.fieldSale.update({
-        where: { id: sale.id },
-        data: { voided: true, voidReason: reason || null },
-      });
       // Any collections a rep claimed against this sale are now moot — reject
       // the still-pending ones so they don't linger in the finance queue.
+      // (Approved payments are already excluded from money math by the
+      // sale.voided filter, so PENDING is enough here.)
       await tx.fieldPayment.updateMany({
         where: { saleId: sale.id, financeStatus: "PENDING" },
         data: {

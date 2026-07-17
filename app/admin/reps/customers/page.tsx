@@ -86,12 +86,7 @@ export default async function AdminFieldCustomersPage() {
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="truncate font-semibold">{c.name}</p>
-                    {c.businessName && (
-                      <span className="truncate text-sm text-muted-foreground">
-                        · {c.businessName}
-                      </span>
-                    )}
+                    <p className="truncate font-semibold">{c.businessName ?? c.name}</p>
                     {c.customerType && <Badge variant="secondary">{c.customerType}</Badge>}
                     {c.creditSuspended && (
                       <Badge variant="destructive">credit suspended</Badge>

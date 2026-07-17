@@ -270,17 +270,25 @@ export default async function AdminRepDetailPage({
             {sales.map((s) => {
               const balance = s.total - s.amountPaid;
               return (
-                <div key={s.id} className="rounded-2xl border border-border bg-card p-4">
+                <div
+                  key={s.id}
+                  className={`rounded-2xl border border-border bg-card p-4${
+                    s.voided || s.financeStatus === "REJECTED" ? " opacity-60" : ""
+                  }`}
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-semibold">{s.code}</span>
                       <StatusBadge status={s.type} />
-                      {s.creditStatus && <StatusBadge status={s.creditStatus} />}
+                      {s.creditStatus && s.financeStatus !== "REJECTED" && <StatusBadge status={s.creditStatus} />}
                       {s.voided && <Badge variant="destructive">Voided</Badge>}
+                      {!s.voided && s.financeStatus === "REJECTED" && (
+                        <Badge variant="destructive">Rejected by finance</Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold">{formatCurrency(s.total)}</span>
-                      {!s.voided && <VoidSaleButton saleId={s.id} />}
+                      {!s.voided && s.financeStatus !== "REJECTED" && <VoidSaleButton saleId={s.id} />}
                     </div>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -288,7 +296,7 @@ export default async function AdminRepDetailPage({
                     {s.items.map((i) => `${i.product.name} × ${i.quantity}`).join(" · ")} ·{" "}
                     {timeAgo(s.createdAt)}
                   </p>
-                  {s.type === "CREDIT" && !s.voided && balance > 0 && (
+                  {s.type === "CREDIT" && !s.voided && s.financeStatus !== "REJECTED" && balance > 0 && (
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
                       <p className="text-sm">
                         Owing <span className="font-semibold text-warning">{formatCurrency(balance)}</span>
