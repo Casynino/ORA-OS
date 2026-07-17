@@ -16,10 +16,13 @@ export async function getMasterCustomers() {
       orderBy: { createdAt: "desc" },
       include: {
         rep: { select: { id: true, name: true } },
-        // Verified figures only — finance-approved field sales.
+        // Live sales (excludes voided + finance-rejected). Lifetime/outstanding
+        // are still computed from APPROVED only (verified figures), but PENDING
+        // ones ride along so the table can flag "sale awaiting finance approval"
+        // instead of a bare "—" that looks identical to no activity at all.
         sales: {
-          where: { voided: false, financeStatus: "APPROVED" },
-          select: { total: true, amountPaid: true, type: true },
+          where: { voided: false, financeStatus: { not: "REJECTED" } },
+          select: { total: true, amountPaid: true, type: true, financeStatus: true },
         },
       },
     }),
