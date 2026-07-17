@@ -154,6 +154,9 @@ export async function recordFieldSale(
       return fail("Enter the cheque bank, number and date.");
     if (isCheque && Number.isNaN(new Date(d.chequeDate!).getTime()))
       return fail("The cheque date is invalid.");
+    // A cheque can't be verified without a picture of it — the photo is required.
+    if (isCheque && !d.paymentProofUrl?.trim())
+      return fail("Attach a photo of the cheque.");
     if (d.dueDate && Number.isNaN(new Date(d.dueDate).getTime()))
       return fail("The payment due date is invalid.");
 
@@ -377,6 +380,9 @@ export async function recordFieldCollection(
       return fail("Enter the cheque bank, number and date.");
     if (isCheque && Number.isNaN(new Date(d.chequeDate!).getTime()))
       return fail("The cheque date is invalid.");
+    // A cheque can't be verified without a picture of it — the photo is required.
+    if (isCheque && !d.paymentProofUrl?.trim())
+      return fail("Attach a photo of the cheque.");
 
     const newPaid = sale.amountPaid + d.amount;
     await prisma.$transaction(async (tx) => {
