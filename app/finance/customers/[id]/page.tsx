@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { CustomerCreditToggle } from "@/components/admin/rep-controls";
+import { CustomerProfileCard } from "@/components/field/customer-profile-card";
 import { FieldCollectionButton } from "@/components/finance/field-collection-button";
 import { formatCurrency, formatDate, formatNumber, timeAgo } from "@/lib/utils";
 
@@ -124,6 +125,8 @@ export default async function FinanceFieldCustomerPage({
         <StatCard label="Outstanding" value={formatCurrency(owed)} accent={owed > 0 ? "warning" : "info"} />
         <StatCard label="Last activity" value={customer.sales[0] ? timeAgo(customer.sales[0].createdAt) : "—"} accent="info" />
       </div>
+
+      <CustomerProfileCard c={customer} />
 
       {customer.notes && (
         <div className="rounded-2xl border border-border bg-card p-4 text-sm">

@@ -76,10 +76,16 @@ export function FieldSaleForm({
   const [listOpen, setListOpen] = useState(false);
   const [savingCustomer, startSaveCustomer] = useTransition();
   const [ncBusiness, setNcBusiness] = useState("");
+  const [ncEmail, setNcEmail] = useState("");
   const [ncPhone, setNcPhone] = useState("");
-  const [ncLocation, setNcLocation] = useState("");
-  const [ncRegion, setNcRegion] = useState("");
   const [ncType, setNcType] = useState("");
+  const [ncRegion, setNcRegion] = useState("");
+  const [ncDistrict, setNcDistrict] = useState("");
+  const [ncLocation, setNcLocation] = useState("");
+  const [ncVolume, setNcVolume] = useState("");
+  const [ncPayment, setNcPayment] = useState("");
+  const [ncLicense, setNcLicense] = useState("");
+  const [ncTax, setNcTax] = useState("");
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsBusy, setGpsBusy] = useState(false);
   const [customerName, setCustomerName] = useState(""); // cash walk-in
@@ -116,10 +122,16 @@ export function FieldSaleForm({
     startSaveCustomer(async () => {
       const res = await createFieldCustomer({
         businessName: biz,
+        email: ncEmail,
         phone: ncPhone,
         location: ncLocation,
         region: ncRegion,
+        district: ncDistrict,
         customerType: ncType,
+        expectedVolume: ncVolume,
+        preferredPayment: ncPayment,
+        businessLicense: ncLicense,
+        taxId: ncTax,
         gpsLat: gps?.lat,
         gpsLng: gps?.lng,
         notes: "",
@@ -137,8 +149,9 @@ export function FieldSaleForm({
         setAdded((a) => [...a, saved]);
         setCustomerId(saved.id);
         setNewCustomer(false);
-        setNcBusiness(""); setNcPhone(""); setNcLocation("");
-        setNcRegion(""); setNcType(""); setGps(null);
+        setNcBusiness(""); setNcEmail(""); setNcPhone(""); setNcType("");
+        setNcRegion(""); setNcDistrict(""); setNcLocation(""); setNcVolume("");
+        setNcPayment(""); setNcLicense(""); setNcTax(""); setGps(null);
         toast({ variant: "success", title: `${biz} saved & selected.` });
         router.refresh();
       } else if (!res.ok) {
@@ -436,23 +449,41 @@ export function FieldSaleForm({
         {newCustomer && (
           <div className="space-y-2.5 rounded-xl border border-primary/30 p-3">
             <div className="grid gap-2.5 sm:grid-cols-2">
-              <Input placeholder="Business name *" value={ncBusiness} onChange={(e) => setNcBusiness(e.target.value)} className="sm:col-span-2" />
+              <Input placeholder="Business / organisation name *" value={ncBusiness} onChange={(e) => setNcBusiness(e.target.value)} className="sm:col-span-2" />
+              <Input type="email" placeholder="Email" value={ncEmail} onChange={(e) => setNcEmail(e.target.value)} />
               <Input placeholder="Phone" value={ncPhone} onChange={(e) => setNcPhone(e.target.value)} />
               <select
                 value={ncType}
                 onChange={(e) => setNcType(e.target.value)}
                 className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
               >
-                <option value="">Customer type…</option>
+                <option value="">Business type…</option>
                 <option>Pharmacy</option>
                 <option>Shop</option>
                 <option>Supermarket</option>
                 <option>Kiosk</option>
                 <option>Clinic</option>
+                <option>Wholesaler</option>
                 <option>Other</option>
               </select>
-              <Input placeholder="Location / street" value={ncLocation} onChange={(e) => setNcLocation(e.target.value)} />
+              <select
+                value={ncPayment}
+                onChange={(e) => setNcPayment(e.target.value)}
+                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Preferred payment…</option>
+                <option>Cash</option>
+                <option>Credit</option>
+              </select>
               <Input placeholder="Region" value={ncRegion} onChange={(e) => setNcRegion(e.target.value)} />
+              <Input placeholder="District" value={ncDistrict} onChange={(e) => setNcDistrict(e.target.value)} />
+              <div className="sm:col-span-2">
+                <Input placeholder="Street / physical address" value={ncLocation} onChange={(e) => setNcLocation(e.target.value)} />
+                <p className="mt-1 text-[11px] text-muted-foreground">This becomes their default delivery address.</p>
+              </div>
+              <Input placeholder="Expected monthly volume — e.g. 500 packs" value={ncVolume} onChange={(e) => setNcVolume(e.target.value)} />
+              <Input placeholder="Business licence (optional)" value={ncLicense} onChange={(e) => setNcLicense(e.target.value)} />
+              <Input placeholder="Tax ID / TIN (optional)" value={ncTax} onChange={(e) => setNcTax(e.target.value)} className="sm:col-span-2" />
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button

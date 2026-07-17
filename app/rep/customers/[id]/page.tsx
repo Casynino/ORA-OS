@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { refreshOverdueFieldCredit } from "@/lib/services/field";
 import { CollectForm } from "@/components/field/field-forms";
+import { CustomerProfileCard } from "@/components/field/customer-profile-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/stat-card";
@@ -86,6 +87,8 @@ export default async function RepCustomerDetailPage({
         <StatCard label="Total purchased" value={formatCurrency(bought)} icon={ShoppingCart} accent="primary" />
         <StatCard label="Total paid" value={formatCurrency(paid)} icon={Banknote} accent="success" />
       </div>
+
+      <CustomerProfileCard c={customer} />
 
       <section>
         <h2 className="mb-3 font-display text-lg font-semibold">Purchases & payments</h2>

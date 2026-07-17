@@ -424,10 +424,16 @@ export function NewCustomerForm() {
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
   const [businessName, setBusinessName] = useState("");
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [location, setLocation] = useState("");
-  const [region, setRegion] = useState("");
   const [customerType, setCustomerType] = useState("");
+  const [region, setRegion] = useState("");
+  const [district, setDistrict] = useState("");
+  const [location, setLocation] = useState("");
+  const [expectedVolume, setExpectedVolume] = useState("");
+  const [preferredPayment, setPreferredPayment] = useState("");
+  const [businessLicense, setBusinessLicense] = useState("");
+  const [taxId, setTaxId] = useState("");
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsBusy, setGpsBusy] = useState(false);
 
@@ -459,10 +465,16 @@ export function NewCustomerForm() {
     start(async () => {
       const res = await createFieldCustomer({
         businessName,
+        email,
         phone,
         location,
         region,
+        district,
         customerType,
+        expectedVolume,
+        preferredPayment,
+        businessLicense,
+        taxId,
         gpsLat: gps?.lat,
         gpsLng: gps?.lng,
         notes: "",
@@ -470,8 +482,9 @@ export function NewCustomerForm() {
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         setOpen(false);
-        setBusinessName(""); setPhone(""); setLocation("");
-        setRegion(""); setCustomerType(""); setGps(null);
+        setBusinessName(""); setEmail(""); setPhone(""); setCustomerType("");
+        setRegion(""); setDistrict(""); setLocation(""); setExpectedVolume("");
+        setPreferredPayment(""); setBusinessLicense(""); setTaxId(""); setGps(null);
         router.refresh();
       } else toast({ variant: "error", title: res.error });
     });
@@ -487,23 +500,41 @@ export function NewCustomerForm() {
   return (
     <div className="w-full space-y-2.5 rounded-xl border border-border p-3">
       <div className="grid gap-2.5 sm:grid-cols-2">
-        <Input placeholder="Business name *" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="h-9 sm:col-span-2" />
+        <Input placeholder="Business / organisation name *" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="h-9 sm:col-span-2" />
+        <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-9" />
         <Input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-9" />
         <select
           value={customerType}
           onChange={(e) => setCustomerType(e.target.value)}
           className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
         >
-          <option value="">Customer type…</option>
+          <option value="">Business type…</option>
           <option>Pharmacy</option>
           <option>Shop</option>
           <option>Supermarket</option>
           <option>Kiosk</option>
           <option>Clinic</option>
+          <option>Wholesaler</option>
           <option>Other</option>
         </select>
-        <Input placeholder="Location / street" value={location} onChange={(e) => setLocation(e.target.value)} className="h-9" />
+        <select
+          value={preferredPayment}
+          onChange={(e) => setPreferredPayment(e.target.value)}
+          className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+        >
+          <option value="">Preferred payment…</option>
+          <option>Cash</option>
+          <option>Credit</option>
+        </select>
         <Input placeholder="Region" value={region} onChange={(e) => setRegion(e.target.value)} className="h-9" />
+        <Input placeholder="District" value={district} onChange={(e) => setDistrict(e.target.value)} className="h-9" />
+        <div className="sm:col-span-2">
+          <Input placeholder="Street / physical address" value={location} onChange={(e) => setLocation(e.target.value)} className="h-9" />
+          <p className="mt-1 text-[11px] text-muted-foreground">This becomes their default delivery address.</p>
+        </div>
+        <Input placeholder="Expected monthly volume — e.g. 500 packs" value={expectedVolume} onChange={(e) => setExpectedVolume(e.target.value)} className="h-9" />
+        <Input placeholder="Business licence (optional)" value={businessLicense} onChange={(e) => setBusinessLicense(e.target.value)} className="h-9" />
+        <Input placeholder="Tax ID / TIN (optional)" value={taxId} onChange={(e) => setTaxId(e.target.value)} className="h-9 sm:col-span-2" />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <button
