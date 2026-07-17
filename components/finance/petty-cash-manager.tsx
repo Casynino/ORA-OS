@@ -16,7 +16,6 @@ import { ProofUpload } from "@/components/ui/proof-upload";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -36,12 +35,19 @@ export type PettyCashExpenseDTO = {
   createdAt: string; // ISO
 };
 
+export type PettyCashItemDTO = {
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+};
+
 export type PettyCashDTO = {
   id: string;
   code: string;
   amount: number;
   purpose: string;
   category: ExpenseCategory;
+  items: PettyCashItemDTO[];
   status: "PENDING" | "APPROVED" | "REJECTED" | "RECONCILED";
   requestedByName: string;
   approvedByName: string | null;
@@ -163,28 +169,43 @@ export function PettyCashManager({
   );
 }
 
-/** Finance asks the admin for a cash allocation. */
+type CartRow = { category: ExpenseCategory; description: string; amount: string };
+
+/** Finance builds a cart of expense lines and requests the total from the CEO. */
 function RequestPettyCashButton() {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState<ExpenseCategory>("OFFICE");
-  const [purpose, setPurpose] = useState("");
+  const [rows, setRows] = useState<CartRow[]>([
+    { category: "OFFICE", description: "", amount: "" },
+  ]);
+
+  const total = rows.reduce((s, r) => s + Math.max(0, Math.round(Number(r.amount) || 0)), 0);
+  const valid =
+    rows.length > 0 &&
+    rows.every((r) => r.description.trim().length >= 2 && Number(r.amount) > 0);
+
+  const setRow = (idx: number, patch: Partial<CartRow>) =>
+    setRows((rs) => rs.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  const addRow = () =>
+    setRows((rs) => [...rs, { category: "OFFICE", description: "", amount: "" }]);
+  const removeRow = (idx: number) =>
+    setRows((rs) => (rs.length > 1 ? rs.filter((_, i) => i !== idx) : rs));
+  const reset = () => setRows([{ category: "OFFICE", description: "", amount: "" }]);
 
   function submit() {
     start(async () => {
       const res = await createPettyCashRequest({
-        amount: Math.round(Number(amount) || 0),
-        category,
-        purpose,
+        items: rows.map((r) => ({
+          category: r.category,
+          description: r.description.trim(),
+          amount: Math.round(Number(r.amount) || 0),
+        })),
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         setOpen(false);
-        setAmount("");
-        setCategory("OFFICE");
-        setPurpose("");
+        reset();
         router.refresh();
       } else toast({ variant: "error", title: res.error });
     });
@@ -201,51 +222,72 @@ function RequestPettyCashButton() {
           open
           onClose={() => setOpen(false)}
           title="Request office fund"
-          description="Goes to the CEO for approval — the money is issued from a company account the moment it is approved."
+          description="Add each expense you need — the CEO approves the total and the money is issued from a company account."
         >
           <div className="space-y-4">
-            <div>
-              <Label>Amount (TSh)</Label>
-              <Input
-                type="number"
-                min={1}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="50000"
-                className="mt-1.5"
-              />
+            <div className="space-y-2.5">
+              {rows.map((r, idx) => (
+                <div key={idx} className="space-y-2 rounded-xl border border-border/70 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      Expense {idx + 1}
+                    </span>
+                    {rows.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeRow(idx)}
+                        className="rounded-md p-0.5 text-muted-foreground hover:text-destructive"
+                        aria-label="Remove expense"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    )}
+                  </div>
+                  <Select
+                    value={r.category}
+                    onChange={(e) => setRow(idx, { category: e.target.value as ExpenseCategory })}
+                  >
+                    {OFFICE_FUND_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {EXPENSE_LABELS[c]}
+                      </option>
+                    ))}
+                  </Select>
+                  <div className="grid grid-cols-[1fr_7.5rem] gap-2">
+                    <Input
+                      value={r.description}
+                      onChange={(e) => setRow(idx, { description: e.target.value })}
+                      placeholder="What is it for?"
+                    />
+                    <Input
+                      type="number"
+                      min={1}
+                      value={r.amount}
+                      onChange={(e) => setRow(idx, { amount: e.target.value })}
+                      placeholder="TSh"
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
-            <div>
-              <Label>Category</Label>
-              <Select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
-                className="mt-1.5"
-              >
-                {OFFICE_FUND_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {EXPENSE_LABELS[c]}
-                  </option>
-                ))}
-              </Select>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Pick the closest expense type — pick “{EXPENSE_LABELS.OTHER}” for anything else and describe it below.
-              </p>
-            </div>
-            <div>
-              <Label>Purpose / details</Label>
-              <Input
-                value={purpose}
-                onChange={(e) => setPurpose(e.target.value)}
-                placeholder="Office supplies & transport for the week"
-                className="mt-1.5"
-              />
-            </div>
-            <Button
-              className="w-full"
-              onClick={submit}
-              disabled={pending || !(Number(amount) > 0) || purpose.trim().length < 3}
+
+            <button
+              type="button"
+              onClick={addRow}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
             >
+              <Plus className="size-4" /> Add another expense
+            </button>
+            <p className="text-xs text-muted-foreground">
+              Pick the closest category for each — choose “{EXPENSE_LABELS.OTHER}” for anything custom.
+            </p>
+
+            <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-2.5">
+              <span className="text-sm text-muted-foreground">Total requested</span>
+              <span className="font-display text-lg font-bold">{formatCurrency(total)}</span>
+            </div>
+
+            <Button className="w-full" onClick={submit} disabled={pending || !valid}>
               {pending ? "Sending…" : "Send request"}
             </Button>
           </div>
@@ -276,7 +318,20 @@ function PendingCard({
             <StatusBadge status={req.status} />
             <Badge variant="secondary">{EXPENSE_LABELS[req.category]}</Badge>
           </p>
-          <p className="mt-0.5 text-sm text-muted-foreground">{req.purpose}</p>
+          {req.items.length > 1 ? (
+            <ul className="mt-1 space-y-0.5">
+              {req.items.map((it, i) => (
+                <li key={i} className="flex justify-between gap-2 text-xs text-muted-foreground">
+                  <span className="min-w-0 truncate">
+                    {EXPENSE_LABELS[it.category]} · {it.description}
+                  </span>
+                  <span className="shrink-0">{formatCurrency(it.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-0.5 text-sm text-muted-foreground">{req.purpose}</p>
+          )}
           <p className="mt-0.5 text-xs text-muted-foreground">
             requested by {req.requestedByName} · {timeAgo(req.createdAt)}
           </p>
@@ -388,7 +443,20 @@ function OpenAllocationCard({
             <StatusBadge status={req.status} />
             <Badge variant="secondary">{EXPENSE_LABELS[req.category]}</Badge>
           </p>
-          <p className="mt-0.5 text-sm text-muted-foreground">{req.purpose}</p>
+          {req.items.length > 1 ? (
+            <ul className="mt-1 space-y-0.5">
+              {req.items.map((it, i) => (
+                <li key={i} className="flex justify-between gap-2 text-xs text-muted-foreground">
+                  <span className="min-w-0 truncate">
+                    {EXPENSE_LABELS[it.category]} · {it.description}
+                  </span>
+                  <span className="shrink-0">{formatCurrency(it.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-0.5 text-sm text-muted-foreground">{req.purpose}</p>
+          )}
           <p className="mt-0.5 text-xs text-muted-foreground">
             requested by {req.requestedByName}
             {req.approvedByName ? ` · approved by ${req.approvedByName}` : ""}
