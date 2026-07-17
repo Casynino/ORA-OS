@@ -12,7 +12,7 @@ import {
   reserveWarehouseStock,
   releaseWarehouseReservation,
 } from "@/lib/services/warehouse-stock";
-import { resolveReceivingAccount } from "@/lib/payment-methods";
+import { resolveReceivingAccount, isCashMethod } from "@/lib/payment-methods";
 import { refCode } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 import type { FieldCreditStatus } from "@prisma/client";
@@ -406,6 +406,9 @@ export async function recordFieldCollection(
           throw new Error("This sale changed while recording — refresh and try again.");
         }
       }
+      // A finance/admin-recorded CASH collection is physical cash in hand the
+      // moment it's auto-approved → Cash on Hand (RECEIVED) until it's banked.
+      const autoApprovedCash = !isRepClaim && isCashMethod(receiving.method);
       await tx.fieldPayment.create({
         data: {
           saleId: sale.id,
@@ -423,6 +426,7 @@ export async function recordFieldCollection(
           ...(isRepClaim
             ? {}
             : { financeReviewedById: actor.id, financeReviewedAt: new Date() }),
+          ...(autoApprovedCash ? { cashStatus: "RECEIVED", cashReceivedAt: new Date() } : {}),
         },
       });
     });
@@ -1435,6 +1439,8 @@ export async function voidFieldSale(
     if (sale.voided) return fail("This sale is already voided.");
     if (sale.financeStatus === "REJECTED")
       return fail("This sale was already rejected by finance — its stock is back with the rep.");
+    if (sale.cashStatus === "DEPOSITED")
+      return fail("This cash sale has already been banked in a deposit — it can't be voided. Reverse the deposit first.");
 
     await prisma.$transaction(async (tx) => {
       // Atomic claim: a sale can only be voided once, and never after finance

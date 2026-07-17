@@ -15,9 +15,10 @@ import { formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 /** A cash-type sale the customer actually paid straight into a bank/Lipa
- * account (not physical cash) — finance verifies the uploaded proof. */
+ * account or by cheque (not physical cash) — finance verifies the uploaded
+ * proof; physical cash instead goes to Cash on Hand when confirmed. */
 function isDirectPayment(method: string | null): boolean {
-  return !!method && /bank|mobile|lipa|transfer|m-?pesa|tigo|airtel|halo/i.test(method);
+  return !!method && /bank|mobile|lipa|transfer|cheque|chek|m-?pesa|tigo|airtel|voda|halo|nmb/i.test(method);
 }
 
 /**
@@ -27,7 +28,7 @@ function isDirectPayment(method: string | null): boolean {
 export default async function FinanceSalesApprovalsPage() {
   await requireRole("FINANCE");
 
-  const [pendingSales, pendingCollections, recentReviewed, accounts] = await Promise.all([
+  const [pendingSales, pendingCollections, recentReviewed] = await Promise.all([
     prisma.fieldSale.findMany({
       where: { financeStatus: "PENDING", voided: false },
       orderBy: { createdAt: "asc" },
@@ -67,12 +68,6 @@ export default async function FinanceSalesApprovalsPage() {
         customer: { select: { name: true } },
         financeReviewedBy: { select: { name: true } },
       },
-    }),
-    // Company accounts finance can deposit into (the CEO owns them).
-    prisma.paymentAccount.findMany({
-      where: { isActive: true },
-      orderBy: [{ type: "asc" }, { name: "asc" }],
-      select: { id: true, name: true, type: true, accountNumber: true },
     }),
   ]);
 
@@ -178,9 +173,7 @@ export default async function FinanceSalesApprovalsPage() {
         <SaleApprovalActions
           saleId={s.id}
           kind={s.type as "CASH" | "CREDIT"}
-          amount={formatCurrency(s.total)}
-          accounts={accounts}
-          suggestedAccountId={s.paymentAccount?.id ?? null}
+          method={s.paymentMethod}
         />
       </div>
     </div>
@@ -267,13 +260,19 @@ export default async function FinanceSalesApprovalsPage() {
                     <p className="text-xs text-muted-foreground">
                       outstanding on sale: {formatCurrency(Math.max(0, p.sale.total - p.sale.amountPaid))}
                     </p>
+                    {p.chequeBank && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Cheque · {p.chequeBank} · {p.chequeNumber}
+                        {p.chequeDate ? ` · ${new Date(p.chequeDate).toLocaleDateString("en-GB")}` : ""}
+                      </p>
+                    )}
+                    {p.paymentProofUrl && (
+                      <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2">
+                        <ProofViewer url={p.paymentProofUrl} label="View payment proof" />
+                      </div>
+                    )}
                   </div>
-                  <CollectionApprovalActions
-                    paymentId={p.id}
-                    amount={formatCurrency(p.amount)}
-                    accounts={accounts}
-                    suggestedAccountId={p.paymentAccount?.id ?? null}
-                  />
+                  <CollectionApprovalActions paymentId={p.id} />
                 </div>
               </div>
             ))}

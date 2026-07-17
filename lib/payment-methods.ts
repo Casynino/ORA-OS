@@ -9,6 +9,14 @@ export const METHOD_LABEL: Record<string, string> = {
   MOBILE_MONEY: "Mobile Money",
 };
 
+// A payment method that lands money DIRECTLY in a company account (bank /
+// mobile / cheque) rather than as physical cash the rep hands over. Single
+// source of truth — used by the cash workflow to route money to Cash on Hand
+// vs. straight to an account. Keep this the only copy on the money path.
+const DIRECT_METHOD = /bank|mobile|lipa|transfer|cheque|chek|m-?pesa|tigo|airtel|voda|halo|nmb/i;
+export const isDirectPayment = (m?: string | null): boolean => !!m && DIRECT_METHOD.test(m);
+export const isCashMethod = (m?: string | null): boolean => !isDirectPayment(m);
+
 /**
  * Resolve + validate a receiving account for a payment. Returns the derived
  * method label and account id (both null when no account was chosen — allowed

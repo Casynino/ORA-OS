@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { applyMovement } from "@/lib/services/inventory";
+import { refCode } from "@/lib/utils";
+import { isCashMethod } from "@/lib/payment-methods";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,9 +21,12 @@ function revalidateApprovals() {
     "/finance/sales-approvals",
     "/finance/credit",
     "/finance/accounts",
+    "/finance/cash",
     "/admin",
     "/admin/credit",
     "/admin/finance",
+    "/admin/finance/accounts",
+    "/admin/finance/cash",
     "/admin/reps",
     "/rep",
     "/rep/sell",
@@ -40,28 +45,20 @@ function creditStatusFor(
   return paid > 0 ? "PARTIAL" : "PENDING";
 }
 
-export type ConfirmDeposit = {
-  // For CASH: the official ORA account the cash was deposited into (or the
-  // account a direct bank/Lipa payment landed in). Updates where the money
-  // is traced. Ignored for CREDIT (no money moves at approval).
-  depositAccountId?: string;
-  // Deposit slip / receipt reference or link — proof of the money.
-  proofRef?: string;
-  // Uploaded deposit-slip / receipt image URL.
-  proofUrl?: string;
-  note?: string;
-};
-
-/** Finance confirms a rep sale. For a CASH sale finance records where the
- * money was banked and attaches proof (deposit slip / receipt); for a CREDIT
- * sale it validates the terms. Only now does it count as company money. */
+/** Finance confirms a rep sale.
+ *  - PHYSICAL CASH sale → "cash received from the rep": becomes revenue and
+ *    goes to Cash on Hand (RECEIVED). The bank account + deposit slip are NOT
+ *    captured here — that happens later at the weekly/monthly bank deposit.
+ *  - BANK / MOBILE / CHEQUE sale → the rep's proof is already attached; finance
+ *    just verifies it and confirms. No re-upload; the account is already set.
+ *  - CREDIT sale → validates the terms (no money moves).
+ */
 export async function approveFieldSale(
   id: string,
-  input?: ConfirmDeposit,
+  note?: string,
 ): Promise<ActionResult> {
   try {
     const actor = await requireActor(["FINANCE", "ADMIN"]);
-    const { depositAccountId, proofRef, proofUrl, note } = input ?? {};
     const sale = await prisma.fieldSale.findUnique({
       where: { id },
       include: {
@@ -72,25 +69,11 @@ export async function approveFieldSale(
     if (!sale) return fail("Sale not found.");
     if (sale.voided) return fail("This sale was voided.");
 
-    // For cash, record which company account the money was deposited into.
-    let depositAccountUpdate: { paymentAccountId?: string } = {};
-    if (sale.type === "CASH") {
-      if (depositAccountId) {
-        const acc = await prisma.paymentAccount.findUnique({
-          where: { id: depositAccountId },
-        });
-        if (!acc || !acc.isActive) {
-          return fail("Choose a valid company account to deposit into.");
-        }
-        depositAccountUpdate = { paymentAccountId: acc.id };
-      } else if (await prisma.paymentAccount.count({ where: { isActive: true } })) {
-        // The CEO owns the accounts — cash has to be traced into one of them.
-        // (If none are configured yet we allow confirmation rather than lock it.)
-        return fail("Choose the company account the cash was deposited into.");
-      }
-    }
+    const physicalCash = sale.type === "CASH" && isCashMethod(sale.paymentMethod);
 
-    // Atomic claim — two reviewers can't both confirm it.
+    // Atomic claim — two reviewers can't both confirm it. We never overwrite the
+    // rep's proof or the sale-time account here; deposited-cash attribution moves
+    // to createCashDeposit, and direct payments already carry their account.
     const claimed = await prisma.fieldSale.updateMany({
       where: { id, financeStatus: "PENDING", voided: false },
       data: {
@@ -98,11 +81,7 @@ export async function approveFieldSale(
         financeReviewedById: actor.id,
         financeReviewedAt: new Date(),
         financeNote: note?.trim() || null,
-        depositProofRef: proofRef?.trim() || null,
-        // Only overwrite the rep's uploaded proof if finance attaches its own
-        // (e.g. the bank deposit slip for a cash sale).
-        ...(proofUrl?.trim() ? { paymentProofUrl: proofUrl.trim() } : {}),
-        ...depositAccountUpdate,
+        ...(physicalCash ? { cashStatus: "RECEIVED", cashReceivedAt: new Date() } : {}),
       },
     });
     if (claimed.count === 0) return fail("This sale was already reviewed.");
@@ -111,20 +90,27 @@ export async function approveFieldSale(
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
-      action: sale.type === "CASH" ? "FIELD_SALE_CONFIRMED" : "FIELD_CREDIT_APPROVED",
+      action:
+        sale.type === "CREDIT"
+          ? "FIELD_CREDIT_APPROVED"
+          : "FIELD_SALE_CONFIRMED",
       entity: "FieldSale",
       entityId: sale.code,
       summary:
-        sale.type === "CASH"
-          ? `Finance confirmed TSh ${sale.total.toLocaleString()} cash received from ${who} (${sale.code}, rep ${sale.rep.name})${proofRef?.trim() ? ` · deposit ref ${proofRef.trim()}` : ""}.`
-          : `Finance approved a credit sale of TSh ${sale.total.toLocaleString()} to ${who} (${sale.code}, rep ${sale.rep.name}).`,
+        sale.type === "CREDIT"
+          ? `Finance approved a credit sale of TSh ${sale.total.toLocaleString()} to ${who} (${sale.code}, rep ${sale.rep.name}).`
+          : physicalCash
+            ? `Finance confirmed TSh ${sale.total.toLocaleString()} cash received from ${sale.rep.name} for ${who} (${sale.code}) — now in Cash on Hand.`
+            : `Finance verified the ${sale.paymentMethod ?? "payment"} for ${who} (${sale.code}, rep ${sale.rep.name}) — TSh ${sale.total.toLocaleString()}.`,
     });
     revalidateApprovals();
     return ok(
       undefined,
-      sale.type === "CASH"
-        ? `${sale.code} confirmed — the cash is now official revenue.`
-        : `${sale.code} approved — now an official company credit sale.`,
+      sale.type === "CREDIT"
+        ? `${sale.code} approved — now an official company credit sale.`
+        : physicalCash
+          ? `${sale.code} confirmed — cash received and now in Cash on Hand.`
+          : `${sale.code} confirmed — the payment is verified.`,
     );
   } catch (e) {
     return fail(errorMessage(e));
@@ -201,6 +187,10 @@ export async function rejectFieldSale(
           financeReviewedById: actor.id,
           financeReviewedAt: new Date(),
           financeNote: `Sale rejected: ${note?.trim() || "no reason given"}`,
+          // Rejected money leaves cash-on-hand too — otherwise a rejected cash
+          // collection would sit in Cash on Hand forever (never bankable).
+          cashStatus: null,
+          cashReceivedAt: null,
         },
       });
     });
@@ -224,11 +214,10 @@ export async function rejectFieldSale(
  * customer's outstanding balance and count as money in. */
 export async function approveFieldCollection(
   paymentId: string,
-  input?: ConfirmDeposit,
+  note?: string,
 ): Promise<ActionResult> {
   try {
     const actor = await requireActor(["FINANCE", "ADMIN"]);
-    const { depositAccountId, proofRef, proofUrl, note } = input ?? {};
     const payment = await prisma.fieldPayment.findUnique({
       where: { id: paymentId },
       include: {
@@ -249,17 +238,9 @@ export async function approveFieldCollection(
       );
     }
 
-    // Record which company account this collection was deposited into.
-    let depositAccountUpdate: { paymentAccountId?: string } = {};
-    if (depositAccountId) {
-      const acc = await prisma.paymentAccount.findUnique({
-        where: { id: depositAccountId },
-      });
-      if (!acc || !acc.isActive) {
-        return fail("Choose a valid company account to deposit into.");
-      }
-      depositAccountUpdate = { paymentAccountId: acc.id };
-    }
+    // A physical-cash collection goes to Cash on Hand until it's banked; a
+    // direct bank/mobile collection already landed in its account.
+    const physicalCash = isCashMethod(payment.method);
 
     const newPaid = sale.amountPaid + payment.amount;
     await prisma.$transaction(async (tx) => {
@@ -271,9 +252,7 @@ export async function approveFieldCollection(
           financeReviewedById: actor.id,
           financeReviewedAt: new Date(),
           financeNote: note?.trim() || null,
-          depositProofRef: proofRef?.trim() || null,
-          ...(proofUrl?.trim() ? { paymentProofUrl: proofUrl.trim() } : {}),
-          ...depositAccountUpdate,
+          ...(physicalCash ? { cashStatus: "RECEIVED", cashReceivedAt: new Date() } : {}),
         },
       });
       if (claimedPayment.count === 0) {
@@ -340,6 +319,120 @@ export async function rejectFieldCollection(
     });
     revalidateApprovals();
     return ok(undefined, "Collection rejected — nothing was posted.");
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+// ── Bank deposits — banking a batch of held cash ────────────────────────────
+
+export type CreateCashDepositInput = {
+  saleIds: string[];
+  paymentIds: string[];
+  depositAccountId: string; // the company bank/mobile account it was banked into
+  depositDate: string; // ISO date the cash was physically banked
+  slipUrl?: string; // uploaded deposit-slip image (required)
+  slipRef?: string; // slip number / bank reference
+  note?: string;
+};
+
+/** Finance banks a BATCH of already-received cash. Selects cash sales +
+ *  collections that are on hand (RECEIVED), records the receiving bank account,
+ *  deposit date and slip, marks them DEPOSITED (moving them out of Cash on Hand
+ *  and into that account), and creates a Deposit record linking them all. */
+export async function createCashDeposit(
+  input: CreateCashDepositInput,
+): Promise<ActionResult<{ code: string }>> {
+  try {
+    const actor = await requireActor(["FINANCE", "ADMIN"]);
+    const saleIds = [...new Set(input.saleIds ?? [])];
+    const paymentIds = [...new Set(input.paymentIds ?? [])];
+    if (saleIds.length + paymentIds.length === 0)
+      return fail("Select at least one cash collection to deposit.");
+
+    const account = await prisma.paymentAccount.findUnique({
+      where: { id: input.depositAccountId },
+    });
+    if (!account || !account.isActive)
+      return fail("Choose a valid company account to deposit into.");
+    if (account.type === "CASH")
+      return fail("Deposit into a bank or mobile-money account, not the cash office.");
+
+    const depositDate = new Date(input.depositDate);
+    if (!input.depositDate || Number.isNaN(depositDate.getTime()))
+      return fail("Pick a valid deposit date.");
+    if (!input.slipUrl?.trim())
+      return fail("Attach the deposit slip.");
+
+    const code = refCode("DEP");
+    let total = 0;
+    await prisma.$transaction(async (tx) => {
+      // Re-read the selected rows, guarded to on-hand cash only, and total them
+      // server-side (never trust a client-supplied sum).
+      const sales = saleIds.length
+        ? await tx.fieldSale.findMany({
+            where: { id: { in: saleIds }, cashStatus: "RECEIVED", financeStatus: "APPROVED", voided: false },
+            select: { id: true, total: true },
+          })
+        : [];
+      const payments = paymentIds.length
+        ? await tx.fieldPayment.findMany({
+            where: { id: { in: paymentIds }, cashStatus: "RECEIVED", financeStatus: "APPROVED", sale: { is: { voided: false } } },
+            select: { id: true, amount: true },
+          })
+        : [];
+      if (sales.length !== saleIds.length || payments.length !== paymentIds.length)
+        throw new Error("Some selected cash was already deposited or changed — refresh and try again.");
+
+      total = sales.reduce((a, s) => a + s.total, 0) + payments.reduce((a, p) => a + p.amount, 0);
+      if (total <= 0) throw new Error("The deposit total must be greater than zero.");
+
+      const deposit = await tx.cashDeposit.create({
+        data: {
+          code,
+          depositAccountId: account.id,
+          total,
+          depositDate,
+          slipUrl: input.slipUrl!.trim(),
+          slipRef: input.slipRef?.trim() || null,
+          note: input.note?.trim() || null,
+          depositedById: actor.id,
+        },
+      });
+
+      // Bank the cash: move it out of hand and attribute it to this account.
+      // The updateMany guards MIRROR the findMany guards exactly, so a sale
+      // voided/rejected between the re-read and here drops the count and rolls
+      // the whole deposit back (the CashDeposit.total must never include money
+      // the account balance excludes).
+      if (saleIds.length) {
+        const done = await tx.fieldSale.updateMany({
+          where: { id: { in: saleIds }, cashStatus: "RECEIVED", financeStatus: "APPROVED", voided: false },
+          data: { cashStatus: "DEPOSITED", cashDepositId: deposit.id, paymentAccountId: account.id },
+        });
+        if (done.count !== saleIds.length)
+          throw new Error("A selected cash sale changed while depositing — refresh and try again.");
+      }
+      if (paymentIds.length) {
+        const done = await tx.fieldPayment.updateMany({
+          where: { id: { in: paymentIds }, cashStatus: "RECEIVED", financeStatus: "APPROVED", sale: { is: { voided: false } } },
+          data: { cashStatus: "DEPOSITED", cashDepositId: deposit.id, paymentAccountId: account.id },
+        });
+        if (done.count !== paymentIds.length)
+          throw new Error("A selected collection changed while depositing — refresh and try again.");
+      }
+    });
+
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "CASH_DEPOSIT_CREATED",
+      entity: "CashDeposit",
+      entityId: code,
+      summary: `${actor.name} banked TSh ${total.toLocaleString()} into ${account.name} (${code}) — ${saleIds.length + paymentIds.length} cash collection(s).`,
+    });
+    revalidateApprovals();
+    return ok({ code }, `Deposit ${code} recorded — TSh ${total.toLocaleString()} banked into ${account.name}.`);
   } catch (e) {
     return fail(errorMessage(e));
   }
