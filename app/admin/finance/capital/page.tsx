@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { getFinanceOverview } from "@/lib/services/finance";
+import { getSelectableAccounts } from "@/lib/services/accounts";
 import { PageHeader } from "@/components/ui/page-header";
 import { FinanceNav } from "@/components/admin/finance-nav";
 import {
@@ -19,12 +20,16 @@ export const dynamic = "force-dynamic";
 export default async function AdminCapitalPage() {
   await requireRole("ADMIN");
 
-  const [entries, overview] = await Promise.all([
+  const [entries, overview, accounts] = await Promise.all([
     prisma.capitalEntry.findMany({
       orderBy: { entryDate: "desc" },
-      include: { recordedBy: { select: { name: true } } },
+      include: {
+        recordedBy: { select: { name: true } },
+        paymentAccount: { select: { name: true } },
+      },
     }),
     getFinanceOverview("all"),
+    getSelectableAccounts(),
   ]);
 
   const injected = entries.reduce((s, e) => s + Math.max(0, e.amount), 0);
@@ -53,8 +58,8 @@ export default async function AdminCapitalPage() {
           Business Capital is calculated live from every payment, expense and capital move — it can&apos;t drift.
         </p>
         <div className="flex gap-2">
-          <AddCapitalButton />
-          <RecordWithdrawalButton />
+          <AddCapitalButton accounts={accounts} />
+          <RecordWithdrawalButton accounts={accounts} />
         </div>
       </div>
 
@@ -78,6 +83,7 @@ export default async function AdminCapitalPage() {
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {e.code} · {formatDate(e.entryDate)} · by {e.recordedBy.name}
+                    {e.paymentAccount ? ` · ${isWithdrawal ? "from" : "into"} ${e.paymentAccount.name}` : ""}
                     {e.note ? ` · ${e.note}` : ""}
                   </p>
                   {e.receiptUrl && (

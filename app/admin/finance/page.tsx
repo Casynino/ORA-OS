@@ -19,6 +19,7 @@ import {
   type Period,
 } from "@/lib/services/finance";
 import { getCashSummary } from "@/lib/services/cash";
+import { getSelectableAccounts } from "@/lib/services/accounts";
 import { PageHeader } from "@/components/ui/page-header";
 import { FinanceNav, PeriodTabs } from "@/components/admin/finance-nav";
 import { StatCard } from "@/components/ui/stat-card";
@@ -48,10 +49,11 @@ export default async function AdminFinancePage({
   const { period: raw = "month" } = await searchParams;
   const period = (["today", "week", "month", "all"].includes(raw) ? raw : "month") as Period;
 
-  const [d, recent, cash] = await Promise.all([
+  const [d, recent, cash, accounts] = await Promise.all([
     getFinanceOverview(period),
     getLedger("all", 8),
     getCashSummary(),
+    getSelectableAccounts(),
   ]);
   const w = d.window;
   const p = d.position;
@@ -117,10 +119,10 @@ export default async function AdminFinancePage({
             </div>
           </div>
           <div className="flex shrink-0 flex-col items-stretch gap-2 lg:w-64">
-            <AddExpenseButton className="w-full rounded-full" />
+            <AddExpenseButton accounts={accounts} className="w-full rounded-full" />
             <div className="flex gap-2">
-              <AddCapitalButton className="flex-1 rounded-full" />
-              <RecordWithdrawalButton className="flex-1 rounded-full" />
+              <AddCapitalButton accounts={accounts} className="flex-1 rounded-full" />
+              <RecordWithdrawalButton accounts={accounts} className="flex-1 rounded-full" />
             </div>
             <Link href="/admin/finance/profit" className="inline-flex items-center justify-center gap-1 text-sm font-medium text-primary hover:underline">
               Full Profit &amp; Loss <ArrowRight className="size-3.5" />

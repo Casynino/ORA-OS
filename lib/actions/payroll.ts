@@ -194,6 +194,7 @@ export async function runPayroll(
           amount: total,
           purpose: `Payroll ${code} — ${d.month}/${d.year}`,
           paymentMethod: receiving.method,
+          paymentAccountId: receiving.paymentAccountId,
           source: "PAYROLL",
           expenseDate: payDate,
           recordedById: admin.id,

@@ -7,6 +7,7 @@ import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { refCode, formatCurrency } from "@/lib/utils";
 import { EXPENSE_CATEGORY_VALUES, EXPENSE_LABELS } from "@/lib/expense-categories";
+import { resolveReceivingAccount } from "@/lib/payment-methods";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,8 +77,12 @@ export async function requestOperationalFunds(
 
 /** CEO approves — the allocation is treated as money leaving the company into
  *  the fund, so it's booked as a Company Expense IMMEDIATELY (money-out + cash
- *  down in the CEO's reports) and added to the fund balance to spend down. */
-export async function approveOperationalFundRequest(id: string): Promise<ActionResult> {
+ *  down in the CEO's reports) and added to the fund balance to spend down. The
+ *  CEO names the account the money is issued FROM, so it draws that balance down. */
+export async function approveOperationalFundRequest(
+  id: string,
+  paymentAccountId?: string | null,
+): Promise<ActionResult> {
   try {
     const admin = await requireActor(["ADMIN"]);
     const req = await prisma.pettyCashRequest.findUnique({
@@ -94,6 +99,9 @@ export async function approveOperationalFundRequest(id: string): Promise<ActionR
         data: { status: "APPROVED", approvedById: admin.id, approvedAt: new Date() },
       });
       if (claimed.count === 0) throw new Error("This request was already reviewed.");
+      // Validate the source account inside the claim so a bad account rolls the
+      // whole approval back (rejects unknown/deactivated).
+      const account = await resolveReceivingAccount(tx, paymentAccountId || null, null);
       // The money has left the company's control into the fund → a Company
       // Expense now. Finance's per-item spends are accountability records
       // against this float, NOT additional money-out.
@@ -105,6 +113,8 @@ export async function approveOperationalFundRequest(id: string): Promise<ActionR
           amount: req.amount,
           purpose: `Operational Fund ${req.code} — ${req.purpose}`,
           note: `Allocated to ${req.requestedBy.name}`,
+          paymentMethod: account.method,
+          paymentAccountId: account.paymentAccountId,
           recordedById: admin.id,
         },
       });

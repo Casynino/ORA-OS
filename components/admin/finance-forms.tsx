@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { ProofUpload } from "@/components/ui/proof-upload";
+import { CompanyAccountSelect, type SelectableAccount } from "@/components/ui/account-select";
 import { toast } from "@/components/ui/use-toast";
 
 const EXPENSE_OPTIONS: { group: string; items: { value: string; label: string }[] }[] = [
@@ -69,10 +70,12 @@ const EXPENSE_OPTIONS: { group: string; items: { value: string; label: string }[
  * and reduces Business Capital automatically.
  */
 export function AddExpenseButton({
+  accounts = [],
   label = "Record direct expense",
   variant = "default",
   className = "rounded-full",
 }: {
+  accounts?: SelectableAccount[];
   label?: string;
   variant?: "default" | "outline";
   className?: string;
@@ -85,7 +88,9 @@ export function AddExpenseButton({
   const [amount, setAmount] = useState("");
   const [purpose, setPurpose] = useState("");
   const [vendor, setVendor] = useState("");
-  const [method, setMethod] = useState("Bank");
+  // Default to the first company account; the CEO can switch to "Other / cheque".
+  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
+  const [method, setMethod] = useState("Cheque"); // only used when no account
   const [date, setDate] = useState("");
   const [receiptUrl, setReceiptUrl] = useState("");
   const [note, setNote] = useState("");
@@ -105,7 +110,8 @@ export function AddExpenseButton({
         amount: Math.round(Number(amount) || 0),
         purpose: purpose.trim(),
         vendor: vendor.trim() || undefined,
-        paymentMethod: method,
+        paymentAccountId: accountId || undefined,
+        paymentMethod: accountId ? undefined : method,
         expenseDate: date,
         receiptUrl: receiptUrl || undefined,
         note: note.trim() || undefined,
@@ -167,19 +173,29 @@ export function AddExpenseButton({
                 <Input value={vendor} onChange={(e) => setVendor(e.target.value)} className="mt-1.5" placeholder="Optional — who was paid" />
               </div>
               <div>
+                <Label>Date (optional)</Label>
+                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1.5" />
+              </div>
+            </div>
+            <CompanyAccountSelect
+              accounts={accounts}
+              value={accountId}
+              onChange={setAccountId}
+              label="Paid from account"
+              allowNone
+              noneLabel="Other / cheque (no account)"
+            />
+            {!accountId && (
+              <div>
                 <Label>Payment method</Label>
                 <Select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1.5">
+                  <option>Cheque</option>
                   <option>Bank</option>
                   <option>Mobile money</option>
                   <option>Cash</option>
-                  <option>Cheque</option>
                 </Select>
               </div>
-            </div>
-            <div>
-              <Label>Date (optional)</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1.5" />
-            </div>
+            )}
             <div>
               <Label className="mb-1.5 block">Supporting document (receipt / invoice)</Label>
               <ProofUpload value={receiptUrl} onChange={setReceiptUrl} label="Attach supporting document" />
@@ -232,10 +248,12 @@ const CAPITAL_OPTIONS = [
 
 /** Owner puts money INTO the business — adds to Business Capital. */
 export function AddCapitalButton({
+  accounts = [],
   label = "Record investment",
   variant = "default",
   className = "rounded-full",
 }: {
+  accounts?: SelectableAccount[];
   label?: string;
   variant?: "default" | "outline";
   className?: string;
@@ -246,6 +264,7 @@ export function AddCapitalButton({
   const [type, setType] = useState("FOUNDER_INVESTMENT");
   const [amount, setAmount] = useState("");
   const [source, setSource] = useState("");
+  const [accountId, setAccountId] = useState("");
   const [date, setDate] = useState("");
   const [receiptUrl, setReceiptUrl] = useState("");
   const [note, setNote] = useState("");
@@ -256,6 +275,7 @@ export function AddCapitalButton({
         type: type as never,
         amount: Math.round(Number(amount) || 0),
         source,
+        paymentAccountId: accountId || undefined,
         entryDate: date,
         receiptUrl: receiptUrl || undefined,
         note,
@@ -301,6 +321,12 @@ export function AddCapitalButton({
               <Label>Source</Label>
               <Input value={source} onChange={(e) => setSource(e.target.value)} className="mt-1.5" placeholder="e.g. Founder — Nino" />
             </div>
+            <CompanyAccountSelect
+              accounts={accounts}
+              value={accountId}
+              onChange={setAccountId}
+              label="Deposit into account"
+            />
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Date (optional)</Label>
@@ -328,10 +354,12 @@ export function AddCapitalButton({
 /** Owner takes money OUT of the business — reduces Business Capital (recorded as
  *  a negative capital movement; can't exceed what's available). */
 export function RecordWithdrawalButton({
+  accounts = [],
   label = "Record withdrawal",
   variant = "outline",
   className = "rounded-full",
 }: {
+  accounts?: SelectableAccount[];
   label?: string;
   variant?: "default" | "outline";
   className?: string;
@@ -341,6 +369,7 @@ export function RecordWithdrawalButton({
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [source, setSource] = useState("");
+  const [accountId, setAccountId] = useState("");
   const [date, setDate] = useState("");
   const [receiptUrl, setReceiptUrl] = useState("");
   const [note, setNote] = useState("");
@@ -351,6 +380,7 @@ export function RecordWithdrawalButton({
         type: "WITHDRAWAL" as never,
         amount: Math.round(Number(amount) || 0),
         source,
+        paymentAccountId: accountId || undefined,
         entryDate: date,
         receiptUrl: receiptUrl || undefined,
         note,
@@ -392,6 +422,12 @@ export function RecordWithdrawalButton({
               <Label>Paid to / reason</Label>
               <Input value={source} onChange={(e) => setSource(e.target.value)} className="mt-1.5" placeholder="e.g. Owner drawings — Nino" />
             </div>
+            <CompanyAccountSelect
+              accounts={accounts}
+              value={accountId}
+              onChange={setAccountId}
+              label="From account"
+            />
             <div>
               <Label className="mb-1.5 block">Supporting document (optional)</Label>
               <ProofUpload value={receiptUrl} onChange={setReceiptUrl} label="Attach document" />

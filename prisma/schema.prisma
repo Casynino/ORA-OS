@@ -463,6 +463,8 @@ model PaymentAccount {
   pettyCashRequests  PettyCashRequest[]
   payrollRuns        PayrollRun[]
   cashDeposits       CashDeposit[]
+  capitalEntries     CapitalEntry[]
+  expenses           Expense[]
 
   @@index([type])
   @@index([isActive])
@@ -1482,6 +1484,10 @@ model Expense {
   receiptUrl    String? // uploaded supporting document
   expenseDate   DateTime        @default(now())
   note          String?
+  // Company account the money was paid FROM (draws the account balance down).
+  // Null = paid outside a tracked account (cheque / other / legacy).
+  paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  paymentAccountId String?
   recordedBy    User            @relation("ExpenseRecorder", fields: [recordedById], references: [id])
   recordedById  String
   createdAt     DateTime        @default(now())
@@ -1490,6 +1496,7 @@ model Expense {
   @@index([category])
   @@index([source])
   @@index([expenseDate])
+  @@index([paymentAccountId])
 }
 
 /// Capital injected into the business — founder money, investments,
@@ -1502,6 +1509,9 @@ model CapitalEntry {
   source       String // who/where it came from
   note         String?
   receiptUrl   String? // optional supporting document for the capital movement
+  // Company account the money lands IN (investment) or comes OUT of (withdrawal).
+  paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  paymentAccountId String?
   entryDate    DateTime    @default(now())
   recordedBy   User        @relation("CapitalRecorder", fields: [recordedById], references: [id])
   recordedById String
@@ -1509,6 +1519,7 @@ model CapitalEntry {
 
   @@index([type])
   @@index([entryDate])
+  @@index([paymentAccountId])
 }
 
 /// Monthly targets per rep (admin-set), driving the rep's progress dashboard.

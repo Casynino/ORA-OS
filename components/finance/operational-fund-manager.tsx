@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/table";
 import { ProofUpload } from "@/components/ui/proof-upload";
 import { ProofViewer } from "@/components/ui/proof-viewer";
+import { CompanyAccountSelect, type SelectableAccount } from "@/components/ui/account-select";
 import { toast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, timeAgo } from "@/lib/utils";
 import type { ExpenseCategory } from "@prisma/client";
@@ -82,10 +83,13 @@ function Tile({ icon: Icon, label, value, hint, accent }: {
 
 export function OperationalFundManager({
   fund,
+  accounts = [],
   canManage = false,
   canApprove = false,
 }: {
   fund: Fund;
+  /** Company accounts the CEO can issue funds FROM (approval only). */
+  accounts?: SelectableAccount[];
   /** Finance can request funds + record spending. */
   canManage?: boolean;
   /** CEO/admin can approve/reject funding requests. */
@@ -150,7 +154,7 @@ export function OperationalFundManager({
                     {r.note && <p className="mt-1 text-xs text-muted-foreground">Note: {r.note}</p>}
                   </div>
                   {canApprove ? (
-                    <ApproveControls id={r.id} />
+                    <ApproveControls id={r.id} accounts={accounts} />
                   ) : (
                     <Badge variant="warning">Awaiting CEO</Badge>
                   )}
@@ -279,15 +283,16 @@ export function OperationalFundManager({
   );
 }
 
-function ApproveControls({ id }: { id: string }) {
+function ApproveControls({ id, accounts }: { id: string; accounts: SelectableAccount[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
+  const [accountId, setAccountId] = useState("");
   function decide(kind: "approve" | "reject") {
     start(async () => {
       const res = kind === "approve"
-        ? await approveOperationalFundRequest(id)
+        ? await approveOperationalFundRequest(id, accountId || undefined)
         : await rejectOperationalFundRequest(id, note.trim() || undefined);
       if (res.ok) { toast({ variant: "success", title: res.message }); router.refresh(); }
       else toast({ variant: "error", title: res.error });
@@ -295,6 +300,11 @@ function ApproveControls({ id }: { id: string }) {
   }
   return (
     <div className="flex shrink-0 flex-col items-end gap-2">
+      {accounts.length > 0 && (
+        <div className="w-52 text-left">
+          <CompanyAccountSelect accounts={accounts} value={accountId} onChange={setAccountId} label="Issue from account" />
+        </div>
+      )}
       <div className="flex gap-1.5">
         <Button size="sm" variant="success" disabled={pending} onClick={() => decide("approve")}>
           <Check className="size-3.5" /> Approve
