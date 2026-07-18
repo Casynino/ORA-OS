@@ -143,7 +143,7 @@ export default async function FinanceDashboardPage() {
               {greeting}, {firstName} 👋
             </h1>
             <p className="mt-1.5 max-w-xl text-sm text-white/90 sm:text-base">
-              You collect, verify, deposit and follow up ORA&apos;s money — the CEO owns the accounts. Here&apos;s what needs you today.
+              Manage payments, track collections, and keep ORA&apos;s financial records organized and up to date.
             </p>
             <div className="mt-5 grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:gap-8">
               <HeroStat label="Collections today" value={formatCurrency(todayCollections)} sub="customer money in" />
