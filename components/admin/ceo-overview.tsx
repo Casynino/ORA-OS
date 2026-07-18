@@ -191,29 +191,28 @@ export function RevenueCollectionOverview({
         Revenue &amp; collections · this month
       </SectionLabel>
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Revenue split — the breakdown of the health headline, not a repeat */}
+        {/* Revenue split — donut of the health headline + details beside it */}
         <div className="glass-card rounded-2xl p-5 sm:p-6">
           <p className="text-sm font-medium">How this month&apos;s revenue splits</p>
-          <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-muted">
-            <div className="bg-success" style={{ width: `${cashPct}%` }} title={`Cash ${formatCurrency(cashRevenue)}`} />
-            <div className="bg-warning" style={{ width: `${creditPct}%` }} title={`Credit ${formatCurrency(creditRevenue)}`} />
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-4">
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="size-2.5 rounded-full bg-success" />
-                <span className="text-xs text-muted-foreground">Cash sales</span>
+          <div className="mt-4 flex flex-col items-center gap-6 sm:flex-row">
+            <RevenueDonut cash={cashRevenue} credit={creditRevenue} creditPct={creditPct} hasData={total > 0} />
+            <div className="w-full flex-1 space-y-4">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full bg-success" />
+                  <span className="text-xs text-muted-foreground">Cash sales</span>
+                </div>
+                <p className="mt-0.5 font-display text-2xl font-bold tracking-tight">{formatCurrency(cashRevenue)}</p>
+                <p className="text-[11px] text-muted-foreground">{Math.round(cashPct)}% · paid on the spot</p>
               </div>
-              <p className="mt-0.5 font-display text-xl font-bold">{formatCurrency(cashRevenue)}</p>
-              <p className="text-[11px] text-muted-foreground">{Math.round(cashPct)}% · paid on the spot</p>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="size-2.5 rounded-full bg-warning" />
-                <span className="text-xs text-muted-foreground">Credit sales</span>
+              <div className="border-t border-border/60 pt-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full bg-warning" />
+                  <span className="text-xs text-muted-foreground">Credit sales</span>
+                </div>
+                <p className="mt-0.5 font-display text-2xl font-bold tracking-tight">{formatCurrency(creditRevenue)}</p>
+                <p className="text-[11px] text-muted-foreground">{Math.round(creditPct)}% · to collect later</p>
               </div>
-              <p className="mt-0.5 font-display text-xl font-bold">{formatCurrency(creditRevenue)}</p>
-              <p className="text-[11px] text-muted-foreground">{Math.round(creditPct)}% · to collect later</p>
             </div>
           </div>
         </div>
@@ -257,6 +256,42 @@ function MiniFigure({ label, value, tone, hint }: { label: string; value: string
         "text-info": tone === "info",
       })}>{value}</p>
       {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+// A two-slice donut (cash green + credit amber) with the credit share — ORA's
+// defining metric — called out in the centre. Renders an empty ring when there
+// are no sales yet.
+function RevenueDonut({ cash, credit, creditPct, hasData }: { cash: number; credit: number; creditPct: number; hasData: boolean }) {
+  const size = 150;
+  const thickness = 22;
+  const radius = (size - thickness) / 2;
+  const circ = 2 * Math.PI * radius;
+  const total = cash + credit || 1;
+  const cashLen = (cash / total) * circ;
+  const creditLen = (credit / total) * circ;
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="hsl(var(--muted))" strokeWidth={thickness} />
+        {hasData && (
+          <>
+            <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="hsl(145 65% 52%)" strokeWidth={thickness} strokeDasharray={`${cashLen} ${circ - cashLen}`} strokeDashoffset={0} />
+            <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="hsl(38 95% 60%)" strokeWidth={thickness} strokeDasharray={`${creditLen} ${circ - creditLen}`} strokeDashoffset={-cashLen} />
+          </>
+        )}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        {hasData ? (
+          <>
+            <span className="font-display text-2xl font-bold tracking-tight">{Math.round(creditPct)}%</span>
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">on credit</span>
+          </>
+        ) : (
+          <span className="text-xs text-muted-foreground">No sales yet</span>
+        )}
+      </div>
     </div>
   );
 }
