@@ -49,17 +49,26 @@ const fundCategory = z
   .default("OFFICE")
   .refine((c) => OFFICE_FUND_SET.has(c), "That category isn't available for the Operational Fund.");
 
+// The persisted totals live in a Postgres int4 (max 2,147,483,647). Guard the
+// line-item sum so a batch can never overflow the column mid-transaction.
+const MAX_INT4 = 2_147_483_647;
+const totalWithinRange = (items: { amount: number }[]) =>
+  items.reduce((s, it) => s + it.amount, 0) <= MAX_INT4;
+const TOTAL_TOO_LARGE = "That total is too large — split it into separate requests.";
+
 const itemSchema = z.object({
   category: fundCategory,
   customCategory: z.string().max(60).optional().or(z.literal("")),
   description: z.string().trim().min(2, "Describe the item.").max(200),
   amount: z.number().int().positive("Enter an amount.").max(1000000000),
 });
-const requestSchema = z.object({
-  purpose: z.string().trim().min(3, "What is this request for?").max(300),
-  items: z.array(itemSchema).min(1, "Add at least one item.").max(50),
-  note: z.string().max(500).optional().or(z.literal("")),
-});
+const requestSchema = z
+  .object({
+    purpose: z.string().trim().min(3, "What is this request for?").max(300),
+    items: z.array(itemSchema).min(1, "Add at least one item.").max(50),
+    note: z.string().max(500).optional().or(z.literal("")),
+  })
+  .refine((d) => totalWithinRange(d.items), { message: TOTAL_TOO_LARGE, path: ["items"] });
 
 /** Finance builds a multi-item allocation request → goes to the CEO. The request
  *  total is the sum of its line items; each line carries its own category so the
@@ -213,12 +222,14 @@ const issueItemSchema = z.object({
   description: z.string().trim().min(2, "Describe the item.").max(200),
   amount: z.number().int().positive("Enter an amount.").max(1000000000),
 });
-const issueSchema = z.object({
-  purpose: z.string().trim().min(3, "What are the funds for?").max(300),
-  items: z.array(issueItemSchema).min(1, "Add at least one item.").max(50),
-  paymentAccountId: z.string().optional().or(z.literal("")), // account the money is issued FROM
-  note: z.string().max(500).optional().or(z.literal("")),
-});
+const issueSchema = z
+  .object({
+    purpose: z.string().trim().min(3, "What are the funds for?").max(300),
+    items: z.array(issueItemSchema).min(1, "Add at least one item.").max(50),
+    paymentAccountId: z.string().optional().or(z.literal("")), // account the money is issued FROM
+    note: z.string().max(500).optional().or(z.literal("")),
+  })
+  .refine((d) => totalWithinRange(d.items), { message: TOTAL_TOO_LARGE, path: ["items"] });
 
 /** CEO pushes funds to Finance without waiting for a request — one or more line
  *  items in a single allocation. Money leaves the chosen account NOW (one Expense
@@ -398,14 +409,16 @@ const spendItemSchema = z.object({
   description: z.string().trim().min(3, "What was this spent on?").max(300),
   amount: z.number().int().positive("Enter the amount spent.").max(1000000000),
 });
-const spendSchema = z.object({
-  items: z.array(spendItemSchema).min(1, "Add at least one item.").max(50),
-  vendor: z.string().max(160).optional().or(z.literal("")),
-  expenseDate: z.string().optional().or(z.literal("")), // ISO date (shared)
-  receiptRef: z.string().max(120).optional().or(z.literal("")),
-  receiptUrl: z.string().max(15000000).optional().or(z.literal("")),
-  note: z.string().max(500).optional().or(z.literal("")),
-});
+const spendSchema = z
+  .object({
+    items: z.array(spendItemSchema).min(1, "Add at least one item.").max(50),
+    vendor: z.string().max(160).optional().or(z.literal("")),
+    expenseDate: z.string().optional().or(z.literal("")), // ISO date (shared)
+    receiptRef: z.string().max(120).optional().or(z.literal("")),
+    receiptUrl: z.string().max(15000000).optional().or(z.literal("")),
+    note: z.string().max(500).optional().or(z.literal("")),
+  })
+  .refine((d) => totalWithinRange(d.items), { message: TOTAL_TOO_LARGE, path: ["items"] });
 
 /** Finance records money spent from the Operational Fund — one OR several line
  *  items in a single transaction, all sharing one vendor/date/receipt. Each line

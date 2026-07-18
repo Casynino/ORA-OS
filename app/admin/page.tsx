@@ -20,11 +20,10 @@ import {
   RevenueCollectionOverview,
   InventoryOverview,
   SalesPerformance,
-  CustomerSummaryStrip,
-  ProductPerformanceCompact,
+  ProductPerformance,
   type AttentionItem,
 } from "@/components/admin/ceo-overview";
-import { RevenueTrends, HumanActivityFeed } from "@/components/admin/command-sections";
+import { RevenueTrends, HumanActivityFeed, CustomerIntelligencePanel } from "@/components/admin/command-sections";
 import { Reveal } from "@/components/ui/reveal";
 import { formatCurrency, timeAgo } from "@/lib/utils";
 
@@ -132,6 +131,9 @@ export default async function AdminCommandCenter() {
         dueThisWeek={collections.dueThisWeek}
         overdueTotal={collections.overdueTotal}
         overdueCount={collections.overdueCount}
+        activeCreditCustomers={collections.activeCreditCustomers}
+        goodPayers={collections.goodPayers}
+        atRiskCustomers={collections.atRiskCustomers}
       />
 
       {/* ── 5 · Inventory overview ── */}
@@ -149,14 +151,16 @@ export default async function AdminCommandCenter() {
         topPartner={d.sales.topPartner}
       />
 
-      {/* ── 6b · Customers (compact) ── */}
-      <CustomerSummaryStrip cust={customers} />
+      {/* ── 6b · Customer intelligence (who ORA sells to — types + top customers) ── */}
+      <CustomerIntelligencePanel cust={customers} />
 
-      {/* ── 7 · Product performance ── */}
-      <ProductPerformanceCompact
+      {/* ── 7 · Product performance (visual — best / slow / low / returned / requested) ── */}
+      <ProductPerformance
         best={d.productPerformance.best}
-        low={d.productPerformance.low}
         slow={d.productPerformance.slow}
+        low={d.productPerformance.low}
+        returned={d.productPerformance.returned}
+        requested={d.productPerformance.requested}
       />
 
       {/* ── 8 · Financial activity + oversight ── */}
