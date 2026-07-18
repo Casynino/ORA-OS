@@ -28,6 +28,7 @@ import {
   AddExpenseButton,
   AddCapitalButton,
   RecordWithdrawalButton,
+  IssueFundsButton,
 } from "@/components/admin/finance-forms";
 import { cn, formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
 
@@ -118,15 +119,16 @@ export default async function AdminFinancePage({
               )}
             </div>
           </div>
-          {/* Uniform full-width action stack — kept inside the banner (long
-              labels like "Record withdrawal" overflow when forced side-by-side). */}
+          {/* CEO money actions — one tidy stack, always here on the overview.
+              Full-width so long labels never overflow the banner; varied
+              variants (issue = primary, invest = green, the rest outline) give
+              it rhythm instead of four identical pills. */}
           <div className="flex w-full shrink-0 flex-col items-stretch gap-2 lg:w-60">
-            <AddExpenseButton accounts={accounts} className="w-full justify-center rounded-full" />
-            <AddCapitalButton accounts={accounts} className="w-full justify-center rounded-full" />
-            <RecordWithdrawalButton accounts={accounts} className="w-full justify-center rounded-full" />
-            <Link href="/admin/finance/profit" className="mt-0.5 inline-flex items-center justify-center gap-1 text-sm font-medium text-primary hover:underline">
-              Full Profit &amp; Loss <ArrowRight className="size-3.5" />
-            </Link>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Quick actions</p>
+            <IssueFundsButton accounts={accounts} variant="default" className="w-full justify-center rounded-full" />
+            <AddExpenseButton accounts={accounts} variant="outline" className="w-full justify-center rounded-full" />
+            <AddCapitalButton accounts={accounts} variant="success" className="w-full justify-center rounded-full" />
+            <RecordWithdrawalButton accounts={accounts} variant="outline" className="w-full justify-center rounded-full" />
           </div>
         </div>
         {capitalDepleted && (

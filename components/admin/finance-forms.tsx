@@ -2,13 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Receipt, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Trash2, Receipt, TrendingUp, TrendingDown, Send } from "lucide-react";
 import {
   recordExpense,
   removeExpense,
   recordCapital,
   removeCapital,
 } from "@/lib/actions/finance";
+import { issueOperationalFunds } from "@/lib/actions/operational-fund";
+import { OFFICE_FUND_CATEGORIES } from "@/lib/expense-categories";
+import { EXPENSE_LABELS } from "@/lib/expense-categories";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +20,10 @@ import { Select } from "@/components/ui/select";
 import { ProofUpload } from "@/components/ui/proof-upload";
 import { CompanyAccountSelect, type SelectableAccount } from "@/components/ui/account-select";
 import { toast } from "@/components/ui/use-toast";
+
+// Any Button look these action buttons may be styled with (kept in sync with
+// the Button component's variants so the hero can vary them for visual rhythm).
+type BtnVariant = "default" | "accent" | "secondary" | "outline" | "ghost" | "destructive" | "success";
 
 const EXPENSE_OPTIONS: { group: string; items: { value: string; label: string }[] }[] = [
   {
@@ -77,7 +84,7 @@ export function AddExpenseButton({
 }: {
   accounts?: SelectableAccount[];
   label?: string;
-  variant?: "default" | "outline";
+  variant?: BtnVariant;
   className?: string;
 }) {
   const router = useRouter();
@@ -255,7 +262,7 @@ export function AddCapitalButton({
 }: {
   accounts?: SelectableAccount[];
   label?: string;
-  variant?: "default" | "outline";
+  variant?: BtnVariant;
   className?: string;
 }) {
   const router = useRouter();
@@ -361,7 +368,7 @@ export function RecordWithdrawalButton({
 }: {
   accounts?: SelectableAccount[];
   label?: string;
-  variant?: "default" | "outline";
+  variant?: BtnVariant;
   className?: string;
 }) {
   const router = useRouter();
@@ -467,5 +474,95 @@ export function DeleteCapitalButton({ id }: { id: string }) {
     >
       <Trash2 className="size-3.5" />
     </Button>
+  );
+}
+
+/** CEO pushes funds to Finance from anywhere (e.g. the Finance overview). The
+ *  money isn't an expense until Finance confirms receipt. Mirrors the modal on
+ *  the Operational Fund page. */
+export function IssueFundsButton({
+  accounts = [],
+  label = "Issue funds to Finance",
+  variant = "default",
+  className = "rounded-full",
+}: {
+  accounts?: SelectableAccount[];
+  label?: string;
+  variant?: BtnVariant;
+  className?: string;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [purpose, setPurpose] = useState("");
+  const [category, setCategory] = useState("OFFICE");
+  const [accountId, setAccountId] = useState("");
+  const [note, setNote] = useState("");
+
+  function submit() {
+    if (Number(amount) <= 0) return toast({ variant: "error", title: "Enter an amount." });
+    if (purpose.trim().length < 3) return toast({ variant: "error", title: "What are the funds for?" });
+    start(async () => {
+      const res = await issueOperationalFunds({
+        amount: Math.round(Number(amount) || 0),
+        purpose: purpose.trim(),
+        category: category as never,
+        paymentAccountId: accountId || undefined,
+        note: note.trim() || undefined,
+      });
+      if (res.ok) {
+        toast({ variant: "success", title: res.message });
+        setOpen(false);
+        setAmount(""); setPurpose(""); setNote(""); setCategory("OFFICE");
+        router.refresh();
+      } else toast({ variant: "error", title: res.error });
+    });
+  }
+
+  return (
+    <>
+      <Button size="sm" variant={variant} className={className} onClick={() => setOpen(true)}>
+        <Send className="size-4" />
+        {label}
+      </Button>
+      {open && (
+        <Modal
+          open
+          onClose={() => setOpen(false)}
+          title="Issue funds to Finance"
+          description="Push money to the Operational Fund. Finance confirms receipt before it's booked as a company expense."
+        >
+          <div className="space-y-3.5">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Amount (TSh)</Label>
+                <Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1.5" placeholder="e.g. 500000" />
+              </div>
+              <div>
+                <Label>Category</Label>
+                <Select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1.5">
+                  {OFFICE_FUND_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Purpose</Label>
+              <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="mt-1.5" placeholder="What the funds are for" />
+            </div>
+            <CompanyAccountSelect accounts={accounts} value={accountId} onChange={setAccountId} label="Issue from account" />
+            <div>
+              <Label>Note (optional)</Label>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" />
+            </div>
+            <Button className="w-full rounded-full" disabled={pending || !amount || purpose.trim().length < 3} onClick={submit}>
+              {pending ? "Issuing…" : "Issue to Finance"}
+            </Button>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }
