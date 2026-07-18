@@ -203,6 +203,7 @@ model User {
   pettyCashRequested    PettyCashRequest[]       @relation("PettyCashRequester")
   pettyCashApproved     PettyCashRequest[]       @relation("PettyCashApprover")
   pettyCashSpent        PettyCashExpense[]       @relation("PettyCashSpender")
+  operationalSpends     OperationalSpend[]       @relation("OperationalSpender")
   payrollCreated        PayrollRun[]             @relation("PayrollCreator")
   payrollApproved       PayrollRun[]             @relation("PayrollApprover")
   // Impact
@@ -1373,6 +1374,29 @@ model PettyCashExpense {
   createdAt    DateTime         @default(now())
 
   @@index([requestId])
+}
+
+/// One use of the Operational Fund — an ACCOUNTABILITY record of how the
+/// CEO-allocated float was spent. It reduces the fund balance but is NOT a
+/// company Expense (the allocation was already expensed at CEO approval), so it
+/// never double-counts money-out in the P&L. This is the "controlled petty cash"
+/// sub-ledger the CEO reviews.
+model OperationalSpend {
+  id           String          @id @default(cuid())
+  code         String          @unique
+  amount       Int // whole TSh
+  category     ExpenseCategory @default(OFFICE)
+  description  String
+  expenseDate  DateTime        @default(now())
+  note         String?
+  receiptRef   String? // receipt / invoice / voucher number
+  receiptUrl   String? // uploaded supporting document
+  recordedBy   User            @relation("OperationalSpender", fields: [recordedById], references: [id])
+  recordedById String
+  createdAt    DateTime        @default(now())
+
+  @@index([category])
+  @@index([expenseDate])
 }
 
 /// Payroll staff registry — employees are paid people, not system logins.

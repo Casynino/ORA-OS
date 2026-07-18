@@ -2,13 +2,17 @@ import { prisma } from "@/lib/db";
 import type { ExpenseCategory } from "@prisma/client";
 
 /**
- * The Operational Fund — the single pool of money the CEO allocates to Finance
- * for day-to-day operations. Finance has no bank access; they only spend what's
- * been allocated here, and every use is recorded.
+ * The Operational Fund — a controlled petty-cash float the CEO allocates to
+ * Finance for day-to-day operations. Finance has no bank access; they only
+ * spend what's been allocated, and account for every shilling.
  *
- * Balance = Σ(approved funding requests) − Σ(operational-fund expenses).
- * Funding never creates an Expense; only actual spend does (source =
- * OPERATIONAL_FUND), so it flows into every report once, as real money-out.
+ * Accounting: when the CEO approves a funding request, the allocation is booked
+ * as a Company Expense immediately (money out of the company into the fund).
+ * Finance's per-item spends are ACCOUNTABILITY records (OperationalSpend) — they
+ * reduce the fund balance but are NOT additional company expenses (that would
+ * double-count the same money). So:
+ *   Company money-out (P&L)  = the allocation expenses (source=OPERATIONAL_FUND).
+ *   Fund balance             = Σ(approved funding) − Σ(operational spends).
  */
 
 /** Fast balance for dashboards/tiles that only need the number. */
@@ -20,7 +24,7 @@ export async function getOperationalFundBalance(): Promise<{
 }> {
   const [funded, spent, pendingCount] = await Promise.all([
     prisma.pettyCashRequest.aggregate({ _sum: { amount: true }, where: { status: "APPROVED" } }),
-    prisma.expense.aggregate({ _sum: { amount: true }, where: { source: "OPERATIONAL_FUND" } }),
+    prisma.operationalSpend.aggregate({ _sum: { amount: true } }),
     prisma.pettyCashRequest.count({ where: { status: "PENDING" } }),
   ]);
   const f = funded._sum.amount ?? 0;
@@ -49,7 +53,6 @@ export type FundExpenseRow = {
   amount: number;
   category: ExpenseCategory;
   description: string;
-  vendor: string | null;
   receiptRef: string | null;
   receiptUrl: string | null;
   expenseDate: Date;
@@ -59,25 +62,24 @@ export type FundExpenseRow = {
 
 /** Everything the Operational Fund dashboard (finance + CEO) needs, in one round. */
 export async function getOperationalFund() {
-  const [requests, expenses] = await Promise.all([
+  const [requests, spends] = await Promise.all([
     prisma.pettyCashRequest.findMany({
       orderBy: { createdAt: "desc" },
       include: { requestedBy: { select: { name: true } }, approvedBy: { select: { name: true } } },
     }),
-    prisma.expense.findMany({
-      where: { source: "OPERATIONAL_FUND" },
+    prisma.operationalSpend.findMany({
       orderBy: { expenseDate: "desc" },
       include: { recordedBy: { select: { name: true } } },
     }),
   ]);
 
   const funded = requests.filter((r) => r.status === "APPROVED").reduce((a, r) => a + r.amount, 0);
-  const spent = expenses.reduce((a, e) => a + e.amount, 0);
+  const spent = spends.reduce((a, e) => a + e.amount, 0);
   const balance = funded - spent;
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const spentThisMonth = expenses
+  const spentThisMonth = spends
     .filter((e) => e.expenseDate >= monthStart)
     .reduce((a, e) => a + e.amount, 0);
 
@@ -85,13 +87,12 @@ export async function getOperationalFund() {
     .filter((r) => r.status === "PENDING")
     .map(toRequestRow);
   const requestRows: FundRequestRow[] = requests.map(toRequestRow);
-  const expenseRows: FundExpenseRow[] = expenses.map((e) => ({
+  const expenseRows: FundExpenseRow[] = spends.map((e) => ({
     id: e.id,
     code: e.code,
     amount: e.amount,
     category: e.category,
-    description: e.purpose,
-    vendor: e.vendor,
+    description: e.description,
     receiptRef: e.receiptRef,
     receiptUrl: e.receiptUrl,
     expenseDate: e.expenseDate,
@@ -101,7 +102,7 @@ export async function getOperationalFund() {
 
   // Spending by category (for the breakdown).
   const catMap = new Map<ExpenseCategory, number>();
-  for (const e of expenses) catMap.set(e.category, (catMap.get(e.category) ?? 0) + e.amount);
+  for (const e of spends) catMap.set(e.category, (catMap.get(e.category) ?? 0) + e.amount);
   const byCategory = [...catMap.entries()]
     .map(([category, amount]) => ({ category, amount }))
     .sort((a, b) => b.amount - a.amount);
