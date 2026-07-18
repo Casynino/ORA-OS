@@ -43,6 +43,7 @@ export type FundRequestRow = {
   adminNote: string | null;
   requestedBy: string;
   approvedBy: string | null;
+  account: string | null;
   createdAt: Date;
   approvedAt: Date | null;
 };
@@ -65,7 +66,11 @@ export async function getOperationalFund() {
   const [requests, spends] = await Promise.all([
     prisma.pettyCashRequest.findMany({
       orderBy: { createdAt: "desc" },
-      include: { requestedBy: { select: { name: true } }, approvedBy: { select: { name: true } } },
+      include: {
+        requestedBy: { select: { name: true } },
+        approvedBy: { select: { name: true } },
+        paymentAccount: { select: { name: true } },
+      },
     }),
     prisma.operationalSpend.findMany({
       orderBy: { expenseDate: "desc" },
@@ -85,6 +90,11 @@ export async function getOperationalFund() {
 
   const pending: FundRequestRow[] = requests
     .filter((r) => r.status === "PENDING")
+    .map(toRequestRow);
+  // CEO-issued funds still awaiting Finance's receipt confirmation — not yet
+  // counted in the balance or booked as an expense.
+  const issued: FundRequestRow[] = requests
+    .filter((r) => r.status === "ISSUED")
     .map(toRequestRow);
   const requestRows: FundRequestRow[] = requests.map(toRequestRow);
   const expenseRows: FundExpenseRow[] = spends.map((e) => ({
@@ -114,6 +124,8 @@ export async function getOperationalFund() {
     spentThisMonth,
     pendingTotal: pending.reduce((a, r) => a + r.amount, 0),
     pending,
+    issued,
+    issuedTotal: issued.reduce((a, r) => a + r.amount, 0),
     requests: requestRows,
     expenses: expenseRows,
     byCategory,
@@ -133,6 +145,7 @@ function toRequestRow(r: {
   approvedAt: Date | null;
   requestedBy: { name: string };
   approvedBy: { name: string } | null;
+  paymentAccount: { name: string } | null;
 }): FundRequestRow {
   return {
     id: r.id,
@@ -145,6 +158,7 @@ function toRequestRow(r: {
     adminNote: r.adminNote,
     requestedBy: r.requestedBy.name,
     approvedBy: r.approvedBy?.name ?? null,
+    account: r.paymentAccount?.name ?? null,
     createdAt: r.createdAt,
     approvedAt: r.approvedAt,
   };

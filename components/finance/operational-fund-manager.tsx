@@ -12,6 +12,7 @@ import {
   Check,
   X,
   Trash2,
+  Send,
 } from "lucide-react";
 import {
   requestOperationalFunds,
@@ -19,6 +20,9 @@ import {
   rejectOperationalFundRequest,
   recordOperationalExpense,
   removeOperationalExpense,
+  issueOperationalFunds,
+  confirmOperationalFundReceipt,
+  cancelIssuedFund,
 } from "@/lib/actions/operational-fund";
 import type { FundRequestRow, FundExpenseRow } from "@/lib/services/operational-fund";
 import { EXPENSE_LABELS, OFFICE_FUND_CATEGORIES } from "@/lib/expense-categories";
@@ -50,13 +54,16 @@ type Fund = {
   spentThisMonth: number;
   pendingTotal: number;
   pending: FundRequestRow[];
+  issued: FundRequestRow[];
+  issuedTotal: number;
   requests: FundRequestRow[];
   expenses: FundExpenseRow[];
   byCategory: { category: ExpenseCategory; amount: number }[];
 };
 
-const STATUS_VARIANT: Record<string, "warning" | "success" | "destructive" | "secondary"> = {
+const STATUS_VARIANT: Record<string, "warning" | "success" | "destructive" | "secondary" | "info"> = {
   PENDING: "warning",
+  ISSUED: "info",
   APPROVED: "success",
   REJECTED: "destructive",
   RECONCILED: "secondary",
@@ -97,14 +104,19 @@ export function OperationalFundManager({
 }) {
   const [requestOpen, setRequestOpen] = useState(false);
   const [spendOpen, setSpendOpen] = useState(false);
+  const [issueOpen, setIssueOpen] = useState(false);
 
   return (
     <div className="space-y-6">
       {/* Tiles */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile icon={Wallet} label="Current balance" value={formatCurrency(fund.balance)} hint="available to spend" accent="text-success" />
-        <Tile icon={Clock} label="Pending requests" value={formatNumber(fund.pending.length)} hint={fund.pendingTotal > 0 ? formatCurrency(fund.pendingTotal) : "none"} accent="text-warning" />
-        <Tile icon={Landmark} label="Total allocated" value={formatCurrency(fund.funded)} hint="company expense (CEO-approved)" accent="text-info" />
+        {fund.issuedTotal > 0 ? (
+          <Tile icon={Send} label="Awaiting confirmation" value={formatCurrency(fund.issuedTotal)} hint={`${fund.issued.length} issued by CEO`} accent="text-info" />
+        ) : (
+          <Tile icon={Clock} label="Pending requests" value={formatNumber(fund.pending.length)} hint={fund.pendingTotal > 0 ? formatCurrency(fund.pendingTotal) : "none"} accent="text-warning" />
+        )}
+        <Tile icon={Landmark} label="Total allocated" value={formatCurrency(fund.funded)} hint="company expense, confirmed" accent="text-info" />
         <Tile icon={TrendingDown} label="Spent this month" value={formatCurrency(fund.spentThisMonth)} accent="text-primary" />
       </div>
 
@@ -122,6 +134,18 @@ export function OperationalFundManager({
               Fund is empty — request more to record spending.
             </span>
           )}
+        </div>
+      )}
+
+      {/* Action (CEO) — push funds to Finance without waiting for a request. */}
+      {canApprove && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={() => setIssueOpen(true)}>
+            <Send className="size-4" /> Issue funds to Finance
+          </Button>
+          <span className="self-center text-xs text-muted-foreground">
+            Finance confirms receipt before it&apos;s booked as an expense.
+          </span>
         </div>
       )}
 
@@ -157,6 +181,49 @@ export function OperationalFundManager({
                     <ApproveControls id={r.id} accounts={accounts} />
                   ) : (
                     <Badge variant="warning">Awaiting CEO</Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* CEO-issued funds awaiting Finance's receipt confirmation */}
+      {fund.issued.length > 0 && (
+        <section className="space-y-3">
+          <div>
+            <h2 className="font-display text-lg font-semibold">
+              {canManage ? "Funds issued to you — confirm receipt" : "Issued — awaiting Finance confirmation"}
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              {canManage
+                ? "The CEO has issued these funds. Confirm once you've received the cash — it's then added to your fund and booked as a company expense."
+                : "Not booked as an expense yet — it becomes money-out once Finance confirms receipt."}
+            </p>
+          </div>
+          <div className="space-y-2">
+            {fund.issued.map((r) => (
+              <div key={r.id} className="rounded-2xl border border-info/30 bg-info/[0.04] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-2 font-display font-semibold">
+                      {formatCurrency(r.amount)}
+                      <Badge variant="secondary" className="text-[10px]">{EXPENSE_LABELS[r.category]}</Badge>
+                    </p>
+                    <p className="mt-0.5 text-sm">{r.purpose}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {r.code} · issued {timeAgo(r.createdAt)}
+                      {r.account ? ` · from ${r.account}` : ""}
+                    </p>
+                    {r.note && <p className="mt-1 text-xs text-muted-foreground">Note: {r.note}</p>}
+                  </div>
+                  {canManage ? (
+                    <ConfirmReceiptControl id={r.id} amount={r.amount} />
+                  ) : canApprove ? (
+                    <CancelIssueControl id={r.id} />
+                  ) : (
+                    <Badge variant="info">Awaiting Finance</Badge>
                   )}
                 </div>
               </div>
@@ -279,6 +346,113 @@ export function OperationalFundManager({
 
       {requestOpen && <RequestModal onClose={() => setRequestOpen(false)} />}
       {spendOpen && <SpendModal balance={fund.balance} onClose={() => setSpendOpen(false)} />}
+      {issueOpen && <IssueModal accounts={accounts} onClose={() => setIssueOpen(false)} />}
+    </div>
+  );
+}
+
+/** CEO pushes funds to Finance — money-out is deferred until Finance confirms. */
+function IssueModal({ accounts, onClose }: { accounts: SelectableAccount[]; onClose: () => void }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [amount, setAmount] = useState("");
+  const [purpose, setPurpose] = useState("");
+  const [category, setCategory] = useState<string>("OFFICE");
+  const [accountId, setAccountId] = useState("");
+  const [note, setNote] = useState("");
+  function submit() {
+    const amt = Math.round(Number(amount) || 0);
+    if (amt <= 0) return toast({ variant: "error", title: "Enter an amount." });
+    if (purpose.trim().length < 3) return toast({ variant: "error", title: "What are the funds for?" });
+    start(async () => {
+      const res = await issueOperationalFunds({
+        amount: amt, purpose: purpose.trim(), category: category as ExpenseCategory,
+        paymentAccountId: accountId || undefined, note: note.trim() || undefined,
+      });
+      if (res.ok) { toast({ variant: "success", title: res.message }); onClose(); router.refresh(); }
+      else toast({ variant: "error", title: res.error });
+    });
+  }
+  return (
+    <Modal open onClose={onClose} title="Issue funds to Finance" description="Push money to the Operational Fund without waiting for a request. Finance confirms receipt before it's booked as a company expense.">
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label>Amount (TSh) *</Label>
+            <Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1.5" placeholder="e.g. 500000" />
+          </div>
+          <div>
+            <Label>Category</Label>
+            <Select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1.5">
+              {OFFICE_FUND_CATEGORIES.map((c) => (
+                <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
+              ))}
+            </Select>
+          </div>
+        </div>
+        <div>
+          <Label>Purpose *</Label>
+          <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="mt-1.5" placeholder="What the funds are for" />
+        </div>
+        <CompanyAccountSelect accounts={accounts} value={accountId} onChange={setAccountId} label="Issue from account" />
+        <div>
+          <Label>Note (optional)</Label>
+          <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" placeholder="Anything Finance should know" />
+        </div>
+        <Button className="w-full" onClick={submit} disabled={pending}>
+          {pending ? "Issuing…" : "Issue to Finance"}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+/** Finance confirms it received CEO-issued funds → books the expense. */
+function ConfirmReceiptControl({ id, amount }: { id: string; amount: number }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  if (!confirming) {
+    return (
+      <Button size="sm" variant="success" className="shrink-0" disabled={pending} onClick={() => setConfirming(true)}>
+        <Check className="size-3.5" /> Confirm receipt
+      </Button>
+    );
+  }
+  return (
+    <div className="flex shrink-0 flex-col items-end gap-1.5">
+      <span className="text-xs text-muted-foreground">Confirm you received {formatCurrency(amount)}?</span>
+      <div className="flex gap-1.5">
+        <Button size="sm" variant="outline" disabled={pending} onClick={() => setConfirming(false)}>Cancel</Button>
+        <Button size="sm" variant="success" disabled={pending} onClick={() => start(async () => {
+          const res = await confirmOperationalFundReceipt(id);
+          if (res.ok) { toast({ variant: "success", title: res.message }); router.refresh(); }
+          else { toast({ variant: "error", title: res.error }); setConfirming(false); }
+        })}>{pending ? "Confirming…" : "Yes, received"}</Button>
+      </div>
+    </div>
+  );
+}
+
+/** CEO cancels a not-yet-confirmed issue. */
+function CancelIssueControl({ id }: { id: string }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <div className="flex shrink-0 flex-col items-end gap-1.5">
+      <Badge variant="info">Awaiting Finance</Badge>
+      {confirm ? (
+        <Button size="sm" variant="destructive" disabled={pending} onClick={() => start(async () => {
+          const res = await cancelIssuedFund(id);
+          if (res.ok) { toast({ variant: "success", title: res.message }); router.refresh(); }
+          else { toast({ variant: "error", title: res.error }); setConfirm(false); }
+        })}>{pending ? "…" : "Cancel issue?"}</Button>
+      ) : (
+        <button type="button" onClick={() => setConfirm(true)} className="text-xs text-muted-foreground hover:text-destructive">
+          Cancel
+        </button>
+      )}
     </div>
   );
 }

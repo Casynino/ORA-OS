@@ -7,7 +7,7 @@ import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { refCode, formatCurrency } from "@/lib/utils";
 import { EXPENSE_CATEGORY_VALUES, EXPENSE_LABELS } from "@/lib/expense-categories";
-import { resolveReceivingAccount } from "@/lib/payment-methods";
+import { resolveReceivingAccount, METHOD_LABEL } from "@/lib/payment-methods";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -155,6 +155,141 @@ export async function rejectOperationalFundRequest(id: string, note?: string): P
     });
     revalidateFund();
     return ok(undefined, "Request rejected.");
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+// ── CEO-initiated issue → Finance confirms receipt ──────────────────────────
+
+const issueSchema = z.object({
+  amount: z.number().int().positive("Enter an amount.").max(1000000000),
+  purpose: z.string().trim().min(3, "What are the funds for?").max(300),
+  category: z.enum(EXPENSE_CATEGORY_VALUES).default("OFFICE"),
+  paymentAccountId: z.string().optional().or(z.literal("")), // account the money is issued FROM
+  note: z.string().max(500).optional().or(z.literal("")),
+});
+
+/** CEO pushes funds to Finance without waiting for a request. The money is NOT
+ *  booked as an expense yet — Finance must confirm receipt first (so nothing
+ *  leaves the company's books until the cash is actually in hand). */
+export async function issueOperationalFunds(
+  input: z.infer<typeof issueSchema>,
+): Promise<ActionResult<{ code: string }>> {
+  try {
+    const admin = await requireActor(["ADMIN"]);
+    const parsed = issueSchema.safeParse(input);
+    if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid amount.");
+    const d = parsed.data;
+    // Validate + record the source account the CEO is issuing from.
+    const account = await resolveReceivingAccount(prisma, d.paymentAccountId || null, null);
+    const req = await prisma.pettyCashRequest.create({
+      data: {
+        code: refCode("OF"),
+        amount: d.amount,
+        purpose: d.purpose,
+        category: d.category,
+        status: "ISSUED",
+        note: d.note?.trim() || null,
+        requestedById: admin.id,
+        approvedById: admin.id,
+        approvedAt: new Date(),
+        paymentAccountId: account.paymentAccountId,
+      },
+    });
+    await logActivity({
+      actorId: admin.id,
+      actorName: admin.name,
+      action: "OPERATIONAL_FUND_ISSUED",
+      entity: "PettyCashRequest",
+      entityId: req.code,
+      summary: `CEO issued ${formatCurrency(d.amount)} to the Operational Fund (${req.code}) — awaiting Finance's receipt confirmation.`,
+    });
+    revalidateFund();
+    return ok({ code: req.code }, `${formatCurrency(d.amount)} issued — Finance will confirm receipt.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+/** Finance confirms it received the CEO-issued funds. Only now is the allocation
+ *  booked as a Company Expense (money out) and added to the spendable balance —
+ *  exactly like an approved request, just triggered from the receiving side. */
+export async function confirmOperationalFundReceipt(id: string): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["FINANCE", "ADMIN"]);
+    const req = await prisma.pettyCashRequest.findUnique({
+      where: { id },
+      include: { paymentAccount: { select: { type: true } } },
+    });
+    if (!req) return fail("Funding record not found.");
+    if (req.status !== "ISSUED")
+      return fail("These funds were already confirmed or cancelled.");
+
+    await prisma.$transaction(async (tx) => {
+      // Atomic claim so the allocation expense is booked exactly once even if
+      // two confirmations race.
+      const claimed = await tx.pettyCashRequest.updateMany({
+        where: { id, status: "ISSUED" },
+        data: { status: "APPROVED" },
+      });
+      if (claimed.count === 0) throw new Error("These funds were already confirmed.");
+      // Money-out now — draws down the account the CEO issued from. Look up the
+      // method label directly (don't re-validate active: the money's committed).
+      const method = req.paymentAccount ? METHOD_LABEL[req.paymentAccount.type] ?? req.paymentAccount.type : null;
+      await tx.expense.create({
+        data: {
+          code: refCode("EXP"),
+          source: "OPERATIONAL_FUND",
+          category: req.category,
+          amount: req.amount,
+          purpose: `Operational Fund ${req.code} — ${req.purpose}`,
+          note: `Issued by CEO · receipt confirmed by ${actor.name}`,
+          paymentMethod: method,
+          paymentAccountId: req.paymentAccountId,
+          recordedById: actor.id,
+        },
+      });
+    });
+
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "OPERATIONAL_FUND_CONFIRMED",
+      entity: "PettyCashRequest",
+      entityId: req.code,
+      summary: `${actor.name} confirmed receipt of ${formatCurrency(req.amount)} (${req.code}) — booked as a company expense and added to the fund.`,
+    });
+    revalidateFund();
+    return ok(undefined, `Receipt confirmed — ${formatCurrency(req.amount)} added to the fund.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+/** CEO cancels a not-yet-confirmed issue (mistake / duplicate). No expense was
+ *  ever booked, so there's nothing to reverse — just mark it rejected. */
+export async function cancelIssuedFund(id: string): Promise<ActionResult> {
+  try {
+    const admin = await requireActor(["ADMIN"]);
+    const req = await prisma.pettyCashRequest.findUnique({ where: { id } });
+    if (!req) return fail("Funding record not found.");
+    const cancelled = await prisma.pettyCashRequest.updateMany({
+      where: { id, status: "ISSUED" },
+      data: { status: "REJECTED", adminNote: "Issue cancelled by CEO before confirmation." },
+    });
+    if (cancelled.count === 0)
+      return fail("These funds were already confirmed or cancelled.");
+    await logActivity({
+      actorId: admin.id,
+      actorName: admin.name,
+      action: "OPERATIONAL_FUND_ISSUE_CANCELLED",
+      entity: "PettyCashRequest",
+      entityId: req.code,
+      summary: `CEO cancelled the issue of ${formatCurrency(req.amount)} (${req.code}) before Finance confirmed it.`,
+    });
+    revalidateFund();
+    return ok(undefined, "Issue cancelled.");
   } catch (e) {
     return fail(errorMessage(e));
   }
