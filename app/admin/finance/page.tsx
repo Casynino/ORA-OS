@@ -118,13 +118,13 @@ export default async function AdminFinancePage({
               )}
             </div>
           </div>
-          <div className="flex shrink-0 flex-col items-stretch gap-2 lg:w-64">
-            <AddExpenseButton accounts={accounts} className="w-full rounded-full" />
-            <div className="flex gap-2">
-              <AddCapitalButton accounts={accounts} className="flex-1 rounded-full" />
-              <RecordWithdrawalButton accounts={accounts} className="flex-1 rounded-full" />
-            </div>
-            <Link href="/admin/finance/profit" className="inline-flex items-center justify-center gap-1 text-sm font-medium text-primary hover:underline">
+          {/* Uniform full-width action stack — kept inside the banner (long
+              labels like "Record withdrawal" overflow when forced side-by-side). */}
+          <div className="flex w-full shrink-0 flex-col items-stretch gap-2 lg:w-60">
+            <AddExpenseButton accounts={accounts} className="w-full justify-center rounded-full" />
+            <AddCapitalButton accounts={accounts} className="w-full justify-center rounded-full" />
+            <RecordWithdrawalButton accounts={accounts} className="w-full justify-center rounded-full" />
+            <Link href="/admin/finance/profit" className="mt-0.5 inline-flex items-center justify-center gap-1 text-sm font-medium text-primary hover:underline">
               Full Profit &amp; Loss <ArrowRight className="size-3.5" />
             </Link>
           </div>
