@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Receipt, TrendingUp, TrendingDown } from "lucide-react";
 import {
   recordExpense,
   removeExpense,
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { ProofUpload } from "@/components/ui/proof-upload";
 import { toast } from "@/components/ui/use-toast";
 
 const EXPENSE_OPTIONS: { group: string; items: { value: string; label: string }[] }[] = [
@@ -59,34 +60,60 @@ const EXPENSE_OPTIONS: { group: string; items: { value: string; label: string }[
       { value: "EQUIPMENT", label: "Equipment" },
     ],
   },
-  { group: "Other", items: [{ value: "OTHER", label: "Miscellaneous" }] },
+  { group: "Other", items: [{ value: "OTHER", label: "Custom / other" }] },
 ];
 
-export function AddExpenseButton() {
+/**
+ * CEO direct-expense form — the same fields Finance uses, but the CEO records
+ * AND approves in one step (final authority), so it takes effect immediately
+ * and reduces Business Capital automatically.
+ */
+export function AddExpenseButton({
+  label = "Record direct expense",
+  variant = "default",
+  className = "rounded-full",
+}: {
+  label?: string;
+  variant?: "default" | "outline";
+  className?: string;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState("RENT");
+  const [customCategory, setCustomCategory] = useState("");
   const [amount, setAmount] = useState("");
   const [purpose, setPurpose] = useState("");
-  const [method, setMethod] = useState("Cash");
+  const [vendor, setVendor] = useState("");
+  const [method, setMethod] = useState("Bank");
   const [date, setDate] = useState("");
+  const [receiptUrl, setReceiptUrl] = useState("");
   const [note, setNote] = useState("");
 
+  function reset() {
+    setAmount(""); setPurpose(""); setVendor(""); setNote(""); setDate("");
+    setReceiptUrl(""); setCustomCategory(""); setCategory("RENT");
+  }
+
   function submit() {
+    if (Number(amount) <= 0) return toast({ variant: "error", title: "Enter the amount." });
+    if (purpose.trim().length < 3) return toast({ variant: "error", title: "What was this expense for?" });
     start(async () => {
       const res = await recordExpense({
         category: category as never,
-        amount: Number(amount) || 0,
-        purpose,
+        customCategory: category === "OTHER" ? customCategory.trim() || undefined : undefined,
+        amount: Math.round(Number(amount) || 0),
+        purpose: purpose.trim(),
+        vendor: vendor.trim() || undefined,
         paymentMethod: method,
         expenseDate: date,
-        note,
+        receiptUrl: receiptUrl || undefined,
+        note: note.trim() || undefined,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         setOpen(false);
-        setAmount(""); setPurpose(""); setNote(""); setDate("");
+        reset();
         router.refresh();
       } else toast({ variant: "error", title: res.error });
     });
@@ -94,16 +121,16 @@ export function AddExpenseButton() {
 
   return (
     <>
-      <Button size="sm" className="rounded-full" onClick={() => setOpen(true)}>
-        <Plus className="size-4" />
-        Record expense
+      <Button size="sm" variant={variant} className={className} onClick={() => setOpen(true)}>
+        <Receipt className="size-4" />
+        {label}
       </Button>
       {open && (
         <Modal
           open
           onClose={() => setOpen(false)}
-          title="Record an expense"
-          description="Every shilling leaving ORA gets a category and a record."
+          title="Record a direct expense"
+          description="Paid straight from the company (supplier, rent, marketing…). It takes effect immediately and reduces Business Capital — no approval needed."
         >
           <div className="space-y-3.5">
             <div className="grid grid-cols-2 gap-3">
@@ -121,33 +148,48 @@ export function AddExpenseButton() {
               </div>
               <div>
                 <Label>Amount (TSh)</Label>
-                <Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1.5" placeholder="e.g. 50000" />
+                <Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1.5" placeholder="e.g. 500000" />
               </div>
             </div>
+            {category === "OTHER" && (
+              <div>
+                <Label>Custom category</Label>
+                <Input value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} className="mt-1.5" placeholder="e.g. Influencer campaign" />
+              </div>
+            )}
             <div>
-              <Label>Purpose</Label>
-              <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="mt-1.5" placeholder="e.g. June office rent" />
+              <Label>Description</Label>
+              <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="mt-1.5" placeholder="What it was for" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Payment method</Label>
-                <Select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1.5">
-                  <option>Cash</option>
-                  <option>Mobile money</option>
-                  <option>Bank</option>
-                </Select>
+                <Label>Vendor / payee</Label>
+                <Input value={vendor} onChange={(e) => setVendor(e.target.value)} className="mt-1.5" placeholder="Optional — who was paid" />
               </div>
               <div>
-                <Label>Date (optional)</Label>
-                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1.5" />
+                <Label>Payment method</Label>
+                <Select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1.5">
+                  <option>Bank</option>
+                  <option>Mobile money</option>
+                  <option>Cash</option>
+                  <option>Cheque</option>
+                </Select>
               </div>
+            </div>
+            <div>
+              <Label>Date (optional)</Label>
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1.5" />
+            </div>
+            <div>
+              <Label className="mb-1.5 block">Supporting document (receipt / invoice)</Label>
+              <ProofUpload value={receiptUrl} onChange={setReceiptUrl} label="Attach supporting document" />
             </div>
             <div>
               <Label>Note (optional)</Label>
               <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" />
             </div>
             <Button className="w-full rounded-full" disabled={pending || !amount || purpose.trim().length < 3} onClick={submit}>
-              {pending ? "Recording…" : "Record expense"}
+              {pending ? "Recording…" : "Record & pay from company"}
             </Button>
           </div>
         </Modal>
@@ -188,7 +230,16 @@ const CAPITAL_OPTIONS = [
   { value: "OTHER", label: "Other" },
 ];
 
-export function AddCapitalButton() {
+/** Owner puts money INTO the business — adds to Business Capital. */
+export function AddCapitalButton({
+  label = "Record investment",
+  variant = "default",
+  className = "rounded-full",
+}: {
+  label?: string;
+  variant?: "default" | "outline";
+  className?: string;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
@@ -196,21 +247,23 @@ export function AddCapitalButton() {
   const [amount, setAmount] = useState("");
   const [source, setSource] = useState("");
   const [date, setDate] = useState("");
+  const [receiptUrl, setReceiptUrl] = useState("");
   const [note, setNote] = useState("");
 
   function submit() {
     start(async () => {
       const res = await recordCapital({
         type: type as never,
-        amount: Number(amount) || 0,
+        amount: Math.round(Number(amount) || 0),
         source,
         entryDate: date,
+        receiptUrl: receiptUrl || undefined,
         note,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         setOpen(false);
-        setAmount(""); setSource(""); setNote(""); setDate("");
+        setAmount(""); setSource(""); setNote(""); setDate(""); setReceiptUrl("");
         router.refresh();
       } else toast({ variant: "error", title: res.error });
     });
@@ -218,16 +271,16 @@ export function AddCapitalButton() {
 
   return (
     <>
-      <Button size="sm" className="rounded-full" onClick={() => setOpen(true)}>
-        <Plus className="size-4" />
-        Record capital
+      <Button size="sm" variant={variant} className={className} onClick={() => setOpen(true)}>
+        <TrendingUp className="size-4" />
+        {label}
       </Button>
       {open && (
         <Modal
           open
           onClose={() => setOpen(false)}
-          title="Record capital"
-          description="Money injected into ORA — founder investment, reinvested profit, grants."
+          title="Record investment"
+          description="Money put into ORA — founder investment, reinvested profit, grants. Adds to Business Capital."
         >
           <div className="space-y-3.5">
             <div className="grid grid-cols-2 gap-3">
@@ -258,8 +311,97 @@ export function AddCapitalButton() {
                 <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" />
               </div>
             </div>
+            <div>
+              <Label className="mb-1.5 block">Supporting document (optional)</Label>
+              <ProofUpload value={receiptUrl} onChange={setReceiptUrl} label="Attach document" />
+            </div>
             <Button className="w-full rounded-full" disabled={pending || !amount || source.trim().length < 2} onClick={submit}>
-              {pending ? "Recording…" : "Record capital"}
+              {pending ? "Recording…" : "Record investment"}
+            </Button>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+/** Owner takes money OUT of the business — reduces Business Capital (recorded as
+ *  a negative capital movement; can't exceed what's available). */
+export function RecordWithdrawalButton({
+  label = "Record withdrawal",
+  variant = "outline",
+  className = "rounded-full",
+}: {
+  label?: string;
+  variant?: "default" | "outline";
+  className?: string;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [source, setSource] = useState("");
+  const [date, setDate] = useState("");
+  const [receiptUrl, setReceiptUrl] = useState("");
+  const [note, setNote] = useState("");
+
+  function submit() {
+    start(async () => {
+      const res = await recordCapital({
+        type: "WITHDRAWAL" as never,
+        amount: Math.round(Number(amount) || 0),
+        source,
+        entryDate: date,
+        receiptUrl: receiptUrl || undefined,
+        note,
+      });
+      if (res.ok) {
+        toast({ variant: "success", title: res.message });
+        setOpen(false);
+        setAmount(""); setSource(""); setNote(""); setDate(""); setReceiptUrl("");
+        router.refresh();
+      } else toast({ variant: "error", title: res.error });
+    });
+  }
+
+  return (
+    <>
+      <Button size="sm" variant={variant} className={className} onClick={() => setOpen(true)}>
+        <TrendingDown className="size-4" />
+        {label}
+      </Button>
+      {open && (
+        <Modal
+          open
+          onClose={() => setOpen(false)}
+          title="Record owner withdrawal"
+          description="Money the owner takes out of the business. Reduces Business Capital — can't exceed what's available."
+        >
+          <div className="space-y-3.5">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Amount (TSh)</Label>
+                <Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1.5" />
+              </div>
+              <div>
+                <Label>Date (optional)</Label>
+                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1.5" />
+              </div>
+            </div>
+            <div>
+              <Label>Paid to / reason</Label>
+              <Input value={source} onChange={(e) => setSource(e.target.value)} className="mt-1.5" placeholder="e.g. Owner drawings — Nino" />
+            </div>
+            <div>
+              <Label className="mb-1.5 block">Supporting document (optional)</Label>
+              <ProofUpload value={receiptUrl} onChange={setReceiptUrl} label="Attach document" />
+            </div>
+            <div>
+              <Label>Note (optional)</Label>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" />
+            </div>
+            <Button className="w-full rounded-full" variant="destructive" disabled={pending || !amount || source.trim().length < 2} onClick={submit}>
+              {pending ? "Recording…" : "Record withdrawal"}
             </Button>
           </div>
         </Modal>
@@ -278,7 +420,7 @@ export function DeleteCapitalButton({ id }: { id: string }) {
       className="rounded-full text-muted-foreground hover:text-destructive"
       disabled={pending}
       onClick={() => {
-        if (!window.confirm("Remove this capital entry? This is logged.")) return;
+        if (!window.confirm("Remove this capital movement? This is logged.")) return;
         start(async () => {
           const res = await removeCapital(id);
           if (res.ok) toast({ variant: "success", title: res.message });

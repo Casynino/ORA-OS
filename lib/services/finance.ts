@@ -349,8 +349,11 @@ export async function getFinanceOverview(period: Period) {
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 6);
 
-  // Capital story
-  const capitalTotal = capitalAll.reduce((s, c) => s + c.amount, 0);
+  // Capital story — injections are positive, owner withdrawals negative, so the
+  // net is what still sits in the business.
+  const capitalInjected = capitalAll.reduce((s, c) => s + Math.max(0, c.amount), 0);
+  const capitalWithdrawn = capitalAll.reduce((s, c) => s + Math.max(0, -c.amount), 0);
+  const capitalTotal = capitalInjected - capitalWithdrawn;
   const capitalByType = new Map<string, number>();
   for (const c of capitalAll)
     capitalByType.set(c.type, (capitalByType.get(c.type) ?? 0) + c.amount);
@@ -392,6 +395,10 @@ export async function getFinanceOverview(period: Period) {
     },
     position: {
       cashAvailable,
+      // Business Capital — the money available to run ORA right now. Same figure
+      // as cashAvailable (all money in − all money out, incl. owner capital and
+      // withdrawals); named for the executive control center.
+      businessCapital: cashAvailable,
       creditOutstanding,
       creditOutstandingPartner,
       creditOutstandingField,
@@ -399,6 +406,8 @@ export async function getFinanceOverview(period: Period) {
       stockValue,
       stockPotentialRevenue,
       capitalTotal,
+      capitalInjected,
+      capitalWithdrawn,
       capitalByType,
       allTimeIn: inAllTime.total,
       allTimeOut: exAllTime.total,
@@ -406,6 +415,14 @@ export async function getFinanceOverview(period: Period) {
     months,
     healthScore,
   };
+}
+
+/** Business Capital right now = all-time money in − all-time money out
+ *  (customer payments + owner capital − every expense − withdrawals). Cheap
+ *  helper for guards like blocking an owner withdrawal larger than what's left. */
+export async function getBusinessCapital(): Promise<number> {
+  const [inAll, exAll] = await Promise.all([cashIn(null), expensesIn(null)]);
+  return inAll.total - exAll.total;
 }
 
 // ── Unified ledger ──────────────────────────────────────────────────────────
@@ -537,7 +554,8 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
       kind: "EXPENSE" as const,
       label: e.purpose,
       reference: e.code,
-      category: EXPENSE_LABELS[e.category],
+      // Surface the free-text custom category when one was given; else the enum label.
+      category: e.customCategory || EXPENSE_LABELS[e.category],
       amount: -e.amount,
       method: e.paymentMethod,
       actor: e.recordedBy.name,

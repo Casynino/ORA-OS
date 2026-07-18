@@ -357,7 +357,7 @@ export default async function FinanceReportsPage() {
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
               Assets include stock anywhere in the system at cost.{" "}
-              {formatCurrency(p.capitalTotal)} of capital has been injected all time.
+              {formatCurrency(p.capitalTotal)} of net capital remains (invested − withdrawn).
             </p>
           </CardContent>
         </Card>
