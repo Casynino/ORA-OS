@@ -72,11 +72,13 @@ export async function removeExpense(id: string): Promise<ActionResult> {
     const actor = await requireActor(["ADMIN", "FINANCE"]);
     const exp = await prisma.expense.findUnique({ where: { id } });
     if (!exp) return fail("Expense not found.");
-    // A paid-payroll expense embodies an admin approval — finance must not be
-    // able to erase that control record.
-    if (exp.source === "PAYROLL" && actor.role !== "ADMIN") {
+    // Payroll pay-outs and Operational Fund allocations embody a CEO approval and
+    // stay in sync with their own records (PayrollRun / funding request). Deleting
+    // the expense alone would desync money-out from those ledgers, so it's blocked
+    // here — reverse it through its own workflow instead.
+    if (exp.source !== "DIRECT") {
       return fail(
-        "This expense was created by the payroll workflow — only the admin can remove it.",
+        "This expense was created by an approval workflow (payroll / operational fund) and can't be deleted here.",
       );
     }
     await prisma.expense.delete({ where: { id } });

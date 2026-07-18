@@ -313,7 +313,7 @@ export default async function FinanceReportsPage() {
                   <span>
                     Operational Fund balance (informational)
                     <span className="block text-xs font-normal text-muted-foreground">
-                      cash allocated to finance, not yet spent — an asset, not a payable
+                      allocated cash finance still holds to spend — already expensed at approval
                     </span>
                   </span>
                 </span>

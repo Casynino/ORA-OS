@@ -92,7 +92,7 @@ export function OperationalFundManager({
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile icon={Wallet} label="Current balance" value={formatCurrency(fund.balance)} hint="available to spend" accent="text-success" />
         <Tile icon={Clock} label="Pending requests" value={formatNumber(fund.pending.length)} hint={fund.pendingTotal > 0 ? formatCurrency(fund.pendingTotal) : "none"} accent="text-warning" />
-        <Tile icon={Landmark} label="Total allocated" value={formatCurrency(fund.funded)} hint="approved by CEO" accent="text-info" />
+        <Tile icon={Landmark} label="Total allocated" value={formatCurrency(fund.funded)} hint="company expense (CEO-approved)" accent="text-info" />
         <Tile icon={TrendingDown} label="Spent this month" value={formatCurrency(fund.spentThisMonth)} accent="text-primary" />
       </div>
 
@@ -116,9 +116,16 @@ export function OperationalFundManager({
       {/* Pending funding requests */}
       {fund.pending.length > 0 && (
         <section className="space-y-3">
-          <h2 className="font-display text-lg font-semibold">
-            {canApprove ? "Funding requests awaiting your approval" : "Pending funding requests"}
-          </h2>
+          <div>
+            <h2 className="font-display text-lg font-semibold">
+              {canApprove ? "Funding requests awaiting your approval" : "Pending funding requests"}
+            </h2>
+            {canApprove && (
+              <p className="text-xs text-muted-foreground">
+                Approving records the amount as a company expense immediately and adds it to the fund balance.
+              </p>
+            )}
+          </div>
           <div className="space-y-2">
             {fund.pending.map((r) => (
               <div key={r.id} className="rounded-2xl border border-warning/30 bg-warning/[0.04] p-4">
@@ -165,9 +172,9 @@ export function OperationalFundManager({
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {e.code} · {formatDate(e.expenseDate)} · by {e.recordedBy}
-                      {e.vendor ? ` · ${e.vendor}` : ""}
                       {e.receiptRef ? ` · ref ${e.receiptRef}` : ""}
                     </p>
+                    {e.note && <p className="mt-0.5 text-xs text-muted-foreground">{e.note}</p>}
                     {e.receiptUrl && (
                       <div className="mt-2 inline-block rounded-lg border border-border bg-muted/30 p-2">
                         <ProofViewer url={e.receiptUrl} label="View receipt" />

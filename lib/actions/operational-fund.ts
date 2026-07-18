@@ -74,8 +74,9 @@ export async function requestOperationalFunds(
   }
 }
 
-/** CEO approves — the amount is added to the Operational Fund balance. Creates
- *  NO expense; funding only tops up the pool that spending draws from. */
+/** CEO approves — the allocation is treated as money leaving the company into
+ *  the fund, so it's booked as a Company Expense IMMEDIATELY (money-out + cash
+ *  down in the CEO's reports) and added to the fund balance to spend down. */
 export async function approveOperationalFundRequest(id: string): Promise<ActionResult> {
   try {
     const admin = await requireActor(["ADMIN"]);
@@ -84,21 +85,41 @@ export async function approveOperationalFundRequest(id: string): Promise<ActionR
       include: { requestedBy: { select: { name: true } } },
     });
     if (!req) return fail("Request not found.");
-    const claimed = await prisma.pettyCashRequest.updateMany({
-      where: { id, status: "PENDING" },
-      data: { status: "APPROVED", approvedById: admin.id, approvedAt: new Date() },
+
+    await prisma.$transaction(async (tx) => {
+      // Atomic claim — a request can only be approved once, so the allocation
+      // expense is booked exactly once.
+      const claimed = await tx.pettyCashRequest.updateMany({
+        where: { id, status: "PENDING" },
+        data: { status: "APPROVED", approvedById: admin.id, approvedAt: new Date() },
+      });
+      if (claimed.count === 0) throw new Error("This request was already reviewed.");
+      // The money has left the company's control into the fund → a Company
+      // Expense now. Finance's per-item spends are accountability records
+      // against this float, NOT additional money-out.
+      await tx.expense.create({
+        data: {
+          code: refCode("EXP"),
+          source: "OPERATIONAL_FUND",
+          category: req.category,
+          amount: req.amount,
+          purpose: `Operational Fund ${req.code} — ${req.purpose}`,
+          note: `Allocated to ${req.requestedBy.name}`,
+          recordedById: admin.id,
+        },
+      });
     });
-    if (claimed.count === 0) return fail("This request was already reviewed.");
+
     await logActivity({
       actorId: admin.id,
       actorName: admin.name,
       action: "OPERATIONAL_FUND_APPROVED",
       entity: "PettyCashRequest",
       entityId: req.code,
-      summary: `CEO approved ${formatCurrency(req.amount)} for the Operational Fund (${req.code}) — added to the balance for ${req.requestedBy.name}.`,
+      summary: `CEO approved ${formatCurrency(req.amount)} for the Operational Fund (${req.code}) — booked as a company expense and allocated to ${req.requestedBy.name}.`,
     });
     revalidateFund();
-    return ok(undefined, `${req.code} approved — ${formatCurrency(req.amount)} added to the Operational Fund.`);
+    return ok(undefined, `${req.code} approved — ${formatCurrency(req.amount)} allocated (recorded as a company expense).`);
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -155,7 +176,7 @@ export async function recordOperationalExpense(
     if (d.expenseDate && Number.isNaN(new Date(d.expenseDate).getTime()))
       return fail("The expense date is invalid.");
 
-    const code = refCode("EXP");
+    const code = refCode("OS");
     let remaining = 0;
     await prisma.$transaction(async (tx) => {
       // Serialize every fund spend so two concurrent expenses can't each slip
@@ -163,7 +184,7 @@ export async function recordOperationalExpense(
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('operational_fund'))`;
       const [funded, spent] = await Promise.all([
         tx.pettyCashRequest.aggregate({ _sum: { amount: true }, where: { status: "APPROVED" } }),
-        tx.expense.aggregate({ _sum: { amount: true }, where: { source: "OPERATIONAL_FUND" } }),
+        tx.operationalSpend.aggregate({ _sum: { amount: true } }),
       ]);
       const balance = (funded._sum.amount ?? 0) - (spent._sum.amount ?? 0);
       // Can't spend money the fund doesn't have.
@@ -172,18 +193,18 @@ export async function recordOperationalExpense(
           `The Operational Fund only has ${formatCurrency(Math.max(0, balance))} left — request more funds before recording this.`,
         );
       remaining = balance - d.amount;
-      await tx.expense.create({
+      // An accountability record — NOT a company Expense (the allocation was
+      // already expensed at approval), so the P&L is never double-counted.
+      await tx.operationalSpend.create({
         data: {
           code,
-          source: "OPERATIONAL_FUND",
           category: d.category,
           amount: d.amount,
-          purpose: d.description,
-          vendor: d.vendor?.trim() || null,
+          description: d.description,
+          note: [d.vendor?.trim() ? `Vendor: ${d.vendor.trim()}` : "", d.note?.trim() ?? ""].filter(Boolean).join(" · ") || null,
           receiptRef: d.receiptRef?.trim() || null,
           receiptUrl: d.receiptUrl?.trim() || null,
           expenseDate: d.expenseDate ? new Date(d.expenseDate) : new Date(),
-          note: d.note?.trim() || null,
           recordedById: actor.id,
         },
       });
@@ -203,26 +224,24 @@ export async function recordOperationalExpense(
   }
 }
 
-/** Delete an operational-fund expense (a correction). Finance can remove its own
- *  fund spending; payroll-sourced rows stay CEO-only. */
+/** Delete an operational-fund spending record (a correction) — returns that
+ *  amount to the fund balance. Doesn't touch the P&L (spends aren't expenses). */
 export async function removeOperationalExpense(id: string): Promise<ActionResult> {
   try {
     const actor = await requireActor(["FINANCE", "ADMIN"]);
-    const exp = await prisma.expense.findUnique({ where: { id } });
-    if (!exp) return fail("Expense not found.");
-    if (exp.source === "PAYROLL" && actor.role !== "ADMIN")
-      return fail("Payroll expenses are a CEO control record — only the admin can remove them.");
-    await prisma.expense.delete({ where: { id } });
+    const spend = await prisma.operationalSpend.findUnique({ where: { id } });
+    if (!spend) return fail("Spending record not found.");
+    await prisma.operationalSpend.delete({ where: { id } });
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
       action: "OPERATIONAL_EXPENSE_REMOVED",
-      entity: "Expense",
-      entityId: exp.code,
-      summary: `${actor.name} removed expense ${exp.code} (${formatCurrency(exp.amount)} — ${exp.purpose}).`,
+      entity: "OperationalSpend",
+      entityId: spend.code,
+      summary: `${actor.name} removed operational spend ${spend.code} (${formatCurrency(spend.amount)} — ${spend.description}).`,
     });
     revalidateFund();
-    return ok(undefined, `Expense ${exp.code} removed.`);
+    return ok(undefined, `Spending record ${spend.code} removed — ${formatCurrency(spend.amount)} returned to the fund.`);
   } catch (e) {
     return fail(errorMessage(e));
   }
