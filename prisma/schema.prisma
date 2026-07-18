@@ -1310,7 +1310,8 @@ enum ExpenseSource {
 
 enum PettyCashStatus {
   PENDING // finance requested, awaiting admin approval
-  APPROVED // admin approved — money issued, expenditures being recorded
+  ISSUED // CEO pushed funds to Finance — awaiting Finance's receipt confirmation (not yet an expense)
+  APPROVED // money confirmed in the fund — booked as a company expense, spendable
   REJECTED
   RECONCILED // finance submitted the reconciliation report
 }
