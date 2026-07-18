@@ -97,7 +97,6 @@ export default async function AdminCommandCenter() {
   const weekAgo = new Date(Date.now() - 7 * 86400000);
   const [
     pettyPendingAgg,
-    payrollPendingRuns,
     largeExpensesAgg,
     pendingSalesByType,
     pendingCollectionsAgg,
@@ -108,10 +107,6 @@ export default async function AdminCommandCenter() {
       _count: true,
       _sum: { amount: true },
       where: { status: "PENDING" },
-    }),
-    prisma.payrollRun.findMany({
-      where: { status: "PENDING_APPROVAL" },
-      select: { items: { select: { net: true } } },
     }),
     prisma.expense.aggregate({
       _count: true,
@@ -143,11 +138,6 @@ export default async function AdminCommandCenter() {
   const pendingCreditSales = pendingSalesByType.find((g) => g.type === "CREDIT");
   const pettyPendingCount = pettyPendingAgg._count;
   const pettyPendingSum = pettyPendingAgg._sum.amount ?? 0;
-  const payrollPendingCount = payrollPendingRuns.length;
-  const payrollPendingSum = payrollPendingRuns.reduce(
-    (s, r) => s + r.items.reduce((t, i) => t + i.net, 0),
-    0,
-  );
   const largeExpenseCount = largeExpensesAgg._count;
   const largeExpenseSum = largeExpensesAgg._sum.amount ?? 0;
 
@@ -342,7 +332,7 @@ export default async function AdminCommandCenter() {
       {/* ── Executive approvals ──────────────────────────────── */}
       <section>
         <SectionLabel>Executive approvals</SectionLabel>
-        {pettyPendingCount === 0 && payrollPendingCount === 0 && largeExpenseCount === 0 && !pendingCashSales && !pendingCreditSales && pendingCollectionsAgg._count === 0 ? (
+        {pettyPendingCount === 0 && largeExpenseCount === 0 && !pendingCashSales && !pendingCreditSales && pendingCollectionsAgg._count === 0 ? (
           <p className="rounded-xl border border-dashed border-border p-3 text-sm text-muted-foreground">
             Nothing awaiting your approval.
           </p>
@@ -360,20 +350,6 @@ export default async function AdminCommandCenter() {
                   <p className="text-xs text-muted-foreground">Operational Fund allocations waiting for your approval</p>
                 </div>
                 <span className="shrink-0 font-display font-semibold">{formatCurrency(pettyPendingSum)}</span>
-              </Link>
-            )}
-            {payrollPendingCount > 0 && (
-              <Link href="/admin/finance/payroll" className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-muted/30">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Users className="size-4 shrink-0 text-warning" />
-                    <p className="truncate text-sm font-medium">
-                      {payrollPendingCount} payroll run{payrollPendingCount === 1 ? "" : "s"} awaiting approval
-                    </p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Salaries won&apos;t be paid until you approve</p>
-                </div>
-                <span className="shrink-0 font-display font-semibold">{formatCurrency(payrollPendingSum)}</span>
               </Link>
             )}
             {(pendingCashSales?._count._all ?? 0) > 0 && (

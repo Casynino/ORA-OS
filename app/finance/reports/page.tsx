@@ -32,41 +32,26 @@ export default async function FinanceReportsPage() {
   await requireRole("FINANCE");
 
   const yearStart = new Date(new Date().getFullYear(), 0, 1);
-  const [d, approvedPayroll, pendingPayroll, opFund, taxesThisYear] =
-    await Promise.all([
-      getFinanceOverview("month"),
-      // Approved but unpaid salary runs — money already committed.
-      prisma.payrollRun.findMany({
-        where: { status: "APPROVED" },
-        select: { items: { select: { net: true } } },
-      }),
-      // Runs sitting with the admin — not yet a liability.
-      prisma.payrollRun.findMany({
-        where: { status: "PENDING_APPROVAL" },
-        select: { items: { select: { net: true } } },
-      }),
-      // Operational Fund balance (CEO-approved allocation not yet spent).
-      getOperationalFundBalance(),
-      prisma.expense.aggregate({
-        _sum: { amount: true },
-        where: { category: "TAXES", expenseDate: { gte: yearStart } },
-      }),
-    ]);
+  const [d, opFund, taxesThisYear] = await Promise.all([
+    getFinanceOverview("month"),
+    // Operational Fund balance (CEO-approved allocation not yet spent).
+    getOperationalFundBalance(),
+    prisma.expense.aggregate({
+      _sum: { amount: true },
+      where: { category: "TAXES", expenseDate: { gte: yearStart } },
+    }),
+  ]);
 
   const w = d.window;
   const p = d.position;
 
-  const runNet = (r: { items: { net: number }[] }) =>
-    r.items.reduce((s, i) => s + i.net, 0);
-  const payrollApproved = approvedPayroll.reduce((s, r) => s + runNet(r), 0);
-  const payrollAwaiting = pendingPayroll.reduce((s, r) => s + runNet(r), 0);
   const pettyCashOpen = opFund.balance;
   const taxesPaid = taxesThisYear._sum.amount ?? 0;
 
-  // Liabilities are committed money only — pending approvals are excluded.
-  // The Operational Fund balance is cash held by finance (an asset/float), not
-  // money owed — never a payable. Payables = committed payroll only.
-  const payables = payrollApproved;
+  // Payroll is paid the moment the boss runs it (booked straight to expenses),
+  // so there is never an outstanding salary liability. The Operational Fund
+  // balance is cash finance still holds (an asset/float), not money owed.
+  const payables = 0;
   const receivables = p.creditOutstanding;
   const assets = p.cashAvailable + receivables + p.stockValue;
   const equity = assets - payables;
@@ -293,17 +278,17 @@ export default async function FinanceReportsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 p-3">
                 <span className="flex items-center gap-2.5 text-sm font-medium">
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-warning/15 text-warning">
+                  <span className="flex size-8 items-center justify-center rounded-lg bg-success/15 text-success">
                     <Users className="size-4" />
                   </span>
                   <span>
-                    Payroll approved, unpaid
+                    Payroll
                     <span className="block text-xs font-normal text-muted-foreground">
-                      {approvedPayroll.length} run{approvedPayroll.length === 1 ? "" : "s"} ready to pay
+                      paid in full the moment the boss runs it — no salary ever left owing
                     </span>
                   </span>
                 </span>
-                <span className="font-semibold">{formatCurrency(payrollApproved)}</span>
+                <span className="font-semibold">{formatCurrency(0)}</span>
               </div>
               <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 p-3">
                 <span className="flex items-center gap-2.5 text-sm font-medium">
@@ -318,22 +303,6 @@ export default async function FinanceReportsPage() {
                   </span>
                 </span>
                 <span className="font-semibold text-muted-foreground">{formatCurrency(pettyCashOpen)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-warning/40 bg-warning/[0.04] p-3">
-                <span className="flex items-center gap-2.5 text-sm font-medium">
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-warning/15 text-warning">
-                    <Receipt className="size-4" />
-                  </span>
-                  <span>
-                    Payroll awaiting approval
-                    <span className="block text-xs font-normal text-muted-foreground">
-                      {pendingPayroll.length} run{pendingPayroll.length === 1 ? "" : "s"} with the admin — not yet a liability
-                    </span>
-                  </span>
-                </span>
-                <span className="font-semibold text-warning">
-                  {formatCurrency(payrollAwaiting)}
-                </span>
               </div>
             </div>
             <div className="mt-3 space-y-1.5 rounded-xl border border-border/60 p-4 text-sm">
@@ -370,7 +339,7 @@ export default async function FinanceReportsPage() {
                   <Scale className="size-3.5" /> Liabilities
                 </h3>
                 <div className="mt-2 space-y-1.5 text-sm">
-                  <Row label="Payroll approved, unpaid" value={formatCurrency(payrollApproved)} />
+                  <Row label="Payroll (paid on run)" value={formatCurrency(0)} />
                   <Row label="Total liabilities" value={formatCurrency(payables)} strong />
                 </div>
               </div>
