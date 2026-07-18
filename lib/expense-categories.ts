@@ -75,3 +75,29 @@ export const OFFICE_FUND_CATEGORIES: ExpenseCategory[] = [
   "EQUIPMENT",
   "OTHER",
 ];
+
+/**
+ * A pickable expense category — either a preset (backed by the enum) or a custom
+ * one (persisted in ExpenseCategoryOption). Picking a custom stores its `group`
+ * enum on the row + the custom `customCategory` name, so grouped reports still
+ * aggregate it while every row shows the real name. Shared by the CategorySelect
+ * picker and the category service.
+ */
+export type CategoryOption = {
+  value: string; // unique key — the preset enum value, or `c:<id>` for a custom
+  label: string;
+  category: ExpenseCategory; // what gets stored on the row
+  customCategory: string | null;
+  group: string; // dropdown group heading
+};
+
+/** Preset categories as grouped picker options (client-safe — no DB). */
+export const PRESET_CATEGORY_OPTIONS: CategoryOption[] = EXPENSE_GROUPS.flatMap((g) =>
+  g.categories.map((c) => ({
+    value: c,
+    label: EXPENSE_LABELS[c],
+    category: c,
+    customCategory: null,
+    group: g.label,
+  })),
+);

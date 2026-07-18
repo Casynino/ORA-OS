@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Wallet,
@@ -24,7 +24,7 @@ import {
   confirmOperationalFundReceipt,
   cancelIssuedFund,
 } from "@/lib/actions/operational-fund";
-import type { FundRequestRow, FundExpenseRow } from "@/lib/services/operational-fund";
+import type { FundRequestRow, FundExpenseRow, FundItemRow } from "@/lib/services/operational-fund";
 import { EXPENSE_LABELS, OFFICE_FUND_CATEGORIES } from "@/lib/expense-categories";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -43,9 +43,11 @@ import {
 import { ProofUpload } from "@/components/ui/proof-upload";
 import { ProofViewer } from "@/components/ui/proof-viewer";
 import { CompanyAccountSelect, type SelectableAccount } from "@/components/ui/account-select";
+import { CategorySelect } from "@/components/ui/category-select";
 import { toast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, timeAgo } from "@/lib/utils";
 import type { ExpenseCategory } from "@prisma/client";
+import type { CategoryOption } from "@/lib/expense-categories";
 
 type Fund = {
   balance: number;
@@ -91,12 +93,15 @@ function Tile({ icon: Icon, label, value, hint, accent }: {
 export function OperationalFundManager({
   fund,
   accounts = [],
+  categories = [],
   canManage = false,
   canApprove = false,
 }: {
   fund: Fund;
   /** Company accounts the CEO can issue funds FROM (approval only). */
   accounts?: SelectableAccount[];
+  /** Pickable expense categories (presets + custom) for the request builder. */
+  categories?: CategoryOption[];
   /** Finance can request funds + record spending. */
   canManage?: boolean;
   /** CEO/admin can approve/reject funding requests. */
@@ -112,7 +117,7 @@ export function OperationalFundManager({
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile icon={Wallet} label="Current balance" value={formatCurrency(fund.balance)} hint="available to spend" accent="text-success" />
         {fund.issuedTotal > 0 ? (
-          <Tile icon={Send} label="Awaiting confirmation" value={formatCurrency(fund.issuedTotal)} hint={`${fund.issued.length} issued by CEO`} accent="text-info" />
+          <Tile icon={Send} label="Sent — awaiting confirmation" value={formatCurrency(fund.issuedTotal)} hint={`${fund.issued.length} awaiting Finance receipt`} accent="text-info" />
         ) : (
           <Tile icon={Clock} label="Pending requests" value={formatNumber(fund.pending.length)} hint={fund.pendingTotal > 0 ? formatCurrency(fund.pendingTotal) : "none"} accent="text-warning" />
         )}
@@ -158,7 +163,7 @@ export function OperationalFundManager({
             </h2>
             {canApprove && (
               <p className="text-xs text-muted-foreground">
-                Approving records the amount as a company expense immediately and adds it to the fund balance.
+                Approving funds the request from a company account now — the money leaves that account and is booked as company expenses. Finance then confirms receipt to unlock the spendable balance.
               </p>
             )}
           </div>
@@ -166,15 +171,15 @@ export function OperationalFundManager({
             {fund.pending.map((r) => (
               <div key={r.id} className="rounded-2xl border border-warning/30 bg-warning/[0.04] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-2 font-display font-semibold">
                       {formatCurrency(r.amount)}
-                      <Badge variant="secondary" className="text-[10px]">{EXPENSE_LABELS[r.category]}</Badge>
+                      <span className="text-sm font-normal text-muted-foreground">· {r.purpose}</span>
                     </p>
-                    <p className="mt-0.5 text-sm">{r.purpose}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {r.code} · by {r.requestedBy} · {timeAgo(r.createdAt)}
                     </p>
+                    <ItemLines items={r.items} />
                     {r.note && <p className="mt-1 text-xs text-muted-foreground">Note: {r.note}</p>}
                   </div>
                   {canApprove ? (
@@ -194,28 +199,28 @@ export function OperationalFundManager({
         <section className="space-y-3">
           <div>
             <h2 className="font-display text-lg font-semibold">
-              {canManage ? "Funds issued to you — confirm receipt" : "Issued — awaiting Finance confirmation"}
+              {canManage ? "Funds sent to you — confirm receipt" : "Sent — awaiting Finance confirmation"}
             </h2>
             <p className="text-xs text-muted-foreground">
               {canManage
-                ? "The CEO has issued these funds. Confirm once you've received the cash — it's then added to your fund and booked as a company expense."
-                : "Not booked as an expense yet — it becomes money-out once Finance confirms receipt."}
+                ? "The money has been sent to you (already booked as a company expense). Confirm once you've received the cash — that unlocks your spendable balance."
+                : "The money has already left the account and is booked as an expense. Recall it to reverse the money-out if Finance didn't receive it."}
             </p>
           </div>
           <div className="space-y-2">
             {fund.issued.map((r) => (
               <div key={r.id} className="rounded-2xl border border-info/30 bg-info/[0.04] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-2 font-display font-semibold">
                       {formatCurrency(r.amount)}
-                      <Badge variant="secondary" className="text-[10px]">{EXPENSE_LABELS[r.category]}</Badge>
+                      <span className="text-sm font-normal text-muted-foreground">· {r.purpose}</span>
                     </p>
-                    <p className="mt-0.5 text-sm">{r.purpose}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {r.code} · issued {timeAgo(r.createdAt)}
+                      {r.code} · sent {timeAgo(r.createdAt)}
                       {r.account ? ` · from ${r.account}` : ""}
                     </p>
+                    <ItemLines items={r.items} />
                     {r.note && <p className="mt-1 text-xs text-muted-foreground">Note: {r.note}</p>}
                   </div>
                   {canManage ? (
@@ -344,7 +349,7 @@ export function OperationalFundManager({
         </section>
       </div>
 
-      {requestOpen && <RequestModal onClose={() => setRequestOpen(false)} />}
+      {requestOpen && <RequestModal categories={categories} onClose={() => setRequestOpen(false)} />}
       {spendOpen && <SpendModal balance={fund.balance} onClose={() => setSpendOpen(false)} />}
       {issueOpen && <IssueModal accounts={accounts} onClose={() => setIssueOpen(false)} />}
     </div>
@@ -434,7 +439,7 @@ function ConfirmReceiptControl({ id, amount }: { id: string; amount: number }) {
   );
 }
 
-/** CEO cancels a not-yet-confirmed issue. */
+/** CEO recalls a not-yet-confirmed allocation — reverses the money-out. */
 function CancelIssueControl({ id }: { id: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -447,12 +452,29 @@ function CancelIssueControl({ id }: { id: string }) {
           const res = await cancelIssuedFund(id);
           if (res.ok) { toast({ variant: "success", title: res.message }); router.refresh(); }
           else { toast({ variant: "error", title: res.error }); setConfirm(false); }
-        })}>{pending ? "…" : "Cancel issue?"}</Button>
+        })}>{pending ? "…" : "Recall funds?"}</Button>
       ) : (
         <button type="button" onClick={() => setConfirm(true)} className="text-xs text-muted-foreground hover:text-destructive">
-          Cancel
+          Recall
         </button>
       )}
+    </div>
+  );
+}
+
+/** Compact line-item list shown under a request's header. */
+function ItemLines({ items }: { items: FundItemRow[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-0.5 rounded-lg border border-border/60 bg-background/50 px-3 py-2">
+      {items.map((it) => (
+        <div key={it.id} className="flex items-center justify-between gap-2 text-xs">
+          <span className="min-w-0 truncate">
+            <span className="text-muted-foreground">{it.label}</span> · {it.description}
+          </span>
+          <span className="shrink-0 font-medium">{formatCurrency(it.amount)}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -519,47 +541,93 @@ function DeleteExpense({ id }: { id: string }) {
   );
 }
 
-function RequestModal({ onClose }: { onClose: () => void }) {
+type DraftItem = { key: number; category: string; customCategory: string | null; description: string; amount: string };
+
+function RequestModal({ categories, onClose }: { categories: CategoryOption[]; onClose: () => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [amount, setAmount] = useState("");
   const [purpose, setPurpose] = useState("");
-  const [category, setCategory] = useState<string>("OFFICE");
   const [note, setNote] = useState("");
+  const nextKey = useRef(2);
+  const [items, setItems] = useState<DraftItem[]>([
+    { key: 1, category: "OFFICE", customCategory: null, description: "", amount: "" },
+  ]);
+
+  const total = items.reduce((s, it) => s + Math.round(Number(it.amount) || 0), 0);
+  const addItem = () =>
+    setItems((prev) => [...prev, { key: nextKey.current++, category: "OFFICE", customCategory: null, description: "", amount: "" }]);
+  const removeItem = (key: number) => setItems((prev) => (prev.length > 1 ? prev.filter((i) => i.key !== key) : prev));
+  const patch = (key: number, p: Partial<DraftItem>) =>
+    setItems((prev) => prev.map((i) => (i.key === key ? { ...i, ...p } : i)));
+
   function submit() {
-    const amt = Math.round(Number(amount) || 0);
-    if (amt <= 0) return toast({ variant: "error", title: "Enter an amount." });
-    if (purpose.trim().length < 3) return toast({ variant: "error", title: "What are the funds for?" });
+    if (purpose.trim().length < 3) return toast({ variant: "error", title: "What is this request for?" });
+    const parsed = items.map((it) => ({
+      category: it.category,
+      customCategory: it.customCategory ?? undefined,
+      description: it.description.trim(),
+      amount: Math.round(Number(it.amount) || 0),
+    }));
+    if (parsed.some((it) => it.amount <= 0 || it.description.length < 2))
+      return toast({ variant: "error", title: "Give every item a description and an amount." });
     start(async () => {
-      const res = await requestOperationalFunds({ amount: amt, purpose: purpose.trim(), category: category as ExpenseCategory, note: note.trim() || undefined });
+      const res = await requestOperationalFunds({ purpose: purpose.trim(), items: parsed as never, note: note.trim() || undefined });
       if (res.ok) { toast({ variant: "success", title: res.message }); onClose(); router.refresh(); }
       else toast({ variant: "error", title: res.error });
     });
   }
+
   return (
-    <Modal open onClose={onClose} title="Request operational funds" description="Ask the CEO to allocate money to the Operational Fund. Once approved, it's added to the balance.">
+    <Modal open onClose={onClose} title="Request operational funds" description="Build a request with one or more line items — the CEO approves and funds the total from a company account.">
       <div className="space-y-4">
         <div>
-          <Label>Amount (TSh) *</Label>
-          <Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1.5" placeholder="e.g. 500000" />
-        </div>
-        <div>
           <Label>Purpose *</Label>
-          <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="mt-1.5" placeholder="What the funds are for" />
+          <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="mt-1.5" placeholder="e.g. Weekly office operations" />
         </div>
-        <div>
-          <Label>Category</Label>
-          <Select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1.5">
-            {OFFICE_FUND_CATEGORIES.map((c) => (
-              <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
-            ))}
-          </Select>
+        <div className="space-y-2">
+          <Label>Items *</Label>
+          {items.map((it) => (
+            <div key={it.key} className="space-y-2 rounded-xl border border-border p-2.5">
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <CategorySelect
+                    categories={categories}
+                    category={it.category}
+                    customCategory={it.customCategory}
+                    onChange={(v) => patch(it.key, v)}
+                    label=""
+                  />
+                </div>
+                {items.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeItem(it.key)}
+                    className="mt-1 rounded-md p-1 text-muted-foreground hover:text-destructive"
+                    aria-label="Remove item"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-[1fr_8rem] gap-2">
+                <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What it's for" className="h-9" />
+                <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="h-9" />
+              </div>
+            </div>
+          ))}
+          <Button size="sm" variant="outline" onClick={addItem}>
+            <Plus className="size-4" /> Add item
+          </Button>
+        </div>
+        <div className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2">
+          <span className="text-sm font-medium">Total requested</span>
+          <span className="font-display text-lg font-bold">{formatCurrency(total)}</span>
         </div>
         <div>
           <Label>Notes (optional)</Label>
           <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" placeholder="Anything the CEO should know" />
         </div>
-        <Button className="w-full" onClick={submit} disabled={pending}>
+        <Button className="w-full" onClick={submit} disabled={pending || total <= 0}>
           {pending ? "Sending…" : "Send to CEO for approval"}
         </Button>
       </div>

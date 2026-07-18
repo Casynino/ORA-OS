@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { EXPENSE_LABELS } from "@/lib/expense-categories";
 import type { ExpenseCategory } from "@prisma/client";
 
 /**
@@ -32,6 +33,13 @@ export async function getOperationalFundBalance(): Promise<{
   return { funded: f, spent: s, balance: f - s, pendingCount };
 }
 
+export type FundItemRow = {
+  id: string;
+  label: string; // custom name or the preset category label
+  description: string;
+  amount: number;
+};
+
 export type FundRequestRow = {
   id: string;
   code: string;
@@ -44,6 +52,7 @@ export type FundRequestRow = {
   requestedBy: string;
   approvedBy: string | null;
   account: string | null;
+  items: FundItemRow[];
   createdAt: Date;
   approvedAt: Date | null;
 };
@@ -70,6 +79,7 @@ export async function getOperationalFund() {
         requestedBy: { select: { name: true } },
         approvedBy: { select: { name: true } },
         paymentAccount: { select: { name: true } },
+        items: { orderBy: { createdAt: "asc" } },
       },
     }),
     prisma.operationalSpend.findMany({
@@ -146,6 +156,7 @@ function toRequestRow(r: {
   requestedBy: { name: string };
   approvedBy: { name: string } | null;
   paymentAccount: { name: string } | null;
+  items?: { id: string; category: ExpenseCategory; customCategory: string | null; description: string; amount: number }[];
 }): FundRequestRow {
   return {
     id: r.id,
@@ -159,6 +170,12 @@ function toRequestRow(r: {
     requestedBy: r.requestedBy.name,
     approvedBy: r.approvedBy?.name ?? null,
     account: r.paymentAccount?.name ?? null,
+    items: (r.items ?? []).map((it) => ({
+      id: it.id,
+      label: it.customCategory || EXPENSE_LABELS[it.category],
+      description: it.description,
+      amount: it.amount,
+    })),
     createdAt: r.createdAt,
     approvedAt: r.approvedAt,
   };

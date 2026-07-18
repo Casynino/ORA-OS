@@ -204,6 +204,7 @@ model User {
   pettyCashApproved     PettyCashRequest[]       @relation("PettyCashApprover")
   pettyCashSpent        PettyCashExpense[]       @relation("PettyCashSpender")
   operationalSpends     OperationalSpend[]       @relation("OperationalSpender")
+  expenseCategories     ExpenseCategoryOption[]  @relation("ExpenseCategoryCreator")
   payrollCreated        PayrollRun[]             @relation("PayrollCreator")
   payrollApproved       PayrollRun[]             @relation("PayrollApprover")
   // Impact
@@ -1345,6 +1346,8 @@ model PettyCashRequest {
 
   items    PettyCashRequestItem[]
   expenses PettyCashExpense[]
+  // Allocation Expense rows booked when this request is approved (one per item).
+  allocationExpenses Expense[] @relation("PettyCashRequestExpenses")
 
   @@index([status])
 }
@@ -1357,11 +1360,29 @@ model PettyCashRequestItem {
   request     PettyCashRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   requestId   String
   category    ExpenseCategory  @default(OFFICE)
+  customCategory String? // free-text label for a custom category (rolls up under `category`)
   description String
   amount      Int
   createdAt   DateTime         @default(now())
 
   @@index([requestId])
+}
+
+/// A persisted custom expense category created by Finance/CEO from a form. The
+/// preset categories stay in the ExpenseCategory enum; these supplement them and
+/// appear in every category picker. Each maps to a `group` (a preset enum value)
+/// so grouped P&L reports still aggregate it sensibly; the row-level label shows
+/// the custom `name`.
+model ExpenseCategoryOption {
+  id          String          @id @default(cuid())
+  name        String          @unique
+  group       ExpenseCategory @default(OTHER) // which preset bucket it rolls up under
+  active      Boolean         @default(true)
+  createdBy   User?           @relation("ExpenseCategoryCreator", fields: [createdById], references: [id])
+  createdById String?
+  createdAt   DateTime        @default(now())
+
+  @@index([active])
 }
 
 /// One expenditure recorded against a petty cash allocation.
@@ -1489,6 +1510,14 @@ model Expense {
   // Null = paid outside a tracked account (cheque / other / legacy).
   paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
   paymentAccountId String?
+  // The Operational-Fund request this allocation expense belongs to (source=
+  // OPERATIONAL_FUND). Lets the fund workflow reverse exactly these rows if the
+  // approval is cancelled, and lets the ledger link back to the request.
+  pettyCashRequest   PettyCashRequest? @relation("PettyCashRequestExpenses", fields: [pettyCashRequestId], references: [id])
+  pettyCashRequestId String?
+  // Groups the N rows of one multi-line direct expense (source=DIRECT) so they
+  // read as a single transaction in the ledger.
+  batchCode     String?
   recordedBy    User            @relation("ExpenseRecorder", fields: [recordedById], references: [id])
   recordedById  String
   createdAt     DateTime        @default(now())
@@ -1498,6 +1527,7 @@ model Expense {
   @@index([source])
   @@index([expenseDate])
   @@index([paymentAccountId])
+  @@index([pettyCashRequestId])
 }
 
 /// Capital injected into the business — founder money, investments,
