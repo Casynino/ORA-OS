@@ -9,7 +9,6 @@ import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 function revalidateAccounts() {
   revalidatePath("/finance");
-  revalidatePath("/finance/accounts");
   revalidatePath("/admin/finance/accounts");
   revalidatePath("/admin/finance");
   revalidatePath("/rep/sell");
