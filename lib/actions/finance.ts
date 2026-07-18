@@ -26,11 +26,19 @@ function revalidateFinance() {
     revalidatePath(p);
 }
 
-const expenseSchema = z.object({
+// One line of a (possibly multi-item) expense: its own category + amount, filed
+// individually so grouped P&L stays correct per line.
+const expenseItemSchema = z.object({
   category: z.enum(EXPENSE_CATEGORY_VALUES),
   customCategory: z.string().max(60).optional().or(z.literal("")),
   amount: z.number().int().positive().max(1000000000),
   purpose: z.string().min(3, "What was this expense for?").max(200),
+});
+
+// The shared "paid from" envelope wrapping the lines — one account, date, vendor
+// and receipt for the whole batch.
+const expensesSchema = z.object({
+  items: z.array(expenseItemSchema).min(1, "Add at least one expense.").max(50),
   vendor: z.string().max(160).optional().or(z.literal("")),
   paymentMethod: z.string().max(40).optional().or(z.literal("")),
   paymentAccountId: z.string().optional().or(z.literal("")), // company account paid from
@@ -39,51 +47,116 @@ const expenseSchema = z.object({
   note: z.string().max(500).optional().or(z.literal("")),
 });
 
-/** Record a company expense. An ADMIN (CEO) records a DIRECT expense that takes
- *  effect immediately — no approval, since the CEO is final authority — and it
- *  reduces Business Capital automatically (all money-out is derived from here). */
-export async function recordExpense(
-  input: z.infer<typeof expenseSchema>,
-): Promise<ActionResult> {
+// The single-expense shape (kept for the compat wrapper below).
+const expenseSchema = z.object({
+  category: z.enum(EXPENSE_CATEGORY_VALUES),
+  customCategory: z.string().max(60).optional().or(z.literal("")),
+  amount: z.number().int().positive().max(1000000000),
+  purpose: z.string().min(3, "What was this expense for?").max(200),
+  vendor: z.string().max(160).optional().or(z.literal("")),
+  paymentMethod: z.string().max(40).optional().or(z.literal("")),
+  paymentAccountId: z.string().optional().or(z.literal("")),
+  expenseDate: z.string().optional().or(z.literal("")),
+  receiptUrl: z.string().max(15000000).optional().or(z.literal("")),
+  note: z.string().max(500).optional().or(z.literal("")),
+});
+
+/** Record one or more company expenses in a single action. Every line is paid
+ *  from the SAME chosen account/date/receipt and becomes its own DIRECT Expense
+ *  (categorised individually) — all created in ONE transaction, tied together by
+ *  a shared batchCode when there's more than one line. Money-out is the Σ of the
+ *  lines, reducing Business Capital + the source account exactly once each (all
+ *  money-out is derived from Expense rows — no double counting). ADMIN (CEO) or
+ *  FINANCE; takes effect immediately (the CEO is final authority). */
+export async function recordExpenses(
+  input: z.infer<typeof expensesSchema>,
+): Promise<ActionResult<{ count: number; total: number }>> {
   try {
     const actor = await requireActor(["ADMIN", "FINANCE"]);
-    const parsed = expenseSchema.safeParse(input);
-    if (!parsed.success)
-      return fail(parsed.error.issues[0]?.message ?? "Invalid expense.");
+    const parsed = expensesSchema.safeParse(input);
+    if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid expense.");
     const d = parsed.data;
-    // Validate the source account (rejects unknown/deactivated); null when the
-    // expense was paid outside a tracked account (cheque / other).
+    if (d.expenseDate && Number.isNaN(new Date(d.expenseDate).getTime()))
+      return fail("The expense date is invalid.");
+
+    // Validate the source account once (rejects unknown/deactivated); null when
+    // paid outside a tracked account (cheque / other).
     const account = await resolveReceivingAccount(prisma, d.paymentAccountId || null, d.paymentMethod || null);
-    const code = refCode("EXP");
-    await prisma.expense.create({
-      data: {
-        code,
-        category: d.category,
-        customCategory: d.customCategory?.trim() || null,
-        amount: d.amount,
-        purpose: d.purpose,
-        vendor: d.vendor?.trim() || null,
-        paymentMethod: d.paymentMethod || account.method || null,
-        paymentAccountId: account.paymentAccountId,
-        expenseDate: d.expenseDate ? new Date(d.expenseDate) : new Date(),
-        receiptUrl: d.receiptUrl || null,
-        note: d.note || null,
-        recordedById: actor.id,
-      },
-    });
+    const expenseDate = d.expenseDate ? new Date(d.expenseDate) : new Date();
+    const method = d.paymentMethod || account.method || null;
+    const vendor = d.vendor?.trim() || null;
+    const total = d.items.reduce((s, it) => s + it.amount, 0);
+    const multi = d.items.length > 1;
+    const batchCode = multi ? refCode("EXB") : null;
+
+    // One Expense per line, all in a single atomic transaction.
+    const created = await prisma.$transaction(
+      d.items.map((it) =>
+        prisma.expense.create({
+          data: {
+            code: refCode("EXP"),
+            category: it.category,
+            customCategory: it.customCategory?.trim() || null,
+            amount: it.amount,
+            purpose: it.purpose,
+            vendor,
+            paymentMethod: method,
+            paymentAccountId: account.paymentAccountId,
+            expenseDate,
+            receiptUrl: d.receiptUrl || null,
+            note: d.note || null,
+            batchCode,
+            recordedById: actor.id,
+          },
+          select: { code: true },
+        }),
+      ),
+    );
+
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
       action: "EXPENSE_RECORDED",
       entity: "Expense",
-      entityId: code,
-      summary: `${actor.name} recorded expense ${code}: TSh ${d.amount.toLocaleString()} — ${d.purpose}.`,
+      entityId: batchCode ?? created[0].code,
+      summary: multi
+        ? `${actor.name} recorded ${d.items.length} expenses totalling ${formatCurrency(total)}${vendor ? ` — ${vendor}` : ""}.`
+        : `${actor.name} recorded expense ${created[0].code}: ${formatCurrency(total)} — ${d.items[0].purpose}.`,
     });
     revalidateFinance();
-    return ok(undefined, `Expense ${code} recorded.`);
+    return ok(
+      { count: d.items.length, total },
+      multi
+        ? `${d.items.length} expenses recorded — ${formatCurrency(total)} total.`
+        : `Expense ${created[0].code} recorded.`,
+    );
   } catch (e) {
     return fail(errorMessage(e));
   }
+}
+
+/** Record a single company expense — thin wrapper over {@link recordExpenses} so
+ *  there is exactly one money-path. Kept for callers that record one line. */
+export async function recordExpense(
+  input: z.infer<typeof expenseSchema>,
+): Promise<ActionResult> {
+  const res = await recordExpenses({
+    items: [
+      {
+        category: input.category,
+        customCategory: input.customCategory,
+        amount: input.amount,
+        purpose: input.purpose,
+      },
+    ],
+    vendor: input.vendor,
+    paymentMethod: input.paymentMethod,
+    paymentAccountId: input.paymentAccountId,
+    expenseDate: input.expenseDate,
+    receiptUrl: input.receiptUrl,
+    note: input.note,
+  });
+  return res.ok ? ok(undefined, res.message) : fail(res.error);
 }
 
 export async function removeExpense(id: string): Promise<ActionResult> {
