@@ -20,6 +20,7 @@ import {
 } from "@/lib/services/finance";
 import { getCashSummary } from "@/lib/services/cash";
 import { getSelectableAccounts } from "@/lib/services/accounts";
+import { getSelectableCategories } from "@/lib/services/categories";
 import { PageHeader } from "@/components/ui/page-header";
 import { FinanceNav, PeriodTabs } from "@/components/admin/finance-nav";
 import { StatCard } from "@/components/ui/stat-card";
@@ -50,11 +51,12 @@ export default async function AdminFinancePage({
   const { period: raw = "month" } = await searchParams;
   const period = (["today", "week", "month", "all"].includes(raw) ? raw : "month") as Period;
 
-  const [d, recent, cash, accounts] = await Promise.all([
+  const [d, recent, cash, accounts, categories] = await Promise.all([
     getFinanceOverview(period),
     getLedger("all", 8),
     getCashSummary(),
     getSelectableAccounts(),
+    getSelectableCategories(),
   ]);
   const w = d.window;
   const p = d.position;
@@ -126,7 +128,7 @@ export default async function AdminFinancePage({
           <div className="flex w-full shrink-0 flex-col items-stretch gap-2 lg:w-60">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Quick actions</p>
             <IssueFundsButton accounts={accounts} variant="default" className="w-full justify-center rounded-full" />
-            <AddExpenseButton accounts={accounts} variant="outline" className="w-full justify-center rounded-full" />
+            <AddExpenseButton accounts={accounts} categories={categories} variant="outline" className="w-full justify-center rounded-full" />
             <AddCapitalButton accounts={accounts} variant="success" className="w-full justify-center rounded-full" />
             <RecordWithdrawalButton accounts={accounts} variant="outline" className="w-full justify-center rounded-full" />
           </div>

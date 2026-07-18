@@ -1,22 +1,24 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Receipt, TrendingUp, TrendingDown, Send } from "lucide-react";
 import {
-  recordExpense,
+  recordExpenses,
   removeExpense,
   recordCapital,
   removeCapital,
 } from "@/lib/actions/finance";
 import { issueOperationalFunds } from "@/lib/actions/operational-fund";
-import { OFFICE_FUND_CATEGORIES } from "@/lib/expense-categories";
-import { EXPENSE_LABELS } from "@/lib/expense-categories";
+import { OFFICE_FUND_CATEGORIES, EXPENSE_LABELS } from "@/lib/expense-categories";
+import type { CategoryOption } from "@/lib/expense-categories";
+import { formatCurrency } from "@/lib/utils";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { CategorySelect } from "@/components/ui/category-select";
 import { ProofUpload } from "@/components/ui/proof-upload";
 import { CompanyAccountSelect, type SelectableAccount } from "@/components/ui/account-select";
 import { toast } from "@/components/ui/use-toast";
@@ -25,64 +27,24 @@ import { toast } from "@/components/ui/use-toast";
 // the Button component's variants so the hero can vary them for visual rhythm).
 type BtnVariant = "default" | "accent" | "secondary" | "outline" | "ghost" | "destructive" | "success";
 
-const EXPENSE_OPTIONS: { group: string; items: { value: string; label: string }[] }[] = [
-  {
-    group: "Operational",
-    items: [
-      { value: "RENT", label: "Office rent" },
-      { value: "UTILITIES", label: "Utilities (electricity, internet)" },
-      { value: "STATIONERY", label: "Stationery" },
-      { value: "OFFICE", label: "Office expenses" },
-    ],
-  },
-  {
-    group: "Staff",
-    items: [
-      { value: "SALARIES", label: "Salaries" },
-      { value: "ALLOWANCES", label: "Sales rep allowances" },
-      { value: "TRANSPORT_REIMBURSEMENT", label: "Transport reimbursement" },
-    ],
-  },
-  {
-    group: "Logistics",
-    items: [
-      { value: "DELIVERY", label: "Delivery costs" },
-      { value: "WAREHOUSE_HANDLING", label: "Warehouse handling" },
-      { value: "TRANSPORT_OF_GOODS", label: "Transport of goods" },
-    ],
-  },
-  {
-    group: "Business",
-    items: [
-      { value: "STOCK_PURCHASE", label: "Stock purchase (supplier)" },
-      { value: "IMPORT_COSTS", label: "Import costs" },
-      { value: "PACKAGING", label: "Packaging materials" },
-      { value: "MARKETING", label: "Marketing" },
-    ],
-  },
-  {
-    group: "Statutory & tech",
-    items: [
-      { value: "TAXES", label: "Taxes" },
-      { value: "INTERNET", label: "Internet" },
-      { value: "EQUIPMENT", label: "Equipment" },
-    ],
-  },
-  { group: "Other", items: [{ value: "OTHER", label: "Custom / other" }] },
-];
+// One editable expense line in the multi-item builder.
+type DraftExpense = { key: number; category: string; customCategory: string | null; purpose: string; amount: string };
 
 /**
- * CEO direct-expense form — the same fields Finance uses, but the CEO records
- * AND approves in one step (final authority), so it takes effect immediately
- * and reduces Business Capital automatically.
+ * CEO direct-expense form — record ONE or SEVERAL expenses at once, all paid from
+ * the same company account/date/receipt. Each line carries its own category and
+ * becomes its own booked expense. The CEO records AND approves in one step (final
+ * authority), so it takes effect immediately and reduces Business Capital.
  */
 export function AddExpenseButton({
   accounts = [],
+  categories = [],
   label = "Record direct expense",
   variant = "default",
   className = "rounded-full",
 }: {
   accounts?: SelectableAccount[];
+  categories?: CategoryOption[];
   label?: string;
   variant?: BtnVariant;
   className?: string;
@@ -90,10 +52,10 @@ export function AddExpenseButton({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
-  const [category, setCategory] = useState("RENT");
-  const [customCategory, setCustomCategory] = useState("");
-  const [amount, setAmount] = useState("");
-  const [purpose, setPurpose] = useState("");
+  const keyRef = useRef(2);
+  const [items, setItems] = useState<DraftExpense[]>([
+    { key: 1, category: "RENT", customCategory: null, purpose: "", amount: "" },
+  ]);
   const [vendor, setVendor] = useState("");
   // Default to the first company account; the CEO can switch to "Other / cheque".
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
@@ -102,20 +64,36 @@ export function AddExpenseButton({
   const [receiptUrl, setReceiptUrl] = useState("");
   const [note, setNote] = useState("");
 
+  const total = items.reduce((s, it) => s + Math.max(0, Math.round(Number(it.amount) || 0)), 0);
+  const valid = items.every((it) => Number(it.amount) > 0 && it.purpose.trim().length >= 3);
+
+  function addItem() {
+    setItems((prev) => [
+      ...prev,
+      { key: keyRef.current++, category: "RENT", customCategory: null, purpose: "", amount: "" },
+    ]);
+  }
+  function removeItem(key: number) {
+    setItems((prev) => (prev.length === 1 ? prev : prev.filter((it) => it.key !== key)));
+  }
+  function patch(key: number, changes: Partial<DraftExpense>) {
+    setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...changes } : it)));
+  }
   function reset() {
-    setAmount(""); setPurpose(""); setVendor(""); setNote(""); setDate("");
-    setReceiptUrl(""); setCustomCategory(""); setCategory("RENT");
+    setItems([{ key: keyRef.current++, category: "RENT", customCategory: null, purpose: "", amount: "" }]);
+    setVendor(""); setNote(""); setDate(""); setReceiptUrl("");
   }
 
   function submit() {
-    if (Number(amount) <= 0) return toast({ variant: "error", title: "Enter the amount." });
-    if (purpose.trim().length < 3) return toast({ variant: "error", title: "What was this expense for?" });
+    if (!valid) return toast({ variant: "error", title: "Give every line an amount and a description." });
     start(async () => {
-      const res = await recordExpense({
-        category: category as never,
-        customCategory: category === "OTHER" ? customCategory.trim() || undefined : undefined,
-        amount: Math.round(Number(amount) || 0),
-        purpose: purpose.trim(),
+      const res = await recordExpenses({
+        items: items.map((it) => ({
+          category: it.category as never,
+          customCategory: it.customCategory || undefined,
+          amount: Math.round(Number(it.amount) || 0),
+          purpose: it.purpose.trim(),
+        })),
         vendor: vendor.trim() || undefined,
         paymentAccountId: accountId || undefined,
         paymentMethod: accountId ? undefined : method,
@@ -143,37 +121,62 @@ export function AddExpenseButton({
           open
           onClose={() => setOpen(false)}
           title="Record a direct expense"
-          description="Paid straight from the company (supplier, rent, marketing…). It takes effect immediately and reduces Business Capital — no approval needed."
+          description="Paid straight from the company (supplier, rent, marketing…). Add one line or several — they take effect immediately and reduce Business Capital. No approval needed."
         >
           <div className="space-y-3.5">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Category</Label>
-                <Select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1.5">
-                  {EXPENSE_OPTIONS.map((g) => (
-                    <optgroup key={g.group} label={g.group}>
-                      {g.items.map((o) => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <Label>Amount (TSh)</Label>
-                <Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1.5" placeholder="e.g. 500000" />
+            {/* Line items — each filed under its own category */}
+            <div className="space-y-2.5">
+              {items.map((it, i) => (
+                <div key={it.key} className="rounded-xl border border-border bg-muted/20 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-muted-foreground">Item {i + 1}</span>
+                    {items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeItem(it.key)}
+                        className="text-muted-foreground transition-colors hover:text-destructive"
+                        aria-label="Remove item"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-[1fr_8rem] items-start gap-2">
+                    <CategorySelect
+                      categories={categories}
+                      category={it.category}
+                      customCategory={it.customCategory}
+                      onChange={(v) => patch(it.key, v)}
+                      label=""
+                    />
+                    <Input
+                      type="number"
+                      min={1}
+                      value={it.amount}
+                      onChange={(e) => patch(it.key, { amount: e.target.value })}
+                      placeholder="Amount"
+                    />
+                  </div>
+                  <Input
+                    value={it.purpose}
+                    onChange={(e) => patch(it.key, { purpose: e.target.value })}
+                    className="mt-2"
+                    placeholder="What it was for"
+                  />
+                </div>
+              ))}
+              <div className="flex items-center justify-between">
+                <Button size="sm" variant="ghost" className="rounded-full" onClick={addItem}>
+                  <Plus className="size-3.5" /> Add item
+                </Button>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Total </span>
+                  <span className="font-display font-semibold">{formatCurrency(total)}</span>
+                </div>
               </div>
             </div>
-            {category === "OTHER" && (
-              <div>
-                <Label>Custom category</Label>
-                <Input value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} className="mt-1.5" placeholder="e.g. Influencer campaign" />
-              </div>
-            )}
-            <div>
-              <Label>Description</Label>
-              <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="mt-1.5" placeholder="What it was for" />
-            </div>
+
+            {/* Shared payment envelope — one account / date / receipt for all lines */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Vendor / payee</Label>
@@ -211,8 +214,12 @@ export function AddExpenseButton({
               <Label>Note (optional)</Label>
               <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" />
             </div>
-            <Button className="w-full rounded-full" disabled={pending || !amount || purpose.trim().length < 3} onClick={submit}>
-              {pending ? "Recording…" : "Record & pay from company"}
+            <Button className="w-full rounded-full" disabled={pending || !valid} onClick={submit}>
+              {pending
+                ? "Recording…"
+                : items.length > 1
+                  ? `Record ${items.length} expenses · ${formatCurrency(total)}`
+                  : "Record & pay from company"}
             </Button>
           </div>
         </Modal>
