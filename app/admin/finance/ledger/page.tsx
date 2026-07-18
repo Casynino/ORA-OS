@@ -24,10 +24,12 @@ export default async function AdminLedgerPage({
   searchParams: Promise<{ period?: string }>;
 }) {
   await requireRole("ADMIN");
-  const { period: raw = "month" } = await searchParams;
-  const period = (["today", "week", "month", "all"].includes(raw) ? raw : "month") as Period;
+  // The ledger is ORA's full accounting history, so it defaults to All time —
+  // every movement shows (incl. back-dated expenses) instead of just this month.
+  const { period: raw = "all" } = await searchParams;
+  const period = (["today", "week", "month", "all"].includes(raw) ? raw : "all") as Period;
 
-  const rows = await getLedger(period, 150);
+  const rows = await getLedger(period, 250);
   const totalIn = rows.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
   const totalOut = rows.filter((r) => r.amount < 0).reduce((s, r) => s - r.amount, 0);
 
