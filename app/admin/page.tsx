@@ -1,41 +1,12 @@
 import Link from "next/link";
-import Image from "next/image";
-import type { LucideIcon } from "lucide-react";
 import {
-  Package,
-  Warehouse as WIcon,
-  Users,
-  CreditCard,
-  TrendingUp,
-  Wallet,
-  Coins,
-  Clock,
-  Truck,
-  Undo2,
-  ArrowLeftRight,
-  UserPlus,
-  ArrowRight,
-  CheckCircle2,
-  CircleDot,
-  ClipboardList,
-  UserCheck,
-  AlertTriangle,
-  Boxes,
-  Star,
-  TrendingDown,
-  PackageX,
-  Repeat,
-  ShoppingCart,
-  PackagePlus,
-  FileBarChart,
-  Banknote,
-  Bell,
-  Receipt,
-  BadgeCheck,
+  AlertTriangle, Clock, Wallet, ClipboardList, Receipt, BadgeCheck,
+  UserPlus, Undo2, PackageX, Users,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { getCommandCenter } from "@/lib/services/command-center";
+import { getFinanceOverview } from "@/lib/services/finance";
 import { getOperationalFund } from "@/lib/services/operational-fund";
 import {
   getCollectionsIntelligence,
@@ -43,170 +14,82 @@ import {
   getBusinessTrends,
 } from "@/lib/services/intelligence";
 import {
-  FinancialOverview,
-  CollectionsAndCredit,
-  CustomerIntelligencePanel,
-  RevenueTrends,
-  HumanActivityFeed,
-} from "@/components/admin/command-sections";
-import { productMeta } from "@/lib/product-meta";
-import { KpiCard } from "@/components/admin/kpi-card";
+  BusinessHealth,
+  NeedsAttention,
+  ExecutiveActions,
+  RevenueCollectionOverview,
+  InventoryOverview,
+  SalesPerformance,
+  CustomerSummaryStrip,
+  ProductPerformanceCompact,
+  type AttentionItem,
+} from "@/components/admin/ceo-overview";
+import { RevenueTrends, HumanActivityFeed } from "@/components/admin/command-sections";
 import { Reveal } from "@/components/ui/reveal";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { DonutChart } from "@/components/ui/charts";
-import { QueueApprove } from "@/components/admin/queue-approve";
-import { buttonVariants } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { cn, formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
+import { formatCurrency, timeAgo } from "@/lib/utils";
 
-const STATUS_COLORS: Record<string, string> = {
-  PENDING: "hsl(38 95% 60%)",
-  PRICED: "hsl(217 91% 60%)",
-  APPROVED: "hsl(145 65% 52%)",
-  IN_TRANSIT: "hsl(199 89% 55%)",
-  FULFILLED: "hsl(322 100% 65%)",
-  REJECTED: "hsl(0 75% 60%)",
-  CANCELLED: "hsl(280 6% 55%)",
-};
-
-const DIST_COLORS = [
-  "hsl(145 65% 52%)",
-  "hsl(199 89% 55%)",
-  "hsl(251 100% 72%)",
-  "hsl(280 60% 65%)",
-  "hsl(38 95% 60%)",
-  "hsl(322 100% 65%)",
-];
+export const dynamic = "force-dynamic";
 
 export default async function AdminCommandCenter() {
   const me = await requireRole("ADMIN");
 
-  const [d, queue, collections, customers, trends] = await Promise.all([
-    getCommandCenter(),
-    Promise.all([
-      prisma.request.findMany({
-        where: { status: { in: ["PENDING", "PRICED"] } },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-        include: { requester: true, items: true },
+  const [d, fin, collections, customers, trends, opFund, pettyPending, lastPaidPayroll, meUser] =
+    await Promise.all([
+      getCommandCenter(),
+      getFinanceOverview("month"),
+      getCollectionsIntelligence(),
+      getCustomerIntelligence(),
+      getBusinessTrends(),
+      getOperationalFund(),
+      prisma.pettyCashRequest.count({ where: { status: "PENDING" } }),
+      prisma.payrollRun.findFirst({
+        where: { status: "PAID" },
+        orderBy: { paidAt: "desc" },
+        include: { items: { select: { net: true } } },
       }),
-      prisma.returnRequest.findMany({
-        where: { status: "PENDING" },
-        orderBy: { createdAt: "desc" },
-        take: 3,
-        include: { product: true, requester: true },
-      }),
-      prisma.user.findMany({
-        where: { role: "PARTNER", status: "PENDING" },
-        orderBy: { createdAt: "desc" },
-        take: 3,
-      }),
-    ]),
-    getCollectionsIntelligence(),
-    getCustomerIntelligence(),
-    getBusinessTrends(),
-  ]);
-  const [pendingRequests, pendingReturns, pendingApplications] = queue;
+      prisma.user.findUnique({ where: { id: me.id }, select: { name: true, preferredName: true } }),
+    ]);
 
-  // Executive approvals — finance items waiting on the admin's sign-off.
-  const weekAgo = new Date(Date.now() - 7 * 86400000);
-  const [
-    pettyPendingAgg,
-    largeExpensesAgg,
-    pendingSalesByType,
-    pendingCollectionsAgg,
-    lastPaidPayroll,
-    opFund,
-  ] = await Promise.all([
-    prisma.pettyCashRequest.aggregate({
-      _count: true,
-      _sum: { amount: true },
-      where: { status: "PENDING" },
-    }),
-    prisma.expense.aggregate({
-      _count: true,
-      _sum: { amount: true },
-      where: { amount: { gte: 1_000_000 }, expenseDate: { gte: weekAgo } },
-    }),
-    // Rep money awaiting finance verification — shown as chips, never in KPIs.
-    prisma.fieldSale.groupBy({
-      by: ["type"],
-      _count: { _all: true },
-      _sum: { total: true },
-      where: { financeStatus: "PENDING", voided: false },
-    }),
-    prisma.fieldPayment.aggregate({
-      _count: true,
-      _sum: { amount: true },
-      where: { financeStatus: "PENDING", sale: { voided: false } },
-    }),
-    // CEO visibility: latest processed payroll + open petty cash floats.
-    prisma.payrollRun.findFirst({
-      where: { status: "PAID" },
-      orderBy: { paidAt: "desc" },
-      include: { items: { select: { net: true } } },
-    }),
-    // CEO visibility: the single Operational Fund — balance + recent spend.
-    getOperationalFund(),
-  ]);
-  const pendingCashSales = pendingSalesByType.find((g) => g.type === "CASH");
-  const pendingCreditSales = pendingSalesByType.find((g) => g.type === "CREDIT");
-  const pettyPendingCount = pettyPendingAgg._count;
-  const pettyPendingSum = pettyPendingAgg._sum.amount ?? 0;
-  const largeExpenseCount = largeExpensesAgg._count;
-  const largeExpenseSum = largeExpensesAgg._sum.amount ?? 0;
-
-  // Personalised greeting — always the signed-in admin, never generic.
-  const meUser = await prisma.user.findUnique({
-    where: { id: me.id },
-    select: { name: true, preferredName: true },
-  });
-  const firstName =
-    meUser?.preferredName || (meUser?.name ?? "there").split(" ")[0];
-  const nickname = meUser?.preferredName || (meUser?.name ?? "").split(" ")[0];
+  const firstName = meUser?.preferredName || (meUser?.name ?? "there").split(" ")[0];
 
   // Greeting + date (Tanzania time, EAT)
   const eatHour = Number(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Africa/Dar_es_Salaam",
-      hour: "2-digit",
-      hour12: false,
-    }).format(new Date()),
+    new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Dar_es_Salaam", hour: "2-digit", hour12: false }).format(new Date()),
   );
-  const greeting =
-    eatHour >= 5 && eatHour < 12
-      ? "Good morning"
-      : eatHour >= 12 && eatHour < 17
-        ? "Good afternoon"
-        : "Good evening";
+  const greeting = eatHour >= 5 && eatHour < 12 ? "Good morning" : eatHour >= 12 && eatHour < 17 ? "Good afternoon" : "Good evening";
   const dateLabel = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Africa/Dar_es_Salaam",
-    weekday: "long",
-    month: "long",
-    day: "numeric",
+    timeZone: "Africa/Dar_es_Salaam", weekday: "long", month: "long", day: "numeric",
   }).format(new Date());
 
-  const inv = d.inventory;
-  const distTotal = inv.distribution.reduce((s, x) => s + x.units, 0) || 1;
-  const pipeline = d.statusPipeline
-    .map((s) => ({
-      label: s.status.charAt(0) + s.status.slice(1).toLowerCase(),
-      value: s.count,
-      color: STATUS_COLORS[s.status] ?? "hsl(280 6% 55%)",
-    }))
-    .filter((s) => s.value > 0);
-  const pipelineTotal = pipeline.reduce((s, x) => s + x.value, 0);
+  // ── Consolidated "needs attention" — every urgent item, one place ──────────
+  const o = d.operations;
+  const attention: AttentionItem[] = [];
+  if (collections.overdueCount > 0)
+    attention.push({ tone: "danger", icon: AlertTriangle, label: `${collections.overdueCount} overdue credit ${collections.overdueCount === 1 ? "account" : "accounts"}`, hint: "chase these before they age further", href: "/admin/credit" });
+  if (collections.dueSoon.length > 0)
+    attention.push({ tone: "warning", icon: Clock, label: `${collections.dueSoon.length} ${collections.dueSoon.length === 1 ? "customer" : "customers"} approaching payment`, hint: "payment dates coming up — plan the follow-ups", href: "/admin/credit" });
+  if (pettyPending > 0)
+    attention.push({ tone: "warning", icon: Wallet, label: `${pettyPending} operational fund ${pettyPending === 1 ? "request" : "requests"}`, hint: "Finance is waiting on your approval", href: "/admin/finance/operational-fund" });
+  if (o.pendingApprovals > 0)
+    attention.push({ tone: "warning", icon: ClipboardList, label: `${o.pendingApprovals} order ${o.pendingApprovals === 1 ? "approval" : "approvals"}`, hint: "partner stock orders awaiting sign-off", href: "/admin/requests" });
+  if (o.pendingPayments > 0)
+    attention.push({ tone: "info", icon: Receipt, label: `${o.pendingPayments} ${o.pendingPayments === 1 ? "payment" : "payments"} to confirm`, hint: "money awaiting verification", href: "/admin/requests" });
+  if (o.pendingRepRequests > 0)
+    attention.push({ tone: "info", icon: BadgeCheck, label: `${o.pendingRepRequests} rep stock ${o.pendingRepRequests === 1 ? "request" : "requests"}`, hint: "field team needs stock", href: "/admin/reps" });
+  if (o.pendingApplications > 0)
+    attention.push({ tone: "info", icon: UserPlus, label: `${o.pendingApplications} partner ${o.pendingApplications === 1 ? "application" : "applications"}`, hint: "new partners to review", href: "/admin/users" });
+  if (o.pendingReturns > 0)
+    attention.push({ tone: "info", icon: Undo2, label: `${o.pendingReturns} ${o.pendingReturns === 1 ? "return" : "returns"} to inspect`, hint: "awaiting your decision", href: "/admin/returns" });
+  if (d.network.lowStock > 0)
+    attention.push({ tone: "warning", icon: PackageX, label: `${d.network.lowStock} ${d.network.lowStock === 1 ? "product" : "products"} low on stock`, hint: "reorder before it runs out", href: "/admin/inventory" });
 
-  const queueTotal =
-    d.operations.pendingApprovals +
-    d.operations.pendingReturns +
-    d.operations.pendingApplications;
+  const latestPayrollTotal = lastPaidPayroll?.items.reduce((s, i) => s + i.net, 0) ?? 0;
 
   return (
     <div className="space-y-6">
-      {/* ── Hero ─────────────────────────────────────────────── */}
+      {/* ── 1 · Welcome banner (no numbers — they live in Business health) ── */}
       <Reveal>
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-accent to-primary p-5 text-white shadow-glow sm:p-8">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-accent to-primary p-6 text-white shadow-glow sm:p-8">
           <div className="absolute inset-0 bg-grid opacity-20" />
           <div className="pointer-events-none absolute -right-12 -top-16 size-56 rounded-full bg-white/15 blur-3xl animate-float-slow" />
           <div className="pointer-events-none absolute -bottom-20 left-1/3 size-48 rounded-full bg-white/10 blur-3xl animate-float-slow-rev" />
@@ -218,605 +101,98 @@ export default async function AdminCommandCenter() {
             <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight sm:text-4xl">
               {greeting}, {firstName} 👋
             </h1>
-            <p className="mt-1.5 text-sm text-white/90 sm:text-base">
-              Welcome back, {nickname}. Here&apos;s everything happening across
-              ORA today.
+            <p className="mt-1.5 max-w-xl text-sm text-white/90 sm:text-base">
+              Here&apos;s ORA at a glance — your money, what&apos;s owed, and what needs a decision today.
             </p>
-            <div className="mt-5 grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:gap-8">
-              <HeroStat label="Cash collected today" value={formatCurrency(d.finance.cashToday)} sub="money in hand" />
-              <HeroStat label="Revenue today" value={formatCurrency(d.sales.today.revenue)} sub="sold — cash + credit" />
-              <HeroStat label="Revenue this month" value={formatCurrency(d.sales.month.revenue)} sub="sold — cash + credit" />
-              <HeroStat
-                label="Outstanding credit"
-                value={formatCurrency(d.finance.outstandingCredit + d.finance.fieldOutstanding)}
-                sub="revenue still owed to ORA"
-              />
-              <HeroStat label="Pads distributed" value={formatNumber(d.sales.padsDistributed)} />
-            </div>
           </div>
         </div>
       </Reveal>
 
-      {/* ── Alerts ───────────────────────────────────────────── */}
-      {d.alerts.length > 0 && (
-        <Reveal>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <Bell className="size-3.5" /> Needs attention
-            </span>
-            {d.alerts.map((a, i) => (
-              <Link
-                key={i}
-                href={a.href}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                  a.tone === "danger" &&
-                    "border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15",
-                  a.tone === "warning" &&
-                    "border-warning/30 bg-warning/10 text-warning hover:bg-warning/15",
-                  a.tone === "info" &&
-                    "border-info/30 bg-info/10 text-info hover:bg-info/15",
-                )}
-              >
-                <CircleDot className="size-3" />
-                {a.text}
-              </Link>
-            ))}
-          </div>
-        </Reveal>
-      )}
-
-      {/* ── CEO financial overview — total revenue, cash vs credit ── */}
-      <FinancialOverview
-        periodLabel="this month"
-        totalRevenue={d.sales.month.revenue}
-        cashRevenue={d.sales.month.cashRevenue}
-        creditRevenue={d.sales.month.creditRevenue}
-        cashCollected={d.sales.month.cashRevenue + d.finance.collectionsMonth}
-        outstanding={d.finance.outstandingCredit + d.finance.fieldOutstanding}
+      {/* ── 2 · Business health summary ── */}
+      <BusinessHealth
+        cashAvailable={fin.position.businessCapital}
+        outstandingCredit={collections.outstandingTotal}
+        revenueMonth={d.sales.month.revenue}
+        netProfit={fin.window.netProfit}
       />
 
-      {/* ── Collections required + credit monitoring ── */}
-      <CollectionsAndCredit ci={collections} />
-
-      {/* ── Inventory: where every unit is ───────────────────── */}
+      {/* ── 3 · Needs attention + executive actions ── */}
+      <NeedsAttention items={attention} />
       <section>
-        <SectionLabel>Inventory · where every unit is</SectionLabel>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <Reveal><KpiCard label="Total inventory" value={inv.total} suffix=" units" icon={Boxes} accent="primary" hint={`${formatNumber(inv.distributed)} distributed to date`} /></Reveal>
-          <Reveal delay={0.05}><KpiCard label="Warehouse inventory" value={inv.warehouse} suffix=" units" icon={WIcon} accent="info" hint="available in warehouses" /></Reveal>
-          <Reveal delay={0.1}><KpiCard label="With sales reps" value={inv.reps} suffix=" units" icon={BadgeCheck} accent="success" hint="in the field team's hands" /></Reveal>
-          <Reveal delay={0.15}><KpiCard label="With partners" value={inv.partner} suffix=" units" icon={Users} accent="accent" hint="committed to partner orders" /></Reveal>
-          <Reveal delay={0.2}><KpiCard label="On credit" value={inv.credit} suffix=" units" icon={CreditCard} accent="warning" hint="held by partners, owed to ORA" /></Reveal>
-        </div>
-
-        {/* Distribution */}
-        <Reveal>
-          <div className="glass-card mt-4 rounded-2xl p-5 sm:p-6">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display font-semibold">Inventory distribution</h3>
-              <span className="text-sm text-muted-foreground">{formatNumber(distTotal)} units placed</span>
-            </div>
-            <div className="mt-4 flex h-3 overflow-hidden rounded-full">
-              {inv.distribution.map((b, i) => (
-                <div key={b.label} style={{ width: `${(b.units / distTotal) * 100}%`, background: DIST_COLORS[i % DIST_COLORS.length] }} title={`${b.label}: ${b.units}`} />
-              ))}
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {inv.distribution.map((b, i) => (
-                <div key={b.label}>
-                  <div className="flex items-center gap-1.5">
-                    <span className="size-2.5 rounded-full" style={{ background: DIST_COLORS[i % DIST_COLORS.length] }} />
-                    <span className="truncate text-xs text-muted-foreground">{b.label}</span>
-                  </div>
-                  <p className="mt-0.5 font-display text-lg font-bold">{formatNumber(b.units)}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Reveal>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick actions</p>
+        <ExecutiveActions />
       </section>
 
-      {/* ── Sales — partner orders + field (rep) sales, cash vs credit ── */}
-      <section>
-        <SectionLabel>Sales · partners + field team</SectionLabel>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <MiniStat icon={TrendingUp} accent="success" label="Sales today" value={formatCurrency(d.sales.today.revenue)} hint={salesHint(d.sales.today)} />
-          <MiniStat icon={TrendingUp} accent="success" label="This week" value={formatCurrency(d.sales.week.revenue)} hint={salesHint(d.sales.week)} />
-          <MiniStat icon={TrendingUp} accent="success" label="This month" value={formatCurrency(d.sales.month.revenue)} hint={salesHint(d.sales.month)} />
-          <MiniStat icon={ShoppingCart} accent="info" label="Avg sale value" value={formatCurrency(d.sales.avgOrderValue)} hint="this month" />
-          <MiniStat icon={Star} accent="accent" label="Top partner" value={d.sales.topPartner?.name ?? "—"} hint={d.sales.topPartner ? formatCurrency(d.sales.topPartner.value) : "no sales yet"} small />
-        </div>
-      </section>
+      {/* ── 4 · Revenue & collection overview ── */}
+      <RevenueCollectionOverview
+        cashRevenue={d.sales.month.cashRevenue}
+        creditRevenue={d.sales.month.creditRevenue}
+        collectedMonth={d.finance.collectionsMonth}
+        collectionRate={collections.collectionRate}
+        dueThisWeek={collections.dueThisWeek}
+        overdueTotal={collections.overdueTotal}
+        overdueCount={collections.overdueCount}
+      />
 
-      {/* ── Customer intelligence — who ORA sells to ── */}
-      <CustomerIntelligencePanel cust={customers} />
+      {/* ── 5 · Inventory overview ── */}
+      <InventoryOverview
+        totalValue={fin.position.stockValue}
+        totalUnits={d.inventory.total}
+        distribution={d.inventory.distribution}
+      />
 
-      {/* ── Credit & finance ─────────────────────────────────── */}
-      <section>
-        <SectionLabel>Credit &amp; finance</SectionLabel>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
-          <MiniStat icon={Wallet} accent="warning" label="Outstanding credit" value={formatCurrency(d.finance.outstandingCredit)} hint="owed by partners" />
-          <MiniStat icon={CreditCard} accent="info" label="Active credit accounts" value={formatNumber(d.finance.activeCreditAccounts)} hint="partners on credit" />
-          <MiniStat icon={Wallet} accent={d.finance.fieldOutstanding > 0 ? "warning" : "info"} label="Field credit" value={formatCurrency(d.finance.fieldOutstanding)} hint={d.finance.fieldOverdue > 0 ? `${formatCurrency(d.finance.fieldOverdue)} overdue` : "owed by rep customers"} />
-          <MiniStat icon={Banknote} accent="success" label="Collections this month" value={formatCurrency(d.finance.collectionsMonth)} hint="partner + field repayments" />
-          <MiniStat icon={AlertTriangle} accent={d.finance.overdueCredit > 0 ? "warning" : "success"} label="Overdue credit" value={formatCurrency(d.finance.overdueCredit)} hint={`${d.finance.overdueCount} partner${d.finance.overdueCount === 1 ? "" : "s"}`} />
-          <MiniStat icon={Coins} accent="primary" label="Cash collected today" value={formatCurrency(d.finance.cashToday)} hint="sales + repayments" />
-        </div>
-      </section>
+      {/* ── 6 · Sales performance ── */}
+      <SalesPerformance
+        today={d.sales.today}
+        week={d.sales.week}
+        avgSale={d.sales.avgOrderValue}
+        topPartner={d.sales.topPartner}
+      />
 
-      {/* ── Operations ───────────────────────────────────────── */}
-      <section>
-        <SectionLabel>Operations · needs action</SectionLabel>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
-          <OpTile icon={UserPlus} label="Applications" value={d.operations.pendingApplications} href="/admin/users" />
-          <OpTile icon={Clock} label="Order approvals" value={d.operations.pendingApprovals} href="/admin/requests" />
-          <OpTile icon={BadgeCheck} label="Rep stock requests" value={d.operations.pendingRepRequests} href="/admin/reps" />
-          <OpTile icon={Receipt} label="Payments to confirm" value={d.operations.pendingPayments} href="/admin/requests" />
-          <OpTile icon={PackagePlus} label="Ready to fulfil" value={d.operations.readyForFulfillment} href="/admin/requests" />
-          <OpTile icon={Truck} label="In transit" value={d.operations.inTransitOrders} href="/admin/requests" />
-          <OpTile icon={Undo2} label="Pending returns" value={d.operations.pendingReturns} href="/admin/returns" />
-          <OpTile icon={ArrowLeftRight} label="Transfers active" value={d.operations.transfersInProgress} href="/admin/transfers" />
-        </div>
-      </section>
+      {/* ── 6b · Customers (compact) ── */}
+      <CustomerSummaryStrip cust={customers} />
 
-      {/* ── Executive approvals ──────────────────────────────── */}
-      <section>
-        <SectionLabel>Executive approvals</SectionLabel>
-        {pettyPendingCount === 0 && largeExpenseCount === 0 && !pendingCashSales && !pendingCreditSales && pendingCollectionsAgg._count === 0 ? (
-          <p className="rounded-xl border border-dashed border-border p-3 text-sm text-muted-foreground">
-            Nothing awaiting your approval.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {pettyPendingCount > 0 && (
-              <Link href="/admin/finance/operational-fund" className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-muted/30">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Wallet className="size-4 shrink-0 text-warning" />
-                    <p className="truncate text-sm font-medium">
-                      {pettyPendingCount} operational fund request{pettyPendingCount === 1 ? "" : "s"} pending
-                    </p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Operational Fund allocations waiting for your approval</p>
-                </div>
-                <span className="shrink-0 font-display font-semibold">{formatCurrency(pettyPendingSum)}</span>
-              </Link>
-            )}
-            {(pendingCashSales?._count._all ?? 0) > 0 && (
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-warning/40 bg-warning/[0.04] p-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Banknote className="size-4 shrink-0 text-warning" />
-                    <p className="truncate text-sm font-medium">
-                      {pendingCashSales!._count._all} sale{pendingCashSales!._count._all === 1 ? "" : "s"} awaiting finance confirmation
-                    </p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Not counted in your KPIs until finance verifies the money</p>
-                </div>
-                <span className="shrink-0 font-display font-semibold">{formatCurrency(pendingCashSales!._sum.total ?? 0)}</span>
-              </div>
-            )}
-            {(pendingCreditSales?._count._all ?? 0) > 0 && (
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-warning/40 bg-warning/[0.04] p-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="size-4 shrink-0 text-warning" />
-                    <p className="truncate text-sm font-medium">
-                      {pendingCreditSales!._count._all} credit sale{pendingCreditSales!._count._all === 1 ? "" : "s"} pending finance review
-                    </p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Become official receivables once finance approves the terms</p>
-                </div>
-                <span className="shrink-0 font-display font-semibold">{formatCurrency(pendingCreditSales!._sum.total ?? 0)}</span>
-              </div>
-            )}
-            {pendingCollectionsAgg._count > 0 && (
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-warning/40 bg-warning/[0.04] p-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Banknote className="size-4 shrink-0 text-warning" />
-                    <p className="truncate text-sm font-medium">
-                      {pendingCollectionsAgg._count} collection{pendingCollectionsAgg._count === 1 ? "" : "s"} awaiting verification
-                    </p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Rep-collected repayments finance still has to verify</p>
-                </div>
-                <span className="shrink-0 font-display font-semibold">{formatCurrency(pendingCollectionsAgg._sum.amount ?? 0)}</span>
-              </div>
-            )}
-            {largeExpenseCount > 0 && (
-              <Link href="/admin/finance/ledger" className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-muted/30">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Receipt className="size-4 shrink-0 text-destructive" />
-                    <p className="truncate text-sm font-medium">
-                      {largeExpenseCount} large expense{largeExpenseCount === 1 ? "" : "s"} this week
-                    </p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">TSh 1,000,000+ each — worth a look</p>
-                </div>
-                <span className="shrink-0 font-display font-semibold">{formatCurrency(largeExpenseSum)}</span>
-              </Link>
-            )}
-          </div>
-        )}
-      </section>
+      {/* ── 7 · Product performance ── */}
+      <ProductPerformanceCompact
+        best={d.productPerformance.best}
+        low={d.productPerformance.low}
+        slow={d.productPerformance.slow}
+      />
 
-      {/* ── Financial oversight — verified activity, payroll, petty cash ── */}
+      {/* ── 8 · Financial activity + oversight ── */}
       <section>
-        <SectionLabel>Financial oversight</SectionLabel>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Financial activity</p>
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           <HumanActivityFeed
             rows={d.financialActivity}
-            title="Financial activity"
+            title="Recent money movements"
             empty="Confirmed sales, deposits, expenses and fund events will stream here."
           />
           <div className="space-y-4">
-            <div className="glass-card rounded-2xl p-5">
-              <h3 className="flex items-center gap-2 font-display font-semibold">
-                <Users className="size-4" /> Latest payroll
-              </h3>
+            <Link href="/admin/finance/operational-fund" className="glass-card block rounded-2xl p-5 transition-colors hover:border-primary/30">
+              <h3 className="flex items-center gap-2 font-display font-semibold"><Wallet className="size-4" /> Operational Fund</h3>
+              <p className="mt-2 font-display text-2xl font-bold">{formatCurrency(opFund.balance)}</p>
+              <p className="text-xs text-muted-foreground">{formatCurrency(opFund.funded)} allocated · {formatCurrency(opFund.spent)} spent</p>
+            </Link>
+            <Link href="/admin/finance/payroll" className="glass-card block rounded-2xl p-5 transition-colors hover:border-primary/30">
+              <h3 className="flex items-center gap-2 font-display font-semibold"><Users className="size-4" /> Latest payroll</h3>
               {lastPaidPayroll ? (
-                <div className="mt-3 space-y-1.5 text-sm">
-                  <p className="font-display text-2xl font-bold">
-                    {formatCurrency(lastPaidPayroll.items.reduce((s, i) => s + i.net, 0))}
+                <>
+                  <p className="mt-2 font-display text-2xl font-bold">{formatCurrency(latestPayrollTotal)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {lastPaidPayroll.month}/{lastPaidPayroll.year} · {lastPaidPayroll.items.length} paid{lastPaidPayroll.paidAt ? ` · ${timeAgo(lastPaidPayroll.paidAt)}` : ""}
                   </p>
-                  <p className="text-muted-foreground">
-                    {lastPaidPayroll.month}/{lastPaidPayroll.year} · {lastPaidPayroll.items.length} employee{lastPaidPayroll.items.length === 1 ? "" : "s"} paid
-                    {lastPaidPayroll.paidAt ? ` · ${timeAgo(lastPaidPayroll.paidAt)}` : ""}
-                  </p>
-                  <Link href="/admin/finance/payroll" className="inline-block text-xs font-medium text-primary hover:underline">
-                    Payroll history →
-                  </Link>
-                </div>
+                </>
               ) : (
-                <p className="mt-3 text-sm text-muted-foreground">No payroll processed yet.</p>
+                <p className="mt-2 text-sm text-muted-foreground">No payroll processed yet.</p>
               )}
-            </div>
-            <div className="glass-card rounded-2xl p-5">
-              <h3 className="flex items-center gap-2 font-display font-semibold">
-                <Wallet className="size-4" /> Operational Fund
-              </h3>
-              <div className="mt-3 flex items-baseline justify-between gap-2">
-                <span className="text-sm text-muted-foreground">Current balance</span>
-                <span className="font-display text-xl font-bold">{formatCurrency(opFund.balance)}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {formatCurrency(opFund.funded)} allocated · {formatCurrency(opFund.spent)} spent
-              </p>
-              {opFund.expenses.length === 0 ? (
-                <p className="mt-3 text-sm text-muted-foreground">No spending recorded yet.</p>
-              ) : (
-                <div className="mt-3 space-y-1.5">
-                  {opFund.expenses.slice(0, 4).map((e) => (
-                    <p key={e.id} className="flex items-center justify-between gap-2 truncate text-xs text-muted-foreground">
-                      <span className="min-w-0 truncate">− {e.description}</span>
-                      <span className="shrink-0 font-medium">{formatCurrency(e.amount)}</span>
-                    </p>
-                  ))}
-                </div>
-              )}
-              <Link href="/admin/finance/operational-fund" className="mt-3 inline-block text-xs font-medium text-primary hover:underline">
-                Operational Fund →
-              </Link>
-            </div>
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* ── Quick actions ────────────────────────────────────── */}
-      <section>
-        <SectionLabel>Quick actions</SectionLabel>
-        <div className="flex flex-wrap gap-2">
-          <QuickAction icon={CheckCircle2} label="Approve orders" href="/admin/requests" />
-          <QuickAction icon={BadgeCheck} label="Rep requests" href="/admin/reps" />
-          <QuickAction icon={UserCheck} label="Applications" href="/admin/users" />
-          <QuickAction icon={ArrowLeftRight} label="New transfer" href="/admin/transfers" />
-          <QuickAction icon={Banknote} label="Record payment" href="/admin/credit" />
-          <QuickAction icon={PackagePlus} label="Receive stock" href="/admin/imports" />
-          <QuickAction icon={Package} label="Inventory" href="/admin/inventory" />
-          <QuickAction icon={FileBarChart} label="Profit & Loss" href="/admin/finance/profit" />
-        </div>
-      </section>
-
-      {/* ── Revenue & cash-flow trends (cash vs credit kept apart) ── */}
+      {/* ── 9 · Charts & trends ── */}
       <RevenueTrends trends={trends} />
-
-      {/* ── Warehouse overview ───────────────────────────────── */}
-      <Reveal>
-        <div className="glass-card rounded-2xl p-5 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="flex items-center gap-2 font-display font-semibold">
-              <WIcon className="size-4" /> Warehouse overview
-            </h3>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5"><Boxes className="size-3.5" /> {formatCurrency(d.network.value)} value</span>
-              <span className="inline-flex items-center gap-1.5"><ArrowLeftRight className="size-3.5" /> {d.network.transfersInProgress} transfers</span>
-              <Link href="/admin/warehouses" className={buttonVariants({ variant: "ghost", size: "sm" })}>Manage <ArrowRight className="size-4" /></Link>
-            </div>
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {d.warehouses.map((w) => (
-              <Link key={w.id} href={`/admin/warehouses/${w.id}`} className="rounded-xl border border-border/60 p-4 transition hover:border-primary/40 hover:bg-muted/30">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="truncate text-sm font-medium">{w.name}</p>
-                  <StatusBadge status={w.status} />
-                </div>
-                <div className="mt-2 flex items-end justify-between">
-                  <span className="font-display text-xl font-semibold">{formatNumber(w.onHand)}<span className="ml-1 text-xs font-normal text-muted-foreground">units</span></span>
-                  <span className="text-xs text-muted-foreground">{formatCurrency(w.value)}</span>
-                </div>
-                <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
-                  <span className="truncate">{w.activeOrders} orders</span>
-                  <span className="truncate text-center">↓{w.transfersIn} ↑{w.transfersOut}</span>
-                  <span className={cn("truncate text-right", w.lowStock > 0 && "text-warning")}>{w.lowStock > 0 ? `${w.lowStock} low` : "stocked"}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </Reveal>
-
-      {/* ── Product performance ──────────────────────────────── */}
-      <section>
-        <SectionLabel>Product performance</SectionLabel>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <ProductPerf icon={Star} accent="text-success" title="Best seller" p={d.productPerformance.best} />
-          <ProductPerf icon={TrendingDown} accent="text-muted-foreground" title="Slow mover" p={d.productPerformance.slow} />
-          <ProductPerf icon={PackageX} accent="text-warning" title="Lowest stock" p={d.productPerformance.low} />
-          <ProductPerf icon={Repeat} accent="text-info" title="Most returned" p={d.productPerformance.returned} />
-          <ProductPerf icon={ShoppingCart} accent="text-primary" title="Most requested" p={d.productPerformance.requested} />
-        </div>
-      </section>
-
-      {/* ── Approval queue + Live activity ───────────────────── */}
-      <div id="queue" className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <Reveal>
-          <div className="glass-card rounded-2xl p-5 sm:p-6">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display font-semibold">Approval queue</h3>
-              <span className="flex items-center gap-1.5 text-xs font-medium text-warning">
-                <CircleDot className="size-3.5" /> {queueTotal} waiting
-              </span>
-            </div>
-            {queueTotal === 0 ? (
-              <EmptyState className="mt-4" icon={CheckCircle2} title="All clear" description="No actions are waiting for approval." />
-            ) : (
-              <div className="mt-4 space-y-2">
-                {pendingRequests.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl border border-border/60 p-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <ClipboardList className="size-4 shrink-0 text-warning" />
-                        <p className="truncate text-sm font-medium">{r.code} · {r.requester.name}</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Stock order · {r.items.length} items · {timeAgo(r.createdAt)}</p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <StatusBadge status={r.status} />
-                      <Link href="/admin/requests" className={buttonVariants({ size: "sm", variant: "outline" })}>Review</Link>
-                    </div>
-                  </div>
-                ))}
-                {pendingReturns.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl border border-border/60 p-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Undo2 className="size-4 shrink-0 text-info" />
-                        <p className="truncate text-sm font-medium">{r.code} · {r.product.name}</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Return · {r.quantity} units · {r.requester.name}</p>
-                    </div>
-                    <QueueApprove kind="return" id={r.id} />
-                  </div>
-                ))}
-                {pendingApplications.map((u) => (
-                  <div key={u.id} className="flex items-center justify-between gap-3 rounded-xl border border-border/60 p-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <UserCheck className="size-4 shrink-0 text-accent" />
-                        <p className="truncate text-sm font-medium">{u.name}</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Partner application{u.organization ? ` · ${u.organization}` : ""}</p>
-                    </div>
-                    <QueueApprove kind="application" id={u.id} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </Reveal>
-
-        <Reveal delay={0.1}>
-          <HumanActivityFeed rows={d.recentActivity} title="Live activity" live empty="Nothing yet." />
-        </Reveal>
-      </div>
-
-      {/* ── Today's orders + request pipeline ────────────────── */}
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <Reveal>
-          <div className="glass-card rounded-2xl p-5 sm:p-6">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display font-semibold">Partners who ordered today</h3>
-              <Link href="/admin/sales" className={buttonVariants({ variant: "ghost", size: "sm" })}>All sales <ArrowRight className="size-4" /></Link>
-            </div>
-            <div className="mt-4 space-y-2">
-              {d.todaysOrders.length === 0 ? (
-                <EmptyState icon={ShoppingCart} title="No orders yet today" description="Fulfilled partner orders will appear here through the day." />
-              ) : (
-                d.todaysOrders.map((o) => (
-                  <div key={o.code} className="flex items-center justify-between gap-3 rounded-xl border border-border/60 p-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{o.name}</p>
-                      <p className="text-xs text-muted-foreground">{o.org ?? "Partner"} · {o.code}</p>
-                    </div>
-                    <span className="shrink-0 font-display font-semibold">{formatCurrency(o.value)}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </Reveal>
-        <Reveal delay={0.1}>
-          <div className="glass-card rounded-2xl p-5 sm:p-6">
-            <h3 className="font-display font-semibold">Order pipeline</h3>
-            <div className="mt-4">
-              {pipelineTotal > 0 ? (
-                <DonutChart segments={pipeline} centervalue={formatNumber(pipelineTotal)} centerLabel="orders" />
-              ) : (
-                <EmptyState icon={ClipboardList} title="No orders yet" />
-              )}
-            </div>
-          </div>
-        </Reveal>
-      </div>
-    </div>
-  );
-}
-
-/* ── helper components ───────────────────────────────────────── */
-
-/** Two-line breakdown: cash vs credit money, then partner vs field count. */
-function salesHint(p: {
-  orders: number;
-  partnerOrders: number;
-  fieldSales: number;
-  cashRevenue: number;
-  creditRevenue: number;
-}) {
-  if (p.orders === 0) return "0 sales";
-  const who: string[] = [];
-  if (p.partnerOrders > 0) who.push(`${p.partnerOrders} partner`);
-  if (p.fieldSales > 0) who.push(`${p.fieldSales} field`);
-  return (
-    <>
-      <span className="block">
-        Cash {formatCurrency(p.cashRevenue)} · Credit {formatCurrency(p.creditRevenue)}
-      </span>
-      {who.length > 0 && <span className="block">{who.join(" · ")}</span>}
-    </>
-  );
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-      {children}
-    </p>
-  );
-}
-
-function HeroStat({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-}) {
-  return (
-    <div className="min-w-0">
-      <p className="truncate text-[11px] uppercase tracking-wide text-white/70">{label}</p>
-      <p className="truncate font-display text-xl font-bold sm:text-2xl">{value}</p>
-      {sub && <p className="truncate text-[11px] text-white/60">{sub}</p>}
-    </div>
-  );
-}
-
-const MINI_ACCENT: Record<string, string> = {
-  primary: "bg-primary/10 text-primary",
-  accent: "bg-accent/12 text-accent",
-  success: "bg-success/12 text-success",
-  warning: "bg-warning/15 text-warning",
-  info: "bg-info/12 text-info",
-};
-
-function MiniStat({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  accent = "primary",
-  small,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  hint?: React.ReactNode;
-  accent?: string;
-  small?: boolean;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
-      <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-xs font-medium text-muted-foreground">{label}</span>
-        <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-lg", MINI_ACCENT[accent])}>
-          <Icon className="size-3.5" />
-        </span>
-      </div>
-      <p className={cn("mt-2 font-display font-bold tracking-tight", small ? "truncate text-base" : "text-xl sm:text-2xl")}>{value}</p>
-      {hint && <p className="mt-0.5 truncate text-xs text-muted-foreground">{hint}</p>}
-    </div>
-  );
-}
-
-function OpTile({ icon: Icon, label, value, href }: { icon: LucideIcon; label: string; value: number; href: string }) {
-  const active = value > 0;
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "rounded-2xl border p-4 transition-colors",
-        active ? "border-warning/30 bg-warning/5 hover:bg-warning/10" : "border-border bg-card hover:bg-muted/40",
-      )}
-    >
-      <div className="flex items-center justify-between">
-        <Icon className={cn("size-4", active ? "text-warning" : "text-muted-foreground")} />
-        <span className="font-display text-2xl font-bold">{formatNumber(value)}</span>
-      </div>
-      <p className="mt-1 truncate text-xs text-muted-foreground">{label}</p>
-    </Link>
-  );
-}
-
-function QuickAction({ icon: Icon, label, href }: { icon: LucideIcon; label: string; href: string }) {
-  return (
-    <Link href={href} className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2 text-sm font-medium shadow-soft transition-colors hover:border-primary/40 hover:bg-muted/40">
-      <Icon className="size-4 text-primary" />
-      {label}
-    </Link>
-  );
-}
-
-function ProductPerf({
-  icon: Icon,
-  accent,
-  title,
-  p,
-}: {
-  icon: LucideIcon;
-  accent: string;
-  title: string;
-  p: { name: string; sku: string; qty: number; caption: string } | null | undefined;
-}) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
-      <div className="relative aspect-[4/3] bg-muted">
-        {p && (
-          <Image src={productMeta(p.sku).image} alt={p.name} fill sizes="200px" className="object-cover" />
-        )}
-        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur">
-          <Icon className={cn("size-3", accent)} /> {title}
-        </span>
-      </div>
-      <div className="p-3">
-        <p className="truncate text-sm font-medium">{p?.name ?? "—"}</p>
-        <p className="text-xs text-muted-foreground">
-          {p ? `${formatNumber(p.qty)} ${p.caption}` : "no data"}
-        </p>
-      </div>
     </div>
   );
 }

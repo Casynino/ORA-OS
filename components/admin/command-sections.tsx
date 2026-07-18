@@ -47,59 +47,6 @@ function Stat({
   return href ? <Link href={href}>{body}</Link> : body;
 }
 
-// ── CEO Financial Overview — revenue split cash vs credit ─────────────────────
-
-export function FinancialOverview({
-  totalRevenue, cashRevenue, creditRevenue, cashCollected, outstanding, periodLabel,
-}: {
-  totalRevenue: number; cashRevenue: number; creditRevenue: number;
-  cashCollected: number; outstanding: number; periodLabel: string;
-}) {
-  const cashPct = totalRevenue > 0 ? (cashRevenue / totalRevenue) * 100 : 0;
-  const creditPct = totalRevenue > 0 ? (creditRevenue / totalRevenue) * 100 : 0;
-  return (
-    <section>
-      <SectionLabel>CEO financial overview · {periodLabel}</SectionLabel>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <div className="glass-card rounded-2xl p-5 sm:p-6">
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-sm text-muted-foreground">Total revenue {periodLabel}</span>
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">sold — cash + credit</span>
-          </div>
-          <p className="mt-1 font-display text-3xl font-bold tracking-tight sm:text-4xl">{formatCurrency(totalRevenue)}</p>
-          {/* cash vs credit split bar */}
-          <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-muted">
-            <div className="bg-success" style={{ width: `${cashPct}%` }} title={`Cash ${formatCurrency(cashRevenue)}`} />
-            <div className="bg-warning" style={{ width: `${creditPct}%` }} title={`Credit ${formatCurrency(creditRevenue)}`} />
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-4">
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="size-2.5 rounded-full bg-success" />
-                <span className="text-xs text-muted-foreground">Cash revenue</span>
-              </div>
-              <p className="mt-0.5 font-display text-lg font-bold">{formatCurrency(cashRevenue)}</p>
-              <p className="text-[11px] text-muted-foreground">{Math.round(cashPct)}% of sales · paid on the spot</p>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="size-2.5 rounded-full bg-warning" />
-                <span className="text-xs text-muted-foreground">Credit revenue</span>
-              </div>
-              <p className="mt-0.5 font-display text-lg font-bold">{formatCurrency(creditRevenue)}</p>
-              <p className="text-[11px] text-muted-foreground">{Math.round(creditPct)}% of sales · owed to ORA</p>
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-rows-2 gap-4">
-          <Stat icon={Banknote} accent="success" label="Cash collected" value={formatCurrency(cashCollected)} hint={`money actually in hand ${periodLabel}`} />
-          <Stat icon={Wallet} accent={outstanding > 0 ? "warning" : "info"} label="Outstanding credit" value={formatCurrency(outstanding)} hint="revenue still owed to ORA" href="/admin/credit" />
-        </div>
-      </div>
-    </section>
-  );
-}
-
 // ── Collections required + credit monitoring ─────────────────────────────────
 
 export function CollectionsAndCredit({
@@ -267,27 +214,28 @@ export function CustomerIntelligencePanel({ cust }: { cust: CustomerIntelligence
 
 export function RevenueTrends({ trends }: { trends: TrendPoint[] }) {
   const maxRevenue = Math.max(1, ...trends.map((t) => t.totalRevenue));
-  const maxFlow = Math.max(1, ...trends.map((t) => Math.max(t.collections, t.expenses)));
+  const maxCollections = Math.max(1, ...trends.map((t) => t.collections));
+  const maxExpenses = Math.max(1, ...trends.map((t) => t.expenses));
   return (
     <section>
       <SectionLabel>Trends · last 6 months</SectionLabel>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         {/* Revenue — stacked cash vs credit */}
         <div className="glass-card rounded-2xl p-5 sm:p-6">
           <div className="flex items-center justify-between">
-            <h3 className="font-display font-semibold">Revenue — cash vs credit</h3>
+            <h3 className="font-display text-sm font-semibold">Revenue trend</h3>
             <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
               <span className="inline-flex items-center gap-1"><span className="size-2 rounded-full bg-success" /> Cash</span>
               <span className="inline-flex items-center gap-1"><span className="size-2 rounded-full bg-warning" /> Credit</span>
             </div>
           </div>
-          <div className="mt-5 flex h-40 items-end justify-between gap-2">
+          <div className="mt-5 flex h-36 items-end justify-between gap-2">
             {trends.map((t) => {
               const h = (t.totalRevenue / maxRevenue) * 100;
               const cashH = t.totalRevenue > 0 ? (t.cashRevenue / t.totalRevenue) * 100 : 0;
               return (
                 <div key={t.key} className="flex flex-1 flex-col items-center gap-1.5">
-                  <div className="flex w-full max-w-9 flex-1 items-end">
+                  <div className="flex w-full max-w-8 flex-1 items-end">
                     <div className="flex w-full flex-col justify-end overflow-hidden rounded-md bg-muted" style={{ height: `${Math.max(h, 2)}%` }} title={`${t.label}: ${formatCurrency(t.totalRevenue)}`}>
                       <div className="w-full bg-warning" style={{ height: `${100 - cashH}%` }} />
                       <div className="w-full bg-success" style={{ height: `${cashH}%` }} />
@@ -299,29 +247,37 @@ export function RevenueTrends({ trends }: { trends: TrendPoint[] }) {
             })}
           </div>
         </div>
-        {/* Collections vs expenses */}
-        <div className="glass-card rounded-2xl p-5 sm:p-6">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display font-semibold">Collections vs expenses</h3>
-            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-              <span className="inline-flex items-center gap-1"><span className="size-2 rounded-full bg-info" /> Collected</span>
-              <span className="inline-flex items-center gap-1"><span className="size-2 rounded-full bg-destructive" /> Spent</span>
-            </div>
-          </div>
-          <div className="mt-5 flex h-40 items-end justify-between gap-2">
-            {trends.map((t) => (
-              <div key={t.key} className="flex flex-1 flex-col items-center gap-1.5">
-                <div className="flex w-full items-end justify-center gap-1" style={{ height: "100%" }}>
-                  <div className="w-2.5 rounded-t bg-info" style={{ height: `${Math.max((t.collections / maxFlow) * 100, 1)}%` }} title={`Collected ${formatCurrency(t.collections)}`} />
-                  <div className="w-2.5 rounded-t bg-destructive" style={{ height: `${Math.max((t.expenses / maxFlow) * 100, 1)}%` }} title={`Spent ${formatCurrency(t.expenses)}`} />
-                </div>
-                <span className="text-[10px] text-muted-foreground">{t.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Collection trend */}
+        <TrendBars title="Collection trend" trends={trends} pick={(t) => t.collections} max={maxCollections} barClass="bg-info" />
+        {/* Expense trend */}
+        <TrendBars title="Expense trend" trends={trends} pick={(t) => t.expenses} max={maxExpenses} barClass="bg-destructive" />
       </div>
     </section>
+  );
+}
+
+function TrendBars({
+  title, trends, pick, max, barClass,
+}: {
+  title: string; trends: TrendPoint[]; pick: (t: TrendPoint) => number; max: number; barClass: string;
+}) {
+  return (
+    <div className="glass-card rounded-2xl p-5 sm:p-6">
+      <h3 className="font-display text-sm font-semibold">{title}</h3>
+      <div className="mt-5 flex h-36 items-end justify-between gap-2">
+        {trends.map((t) => {
+          const v = pick(t);
+          return (
+            <div key={t.key} className="flex flex-1 flex-col items-center gap-1.5">
+              <div className="flex w-full max-w-8 flex-1 items-end">
+                <div className={cn("w-full rounded-t-md", barClass)} style={{ height: `${Math.max((v / max) * 100, v > 0 ? 3 : 0)}%` }} title={`${t.label}: ${formatCurrency(v)}`} />
+              </div>
+              <span className="text-[10px] text-muted-foreground">{t.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
