@@ -60,12 +60,13 @@ export function AddExpenseButton({
   // Default to the first company account; the CEO can switch to "Other / cheque".
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [method, setMethod] = useState("Cheque"); // only used when no account
-  const [date, setDate] = useState("");
   const [receiptUrl, setReceiptUrl] = useState("");
   const [note, setNote] = useState("");
 
   const total = items.reduce((s, it) => s + Math.max(0, Math.round(Number(it.amount) || 0)), 0);
-  const valid = items.every((it) => Number(it.amount) > 0 && it.purpose.trim().length >= 3);
+  // Only an amount is required — the category names the expense; the date is the
+  // moment it's recorded (stamped automatically).
+  const valid = items.every((it) => Number(it.amount) > 0);
 
   function addItem() {
     setItems((prev) => [
@@ -81,23 +82,22 @@ export function AddExpenseButton({
   }
   function reset() {
     setItems([{ key: keyRef.current++, category: "RENT", customCategory: null, purpose: "", amount: "" }]);
-    setVendor(""); setNote(""); setDate(""); setReceiptUrl("");
+    setVendor(""); setNote(""); setReceiptUrl("");
   }
 
   function submit() {
-    if (!valid) return toast({ variant: "error", title: "Give every line an amount and a description." });
+    if (!valid) return toast({ variant: "error", title: "Give every line an amount." });
     start(async () => {
       const res = await recordExpenses({
         items: items.map((it) => ({
           category: it.category as never,
           customCategory: it.customCategory || undefined,
           amount: Math.round(Number(it.amount) || 0),
-          purpose: it.purpose.trim(),
+          purpose: it.purpose.trim() || undefined,
         })),
         vendor: vendor.trim() || undefined,
         paymentAccountId: accountId || undefined,
         paymentMethod: accountId ? undefined : method,
-        expenseDate: date,
         receiptUrl: receiptUrl || undefined,
         note: note.trim() || undefined,
       });
@@ -161,7 +161,7 @@ export function AddExpenseButton({
                     value={it.purpose}
                     onChange={(e) => patch(it.key, { purpose: e.target.value })}
                     className="mt-2"
-                    placeholder="What it was for"
+                    placeholder="What it was for (optional)"
                   />
                 </div>
               ))}
@@ -176,16 +176,11 @@ export function AddExpenseButton({
               </div>
             </div>
 
-            {/* Shared payment envelope — one account / date / receipt for all lines */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Vendor / payee</Label>
-                <Input value={vendor} onChange={(e) => setVendor(e.target.value)} className="mt-1.5" placeholder="Optional — who was paid" />
-              </div>
-              <div>
-                <Label>Date (optional)</Label>
-                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1.5" />
-              </div>
+            {/* Shared payment envelope — one account / receipt for all lines. The
+                date is stamped automatically when the expense is recorded. */}
+            <div>
+              <Label>Vendor / payee <span className="font-normal text-muted-foreground">(optional)</span></Label>
+              <Input value={vendor} onChange={(e) => setVendor(e.target.value)} className="mt-1.5" placeholder="Who was paid" />
             </div>
             <CompanyAccountSelect
               accounts={accounts}
@@ -521,9 +516,9 @@ export function IssueFundsButton({
 
   function submit() {
     if (purpose.trim().length < 3) return toast({ variant: "error", title: "What are the funds for?" });
-    const parsed = items.map((it) => ({ category: it.category, description: it.description.trim(), amount: Math.round(Number(it.amount) || 0) }));
-    if (parsed.some((it) => it.amount <= 0 || it.description.length < 2))
-      return toast({ variant: "error", title: "Give every item a description and an amount." });
+    const parsed = items.map((it) => ({ category: it.category, description: it.description.trim() || undefined, amount: Math.round(Number(it.amount) || 0) }));
+    if (parsed.some((it) => it.amount <= 0))
+      return toast({ variant: "error", title: "Give every item an amount." });
     start(async () => {
       const res = await issueOperationalFunds({
         purpose: purpose.trim(),
@@ -577,7 +572,7 @@ export function IssueFundsButton({
                     )}
                   </div>
                   <div className="grid grid-cols-[1fr_8rem] gap-2">
-                    <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What it's for" className="h-9" />
+                    <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What it's for (optional)" className="h-9" />
                     <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="h-9" />
                   </div>
                 </div>

@@ -375,9 +375,9 @@ function IssueModal({ accounts, onClose }: { accounts: SelectableAccount[]; onCl
 
   function submit() {
     if (purpose.trim().length < 3) return toast({ variant: "error", title: "What are the funds for?" });
-    const parsed = items.map((it) => ({ category: it.category, description: it.description.trim(), amount: Math.round(Number(it.amount) || 0) }));
-    if (parsed.some((it) => it.amount <= 0 || it.description.length < 2))
-      return toast({ variant: "error", title: "Give every item a description and an amount." });
+    const parsed = items.map((it) => ({ category: it.category, description: it.description.trim() || undefined, amount: Math.round(Number(it.amount) || 0) }));
+    if (parsed.some((it) => it.amount <= 0))
+      return toast({ variant: "error", title: "Give every item an amount." });
     start(async () => {
       const res = await issueOperationalFunds({
         purpose: purpose.trim(), items: parsed as never,
@@ -413,7 +413,7 @@ function IssueModal({ accounts, onClose }: { accounts: SelectableAccount[]; onCl
                 )}
               </div>
               <div className="grid grid-cols-[1fr_8rem] gap-2">
-                <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What it's for" className="h-9" />
+                <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What it's for (optional)" className="h-9" />
                 <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="h-9" />
               </div>
             </div>
@@ -592,11 +592,11 @@ function RequestModal({ categories, onClose }: { categories: CategoryOption[]; o
     const parsed = items.map((it) => ({
       category: it.category,
       customCategory: it.customCategory ?? undefined,
-      description: it.description.trim(),
+      description: it.description.trim() || undefined,
       amount: Math.round(Number(it.amount) || 0),
     }));
-    if (parsed.some((it) => it.amount <= 0 || it.description.length < 2))
-      return toast({ variant: "error", title: "Give every item a description and an amount." });
+    if (parsed.some((it) => it.amount <= 0))
+      return toast({ variant: "error", title: "Give every item an amount." });
     start(async () => {
       const res = await requestOperationalFunds({ purpose: purpose.trim(), items: parsed as never, note: note.trim() || undefined });
       if (res.ok) { toast({ variant: "success", title: res.message }); onClose(); router.refresh(); }
@@ -637,7 +637,7 @@ function RequestModal({ categories, onClose }: { categories: CategoryOption[]; o
                 )}
               </div>
               <div className="grid grid-cols-[1fr_8rem] gap-2">
-                <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What it's for" className="h-9" />
+                <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What it's for (optional)" className="h-9" />
                 <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="h-9" />
               </div>
             </div>
@@ -668,8 +668,6 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
   const nextKey = useRef(2);
   const [items, setItems] = useState<SimpleLine[]>([{ key: 1, category: "OFFICE", description: "", amount: "" }]);
   const [vendor, setVendor] = useState("");
-  const today = new Date().toISOString().slice(0, 10);
-  const [date, setDate] = useState(today);
   const [receiptRef, setReceiptRef] = useState("");
   const [receiptUrl, setReceiptUrl] = useState("");
   const [note, setNote] = useState("");
@@ -680,14 +678,14 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
   const patch = (key: number, ch: Partial<SimpleLine>) => setItems((p) => p.map((i) => (i.key === key ? { ...i, ...ch } : i)));
 
   function submit() {
-    const parsed = items.map((it) => ({ category: it.category, description: it.description.trim(), amount: Math.round(Number(it.amount) || 0) }));
-    if (parsed.some((it) => it.amount <= 0 || it.description.length < 3))
-      return toast({ variant: "error", title: "Give every item a description and an amount." });
+    const parsed = items.map((it) => ({ category: it.category, description: it.description.trim() || undefined, amount: Math.round(Number(it.amount) || 0) }));
+    if (parsed.some((it) => it.amount <= 0))
+      return toast({ variant: "error", title: "Give every item an amount." });
     if (total > balance) return toast({ variant: "error", title: `Only ${formatCurrency(balance)} left in the fund.` });
     start(async () => {
       const res = await recordOperationalExpense({
         items: parsed as never,
-        vendor: vendor.trim() || undefined, expenseDate: date, receiptRef: receiptRef.trim() || undefined,
+        vendor: vendor.trim() || undefined, receiptRef: receiptRef.trim() || undefined,
         receiptUrl: receiptUrl || undefined, note: note.trim() || undefined,
       });
       if (res.ok) { toast({ variant: "success", title: res.message }); onClose(); router.refresh(); }
@@ -717,7 +715,7 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
                 )}
               </div>
               <div className="grid grid-cols-[1fr_8rem] gap-2">
-                <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What was bought" className="h-9" />
+                <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What was bought (optional)" className="h-9" />
                 <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="h-9" />
               </div>
             </div>
@@ -731,15 +729,10 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
           <span className={`font-display text-lg font-bold ${over ? "text-destructive" : ""}`}>{formatCurrency(total)}</span>
         </div>
         {over && <p className="text-xs text-destructive">Exceeds the {formatCurrency(balance)} available in the fund.</p>}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label>Vendor / recipient</Label>
-            <Input value={vendor} onChange={(e) => setVendor(e.target.value)} className="mt-1.5" placeholder="Optional" />
-          </div>
-          <div>
-            <Label>Date</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1.5" />
-          </div>
+        {/* The spend date is stamped automatically when it's recorded. */}
+        <div>
+          <Label>Vendor / recipient <span className="font-normal text-muted-foreground">(optional)</span></Label>
+          <Input value={vendor} onChange={(e) => setVendor(e.target.value)} className="mt-1.5" placeholder="Who was paid" />
         </div>
         <div>
           <Label>Receipt / voucher reference</Label>
