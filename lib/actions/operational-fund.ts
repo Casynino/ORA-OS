@@ -56,10 +56,17 @@ const totalWithinRange = (items: { amount: number }[]) =>
   items.reduce((s, it) => s + it.amount, 0) <= MAX_INT4;
 const TOTAL_TOO_LARGE = "That total is too large — split it into separate requests.";
 
+/** A line's description — its own text, else the category name (custom or preset)
+ *  — so a blank description never shows up empty in the fund history / ledger. */
+function fundItemDescription(it: { description?: string | null; customCategory?: string | null; category: ExpenseCategory }): string {
+  return it.description?.trim() || it.customCategory?.trim() || EXPENSE_LABELS[it.category];
+}
+
 const itemSchema = z.object({
   category: fundCategory,
   customCategory: z.string().max(60).optional().or(z.literal("")),
-  description: z.string().trim().min(2, "Describe the item.").max(200),
+  // Optional — the category names the item; a description just adds detail.
+  description: z.string().max(200).optional().or(z.literal("")),
   amount: z.number().int().positive("Enter an amount.").max(1000000000),
 });
 const requestSchema = z
@@ -94,7 +101,7 @@ export async function requestOperationalFunds(
           create: d.items.map((it) => ({
             category: it.category,
             customCategory: it.customCategory?.trim() || null,
-            description: it.description,
+            description: fundItemDescription(it),
             amount: it.amount,
           })),
         },
@@ -219,7 +226,7 @@ export async function rejectOperationalFundRequest(id: string, note?: string): P
 
 const issueItemSchema = z.object({
   category: fundCategory,
-  description: z.string().trim().min(2, "Describe the item.").max(200),
+  description: z.string().max(200).optional().or(z.literal("")),
   amount: z.number().int().positive("Enter an amount.").max(1000000000),
 });
 const issueSchema = z
@@ -264,7 +271,7 @@ export async function issueOperationalFunds(
             create: d.items.map((it) => ({
               category: it.category,
               customCategory: null,
-              description: it.description,
+              description: fundItemDescription(it),
               amount: it.amount,
             })),
           },
@@ -279,7 +286,7 @@ export async function issueOperationalFunds(
             source: "OPERATIONAL_FUND",
             category: it.category,
             amount: it.amount,
-            purpose: `Operational Fund ${req.code} — ${it.description}`,
+            purpose: `Operational Fund ${req.code} — ${fundItemDescription(it)}`,
             note: `Issued by CEO — awaiting Finance confirmation`,
             paymentMethod: account.method,
             paymentAccountId: account.paymentAccountId,
@@ -406,7 +413,7 @@ export async function cancelIssuedFund(id: string): Promise<ActionResult> {
 
 const spendItemSchema = z.object({
   category: z.enum(EXPENSE_CATEGORY_VALUES).default("OFFICE"),
-  description: z.string().trim().min(3, "What was this spent on?").max(300),
+  description: z.string().max(300).optional().or(z.literal("")),
   amount: z.number().int().positive("Enter the amount spent.").max(1000000000),
 });
 const spendSchema = z
@@ -467,7 +474,7 @@ export async function recordOperationalExpense(
             code: refCode("OS"),
             category: it.category,
             amount: it.amount,
-            description: it.description,
+            description: fundItemDescription(it),
             note: sharedNote,
             receiptRef: d.receiptRef?.trim() || null,
             receiptUrl: d.receiptUrl?.trim() || null,
@@ -486,7 +493,7 @@ export async function recordOperationalExpense(
       entityId: batchCode ?? "spend",
       summary: multi
         ? `${actor.name} recorded ${d.items.length} operational-fund expenses totalling ${formatCurrency(total)}${d.vendor?.trim() ? ` · ${d.vendor.trim()}` : ""}.`
-        : `${actor.name} spent ${formatCurrency(total)} from the Operational Fund — ${d.items[0].description} (${EXPENSE_LABELS[d.items[0].category]})${d.vendor?.trim() ? ` · ${d.vendor.trim()}` : ""}.`,
+        : `${actor.name} spent ${formatCurrency(total)} from the Operational Fund — ${fundItemDescription(d.items[0])} (${EXPENSE_LABELS[d.items[0].category]})${d.vendor?.trim() ? ` · ${d.vendor.trim()}` : ""}.`,
     });
     revalidateFund();
     return ok(

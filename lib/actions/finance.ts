@@ -6,7 +6,8 @@ import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { refCode } from "@/lib/utils";
-import { EXPENSE_CATEGORY_VALUES } from "@/lib/expense-categories";
+import { EXPENSE_CATEGORY_VALUES, EXPENSE_LABELS } from "@/lib/expense-categories";
+import type { ExpenseCategory } from "@prisma/client";
 import { getBusinessCapital } from "@/lib/services/finance";
 import { resolveReceivingAccount } from "@/lib/payment-methods";
 import { formatCurrency } from "@/lib/utils";
@@ -32,8 +33,15 @@ const expenseItemSchema = z.object({
   category: z.enum(EXPENSE_CATEGORY_VALUES),
   customCategory: z.string().max(60).optional().or(z.literal("")),
   amount: z.number().int().positive().max(1000000000),
-  purpose: z.string().min(3, "What was this expense for?").max(200),
+  // Optional — the category names the expense; a description just adds detail.
+  purpose: z.string().max(200).optional().or(z.literal("")),
 });
+
+/** What an expense line is "for" — its own description, else the category name
+ *  (custom or preset). So a line never shows blank in the ledger. */
+function expensePurpose(it: { purpose?: string; customCategory?: string; category: ExpenseCategory }): string {
+  return it.purpose?.trim() || it.customCategory?.trim() || EXPENSE_LABELS[it.category];
+}
 
 // The shared "paid from" envelope wrapping the lines — one account, date, vendor
 // and receipt for the whole batch.
@@ -98,7 +106,7 @@ export async function recordExpenses(
             category: it.category,
             customCategory: it.customCategory?.trim() || null,
             amount: it.amount,
-            purpose: it.purpose,
+            purpose: expensePurpose(it),
             vendor,
             paymentMethod: method,
             paymentAccountId: account.paymentAccountId,
@@ -121,7 +129,7 @@ export async function recordExpenses(
       entityId: batchCode ?? created[0].code,
       summary: multi
         ? `${actor.name} recorded ${d.items.length} expenses totalling ${formatCurrency(total)}${vendor ? ` — ${vendor}` : ""}.`
-        : `${actor.name} recorded expense ${created[0].code}: ${formatCurrency(total)} — ${d.items[0].purpose}.`,
+        : `${actor.name} recorded expense ${created[0].code}: ${formatCurrency(total)} — ${expensePurpose(d.items[0])}.`,
     });
     revalidateFinance();
     return ok(
