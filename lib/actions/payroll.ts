@@ -10,13 +10,13 @@ import { refCode, formatCurrency } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Payroll: finance keeps the employee register and builds monthly runs;
-//  admin approves; finance pays — paying creates a SALARIES Expense so
-//  payroll flows into every financial report automatically.
+//  Payroll is CEO-owned: the boss keeps the employee register and pays salaries
+//  in one action on a chosen date. Paying books a SALARIES Expense so payroll
+//  flows into every financial report and the cash figures automatically.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function revalidatePayroll() {
-  for (const p of ["/finance", "/finance/payroll", "/admin", "/admin/finance", "/admin/finance/payroll", "/admin/finance/expenses", "/finance/expenses", "/finance/reports"])
+  for (const p of ["/admin", "/admin/finance", "/admin/finance/payroll", "/admin/finance/ledger", "/finance", "/finance/reports"])
     revalidatePath(p);
 }
 
@@ -97,11 +97,13 @@ export async function updateEmployee(
   }
 }
 
-// ── Payroll runs ─────────────────────────────────────────────────────────────
+// ── Run & pay payroll (one CEO action) ───────────────────────────────────────
 
 const runSchema = z.object({
   month: z.number().int().min(1).max(12),
   year: z.number().int().min(2024).max(2100),
+  payDate: z.string().min(1, "Pick the pay date."), // ISO date the boss pays
+  paymentAccountId: z.string().optional().or(z.literal("")),
   lines: z
     .array(
       z.object({
@@ -115,35 +117,26 @@ const runSchema = z.object({
   note: z.string().max(300).optional().or(z.literal("")),
 });
 
-/** Finance builds a run and submits it straight to admin for approval. */
-export async function createPayrollRun(
+/** The boss runs payroll in ONE action: picks the pay date + account, pays all
+ * the listed employees at once, and it's immediately recorded as a SALARIES
+ * company expense on that date (money out of the company). */
+export async function runPayroll(
   input: z.infer<typeof runSchema>,
 ): Promise<ActionResult<{ code: string }>> {
   try {
-    const actor = await requireActor(["ADMIN"]);
+    const admin = await requireActor(["ADMIN"]);
     const parsed = runSchema.safeParse(input);
     if (!parsed.success) {
-      return fail(parsed.error.issues[0]?.message ?? "Invalid payroll run.");
+      return fail(parsed.error.issues[0]?.message ?? "Invalid payroll.");
     }
     const d = parsed.data;
+    const payDate = new Date(d.payDate);
+    if (Number.isNaN(payDate.getTime())) return fail("The pay date is invalid.");
 
-    const existing = await prisma.payrollRun.findFirst({
-      where: {
-        month: d.month,
-        year: d.year,
-        status: { in: ["PENDING_APPROVAL", "APPROVED", "PAID"] },
-      },
-    });
-    if (existing) {
-      return fail(
-        existing.status === "PAID"
-          ? `Salaries for ${d.month}/${d.year} were already paid (${existing.code}). Record any top-up as an Allowances expense instead.`
-          : `A payroll run for ${d.month}/${d.year} is already awaiting approval or payment (${existing.code}).`,
-      );
-    }
-
+    // Only people actually on the active payroll can be paid — the register is
+    // the source of truth, never the amounts the browser happened to send.
     const employees = await prisma.employee.findMany({
-      where: { id: { in: d.lines.map((l) => l.employeeId) } },
+      where: { id: { in: d.lines.map((l) => l.employeeId) }, isActive: true },
       select: { id: true, name: true },
     });
     const nameById = new Map(employees.map((e) => [e.id, e.name]));
@@ -157,156 +150,67 @@ export async function createPayrollRun(
         deduction: l.deduction,
         net: Math.max(0, l.gross + l.allowance - l.deduction),
       }));
-    if (items.length === 0) return fail("No valid employees on this run.");
+    if (items.length === 0) return fail("No active employees on this run.");
     const total = items.reduce((s, i) => s + i.net, 0);
+    if (total <= 0) return fail("The total pay must be greater than zero.");
+    // Expense.amount is a 32-bit int; keep the whole run inside that ceiling.
+    if (total > 2000000000)
+      return fail("That total is too large to record in a single payroll run.");
 
-    const run = await prisma.payrollRun.create({
-      data: {
-        code: refCode("PAY"),
-        month: d.month,
-        year: d.year,
-        status: "PENDING_APPROVAL",
-        createdById: actor.id,
-        note: d.note?.trim() || null,
-        items: { create: items },
-      },
-    });
-    await logActivity({
-      actorId: actor.id,
-      actorName: actor.name,
-      action: "PAYROLL_SUBMITTED",
-      entity: "PayrollRun",
-      entityId: run.id,
-      summary: `Payroll ${run.code} (${d.month}/${d.year}) submitted — ${items.length} employee${items.length === 1 ? "" : "s"}, ${formatCurrency(total)} net. Awaiting admin approval.`,
-    });
-    revalidatePayroll();
-    return ok({ code: run.code }, `${run.code} submitted for admin approval.`);
-  } catch (e) {
-    return fail(errorMessage(e));
-  }
-}
-
-/** Admin approves a run — finance can then pay it out. */
-export async function approvePayrollRun(id: string): Promise<ActionResult> {
-  try {
-    const admin = await requireActor(["ADMIN"]);
-    const run = await prisma.payrollRun.findUnique({
-      where: { id },
-      include: { items: { select: { net: true } } },
-    });
-    if (!run) return fail("Payroll run not found.");
-    const approved = await prisma.payrollRun.updateMany({
-      where: { id, status: "PENDING_APPROVAL" },
-      data: { status: "APPROVED", approvedById: admin.id, approvedAt: new Date() },
-    });
-    if (approved.count === 0) return fail("This run was already reviewed.");
-    const total = run.items.reduce((s, i) => s + i.net, 0);
-    await logActivity({
-      actorId: admin.id,
-      actorName: admin.name,
-      action: "PAYROLL_APPROVED",
-      entity: "PayrollRun",
-      entityId: run.id,
-      summary: `Payroll ${run.code} approved — ${formatCurrency(total)} ready to pay.`,
-    });
-    revalidatePayroll();
-    return ok(undefined, `${run.code} approved — finance can now pay it.`);
-  } catch (e) {
-    return fail(errorMessage(e));
-  }
-}
-
-export async function rejectPayrollRun(
-  id: string,
-  note?: string,
-): Promise<ActionResult> {
-  try {
-    const admin = await requireActor(["ADMIN"]);
-    const run = await prisma.payrollRun.findUnique({ where: { id } });
-    if (!run) return fail("Payroll run not found.");
-    const rejected = await prisma.payrollRun.updateMany({
-      where: { id, status: "PENDING_APPROVAL" },
-      data: {
-        status: "REJECTED",
-        approvedById: admin.id,
-        approvedAt: new Date(),
-        note: note?.trim() || run.note,
-      },
-    });
-    if (rejected.count === 0) return fail("This run was already reviewed.");
-    await logActivity({
-      actorId: admin.id,
-      actorName: admin.name,
-      action: "PAYROLL_REJECTED",
-      entity: "PayrollRun",
-      entityId: run.id,
-      summary: `Payroll ${run.code} rejected.`,
-    });
-    revalidatePayroll();
-    return ok(undefined, "Payroll run rejected — finance can rebuild it.");
-  } catch (e) {
-    return fail(errorMessage(e));
-  }
-}
-
-/** Finance pays an approved run — records the SALARIES expense from the
- * chosen company account and locks the run as PAID. */
-export async function payPayrollRun(
-  id: string,
-  paymentAccountId?: string,
-): Promise<ActionResult> {
-  try {
-    const actor = await requireActor(["ADMIN"]);
-    const run = await prisma.payrollRun.findUnique({
-      where: { id },
-      include: { items: { select: { net: true } } },
-    });
-    if (!run) return fail("Payroll run not found.");
-    const total = run.items.reduce((s, i) => s + i.net, 0);
-
+    const code = refCode("PAY");
     await prisma.$transaction(async (tx) => {
-      // Atomic claim — a double click can't pay salaries twice.
-      const paid = await tx.payrollRun.updateMany({
-        where: { id, status: "APPROVED" },
-        data: { status: "PAID", paidAt: new Date() },
+      // Serialize payroll so the same month can't be paid twice concurrently.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll-${d.year}-${d.month}`}))`;
+      const already = await tx.payrollRun.findFirst({
+        where: { month: d.month, year: d.year, status: "PAID" },
+        select: { code: true },
       });
-      if (paid.count === 0) {
-        throw new Error("Only an admin-approved run can be paid (and only once).");
-      }
-      const receiving = await resolveReceivingAccount(
-        tx,
-        paymentAccountId || null,
-        "Bank Transfer",
-      );
-      if (receiving.paymentAccountId) {
-        await tx.payrollRun.update({
-          where: { id },
-          data: { paymentAccountId: receiving.paymentAccountId },
-        });
-      }
+      if (already)
+        throw new Error(
+          `Salaries for ${d.month}/${d.year} were already paid (${already.code}). Record any top-up as an Allowances expense instead.`,
+        );
+
+      const receiving = await resolveReceivingAccount(tx, d.paymentAccountId || null, "Bank Transfer");
+      await tx.payrollRun.create({
+        data: {
+          code,
+          month: d.month,
+          year: d.year,
+          status: "PAID",
+          createdById: admin.id,
+          approvedById: admin.id,
+          approvedAt: new Date(),
+          paidAt: payDate,
+          paymentAccountId: receiving.paymentAccountId,
+          note: d.note?.trim() || null,
+          items: { create: items },
+        },
+      });
+      // Booked as a company expense on the pay date — money leaves the company.
       await tx.expense.create({
         data: {
           code: refCode("EXP"),
           category: "SALARIES",
           amount: total,
-          purpose: `Payroll ${run.code} — ${run.month}/${run.year}`,
+          purpose: `Payroll ${code} — ${d.month}/${d.year}`,
           paymentMethod: receiving.method,
           source: "PAYROLL",
-          recordedById: actor.id,
+          expenseDate: payDate,
+          recordedById: admin.id,
         },
       });
     });
 
     await logActivity({
-      actorId: actor.id,
-      actorName: actor.name,
+      actorId: admin.id,
+      actorName: admin.name,
       action: "PAYROLL_PAID",
       entity: "PayrollRun",
-      entityId: run.id,
-      summary: `Payroll ${run.code} paid — ${formatCurrency(total)} in salaries.`,
+      entityId: code,
+      summary: `${admin.name} paid payroll ${code} (${d.month}/${d.year}) — ${formatCurrency(total)} to ${items.length} employee${items.length === 1 ? "" : "s"}, recorded as a salaries expense.`,
     });
     revalidatePayroll();
-    return ok(undefined, `${run.code} paid — ${formatCurrency(total)} recorded as salaries.`);
+    return ok({ code }, `Payroll ${code} paid — ${formatCurrency(total)} recorded as salaries.`);
   } catch (e) {
     return fail(errorMessage(e));
   }

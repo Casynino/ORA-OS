@@ -4,8 +4,6 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
-  Check,
-  X,
   Users,
   Pencil,
   ChevronDown,
@@ -15,10 +13,7 @@ import {
 import {
   createEmployee,
   updateEmployee,
-  createPayrollRun,
-  approvePayrollRun,
-  rejectPayrollRun,
-  payPayrollRun,
+  runPayroll,
 } from "@/lib/actions/payroll";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -27,7 +22,6 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ActionButton } from "@/components/dashboard/action-button";
 import {
   Table,
   TableHeader,
@@ -37,7 +31,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { toast } from "@/components/ui/use-toast";
-import { formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
+import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 
 export type EmployeeDTO = {
   id: string;
@@ -79,25 +73,6 @@ type ReceivingAccount = {
   accountNumber: string | null;
 };
 
-const RUN_VARIANT: Record<
-  PayrollRunDTO["status"],
-  "secondary" | "warning" | "info" | "success" | "destructive"
-> = {
-  DRAFT: "secondary",
-  PENDING_APPROVAL: "warning",
-  APPROVED: "info",
-  PAID: "success",
-  REJECTED: "destructive",
-};
-
-const RUN_LABEL: Record<PayrollRunDTO["status"], string> = {
-  DRAFT: "Draft",
-  PENDING_APPROVAL: "Awaiting approval",
-  APPROVED: "Approved — ready to pay",
-  PAID: "Paid",
-  REJECTED: "Rejected",
-};
-
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -105,43 +80,68 @@ const MONTHS = [
 
 const runTotal = (r: PayrollRunDTO) => r.items.reduce((s, i) => s + i.net, 0);
 
-/** Payroll: finance keeps the employee register and builds runs; admin
- * approves; finance pays. One component, two vantage points. */
+/** Payroll is CEO-owned: the boss manages the employee register and pays all
+ * salaries in one action on a chosen date. `canManage` is true for the admin. */
 export function PayrollManager({
   employees,
   runs,
   receivingAccounts,
-  mode,
+  canManage,
 }: {
   employees: EmployeeDTO[];
   runs: PayrollRunDTO[];
   receivingAccounts: ReceivingAccount[];
-  mode: "finance" | "admin";
+  canManage: boolean;
 }) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<EmployeeDTO | null>(null);
-  const [creatingRun, setCreatingRun] = useState(false);
+  const [runningPayroll, setRunningPayroll] = useState(false);
+
+  const activeEmployees = employees.filter((e) => e.isActive);
+  const monthlyWage = activeEmployees.reduce((s, e) => s + e.baseSalary, 0);
+  const paidRuns = runs.filter((r) => r.status === "PAID");
 
   return (
     <div className="space-y-8">
+      {/* Summary */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Employees</p>
+          <p className="mt-2 font-display text-2xl font-bold">{formatNumber(activeEmployees.length)}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Monthly wage bill</p>
+          <p className="mt-2 font-display text-2xl font-bold">{formatCurrency(monthlyWage)}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Payrolls run</p>
+          <p className="mt-2 font-display text-2xl font-bold">{formatNumber(paidRuns.length)}</p>
+        </div>
+      </div>
+
       {/* Employee register */}
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
             <Users className="size-5 text-primary" /> Employees
           </h2>
-          {mode === "finance" && (
-            <Button size="sm" className="rounded-full" onClick={() => setAdding(true)}>
-              <Plus className="size-4" /> Add employee
-            </Button>
+          {canManage && (
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="rounded-full" onClick={() => setAdding(true)}>
+                <Plus className="size-4" /> Add employee
+              </Button>
+              <Button size="sm" className="rounded-full" onClick={() => setRunningPayroll(true)} disabled={activeEmployees.length === 0}>
+                <Banknote className="size-4" /> Run payroll
+              </Button>
+            </div>
           )}
         </div>
         {employees.length === 0 ? (
           <EmptyState
             icon={Users}
             title="No employees yet"
-            description="Add employees to the register to start running payroll."
+            description="Add employees to the register, then run payroll to pay them all at once."
           />
         ) : (
           <div className="rounded-2xl border border-border bg-card">
@@ -152,7 +152,7 @@ export function PayrollManager({
                   <TableHead>Position</TableHead>
                   <TableHead className="text-right">Monthly salary</TableHead>
                   <TableHead>Status</TableHead>
-                  {mode === "finance" && <TableHead className="text-right">Actions</TableHead>}
+                  {canManage && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -173,10 +173,10 @@ export function PayrollManager({
                         {e.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
-                    {mode === "finance" && (
+                    {canManage && (
                       <TableCell data-label="Actions" className="text-right">
                         <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setEditing(e)}>
-                          <Pencil className="size-3.5" />
+                          <Pencil className="size-3.5" /> Edit
                         </Button>
                       </TableCell>
                     )}
@@ -188,165 +188,68 @@ export function PayrollManager({
         )}
       </section>
 
-      {/* Payroll runs */}
+      {/* Payroll history */}
       <section>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
-            <Banknote className="size-5 text-primary" /> Payroll runs
-          </h2>
-          {mode === "finance" && (
-            <Button
-              size="sm"
-              className="rounded-full"
-              onClick={() => setCreatingRun(true)}
-              disabled={employees.filter((e) => e.isActive).length === 0}
-            >
-              <Plus className="size-4" /> New payroll run
-            </Button>
-          )}
-        </div>
-        {runs.length === 0 ? (
+        <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold">
+          <Banknote className="size-5 text-primary" /> Payroll history
+        </h2>
+        {paidRuns.length === 0 ? (
           <EmptyState
             icon={Banknote}
-            title="No payroll runs yet"
-            description="Build a run from the employee register — the admin approves it, then finance pays it out."
+            title="No payroll paid yet"
+            description={canManage ? "Use “Run payroll” to pay all employees at once — it's recorded as a salaries expense." : "Paid payroll runs appear here."}
           />
         ) : (
           <div className="space-y-2">
-            {runs.map((r) => (
-              <RunCard key={r.id} run={r} mode={mode} accounts={receivingAccounts} onDone={() => router.refresh()} />
+            {paidRuns.map((r) => (
+              <RunCard key={r.id} run={r} />
             ))}
           </div>
         )}
       </section>
 
       {adding && (
-        <EmployeeModal
-          onClose={() => setAdding(false)}
-          onDone={() => {
-            setAdding(false);
-            router.refresh();
-          }}
-        />
+        <EmployeeModal onClose={() => setAdding(false)} onDone={() => { setAdding(false); router.refresh(); }} />
       )}
       {editing && (
-        <EmployeeModal
-          employee={editing}
-          onClose={() => setEditing(null)}
-          onDone={() => {
-            setEditing(null);
-            router.refresh();
-          }}
-        />
+        <EmployeeModal employee={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); router.refresh(); }} />
       )}
-      {creatingRun && (
-        <NewRunModal
-          employees={employees.filter((e) => e.isActive)}
-          onClose={() => setCreatingRun(false)}
-          onDone={() => {
-            setCreatingRun(false);
-            router.refresh();
-          }}
+      {runningPayroll && (
+        <RunPayrollModal
+          employees={activeEmployees}
+          accounts={receivingAccounts}
+          onClose={() => setRunningPayroll(false)}
+          onDone={() => { setRunningPayroll(false); router.refresh(); }}
         />
       )}
     </div>
   );
 }
 
-// ── One payroll run ──────────────────────────────────────────────────────────
+// ── One paid payroll run ─────────────────────────────────────────────────────
 
-function RunCard({
-  run,
-  mode,
-  accounts,
-  onDone,
-}: {
-  run: PayrollRunDTO;
-  mode: "finance" | "admin";
-  accounts: ReceivingAccount[];
-  onDone: () => void;
-}) {
+function RunCard({ run }: { run: PayrollRunDTO }) {
   const [open, setOpen] = useState(false);
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const total = runTotal(run);
-
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
             {MONTHS[run.month - 1]} {run.year}
-            <Badge variant={RUN_VARIANT[run.status]}>{RUN_LABEL[run.status]}</Badge>
+            <Badge variant="success">Paid</Badge>
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {run.code} · {run.items.length} employee{run.items.length === 1 ? "" : "s"} · built by {run.createdByName}{" "}
-            {timeAgo(run.createdAt)}
-            {run.approvedByName ? ` · reviewed by ${run.approvedByName}` : ""}
-            {run.paidAt ? ` · paid ${timeAgo(run.paidAt)}` : ""}
+            {run.code} · {run.items.length} employee{run.items.length === 1 ? "" : "s"} · paid by {run.createdByName}
+            {run.paidAt ? ` · ${formatDate(new Date(run.paidAt))}` : ""}
           </p>
           {run.note && <p className="mt-1 text-xs text-muted-foreground">“{run.note}”</p>}
           <p className="mt-1.5 font-display text-xl font-bold">{formatCurrency(total)}</p>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-          {mode === "admin" && run.status === "PENDING_APPROVAL" && (
-            <>
-              <ActionButton
-                size="sm"
-                variant="success"
-                action={() => approvePayrollRun(run.id)}
-                onDone={onDone}
-                pendingText="…"
-              >
-                <Check className="size-3.5" /> Approve
-              </ActionButton>
-              <ActionButton
-                size="sm"
-                variant="outline"
-                className="text-destructive hover:bg-destructive/10"
-                action={() =>
-                  rejectPayrollRun(run.id, window.prompt("Reason for rejecting (optional)") ?? undefined)
-                }
-                onDone={onDone}
-                pendingText="…"
-              >
-                <X className="size-3.5" /> Reject
-              </ActionButton>
-            </>
-          )}
-          {mode === "finance" && run.status === "APPROVED" && (
-            <>
-              {accounts.length > 0 && (
-                <Select
-                  value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                  className="h-8 max-w-44 text-xs"
-                  title="Account the salaries are paid from"
-                >
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                      {a.accountNumber ? ` · ${a.accountNumber}` : ""}
-                    </option>
-                  ))}
-                </Select>
-              )}
-              <ActionButton
-                size="sm"
-                variant="success"
-                confirm={`Pay ${formatCurrency(total)} in salaries for ${MONTHS[run.month - 1]} ${run.year}?`}
-                action={() => payPayrollRun(run.id, accountId || undefined)}
-                onDone={onDone}
-                pendingText="Paying…"
-              >
-                <Banknote className="size-3.5" /> Pay run
-              </ActionButton>
-            </>
-          )}
-          <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setOpen((v) => !v)}>
-            {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-            {open ? "Hide" : "Details"}
-          </Button>
-        </div>
+        <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setOpen((v) => !v)}>
+          {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+          {open ? "Hide" : "Details"}
+        </Button>
       </div>
       {open && (
         <div className="mt-3 overflow-x-auto border-t border-border/60 pt-3">
@@ -404,14 +307,7 @@ function EmployeeModal({
     }
     start(async () => {
       const res = employee
-        ? await updateEmployee({
-            employeeId: employee.id,
-            name,
-            position,
-            phone,
-            baseSalary,
-            isActive: active,
-          })
+        ? await updateEmployee({ employeeId: employee.id, name, position, phone, baseSalary, isActive: active })
         : await createEmployee({ name, position, phone, baseSalary });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
@@ -451,7 +347,7 @@ function EmployeeModal({
             <span>
               <span className="font-medium">On active payroll</span>
               <span className="block text-xs text-muted-foreground">
-                Inactive employees are skipped when building new runs.
+                Inactive employees are skipped when you run payroll.
               </span>
             </span>
             <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="size-4 accent-primary" />
@@ -465,14 +361,16 @@ function EmployeeModal({
   );
 }
 
-// ── New run modal ────────────────────────────────────────────────────────────
+// ── Run payroll modal (one action: pay all + book the expense) ────────────────
 
-function NewRunModal({
+function RunPayrollModal({
   employees,
+  accounts,
   onClose,
   onDone,
 }: {
   employees: EmployeeDTO[];
+  accounts: ReceivingAccount[];
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -480,13 +378,15 @@ function NewRunModal({
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
+  // Build the default from the same local parts as month/year so they always
+  // agree (a UTC ISO slice can land a day off near midnight).
+  const [payDate, setPayDate] = useState(
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+  );
+  const [accountId, setAccountId] = useState(accounts.find((a) => a.type === "BANK")?.id ?? accounts[0]?.id ?? "");
   const [note, setNote] = useState("");
-  const [lines, setLines] = useState<
-    Record<string, { gross: string; allowance: string; deduction: string }>
-  >(() =>
-    Object.fromEntries(
-      employees.map((e) => [e.id, { gross: String(e.baseSalary), allowance: "", deduction: "" }]),
-    ),
+  const [lines, setLines] = useState<Record<string, { gross: string; allowance: string; deduction: string }>>(() =>
+    Object.fromEntries(employees.map((e) => [e.id, { gross: String(e.baseSalary), allowance: "", deduction: "" }])),
   );
 
   const get = (id: string) => lines[id] ?? { gross: "0", allowance: "", deduction: "" };
@@ -494,12 +394,7 @@ function NewRunModal({
     setLines((s) => ({ ...s, [id]: { ...get(id), [k]: v } }));
   const netOf = (id: string) => {
     const l = get(id);
-    return Math.max(
-      0,
-      (Math.round(Number(l.gross)) || 0) +
-        (Math.round(Number(l.allowance)) || 0) -
-        (Math.round(Number(l.deduction)) || 0),
-    );
+    return Math.max(0, (Math.round(Number(l.gross)) || 0) + (Math.round(Number(l.allowance)) || 0) - (Math.round(Number(l.deduction)) || 0));
   };
   const total = useMemo(
     () => employees.reduce((s, e) => s + netOf(e.id), 0),
@@ -508,11 +403,11 @@ function NewRunModal({
   );
 
   function submit() {
+    if (!payDate) return toast({ variant: "error", title: "Pick the pay date." });
+    if (total <= 0) return toast({ variant: "error", title: "The total pay must be greater than zero." });
     start(async () => {
-      const res = await createPayrollRun({
-        month,
-        year,
-        note,
+      const res = await runPayroll({
+        month, year, payDate, paymentAccountId: accountId || undefined, note,
         lines: employees.map((e) => {
           const l = get(e.id);
           return {
@@ -534,43 +429,49 @@ function NewRunModal({
     <Modal
       open
       onClose={onClose}
-      title="New payroll run"
-      description="Lines start from each employee's monthly salary — adjust, then submit to the admin for approval."
+      title="Run payroll"
+      description="Pay all listed employees at once. It's recorded as a salaries expense on the pay date — the money leaves the company then."
     >
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Month</Label>
             <Select value={String(month)} onChange={(e) => setMonth(Number(e.target.value))} className="mt-1.5">
-              {MONTHS.map((m, i) => (
-                <option key={m} value={i + 1}>
-                  {m}
-                </option>
-              ))}
+              {MONTHS.map((m, i) => (<option key={m} value={i + 1}>{m}</option>))}
             </Select>
           </div>
           <div>
             <Label>Year</Label>
             <Select value={String(year)} onChange={(e) => setYear(Number(e.target.value))} className="mt-1.5">
-              {[year - 1, year, year + 1].map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
+              {[year - 1, year, year + 1].map((y) => (<option key={y} value={y}>{y}</option>))}
+            </Select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Pay date *</Label>
+            <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className="mt-1.5" />
+          </div>
+          <div>
+            <Label>Paid from</Label>
+            <Select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="mt-1.5">
+              <option value="">Account…</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}{a.accountNumber ? ` · ${a.accountNumber}` : ""}</option>
               ))}
             </Select>
           </div>
         </div>
 
         <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Adjust amounts if needed — starts from each salary.</p>
           {employees.map((e) => {
             const l = get(e.id);
             return (
               <div key={e.id} className="rounded-xl border border-border p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium">{e.name}</p>
-                  <p className="text-xs font-semibold text-primary">
-                    net {formatCurrency(netOf(e.id))}
-                  </p>
+                  <p className="text-xs font-semibold text-primary">net {formatCurrency(netOf(e.id))}</p>
                 </div>
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   <div>
@@ -593,16 +494,17 @@ function NewRunModal({
 
         <div>
           <Label>Note (optional)</Label>
-          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything the admin should know…" className="mt-1.5" />
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything worth recording…" className="mt-1.5" />
         </div>
 
         <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-2.5 text-sm">
-          <span className="text-muted-foreground">Total net pay</span>
+          <span className="text-muted-foreground">Total to pay</span>
           <span className="font-display text-lg font-semibold">{formatCurrency(total)}</span>
         </div>
 
         <Button className="w-full" onClick={submit} disabled={pending || total <= 0}>
-          {pending ? "Submitting…" : "Submit for admin approval"}
+          <Banknote className="size-4" />
+          {pending ? "Paying…" : `Pay ${formatCurrency(total)} & record expense`}
         </Button>
       </div>
     </Modal>

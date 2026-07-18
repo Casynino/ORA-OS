@@ -6,7 +6,8 @@ import { PayrollManager } from "@/components/finance/payroll-manager";
 
 export const dynamic = "force-dynamic";
 
-/** Admin vantage point: approve or reject payroll runs before payment. */
+/** Payroll is the boss's own: manage the employee register and pay everyone in
+ * one action on a chosen date — booked immediately as a salaries expense. */
 export default async function AdminPayrollPage() {
   await requireRole("ADMIN");
   const { employees, runs, receivingAccounts } = await getPayrollData();
@@ -14,12 +15,12 @@ export default async function AdminPayrollPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Finance"
-        description="Where ORA money comes from and where it goes — live, categorised, traceable."
+        title="Payroll"
+        description="Your employees and salaries. Run payroll to pay everyone at once — it's cut from the company as a salaries expense on the pay date."
       >
         <FinanceNav />
       </PageHeader>
-      <PayrollManager employees={employees} runs={runs} receivingAccounts={receivingAccounts} mode="admin" />
+      <PayrollManager employees={employees} runs={runs} receivingAccounts={receivingAccounts} canManage />
     </div>
   );
 }
