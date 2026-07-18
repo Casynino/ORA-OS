@@ -397,25 +397,20 @@ function IssueModal({ accounts, onClose }: { accounts: SelectableAccount[]; onCl
         <div className="space-y-2">
           <Label>Items *</Label>
           {items.map((it) => (
-            <div key={it.key} className="space-y-2 rounded-xl border border-border p-2.5">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <Select value={it.category} onChange={(e) => patch(it.key, { category: e.target.value })}>
-                    {OFFICE_FUND_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
-                    ))}
-                  </Select>
-                </div>
-                {items.length > 1 && (
-                  <button type="button" onClick={() => removeItem(it.key)} className="mt-1 rounded-md p-1 text-muted-foreground hover:text-destructive" aria-label="Remove item">
-                    <Trash2 className="size-4" />
-                  </button>
-                )}
+            <div key={it.key} className="flex items-center gap-2 rounded-xl border border-border p-2.5">
+              <div className="min-w-0 flex-1">
+                <Select value={it.category} onChange={(e) => patch(it.key, { category: e.target.value })}>
+                  {OFFICE_FUND_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
+                  ))}
+                </Select>
               </div>
-              <div className="grid grid-cols-[1fr_8rem] gap-2">
-                <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What it's for (optional)" className="h-9" />
-                <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="h-9" />
-              </div>
+              <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="w-28 shrink-0" />
+              {items.length > 1 && (
+                <button type="button" onClick={() => removeItem(it.key)} className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-destructive" aria-label="Remove item">
+                  <Trash2 className="size-4" />
+                </button>
+              )}
             </div>
           ))}
           <Button size="sm" variant="outline" onClick={addItem}>
@@ -614,32 +609,27 @@ function RequestModal({ categories, onClose }: { categories: CategoryOption[]; o
         <div className="space-y-2">
           <Label>Items *</Label>
           {items.map((it) => (
-            <div key={it.key} className="space-y-2 rounded-xl border border-border p-2.5">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <CategorySelect
-                    categories={categories}
-                    category={it.category}
-                    customCategory={it.customCategory}
-                    onChange={(v) => patch(it.key, v)}
-                    label=""
-                  />
-                </div>
-                {items.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeItem(it.key)}
-                    className="mt-1 rounded-md p-1 text-muted-foreground hover:text-destructive"
-                    aria-label="Remove item"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                )}
+            <div key={it.key} className="flex items-start gap-2 rounded-xl border border-border p-2.5">
+              <div className="min-w-0 flex-1">
+                <CategorySelect
+                  categories={categories}
+                  category={it.category}
+                  customCategory={it.customCategory}
+                  onChange={(v) => patch(it.key, v)}
+                  label=""
+                />
               </div>
-              <div className="grid grid-cols-[1fr_8rem] gap-2">
-                <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What it's for (optional)" className="h-9" />
-                <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="h-9" />
-              </div>
+              <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="w-28 shrink-0" />
+              {items.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeItem(it.key)}
+                  className="mt-1 shrink-0 rounded-md p-1 text-muted-foreground hover:text-destructive"
+                  aria-label="Remove item"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              )}
             </div>
           ))}
           <Button size="sm" variant="outline" onClick={addItem}>
@@ -699,25 +689,20 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
         <div className="space-y-2">
           <Label>Items *</Label>
           {items.map((it) => (
-            <div key={it.key} className="space-y-2 rounded-xl border border-border p-2.5">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <Select value={it.category} onChange={(e) => patch(it.key, { category: e.target.value })}>
-                    {OFFICE_FUND_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
-                    ))}
-                  </Select>
-                </div>
-                {items.length > 1 && (
-                  <button type="button" onClick={() => removeItem(it.key)} className="mt-1 rounded-md p-1 text-muted-foreground hover:text-destructive" aria-label="Remove item">
-                    <Trash2 className="size-4" />
-                  </button>
-                )}
+            <div key={it.key} className="flex items-center gap-2 rounded-xl border border-border p-2.5">
+              <div className="min-w-0 flex-1">
+                <Select value={it.category} onChange={(e) => patch(it.key, { category: e.target.value })}>
+                  {OFFICE_FUND_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
+                  ))}
+                </Select>
               </div>
-              <div className="grid grid-cols-[1fr_8rem] gap-2">
-                <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What was bought (optional)" className="h-9" />
-                <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="h-9" />
-              </div>
+              <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="w-28 shrink-0" />
+              {items.length > 1 && (
+                <button type="button" onClick={() => removeItem(it.key)} className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-destructive" aria-label="Remove item">
+                  <Trash2 className="size-4" />
+                </button>
+              )}
             </div>
           ))}
           <Button size="sm" variant="outline" onClick={addItem}>
