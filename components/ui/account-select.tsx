@@ -59,9 +59,11 @@ export function CompanyAccountSelect({
   }, [value, accounts]);
 
   const optLabel = (a: SelectableAccount) => {
-    const last4 = a.accountNumber ? ` · ····${a.accountNumber.slice(-4)}` : "";
+    // Full account/Lipa number (the CEO owns these accounts) so the pick is
+    // unambiguous — same number reps and customers already see.
+    const num = a.accountNumber ? ` · ${a.accountNumber}` : "";
     const bal = a.balance !== undefined ? ` · ${formatCurrency(a.balance)}` : "";
-    return `${a.name}${last4}${bal}`;
+    return `${a.name}${num}${bal}`;
   };
 
   if (accounts.length === 0 && !allowNone) {
@@ -94,12 +96,15 @@ export function CompanyAccountSelect({
           </optgroup>
         ))}
       </Select>
-      {selected && selected.balance !== undefined && (
+      {selected && (
         <p
-          className={`mt-1 text-xs ${selected.balance < 0 ? "text-destructive" : "text-muted-foreground"}`}
+          className={`mt-1 text-xs ${selected.balance !== undefined && selected.balance < 0 ? "text-destructive" : "text-muted-foreground"}`}
         >
-          {selected.name} balance: {formatCurrency(selected.balance)}
-          {selected.balance < 0 ? " — overdrawn in ORA's records" : ""}
+          {selected.accountNumber
+            ? `${selected.type === "MOBILE_MONEY" ? "Lipa" : "A/C"} ${selected.accountNumber} · `
+            : ""}
+          balance {selected.balance !== undefined ? formatCurrency(selected.balance) : "—"}
+          {selected.balance !== undefined && selected.balance < 0 ? " — overdrawn in ORA's records" : ""}
         </p>
       )}
     </div>

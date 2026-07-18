@@ -230,8 +230,8 @@ export default async function AccountLedgerPage({
             </h1>
             {account.accountName && <p className="text-sm text-white/80">{account.accountName}</p>}
             {account.accountNumber && (
-              <p className="mt-1 font-mono text-sm tracking-[0.2em] text-white/90">
-                {account.type === "MOBILE_MONEY" ? "LIPA" : "A/C"} ···· ···· {account.accountNumber.slice(-4)}
+              <p className="mt-1 font-mono text-sm tracking-widest text-white/90">
+                {account.type === "MOBILE_MONEY" ? "LIPA" : "A/C"} {account.accountNumber}
               </p>
             )}
           </div>
