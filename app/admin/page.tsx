@@ -1,8 +1,5 @@
 import Link from "next/link";
-import {
-  AlertTriangle, Clock, Wallet, ClipboardList, Receipt, BadgeCheck,
-  UserPlus, Undo2, PackageX, Users,
-} from "lucide-react";
+import { AlertTriangle, Clock, Wallet, PackageX, Users } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { getCommandCenter } from "@/lib/services/command-center";
@@ -17,6 +14,7 @@ import {
   BusinessHealth,
   NeedsAttention,
   ExecutiveActions,
+  OperationsStatus,
   RevenueCollectionOverview,
   InventoryOverview,
   SalesPerformance,
@@ -24,6 +22,9 @@ import {
   type AttentionItem,
 } from "@/components/admin/ceo-overview";
 import { RevenueTrends, HumanActivityFeed, CustomerIntelligencePanel } from "@/components/admin/command-sections";
+import { AddExpenseButton, IssueFundsButton, AddCapitalButton } from "@/components/admin/finance-forms";
+import { getSelectableAccounts } from "@/lib/services/accounts";
+import { getSelectableCategories } from "@/lib/services/categories";
 import { Reveal } from "@/components/ui/reveal";
 import { formatCurrency, timeAgo } from "@/lib/utils";
 
@@ -32,7 +33,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminCommandCenter() {
   const me = await requireRole("ADMIN");
 
-  const [d, fin, collections, customers, trends, opFund, pettyPending, lastPaidPayroll, meUser] =
+  const [d, fin, collections, customers, trends, opFund, accounts, categories, pettyPending, lastPaidPayroll, meUser] =
     await Promise.all([
       getCommandCenter(),
       getFinanceOverview("month"),
@@ -40,6 +41,8 @@ export default async function AdminCommandCenter() {
       getCustomerIntelligence(),
       getBusinessTrends(),
       getOperationalFund(),
+      getSelectableAccounts(),
+      getSelectableCategories(),
       prisma.pettyCashRequest.count({ where: { status: "PENDING" } }),
       prisma.payrollRun.findFirst({
         where: { status: "PAID" },
@@ -60,7 +63,9 @@ export default async function AdminCommandCenter() {
     timeZone: "Africa/Dar_es_Salaam", weekday: "long", month: "long", day: "numeric",
   }).format(new Date());
 
-  // ── Consolidated "needs attention" — every urgent item, one place ──────────
+  // ── "Needs attention" — the money/credit/stock decisions only the CEO makes.
+  //    The operational pipeline (approvals, transfers, returns…) lives in its own
+  //    Operations section below, so nothing is counted twice. ──────────────────
   const o = d.operations;
   const attention: AttentionItem[] = [];
   if (collections.overdueCount > 0)
@@ -69,16 +74,6 @@ export default async function AdminCommandCenter() {
     attention.push({ tone: "warning", icon: Clock, label: `${collections.dueSoon.length} ${collections.dueSoon.length === 1 ? "customer" : "customers"} approaching payment`, hint: "payment dates coming up — plan the follow-ups", href: "/admin/credit" });
   if (pettyPending > 0)
     attention.push({ tone: "warning", icon: Wallet, label: `${pettyPending} operational fund ${pettyPending === 1 ? "request" : "requests"}`, hint: "Finance is waiting on your approval", href: "/admin/finance/operational-fund" });
-  if (o.pendingApprovals > 0)
-    attention.push({ tone: "warning", icon: ClipboardList, label: `${o.pendingApprovals} order ${o.pendingApprovals === 1 ? "approval" : "approvals"}`, hint: "partner stock orders awaiting sign-off", href: "/admin/requests" });
-  if (o.pendingPayments > 0)
-    attention.push({ tone: "info", icon: Receipt, label: `${o.pendingPayments} ${o.pendingPayments === 1 ? "payment" : "payments"} to confirm`, hint: "money awaiting verification", href: "/admin/requests" });
-  if (o.pendingRepRequests > 0)
-    attention.push({ tone: "info", icon: BadgeCheck, label: `${o.pendingRepRequests} rep stock ${o.pendingRepRequests === 1 ? "request" : "requests"}`, hint: "field team needs stock", href: "/admin/reps" });
-  if (o.pendingApplications > 0)
-    attention.push({ tone: "info", icon: UserPlus, label: `${o.pendingApplications} partner ${o.pendingApplications === 1 ? "application" : "applications"}`, hint: "new partners to review", href: "/admin/users" });
-  if (o.pendingReturns > 0)
-    attention.push({ tone: "info", icon: Undo2, label: `${o.pendingReturns} ${o.pendingReturns === 1 ? "return" : "returns"} to inspect`, hint: "awaiting your decision", href: "/admin/returns" });
   if (d.network.lowStock > 0)
     attention.push({ tone: "warning", icon: PackageX, label: `${d.network.lowStock} ${d.network.lowStock === 1 ? "product" : "products"} low on stock`, hint: "reorder before it runs out", href: "/admin/inventory" });
 
@@ -115,11 +110,16 @@ export default async function AdminCommandCenter() {
         netProfit={fin.window.netProfit}
       />
 
-      {/* ── 3 · Needs attention + executive actions ── */}
+      {/* ── 3 · Needs attention + quick actions (money + navigation) ── */}
       <NeedsAttention items={attention} />
       <section>
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick actions</p>
-        <ExecutiveActions />
+        <div className="flex flex-wrap items-center gap-2">
+          <AddExpenseButton accounts={accounts} categories={categories} label="Record expense" variant="default" className="rounded-xl" />
+          <IssueFundsButton accounts={accounts} label="Issue funds" variant="accent" className="rounded-xl" />
+          <AddCapitalButton accounts={accounts} label="Add capital" variant="outline" className="rounded-xl" />
+          <ExecutiveActions />
+        </div>
       </section>
 
       {/* ── 4 · Revenue & collection overview ── */}
@@ -151,7 +151,10 @@ export default async function AdminCommandCenter() {
         topPartner={d.sales.topPartner}
       />
 
-      {/* ── 6b · Customer intelligence (who ORA sells to — types + top customers) ── */}
+      {/* ── 6b · Operations · at a glance (the pipeline the CEO oversees) ── */}
+      <OperationsStatus ops={o} />
+
+      {/* ── 6c · Customer intelligence (who ORA sells to — types + top customers) ── */}
       <CustomerIntelligencePanel cust={customers} />
 
       {/* ── 7 · Product performance (visual — best / slow / low / returned / requested) ── */}

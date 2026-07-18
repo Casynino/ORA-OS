@@ -4,7 +4,8 @@ import type { LucideIcon } from "lucide-react";
 import {
   Wallet, CreditCard, TrendingUp, Scale, ArrowRight, Star, PackageX,
   TrendingDown, Boxes, ShoppingCart, ChevronRight, RotateCcw,
-  FileBarChart, Users, ShieldAlert, Package, ScrollText, PiggyBank,
+  FileBarChart, Users, ShieldAlert, Package, ScrollText,
+  UserPlus, ClipboardList, BadgeCheck, Receipt, PackagePlus, Truck, Undo2, ArrowLeftRight,
 } from "lucide-react";
 import type { CustomerIntelligence } from "@/lib/services/intelligence";
 import { KpiCard } from "@/components/admin/kpi-card";
@@ -93,20 +94,23 @@ export function NeedsAttention({ items }: { items: AttentionItem[] }) {
   );
 }
 
-// ── 3b · Executive quick actions (decisions, not daily operations) ───────────
+// ── 3b · Executive quick links — jump to the pages a CEO acts from. The money
+//        actions (record expense / issue funds / add capital) are rendered as
+//        live modal buttons in the page alongside these. ──────────────────────
 
 const EXEC_ACTIONS: { icon: LucideIcon; label: string; href: string }[] = [
+  { icon: ClipboardList, label: "Approve orders", href: "/admin/requests" },
+  { icon: PackagePlus, label: "Receive stock", href: "/admin/imports" },
+  { icon: Package, label: "Inventory", href: "/admin/inventory" },
   { icon: FileBarChart, label: "Reports", href: "/admin/finance/profit" },
   { icon: Users, label: "Customers", href: "/admin/customers" },
   { icon: ShieldAlert, label: "Credit risk", href: "/admin/credit" },
-  { icon: Package, label: "Inventory", href: "/admin/inventory" },
   { icon: ScrollText, label: "General Ledger", href: "/admin/finance/ledger" },
-  { icon: PiggyBank, label: "Add capital", href: "/admin/finance/capital" },
 ];
 
 export function ExecutiveActions() {
   return (
-    <div className="flex flex-wrap gap-2">
+    <>
       {EXEC_ACTIONS.map((a) => (
         <Link
           key={a.href}
@@ -117,7 +121,54 @@ export function ExecutiveActions() {
           {a.label}
         </Link>
       ))}
-    </div>
+    </>
+  );
+}
+
+// ── 3c · Operations at a glance — the pipeline the CEO oversees ──────────────
+
+export type OpsCounts = {
+  pendingApplications: number; pendingApprovals: number; pendingRepRequests: number;
+  pendingPayments: number; readyForFulfillment: number; inTransitOrders: number;
+  pendingReturns: number; transfersInProgress: number;
+};
+
+export function OperationsStatus({ ops }: { ops: OpsCounts }) {
+  const tiles: { icon: LucideIcon; label: string; value: number; href: string }[] = [
+    { icon: UserPlus, label: "Applications", value: ops.pendingApplications, href: "/admin/users" },
+    { icon: ClipboardList, label: "Order approvals", value: ops.pendingApprovals, href: "/admin/requests" },
+    { icon: BadgeCheck, label: "Rep stock requests", value: ops.pendingRepRequests, href: "/admin/reps" },
+    { icon: Receipt, label: "Payments to confirm", value: ops.pendingPayments, href: "/admin/requests" },
+    { icon: PackagePlus, label: "Ready to fulfil", value: ops.readyForFulfillment, href: "/admin/requests" },
+    { icon: Truck, label: "In transit", value: ops.inTransitOrders, href: "/admin/requests" },
+    { icon: Undo2, label: "Pending returns", value: ops.pendingReturns, href: "/admin/returns" },
+    { icon: ArrowLeftRight, label: "Transfers active", value: ops.transfersInProgress, href: "/admin/transfers" },
+  ];
+  return (
+    <section>
+      <SectionLabel>Operations · at a glance</SectionLabel>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+        {tiles.map((t) => {
+          const active = t.value > 0;
+          return (
+            <Link
+              key={t.label}
+              href={t.href}
+              className={cn(
+                "rounded-2xl border p-4 transition-colors",
+                active ? "border-warning/30 bg-warning/5 hover:bg-warning/10" : "border-border bg-card hover:bg-muted/40",
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <t.icon className={cn("size-4", active ? "text-warning" : "text-muted-foreground")} />
+                <span className="font-display text-2xl font-bold">{formatNumber(t.value)}</span>
+              </div>
+              <p className="mt-1 truncate text-xs text-muted-foreground">{t.label}</p>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
