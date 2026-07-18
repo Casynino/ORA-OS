@@ -28,6 +28,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 import { ProofUpload } from "@/components/ui/proof-upload";
 import { ProofViewer } from "@/components/ui/proof-viewer";
 import { toast } from "@/components/ui/use-toast";
@@ -153,41 +161,73 @@ export function OperationalFundManager({
         </section>
       )}
 
-      {/* Recent spending */}
+      {/* Recent spending — one uniform row per expense, stays tidy when busy */}
       <section className="space-y-3">
-        <h2 className="font-display text-lg font-semibold">Spending history</h2>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="font-display text-lg font-semibold">Spending history</h2>
+          {fund.expenses.length > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {formatNumber(fund.expenses.length)} {fund.expenses.length === 1 ? "entry" : "entries"}
+            </span>
+          )}
+        </div>
         {fund.expenses.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
             No expenses recorded yet.
           </p>
         ) : (
-          <div className="space-y-2">
-            {fund.expenses.map((e) => (
-              <div key={e.id} className="rounded-2xl border border-border bg-card p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="flex flex-wrap items-center gap-2 font-medium">
-                      {e.description}
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
+            <Table wrapperClassName="table-stack">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Expense</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Recorded by</TableHead>
+                  <TableHead>Receipt</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  {canManage && <TableHead className="text-right sr-only">Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {fund.expenses.map((e) => (
+                  <TableRow key={e.id}>
+                    <TableCell data-cardtitle className="align-top">
+                      <span className="font-medium">{e.description}</span>
+                      <span className="mt-0.5 block max-w-[22rem] truncate text-[11px] text-muted-foreground">
+                        {e.code}{e.note ? ` · ${e.note}` : ""}
+                      </span>
+                    </TableCell>
+                    <TableCell data-label="Category" className="align-top">
                       <Badge variant="secondary" className="text-[10px]">{EXPENSE_LABELS[e.category]}</Badge>
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {e.code} · {formatDate(e.expenseDate)} · by {e.recordedBy}
-                      {e.receiptRef ? ` · ref ${e.receiptRef}` : ""}
-                    </p>
-                    {e.note && <p className="mt-0.5 text-xs text-muted-foreground">{e.note}</p>}
-                    {e.receiptUrl && (
-                      <div className="mt-2 inline-block rounded-lg border border-border bg-muted/30 p-2">
-                        <ProofViewer url={e.receiptUrl} label="View receipt" />
-                      </div>
+                    </TableCell>
+                    <TableCell data-label="Date" className="align-top whitespace-nowrap text-sm text-muted-foreground">
+                      {formatDate(e.expenseDate)}
+                    </TableCell>
+                    <TableCell data-label="Recorded by" className="align-top text-sm text-muted-foreground">
+                      {e.recordedBy}
+                    </TableCell>
+                    <TableCell data-label="Receipt" className="align-top">
+                      {e.receiptUrl ? (
+                        <ProofViewer url={e.receiptUrl} label="Receipt" compact />
+                      ) : e.receiptRef ? (
+                        <span className="text-xs text-muted-foreground">ref {e.receiptRef}</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell data-label="Amount" className="align-top whitespace-nowrap text-right font-semibold text-destructive">
+                      −{formatCurrency(e.amount)}
+                    </TableCell>
+                    {canManage && (
+                      <TableCell className="align-top text-right">
+                        <DeleteExpense id={e.id} />
+                      </TableCell>
                     )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-display font-semibold text-destructive">−{formatCurrency(e.amount)}</span>
-                    {canManage && <DeleteExpense id={e.id} />}
-                  </div>
-                </div>
-              </div>
-            ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         )}
       </section>
