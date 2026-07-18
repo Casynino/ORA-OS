@@ -12,7 +12,7 @@ const LINKS = [
   { path: "/accounts", label: "Accounts" },
   { path: "/cash", label: "Cash & deposits" },
   { path: "/payroll", label: "Payroll" },
-  { path: "/ledger", label: "Ledger" },
+  { path: "/ledger", label: "General Ledger" },
 ];
 
 export function FinanceNav({

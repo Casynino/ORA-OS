@@ -443,6 +443,9 @@ export type LedgerEntry = {
   amount: number; // signed: + in, − out
   method: string | null;
   actor: string | null;
+  accountId: string | null; // company account the money moved through
+  accountName: string | null;
+  linkedHref: string | null; // where to open the source document
 };
 
 export async function getLedger(period: Period, take = 120): Promise<LedgerEntry[]> {
@@ -457,6 +460,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
         take,
         select: {
           id: true, code: true, totalAmount: true, fulfilledAt: true, createdAt: true,
+          paymentAccountId: true, paymentAccount: { select: { name: true } },
           requester: { select: { name: true, organization: true } },
         },
       }),
@@ -468,6 +472,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
           creditAccount: {
             select: { request: { select: { code: true } }, agent: { select: { name: true } } },
           },
+          paymentAccount: { select: { name: true } },
           recordedBy: { select: { name: true } },
         },
       }),
@@ -477,6 +482,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
         take,
         select: {
           id: true, code: true, total: true, createdAt: true, customerName: true,
+          paymentAccountId: true, paymentAccount: { select: { name: true } },
           rep: { select: { name: true } }, customer: { select: { name: true } },
         },
       }),
@@ -486,6 +492,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
         take,
         include: {
           sale: { select: { code: true, customer: { select: { name: true } } } },
+          paymentAccount: { select: { name: true } },
           recordedBy: { select: { name: true } },
         },
       }),
@@ -493,13 +500,19 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
         where: dateW ? { expenseDate: dateW } : {},
         orderBy: { expenseDate: "desc" },
         take,
-        include: { recordedBy: { select: { name: true } } },
+        include: {
+          paymentAccount: { select: { name: true } },
+          recordedBy: { select: { name: true } },
+        },
       }),
       prisma.capitalEntry.findMany({
         where: dateW ? { entryDate: dateW } : {},
         orderBy: { entryDate: "desc" },
         take,
-        include: { recordedBy: { select: { name: true } } },
+        include: {
+          paymentAccount: { select: { name: true } },
+          recordedBy: { select: { name: true } },
+        },
       }),
     ]);
 
@@ -514,6 +527,9 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
       amount: o.totalAmount ?? 0,
       method: null,
       actor: null,
+      accountId: o.paymentAccountId ?? null,
+      accountName: o.paymentAccount?.name ?? null,
+      linkedHref: `/admin/requests/${o.id}`,
     })),
     ...payments.map((p) => ({
       id: `pay-${p.id}`,
@@ -525,6 +541,9 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
       amount: p.amount,
       method: p.method,
       actor: p.recordedBy.name,
+      accountId: p.paymentAccountId ?? null,
+      accountName: p.paymentAccount?.name ?? null,
+      linkedHref: `/admin/credit`,
     })),
     ...fieldSales.map((s) => ({
       id: `fs-${s.id}`,
@@ -536,6 +555,9 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
       amount: s.total,
       method: "Cash",
       actor: s.rep.name,
+      accountId: s.paymentAccountId ?? null,
+      accountName: s.paymentAccount?.name ?? null,
+      linkedHref: `/admin/sales`,
     })),
     ...fieldPayments.map((p) => ({
       id: `fp-${p.id}`,
@@ -547,6 +569,9 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
       amount: p.amount,
       method: p.method,
       actor: p.recordedBy.name,
+      accountId: p.paymentAccountId ?? null,
+      accountName: p.paymentAccount?.name ?? null,
+      linkedHref: `/admin/sales`,
     })),
     ...expenses.map((e) => ({
       id: `exp-${e.id}`,
@@ -559,6 +584,9 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
       amount: -e.amount,
       method: e.paymentMethod,
       actor: e.recordedBy.name,
+      accountId: e.paymentAccountId ?? null,
+      accountName: e.paymentAccount?.name ?? null,
+      linkedHref: null,
     })),
     ...capital.map((c) => ({
       id: `cap-${c.id}`,
@@ -570,6 +598,9 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
       amount: c.amount,
       method: null,
       actor: c.recordedBy.name,
+      accountId: c.paymentAccountId ?? null,
+      accountName: c.paymentAccount?.name ?? null,
+      linkedHref: `/admin/finance/capital`,
     })),
   ];
 
