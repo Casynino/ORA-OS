@@ -501,7 +501,7 @@ export default async function AdminCommandCenter() {
           <QuickAction icon={Banknote} label="Record payment" href="/admin/credit" />
           <QuickAction icon={PackagePlus} label="Receive stock" href="/admin/imports" />
           <QuickAction icon={Package} label="Inventory" href="/admin/inventory" />
-          <QuickAction icon={FileBarChart} label="Reports" href="/admin/profit" />
+          <QuickAction icon={FileBarChart} label="Profit & Loss" href="/admin/finance/profit" />
         </div>
       </section>
 

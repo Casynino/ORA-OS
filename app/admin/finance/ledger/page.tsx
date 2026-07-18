@@ -36,9 +36,8 @@ export default async function AdminLedgerPage({
       <PageHeader
         title="Transaction ledger"
         description="Every financial movement in one place — the accounting history of ORA."
-      >
-        <FinanceNav />
-      </PageHeader>
+      />
+      <FinanceNav />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PeriodTabs period={period} basePath="/admin/finance/ledger" />

@@ -17,9 +17,8 @@ export default async function AdminCashPage() {
       <PageHeader
         title="Cash & deposits"
         description="Monitor cash across its whole life — collected from reps, held on hand, and banked. Open any deposit to see exactly which cash sales it covered."
-      >
-        <FinanceNav />
-      </PageHeader>
+      />
+      <FinanceNav />
       <CashDepositsManager
         onHand={summary.onHand}
         items={summary.items}

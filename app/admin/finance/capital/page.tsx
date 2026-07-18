@@ -27,9 +27,8 @@ export default async function AdminCapitalPage() {
       <PageHeader
         title="Business capital"
         description="How ORA is funded and grows — founder money, investments, reinvested profit."
-      >
-        <FinanceNav />
-      </PageHeader>
+      />
+      <FinanceNav />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
