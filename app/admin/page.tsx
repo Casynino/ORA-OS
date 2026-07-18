@@ -136,12 +136,8 @@ export default async function AdminCommandCenter() {
         atRiskCustomers={collections.atRiskCustomers}
       />
 
-      {/* ── 5 · Inventory overview ── */}
-      <InventoryOverview
-        totalValue={fin.position.stockValue}
-        totalUnits={d.inventory.total}
-        distribution={d.inventory.distribution}
-      />
+      {/* ── 5 · Inventory overview (value + every location incl. on-credit) ── */}
+      <InventoryOverview totalValue={fin.position.stockValue} inv={d.inventory} />
 
       {/* ── 6 · Sales performance ── */}
       <SalesPerformance
