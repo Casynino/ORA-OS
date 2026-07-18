@@ -17,9 +17,8 @@ export default async function AdminOperationalFundPage() {
       <PageHeader
         title="Operational Fund"
         description="The single fund you allocate to Finance for daily operations. Approve funding requests, then monitor the balance and every recorded expense — full transparency, no per-expense sign-off."
-      >
-        <FinanceNav />
-      </PageHeader>
+      />
+      <FinanceNav />
       <OperationalFundManager fund={fund} canApprove />
     </div>
   );

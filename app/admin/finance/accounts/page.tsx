@@ -93,9 +93,8 @@ export default async function FinanceAccountsPage() {
       <PageHeader
         title="Finance"
         description="Where ORA money comes from and where it goes — live, categorised, traceable."
-      >
-        <FinanceNav />
-      </PageHeader>
+      />
+      <FinanceNav />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

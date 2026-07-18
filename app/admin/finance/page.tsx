@@ -67,9 +67,8 @@ export default async function AdminFinancePage({
       <PageHeader
         title="Finance"
         description="Where ORA money comes from and where it goes — live, categorised, traceable."
-      >
-        <FinanceNav />
-      </PageHeader>
+      />
+      <FinanceNav />
 
       <PeriodTabs period={period} basePath="/admin/finance" />
 

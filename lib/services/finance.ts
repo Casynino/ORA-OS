@@ -91,7 +91,8 @@ async function cashIn(start: Date | null) {
   };
 }
 
-/** Accrual revenue + COGS for a window (partner/warehouse + field sales). */
+/** Accrual revenue + COGS for a window (partner/warehouse + field sales),
+ *  with a per-product breakdown so the P&L can show which packs earn most. */
 async function revenueAndCogs(start: Date | null) {
   const [requests, fieldItems] = await Promise.all([
     prisma.request.findMany({
@@ -105,7 +106,7 @@ async function revenueAndCogs(start: Date | null) {
             quantity: true,
             unitPrice: true,
             lineTotal: true,
-            product: { select: { costPrice: true } },
+            product: { select: { id: true, name: true, costPrice: true } },
           },
         },
       },
@@ -121,7 +122,7 @@ async function revenueAndCogs(start: Date | null) {
       select: {
         quantity: true,
         lineTotal: true,
-        product: { select: { costPrice: true } },
+        product: { select: { id: true, name: true, costPrice: true } },
       },
     }),
   ]);
@@ -129,18 +130,31 @@ async function revenueAndCogs(start: Date | null) {
   let revenue = 0;
   let cogs = 0;
   let units = 0;
+  const products = new Map<
+    string,
+    { id: string; name: string; units: number; revenue: number; cost: number }
+  >();
+  const addLine = (
+    p: { id: string; name: string; costPrice: number },
+    qty: number,
+    lineRev: number,
+  ) => {
+    const lineCost = p.costPrice * qty;
+    revenue += lineRev;
+    cogs += lineCost;
+    units += qty;
+    const cur = products.get(p.id) ?? { id: p.id, name: p.name, units: 0, revenue: 0, cost: 0 };
+    cur.units += qty;
+    cur.revenue += lineRev;
+    cur.cost += lineCost;
+    products.set(p.id, cur);
+  };
   for (const r of requests)
-    for (const it of r.items) {
-      revenue += it.lineTotal ?? (it.unitPrice ?? 0) * it.quantity;
-      cogs += it.product.costPrice * it.quantity;
-      units += it.quantity;
-    }
-  for (const it of fieldItems) {
-    revenue += it.lineTotal;
-    cogs += it.product.costPrice * it.quantity;
-    units += it.quantity;
-  }
-  return { revenue, cogs, units };
+    for (const it of r.items)
+      addLine(it.product, it.quantity, it.lineTotal ?? (it.unitPrice ?? 0) * it.quantity);
+  for (const it of fieldItems) addLine(it.product, it.quantity, it.lineTotal);
+
+  return { revenue, cogs, units, products: [...products.values()] };
 }
 
 async function expensesIn(start: Date | null) {
@@ -222,6 +236,19 @@ export async function getFinanceOverview(period: Period) {
 
   const grossProfit = rc.revenue - rc.cogs;
   const netProfit = grossProfit - exWindow.operating;
+
+  // Per-product profit for the window (both sales channels), best first.
+  const productProfit = rc.products
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      units: p.units,
+      revenue: p.revenue,
+      cost: p.cost,
+      profit: p.revenue - p.cost,
+      margin: p.revenue > 0 ? ((p.revenue - p.cost) / p.revenue) * 100 : 0,
+    }))
+    .sort((a, b) => b.profit - a.profit);
 
   // Receivables — split so finance always shows WHO owes: partners vs the
   // rep-customer book.
@@ -313,6 +340,14 @@ export async function getFinanceOverview(period: Period) {
     .map(([c, amount]) => ({ category: c, label: EXPENSE_LABELS[c], amount }))
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 6);
+  // Operating-cost breakdown — excludes STOCK_PURCHASE (capitalised into
+  // inventory, reaches profit via COGS), so shares are of operatingExpenses and
+  // add up to ~100% instead of blowing past it.
+  const operatingCategories = [...exWindow.byCategory.entries()]
+    .filter(([c]) => c !== "STOCK_PURCHASE")
+    .map(([c, amount]) => ({ category: c, label: EXPENSE_LABELS[c], amount }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 6);
 
   // Capital story
   const capitalTotal = capitalAll.reduce((s, c) => s + c.amount, 0);
@@ -343,8 +378,10 @@ export async function getFinanceOverview(period: Period) {
       unitsSold: rc.units,
       grossProfit,
       netProfit,
+      productProfit,
       expenseBreakdown,
       topCategories,
+      operatingCategories,
     },
     today: {
       moneyIn: inToday.total,

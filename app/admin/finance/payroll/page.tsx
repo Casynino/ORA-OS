@@ -17,9 +17,8 @@ export default async function AdminPayrollPage() {
       <PageHeader
         title="Payroll"
         description="Your employees and salaries. Run payroll to pay everyone at once — it's cut from the company as a salaries expense on the pay date."
-      >
-        <FinanceNav />
-      </PageHeader>
+      />
+      <FinanceNav />
       <PayrollManager employees={employees} runs={runs} receivingAccounts={receivingAccounts} canManage />
     </div>
   );
