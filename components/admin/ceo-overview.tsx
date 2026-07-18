@@ -265,46 +265,58 @@ function MiniFigure({ label, value, tone, hint }: { label: string; value: string
 
 const DIST_COLORS = ["hsl(145 65% 52%)", "hsl(199 89% 55%)", "hsl(251 100% 72%)", "hsl(38 95% 60%)"];
 
-export function InventoryOverview({
-  totalValue, totalUnits, distribution,
-}: {
-  totalValue: number; totalUnits: number;
+export type InventoryCounts = {
+  total: number; warehouse: number; reps: number; partner: number; credit: number; distributed: number;
   distribution: { label: string; units: number }[];
-}) {
-  const distTotal = distribution.reduce((s, x) => s + x.units, 0) || 1;
+};
+
+export function InventoryOverview({ totalValue, inv }: { totalValue: number; inv: InventoryCounts }) {
+  const distTotal = inv.distribution.reduce((s, x) => s + x.units, 0) || 1;
+  // Where every unit sits — company-held (warehouse/reps/partners), with customers
+  // on credit (delivered, still owed), and the running total distributed.
+  const cells: { label: string; value: number; color: string | null }[] = [
+    { label: "In warehouse", value: inv.warehouse, color: DIST_COLORS[0] },
+    { label: "With sales reps", value: inv.reps, color: DIST_COLORS[1] },
+    { label: "With partners", value: inv.partner, color: DIST_COLORS[2] },
+    { label: "With customers · on credit", value: inv.credit, color: DIST_COLORS[3] },
+    { label: "Distributed to date", value: inv.distributed, color: null },
+  ];
   return (
     <section>
       <SectionLabel action={
         <span className="flex items-center gap-3">
           <Link href="/admin/warehouses" className="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline">By warehouse</Link>
-          <Link href="/admin/inventory" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">Inventory analytics <ArrowRight className="size-3.5" /></Link>
+          <Link href="/admin/inventory" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">Analytics <ArrowRight className="size-3.5" /></Link>
         </span>
       }>
         Inventory · where every unit is
       </SectionLabel>
-      <div className="glass-card rounded-2xl p-5 sm:p-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">Total stock value · at buying price</p>
-            <p className="mt-1 font-display text-3xl font-bold tracking-tight">{formatCurrency(totalValue)}</p>
-          </div>
+      <div className="glass-card rounded-2xl p-4 sm:p-5">
+        {/* headline: stock value + units, on one line */}
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <p className="font-display text-2xl font-bold tracking-tight">
+            {formatCurrency(totalValue)}
+            <span className="ml-2 text-xs font-normal text-muted-foreground">stock value · at buying price</span>
+          </p>
           <p className="text-sm text-muted-foreground">
-            <Boxes className="mr-1.5 inline size-4" />{formatNumber(totalUnits)} units in stock
+            <Boxes className="mr-1.5 inline size-4" />{formatNumber(inv.total)} units in stock
           </p>
         </div>
-        <div className="mt-5 flex h-3 overflow-hidden rounded-full">
-          {distribution.map((b, i) => (
+        {/* thin distribution bar (current company-held locations) */}
+        <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted">
+          {inv.distribution.map((b, i) => (
             <div key={b.label} style={{ width: `${(b.units / distTotal) * 100}%`, background: DIST_COLORS[i % DIST_COLORS.length] }} title={`${b.label}: ${b.units}`} />
           ))}
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {distribution.map((b, i) => (
-            <div key={b.label}>
+        {/* compact per-location unit counts */}
+        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-5">
+          {cells.map((c) => (
+            <div key={c.label}>
               <div className="flex items-center gap-1.5">
-                <span className="size-2.5 rounded-full" style={{ background: DIST_COLORS[i % DIST_COLORS.length] }} />
-                <span className="truncate text-xs text-muted-foreground">{b.label}</span>
+                {c.color ? <span className="size-2 rounded-full" style={{ background: c.color }} /> : <span className="size-2 rounded-full bg-muted-foreground/40" />}
+                <span className="truncate text-[11px] text-muted-foreground">{c.label}</span>
               </div>
-              <p className="mt-0.5 font-display text-lg font-bold">{formatNumber(b.units)}</p>
+              <p className="mt-0.5 font-display text-lg font-bold">{formatNumber(c.value)}</p>
             </div>
           ))}
         </div>
