@@ -6,16 +6,21 @@ import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { refCode, formatCurrency } from "@/lib/utils";
-import { EXPENSE_CATEGORY_VALUES, EXPENSE_LABELS } from "@/lib/expense-categories";
+import { EXPENSE_CATEGORY_VALUES, EXPENSE_LABELS, OFFICE_FUND_CATEGORIES } from "@/lib/expense-categories";
 import { resolveReceivingAccount, METHOD_LABEL } from "@/lib/payment-methods";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
+import type { ExpenseCategory } from "@prisma/client";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Operational Fund — the single pool the CEO allocates to Finance for daily
-//  operations. Finance requests funds → CEO approves (adds to the balance) →
-//  Finance records spending (auto-reduces the balance) → when low, request more.
-//  Funding never creates an Expense; only actual spend does (source =
-//  OPERATIONAL_FUND), so reports count each shilling exactly once.
+//  operations. Finance builds a multi-item request → CEO approves & funds it
+//  from a company account (money-out booked NOW — one Expense per line, account
+//  debited) → status ISSUED (awaiting receipt) → Finance confirms receipt (flips
+//  to APPROVED, unlocking the spendable balance) → Finance records spending
+//  (an OperationalSpend accountability record that draws the balance down but is
+//  NOT additional money-out — the allocation already expensed it). A recalled/
+//  rejected ISSUED request deletes exactly its allocation Expense rows to
+//  reverse the money-out. Money-out invariant preserved: Σ Expense.amount, once.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function revalidateFund() {
@@ -34,14 +39,31 @@ function revalidateFund() {
 
 // ── Funding requests ────────────────────────────────────────────────────────
 
-const requestSchema = z.object({
+// The Operational Fund is petty cash — it covers day-to-day office spending only,
+// never capitalised stock, salaries or imports. Enforcing this at the action
+// keeps a fund allocation from ever being filed as STOCK_PURCHASE (which the P&L
+// treats as inventory), regardless of what a client might submit.
+const OFFICE_FUND_SET = new Set<ExpenseCategory>(OFFICE_FUND_CATEGORIES);
+const fundCategory = z
+  .enum(EXPENSE_CATEGORY_VALUES)
+  .default("OFFICE")
+  .refine((c) => OFFICE_FUND_SET.has(c), "That category isn't available for the Operational Fund.");
+
+const itemSchema = z.object({
+  category: fundCategory,
+  customCategory: z.string().max(60).optional().or(z.literal("")),
+  description: z.string().trim().min(2, "Describe the item.").max(200),
   amount: z.number().int().positive("Enter an amount.").max(1000000000),
-  purpose: z.string().trim().min(3, "What are the funds for?").max(300),
-  category: z.enum(EXPENSE_CATEGORY_VALUES).default("OFFICE"),
+});
+const requestSchema = z.object({
+  purpose: z.string().trim().min(3, "What is this request for?").max(300),
+  items: z.array(itemSchema).min(1, "Add at least one item.").max(50),
   note: z.string().max(500).optional().or(z.literal("")),
 });
 
-/** Finance requests an allocation to the Operational Fund — goes to the CEO. */
+/** Finance builds a multi-item allocation request → goes to the CEO. The request
+ *  total is the sum of its line items; each line carries its own category so the
+ *  eventual allocation expense is filed correctly per line. */
 export async function requestOperationalFunds(
   input: z.infer<typeof requestSchema>,
 ): Promise<ActionResult<{ code: string }>> {
@@ -50,14 +72,23 @@ export async function requestOperationalFunds(
     const parsed = requestSchema.safeParse(input);
     if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid request.");
     const d = parsed.data;
+    const total = d.items.reduce((s, it) => s + it.amount, 0);
     const req = await prisma.pettyCashRequest.create({
       data: {
         code: refCode("OF"),
-        amount: d.amount,
+        amount: total,
         purpose: d.purpose,
-        category: d.category,
+        category: d.items[0].category, // representative; each item carries its own
         note: d.note?.trim() || null,
         requestedById: actor.id,
+        items: {
+          create: d.items.map((it) => ({
+            category: it.category,
+            customCategory: it.customCategory?.trim() || null,
+            description: it.description,
+            amount: it.amount,
+          })),
+        },
       },
     });
     await logActivity({
@@ -66,7 +97,7 @@ export async function requestOperationalFunds(
       action: "OPERATIONAL_FUND_REQUESTED",
       entity: "PettyCashRequest",
       entityId: req.code,
-      summary: `${actor.name} requested ${formatCurrency(d.amount)} for the Operational Fund (${req.code}, ${EXPENSE_LABELS[d.category]}) — awaiting CEO approval.`,
+      summary: `${actor.name} requested ${formatCurrency(total)} for the Operational Fund (${req.code}, ${d.items.length} item${d.items.length === 1 ? "" : "s"}) — awaiting CEO approval.`,
     });
     revalidateFund();
     return ok({ code: req.code }, `${req.code} sent to the CEO for approval.`);
@@ -75,10 +106,22 @@ export async function requestOperationalFunds(
   }
 }
 
-/** CEO approves — the allocation is treated as money leaving the company into
- *  the fund, so it's booked as a Company Expense IMMEDIATELY (money-out + cash
- *  down in the CEO's reports) and added to the fund balance to spend down. The
- *  CEO names the account the money is issued FROM, so it draws that balance down. */
+// The allocation lines to expense for a request: its line items, or a single
+// line for a legacy (itemless) request. Each becomes one OPERATIONAL_FUND Expense.
+type AllocLine = { category: ExpenseCategory; customCategory: string | null; description: string; amount: number };
+function requestLines(req: {
+  category: ExpenseCategory; purpose: string; amount: number;
+  items?: { category: ExpenseCategory; customCategory: string | null; description: string; amount: number }[];
+}): AllocLine[] {
+  if (req.items && req.items.length > 0)
+    return req.items.map((it) => ({ category: it.category, customCategory: it.customCategory, description: it.description, amount: it.amount }));
+  return [{ category: req.category, customCategory: null, description: req.purpose, amount: req.amount }];
+}
+
+/** CEO approves & FUNDS the request from a chosen company account. The money
+ *  leaves the account NOW — one Company Expense per line (money-out booked
+ *  immediately). The request goes to ISSUED (awaiting Finance's receipt
+ *  confirmation) and is NOT yet spendable; Finance confirms to unlock it. */
 export async function approveOperationalFundRequest(
   id: string,
   paymentAccountId?: string | null,
@@ -87,37 +130,40 @@ export async function approveOperationalFundRequest(
     const admin = await requireActor(["ADMIN"]);
     const req = await prisma.pettyCashRequest.findUnique({
       where: { id },
-      include: { requestedBy: { select: { name: true } } },
+      include: { requestedBy: { select: { name: true } }, items: true },
     });
     if (!req) return fail("Request not found.");
 
     await prisma.$transaction(async (tx) => {
+      // Validate the source account first so a bad account rolls the whole
+      // approval back (rejects unknown/deactivated).
+      const account = await resolveReceivingAccount(tx, paymentAccountId || null, null);
       // Atomic claim — a request can only be approved once, so the allocation
-      // expense is booked exactly once.
+      // expenses are booked exactly once.
       const claimed = await tx.pettyCashRequest.updateMany({
         where: { id, status: "PENDING" },
-        data: { status: "APPROVED", approvedById: admin.id, approvedAt: new Date() },
+        data: { status: "ISSUED", approvedById: admin.id, approvedAt: new Date(), paymentAccountId: account.paymentAccountId },
       });
       if (claimed.count === 0) throw new Error("This request was already reviewed.");
-      // Validate the source account inside the claim so a bad account rolls the
-      // whole approval back (rejects unknown/deactivated).
-      const account = await resolveReceivingAccount(tx, paymentAccountId || null, null);
-      // The money has left the company's control into the fund → a Company
-      // Expense now. Finance's per-item spends are accountability records
-      // against this float, NOT additional money-out.
-      await tx.expense.create({
-        data: {
-          code: refCode("EXP"),
-          source: "OPERATIONAL_FUND",
-          category: req.category,
-          amount: req.amount,
-          purpose: `Operational Fund ${req.code} — ${req.purpose}`,
-          note: `Allocated to ${req.requestedBy.name}`,
-          paymentMethod: account.method,
-          paymentAccountId: account.paymentAccountId,
-          recordedById: admin.id,
-        },
-      });
+      // Money leaves the company account now — one Expense per line, linked to
+      // the request so a recall can reverse exactly these rows.
+      for (const line of requestLines(req)) {
+        await tx.expense.create({
+          data: {
+            code: refCode("EXP"),
+            source: "OPERATIONAL_FUND",
+            category: line.category,
+            customCategory: line.customCategory,
+            amount: line.amount,
+            purpose: `Operational Fund ${req.code} — ${line.description}`,
+            note: `Allocated to ${req.requestedBy.name}`,
+            paymentMethod: account.method,
+            paymentAccountId: account.paymentAccountId,
+            pettyCashRequestId: req.id,
+            recordedById: admin.id,
+          },
+        });
+      }
     });
 
     await logActivity({
@@ -126,10 +172,10 @@ export async function approveOperationalFundRequest(
       action: "OPERATIONAL_FUND_APPROVED",
       entity: "PettyCashRequest",
       entityId: req.code,
-      summary: `CEO approved ${formatCurrency(req.amount)} for the Operational Fund (${req.code}) — booked as a company expense and allocated to ${req.requestedBy.name}.`,
+      summary: `CEO approved & funded ${formatCurrency(req.amount)} for ${req.requestedBy.name} (${req.code}) — money-out booked; awaiting Finance's receipt confirmation.`,
     });
     revalidateFund();
-    return ok(undefined, `${req.code} approved — ${formatCurrency(req.amount)} allocated (recorded as a company expense).`);
+    return ok(undefined, `${req.code} approved — ${formatCurrency(req.amount)} sent; awaiting Finance confirmation.`);
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -165,14 +211,14 @@ export async function rejectOperationalFundRequest(id: string, note?: string): P
 const issueSchema = z.object({
   amount: z.number().int().positive("Enter an amount.").max(1000000000),
   purpose: z.string().trim().min(3, "What are the funds for?").max(300),
-  category: z.enum(EXPENSE_CATEGORY_VALUES).default("OFFICE"),
+  category: fundCategory,
   paymentAccountId: z.string().optional().or(z.literal("")), // account the money is issued FROM
   note: z.string().max(500).optional().or(z.literal("")),
 });
 
-/** CEO pushes funds to Finance without waiting for a request. The money is NOT
- *  booked as an expense yet — Finance must confirm receipt first (so nothing
- *  leaves the company's books until the cash is actually in hand). */
+/** CEO pushes funds to Finance without waiting for a request. Money leaves the
+ *  chosen account NOW (Expense booked), status ISSUED — Finance confirms receipt
+ *  to unlock the spendable balance. Same money-out timing as an approval. */
 export async function issueOperationalFunds(
   input: z.infer<typeof issueSchema>,
 ): Promise<ActionResult<{ code: string }>> {
@@ -181,75 +227,102 @@ export async function issueOperationalFunds(
     const parsed = issueSchema.safeParse(input);
     if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid amount.");
     const d = parsed.data;
-    // Validate + record the source account the CEO is issuing from.
-    const account = await resolveReceivingAccount(prisma, d.paymentAccountId || null, null);
-    const req = await prisma.pettyCashRequest.create({
-      data: {
-        code: refCode("OF"),
-        amount: d.amount,
-        purpose: d.purpose,
-        category: d.category,
-        status: "ISSUED",
-        note: d.note?.trim() || null,
-        requestedById: admin.id,
-        approvedById: admin.id,
-        approvedAt: new Date(),
-        paymentAccountId: account.paymentAccountId,
-      },
+    let code = "";
+    await prisma.$transaction(async (tx) => {
+      const account = await resolveReceivingAccount(tx, d.paymentAccountId || null, null);
+      const req = await tx.pettyCashRequest.create({
+        data: {
+          code: refCode("OF"),
+          amount: d.amount,
+          purpose: d.purpose,
+          category: d.category,
+          status: "ISSUED",
+          note: d.note?.trim() || null,
+          requestedById: admin.id,
+          approvedById: admin.id,
+          approvedAt: new Date(),
+          paymentAccountId: account.paymentAccountId,
+        },
+      });
+      code = req.code;
+      // Money-out now — drawing down the chosen account.
+      await tx.expense.create({
+        data: {
+          code: refCode("EXP"),
+          source: "OPERATIONAL_FUND",
+          category: d.category,
+          amount: d.amount,
+          purpose: `Operational Fund ${req.code} — ${d.purpose}`,
+          note: `Issued by CEO — awaiting Finance confirmation`,
+          paymentMethod: account.method,
+          paymentAccountId: account.paymentAccountId,
+          pettyCashRequestId: req.id,
+          recordedById: admin.id,
+        },
+      });
     });
     await logActivity({
       actorId: admin.id,
       actorName: admin.name,
       action: "OPERATIONAL_FUND_ISSUED",
       entity: "PettyCashRequest",
-      entityId: req.code,
-      summary: `CEO issued ${formatCurrency(d.amount)} to the Operational Fund (${req.code}) — awaiting Finance's receipt confirmation.`,
+      entityId: code,
+      summary: `CEO issued ${formatCurrency(d.amount)} to the Operational Fund (${code}) — money-out booked; awaiting Finance's receipt confirmation.`,
     });
     revalidateFund();
-    return ok({ code: req.code }, `${formatCurrency(d.amount)} issued — Finance will confirm receipt.`);
+    return ok({ code }, `${formatCurrency(d.amount)} issued — Finance will confirm receipt.`);
   } catch (e) {
     return fail(errorMessage(e));
   }
 }
 
-/** Finance confirms it received the CEO-issued funds. Only now is the allocation
- *  booked as a Company Expense (money out) and added to the spendable balance —
- *  exactly like an approved request, just triggered from the receiving side. */
+/** Finance confirms it received the funds — flips ISSUED → APPROVED, unlocking
+ *  the spendable balance. The allocation expense was already booked at approval/
+ *  issue, so nothing new is booked (except for legacy ISSUED rows created before
+ *  debit-at-approval, which have no expense yet — booked here as a fallback). */
 export async function confirmOperationalFundReceipt(id: string): Promise<ActionResult> {
   try {
     const actor = await requireActor(["FINANCE", "ADMIN"]);
     const req = await prisma.pettyCashRequest.findUnique({
       where: { id },
-      include: { paymentAccount: { select: { type: true } } },
+      include: {
+        items: true,
+        paymentAccount: { select: { type: true } },
+        allocationExpenses: { select: { id: true } },
+      },
     });
     if (!req) return fail("Funding record not found.");
     if (req.status !== "ISSUED")
       return fail("These funds were already confirmed or cancelled.");
 
     await prisma.$transaction(async (tx) => {
-      // Atomic claim so the allocation expense is booked exactly once even if
-      // two confirmations race.
       const claimed = await tx.pettyCashRequest.updateMany({
         where: { id, status: "ISSUED" },
         data: { status: "APPROVED" },
       });
       if (claimed.count === 0) throw new Error("These funds were already confirmed.");
-      // Money-out now — draws down the account the CEO issued from. Look up the
-      // method label directly (don't re-validate active: the money's committed).
-      const method = req.paymentAccount ? METHOD_LABEL[req.paymentAccount.type] ?? req.paymentAccount.type : null;
-      await tx.expense.create({
-        data: {
-          code: refCode("EXP"),
-          source: "OPERATIONAL_FUND",
-          category: req.category,
-          amount: req.amount,
-          purpose: `Operational Fund ${req.code} — ${req.purpose}`,
-          note: `Issued by CEO · receipt confirmed by ${actor.name}`,
-          paymentMethod: method,
-          paymentAccountId: req.paymentAccountId,
-          recordedById: actor.id,
-        },
-      });
+      // Backward-compat only: a legacy ISSUED row (pre debit-at-approval) has no
+      // allocation expense — book it now so money-out is recorded exactly once.
+      if (req.allocationExpenses.length === 0) {
+        const method = req.paymentAccount ? METHOD_LABEL[req.paymentAccount.type] ?? req.paymentAccount.type : null;
+        for (const line of requestLines(req)) {
+          await tx.expense.create({
+            data: {
+              code: refCode("EXP"),
+              source: "OPERATIONAL_FUND",
+              category: line.category,
+              customCategory: line.customCategory,
+              amount: line.amount,
+              purpose: `Operational Fund ${req.code} — ${line.description}`,
+              note: `Receipt confirmed by ${actor.name}`,
+              paymentMethod: method,
+              paymentAccountId: req.paymentAccountId,
+              pettyCashRequestId: req.id,
+              recordedById: actor.id,
+            },
+          });
+        }
+      }
     });
 
     await logActivity({
@@ -258,7 +331,7 @@ export async function confirmOperationalFundReceipt(id: string): Promise<ActionR
       action: "OPERATIONAL_FUND_CONFIRMED",
       entity: "PettyCashRequest",
       entityId: req.code,
-      summary: `${actor.name} confirmed receipt of ${formatCurrency(req.amount)} (${req.code}) — booked as a company expense and added to the fund.`,
+      summary: `${actor.name} confirmed receipt of ${formatCurrency(req.amount)} (${req.code}) — the fund is now spendable.`,
     });
     revalidateFund();
     return ok(undefined, `Receipt confirmed — ${formatCurrency(req.amount)} added to the fund.`);
@@ -267,29 +340,35 @@ export async function confirmOperationalFundReceipt(id: string): Promise<ActionR
   }
 }
 
-/** CEO cancels a not-yet-confirmed issue (mistake / duplicate). No expense was
- *  ever booked, so there's nothing to reverse — just mark it rejected. */
+/** CEO recalls a not-yet-confirmed allocation (mistake / Finance didn't receive
+ *  it). The money-out was booked at approval/issue, so this DELETES exactly the
+ *  linked allocation expenses to return the funds to the account, then rejects. */
 export async function cancelIssuedFund(id: string): Promise<ActionResult> {
   try {
     const admin = await requireActor(["ADMIN"]);
     const req = await prisma.pettyCashRequest.findUnique({ where: { id } });
     if (!req) return fail("Funding record not found.");
-    const cancelled = await prisma.pettyCashRequest.updateMany({
-      where: { id, status: "ISSUED" },
-      data: { status: "REJECTED", adminNote: "Issue cancelled by CEO before confirmation." },
+    let amount = 0;
+    await prisma.$transaction(async (tx) => {
+      const cancelled = await tx.pettyCashRequest.updateMany({
+        where: { id, status: "ISSUED" },
+        data: { status: "REJECTED", adminNote: "Recalled by CEO before confirmation." },
+      });
+      if (cancelled.count === 0) throw new Error("These funds were already confirmed or cancelled.");
+      // Reverse the money-out: delete exactly this request's allocation expenses.
+      await tx.expense.deleteMany({ where: { pettyCashRequestId: id } });
+      amount = req.amount;
     });
-    if (cancelled.count === 0)
-      return fail("These funds were already confirmed or cancelled.");
     await logActivity({
       actorId: admin.id,
       actorName: admin.name,
       action: "OPERATIONAL_FUND_ISSUE_CANCELLED",
       entity: "PettyCashRequest",
       entityId: req.code,
-      summary: `CEO cancelled the issue of ${formatCurrency(req.amount)} (${req.code}) before Finance confirmed it.`,
+      summary: `CEO recalled ${formatCurrency(amount)} (${req.code}) before confirmation — money-out reversed, funds returned to the account.`,
     });
     revalidateFund();
-    return ok(undefined, "Issue cancelled.");
+    return ok(undefined, "Allocation recalled — funds returned to the account.");
   } catch (e) {
     return fail(errorMessage(e));
   }
