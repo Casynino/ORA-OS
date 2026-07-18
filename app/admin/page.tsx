@@ -93,10 +93,10 @@ export default async function AdminCommandCenter() {
               <span className="min-w-0 truncate">{dateLabel}</span>
             </p>
             <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight sm:text-4xl">
-              {greeting}, {firstName} 👋
+              {greeting}, {firstName}. 👋
             </h1>
             <p className="mt-1.5 max-w-xl text-sm text-white/90 sm:text-base">
-              Here&apos;s ORA at a glance — your money, what&apos;s owed, and what needs a decision today.
+              Here&apos;s what&apos;s happening across ORA today.
             </p>
           </div>
         </div>
