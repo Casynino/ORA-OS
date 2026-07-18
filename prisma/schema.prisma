@@ -1293,6 +1293,7 @@ enum CapitalType {
   PROFIT_REINVESTED
   GRANT
   OTHER
+  WITHDRAWAL // owner takes money out — stored with a NEGATIVE amount so sums net
 }
 
 /// Where an Expense row originated — lets the Operational Fund net only its own
@@ -1475,6 +1476,7 @@ model Expense {
   purpose       String // description of the spend
   paymentMethod String? // cash, mobile money, bank
   source        ExpenseSource   @default(DIRECT) // where it came from (fund / payroll / direct)
+  customCategory String? // free-text label when no preset fits (rolls up under `category`)
   vendor        String? // vendor / recipient (optional)
   receiptRef    String? // receipt / invoice / voucher number
   receiptUrl    String? // uploaded supporting document
@@ -1496,9 +1498,10 @@ model CapitalEntry {
   id           String      @id @default(cuid())
   code         String      @unique
   type         CapitalType
-  amount       Int // whole TSh
+  amount       Int // whole TSh — NEGATIVE for WITHDRAWAL (owner takes money out)
   source       String // who/where it came from
   note         String?
+  receiptUrl   String? // optional supporting document for the capital movement
   entryDate    DateTime    @default(now())
   recordedBy   User        @relation("CapitalRecorder", fields: [recordedById], references: [id])
   recordedById String

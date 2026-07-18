@@ -4,11 +4,13 @@ import {
   TrendingDown,
   Wallet,
   CreditCard,
-  Package,
   Banknote,
   ArrowRight,
   ShieldCheck,
   PiggyBank,
+  Boxes,
+  Layers,
+  AlertTriangle,
 } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import {
@@ -16,10 +18,16 @@ import {
   getLedger,
   type Period,
 } from "@/lib/services/finance";
+import { getCashSummary } from "@/lib/services/cash";
 import { PageHeader } from "@/components/ui/page-header";
 import { FinanceNav, PeriodTabs } from "@/components/admin/finance-nav";
 import { StatCard } from "@/components/ui/stat-card";
 import { Progress } from "@/components/ui/progress";
+import {
+  AddExpenseButton,
+  AddCapitalButton,
+  RecordWithdrawalButton,
+} from "@/components/admin/finance-forms";
 import { cn, formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -40,12 +48,19 @@ export default async function AdminFinancePage({
   const { period: raw = "month" } = await searchParams;
   const period = (["today", "week", "month", "all"].includes(raw) ? raw : "month") as Period;
 
-  const [d, recent] = await Promise.all([
+  const [d, recent, cash] = await Promise.all([
     getFinanceOverview(period),
     getLedger("all", 8),
+    getCashSummary(),
   ]);
   const w = d.window;
   const p = d.position;
+  const cashOnHand = cash.onHand.total;
+
+  // Business Capital = the money available to run ORA (all money in − all out).
+  const businessCapital = p.businessCapital;
+  const atLoss = w.netProfit < 0; // this period spent more than it earned
+  const capitalDepleted = businessCapital <= 0;
 
   const health =
     d.healthScore >= 75
@@ -72,44 +87,74 @@ export default async function AdminFinancePage({
 
       <PeriodTabs period={period} basePath="/admin/finance" />
 
-      {/* Overview cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard
-          label={`Income ${PERIOD_LABEL[period]}`}
-          value={formatCurrency(w.income.income)}
-          icon={TrendingUp}
-          accent="success"
-          hint={`cash sales ${formatCurrency(w.income.sales)} · repayments ${formatCurrency(w.income.collections)}`}
-        />
-        <StatCard label={`Expenses ${PERIOD_LABEL[period]}`} value={formatCurrency(w.expenses)} icon={TrendingDown} accent="warning" />
-        <StatCard
-          label={`Net profit ${PERIOD_LABEL[period]}`}
-          value={formatCurrency(w.netProfit)}
-          icon={Wallet}
-          accent={w.netProfit >= 0 ? "primary" : "warning"}
-          hint={`gross ${formatCurrency(w.grossProfit)} − operating costs`}
-        />
-        <StatCard label="Cash available" value={formatCurrency(p.cashAvailable)} icon={Banknote} accent="success" hint="all money in − all money out" />
-        <StatCard
-          label="Credit outstanding"
-          value={formatCurrency(p.creditOutstanding)}
-          icon={CreditCard}
-          accent="warning"
-          hint={
-            <>
-              <span className="block">
-                partners {formatCurrency(p.creditOutstandingPartner)} · rep customers{" "}
-                {formatCurrency(p.creditOutstandingField)}
-              </span>
-              <span className="block">
-                {p.overdueCount > 0
-                  ? `${p.overdueCount} overdue — expected income, not cash`
-                  : "expected income, not cash yet"}
-              </span>
-            </>
-          }
-        />
-        <StatCard label="Stock value (cost)" value={formatCurrency(p.stockValue)} icon={Package} accent="info" hint={`worth ${formatCurrency(p.stockPotentialRevenue)} if all sold`} />
+      {/* Business Capital hero — the money available to run ORA */}
+      <section
+        className={cn(
+          "rounded-2xl border p-5 shadow-soft",
+          capitalDepleted ? "border-destructive/40 bg-destructive/[0.04]" : "border-primary/30 bg-primary/[0.04]",
+        )}
+      >
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Wallet className="size-4 text-primary" /> Business Capital
+            </p>
+            <p className={cn("mt-1 font-display text-4xl font-extrabold tracking-tight", capitalDepleted && "text-destructive")}>
+              {formatCurrency(businessCapital)}
+            </p>
+            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+              The money available to run ORA — all money in − all money out, calculated live so it never drifts.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
+              {/* Show withdrawals as money OUT (add them back to both sides — the
+                  difference is unchanged, so in − out still equals capital). */}
+              <span>Money in (all time): <b className="text-foreground">{formatCurrency(p.allTimeIn + p.capitalWithdrawn)}</b></span>
+              <span>Money out (all time): <b className="text-foreground">{formatCurrency(p.allTimeOut + p.capitalWithdrawn)}</b></span>
+              <span>Invested: <b className="text-success">{formatCurrency(p.capitalInjected)}</b></span>
+              {p.capitalWithdrawn > 0 && (
+                <span>Withdrawn: <b className="text-destructive">{formatCurrency(p.capitalWithdrawn)}</b></span>
+              )}
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-col items-stretch gap-2 lg:w-64">
+            <AddExpenseButton className="w-full rounded-full" />
+            <div className="flex gap-2">
+              <AddCapitalButton className="flex-1 rounded-full" />
+              <RecordWithdrawalButton className="flex-1 rounded-full" />
+            </div>
+            <Link href="/admin/finance/profit" className="inline-flex items-center justify-center gap-1 text-sm font-medium text-primary hover:underline">
+              Full Profit &amp; Loss <ArrowRight className="size-3.5" />
+            </Link>
+          </div>
+        </div>
+        {capitalDepleted && (
+          <p className="mt-3 flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+            <AlertTriangle className="size-4 shrink-0" /> Business Capital is depleted — spending has caught up with income. Add capital or slow spending.
+          </p>
+        )}
+      </section>
+
+      {/* Loss signal */}
+      {atLoss && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-warning/40 bg-warning/[0.06] p-4 text-sm">
+          <AlertTriangle className="size-5 shrink-0 text-warning" />
+          <span className="font-semibold">Operating at a loss {PERIOD_LABEL[period]}</span>
+          <span className="text-muted-foreground">
+            — revenue {formatCurrency(w.revenue)} vs expenses {formatCurrency(w.expenses)} → net {formatCurrency(w.netProfit)}.
+          </span>
+        </div>
+      )}
+
+      {/* Financial health cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Cash on hand" value={formatCurrency(cashOnHand)} icon={Banknote} accent="success" hint="received, not yet banked" />
+        <StatCard label={`Revenue ${PERIOD_LABEL[period]}`} value={formatCurrency(w.revenue)} icon={TrendingUp} accent="success" hint={`${formatNumber(w.unitsSold)} packs sold`} />
+        <StatCard label={`Total expenses ${PERIOD_LABEL[period]}`} value={formatCurrency(w.expenses)} icon={TrendingDown} accent="warning" />
+        <StatCard label={`Gross profit ${PERIOD_LABEL[period]}`} value={formatCurrency(w.grossProfit)} icon={Layers} accent="info" hint="revenue − cost of goods" />
+        <StatCard label={`Net profit ${PERIOD_LABEL[period]}`} value={formatCurrency(w.netProfit)} icon={Wallet} accent={w.netProfit >= 0 ? "primary" : "warning"} hint={atLoss ? "operating at a loss" : "after all costs"} />
+        <StatCard label="Inventory value (cost)" value={formatCurrency(p.stockValue)} icon={Boxes} accent="info" hint={`worth ${formatCurrency(p.stockPotentialRevenue)} sold`} />
+        <StatCard label="Outstanding customer debt" value={formatCurrency(p.creditOutstanding)} icon={CreditCard} accent="warning" hint={p.overdueCount > 0 ? `${p.overdueCount} overdue` : "expected income, not cash"} />
+        <StatCard label="Capital injected" value={formatCurrency(p.capitalInjected)} icon={PiggyBank} accent="info" hint={p.capitalWithdrawn > 0 ? `${formatCurrency(p.capitalWithdrawn)} withdrawn` : "owner + investors"} />
       </div>
 
       {/* Today's cash movement + health */}
@@ -169,10 +214,10 @@ export default async function AdminFinancePage({
             Real cash position
           </h3>
           <div className="mt-2 space-y-1.5 text-sm">
-            <Row label="Cash available" value={formatCurrency(p.cashAvailable)} />
+            <Row label="Business Capital (cash)" value={formatCurrency(p.businessCapital)} />
             <Row label="Tied up in credit" value={formatCurrency(p.creditOutstanding)} muted />
             <Row label="Tied up in stock" value={formatCurrency(p.stockValue)} muted />
-            <Row label="Capital injected (all time)" value={formatCurrency(p.capitalTotal)} muted />
+            <Row label="Net capital (invested − withdrawn)" value={formatCurrency(p.capitalTotal)} muted />
           </div>
         </section>
       </div>
