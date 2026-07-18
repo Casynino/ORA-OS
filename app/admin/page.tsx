@@ -37,11 +37,23 @@ import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { getCommandCenter } from "@/lib/services/command-center";
 import { getOperationalFund } from "@/lib/services/operational-fund";
+import {
+  getCollectionsIntelligence,
+  getCustomerIntelligence,
+  getBusinessTrends,
+} from "@/lib/services/intelligence";
+import {
+  FinancialOverview,
+  CollectionsAndCredit,
+  CustomerIntelligencePanel,
+  RevenueTrends,
+  HumanActivityFeed,
+} from "@/components/admin/command-sections";
 import { productMeta } from "@/lib/product-meta";
 import { KpiCard } from "@/components/admin/kpi-card";
 import { Reveal } from "@/components/ui/reveal";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { BarChart, DonutChart } from "@/components/ui/charts";
+import { DonutChart } from "@/components/ui/charts";
 import { QueueApprove } from "@/components/admin/queue-approve";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -69,7 +81,7 @@ const DIST_COLORS = [
 export default async function AdminCommandCenter() {
   const me = await requireRole("ADMIN");
 
-  const [d, queue] = await Promise.all([
+  const [d, queue, collections, customers, trends] = await Promise.all([
     getCommandCenter(),
     Promise.all([
       prisma.request.findMany({
@@ -90,6 +102,9 @@ export default async function AdminCommandCenter() {
         take: 3,
       }),
     ]),
+    getCollectionsIntelligence(),
+    getCustomerIntelligence(),
+    getBusinessTrends(),
   ]);
   const [pendingRequests, pendingReturns, pendingApplications] = queue;
 
@@ -251,6 +266,19 @@ export default async function AdminCommandCenter() {
         </Reveal>
       )}
 
+      {/* ── CEO financial overview — total revenue, cash vs credit ── */}
+      <FinancialOverview
+        periodLabel="this month"
+        totalRevenue={d.sales.month.revenue}
+        cashRevenue={d.sales.month.cashRevenue}
+        creditRevenue={d.sales.month.creditRevenue}
+        cashCollected={d.sales.month.cashRevenue + d.finance.collectionsMonth}
+        outstanding={d.finance.outstandingCredit + d.finance.fieldOutstanding}
+      />
+
+      {/* ── Collections required + credit monitoring ── */}
+      <CollectionsAndCredit ci={collections} />
+
       {/* ── Inventory: where every unit is ───────────────────── */}
       <section>
         <SectionLabel>Inventory · where every unit is</SectionLabel>
@@ -300,6 +328,9 @@ export default async function AdminCommandCenter() {
           <MiniStat icon={Star} accent="accent" label="Top partner" value={d.sales.topPartner?.name ?? "—"} hint={d.sales.topPartner ? formatCurrency(d.sales.topPartner.value) : "no sales yet"} small />
         </div>
       </section>
+
+      {/* ── Customer intelligence — who ORA sells to ── */}
+      <CustomerIntelligencePanel cust={customers} />
 
       {/* ── Credit & finance ─────────────────────────────────── */}
       <section>
@@ -416,27 +447,11 @@ export default async function AdminCommandCenter() {
       <section>
         <SectionLabel>Financial oversight</SectionLabel>
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-          <div className="glass-card rounded-2xl p-5">
-            <h3 className="flex items-center gap-2 font-display font-semibold">
-              <Banknote className="size-4" /> Financial activity
-            </h3>
-            {d.financialActivity.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">
-                Confirmed sales, deposits, expenses and office fund events will stream here.
-              </p>
-            ) : (
-              <ol className="relative mt-4 space-y-3.5 pl-5">
-                <span className="absolute left-[5px] top-1 h-[calc(100%-0.5rem)] w-px bg-border" />
-                {d.financialActivity.map((a) => (
-                  <li key={a.id} className="relative">
-                    <span className="absolute -left-5 top-1.5 size-2.5 rounded-full bg-success/70" />
-                    <p className="text-sm">{a.summary}</p>
-                    <p className="text-[11px] text-muted-foreground">{timeAgo(a.createdAt)}</p>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </div>
+          <HumanActivityFeed
+            rows={d.financialActivity}
+            title="Financial activity"
+            empty="Confirmed sales, deposits, expenses and fund events will stream here."
+          />
           <div className="space-y-4">
             <div className="glass-card rounded-2xl p-5">
               <h3 className="flex items-center gap-2 font-display font-semibold">
@@ -505,18 +520,8 @@ export default async function AdminCommandCenter() {
         </div>
       </section>
 
-      {/* ── Charts ───────────────────────────────────────────── */}
-      <section className="grid gap-4 lg:grid-cols-3">
-        <Reveal>
-          <TrendCard title="Sales trend" caption={formatCurrency(d.sales.month.revenue) + " this month"} data={d.trends.sales} color="hsl(145 65% 52%)" />
-        </Reveal>
-        <Reveal delay={0.05}>
-          <TrendCard title="Cash collections" caption={formatCurrency(d.finance.collectionsMonth) + " this month"} data={d.trends.collections} color="hsl(199 89% 55%)" />
-        </Reveal>
-        <Reveal delay={0.1}>
-          <TrendCard title="Partner growth" caption={`${formatNumber(d.operations.activePartners)} active partners`} data={d.trends.partners} color="hsl(251 100% 72%)" valueMode="count" />
-        </Reveal>
-      </section>
+      {/* ── Revenue & cash-flow trends (cash vs credit kept apart) ── */}
+      <RevenueTrends trends={trends} />
 
       {/* ── Warehouse overview ───────────────────────────────── */}
       <Reveal>
@@ -624,29 +629,7 @@ export default async function AdminCommandCenter() {
         </Reveal>
 
         <Reveal delay={0.1}>
-          <div className="glass-card rounded-2xl p-5 sm:p-6">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display font-semibold">Live activity</h3>
-              <span className="flex items-center gap-1.5 text-xs font-medium text-success">
-                <span className="size-1.5 animate-pulse rounded-full bg-success" /> Live
-              </span>
-            </div>
-            <div className="mt-4 space-y-3.5">
-              {d.recentActivity.length === 0 ? (
-                <EmptyState icon={ClipboardList} title="Nothing yet" />
-              ) : (
-                d.recentActivity.map((a) => (
-                  <div key={a.id} className="flex gap-3">
-                    <span className="mt-1.5 size-2 shrink-0 rounded-full bg-gradient-to-br from-primary to-accent" />
-                    <div className="min-w-0">
-                      <p className="text-sm leading-snug">{a.summary}</p>
-                      <p className="text-xs text-muted-foreground">{timeAgo(a.createdAt)}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          <HumanActivityFeed rows={d.recentActivity} title="Live activity" live empty="Nothing yet." />
         </Reveal>
       </div>
 
@@ -804,43 +787,6 @@ function QuickAction({ icon: Icon, label, href }: { icon: LucideIcon; label: str
       <Icon className="size-4 text-primary" />
       {label}
     </Link>
-  );
-}
-
-function TrendCard({
-  title,
-  caption,
-  data,
-  color,
-  valueMode = "money",
-}: {
-  title: string;
-  caption: string;
-  data: { label: string; value: number }[];
-  color: string;
-  valueMode?: "money" | "count";
-}) {
-  const bars = data.map((b) => ({
-    label: b.label,
-    value: valueMode === "money" ? Math.round(b.value / 1000) : b.value,
-    color,
-  }));
-  const hasData = bars.some((b) => b.value > 0);
-  return (
-    <div className="glass-card flex h-full flex-col rounded-2xl p-5 sm:p-6">
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="font-display font-semibold">{title}</h3>
-        {valueMode === "money" && <span className="text-[10px] uppercase tracking-wide text-muted-foreground">TSh ’000</span>}
-      </div>
-      <p className="mt-0.5 text-sm text-muted-foreground">{caption}</p>
-      <div className="mt-4 flex-1">
-        {hasData ? (
-          <BarChart data={bars} height={140} showValues={false} />
-        ) : (
-          <div className="flex h-[140px] items-center justify-center text-sm text-muted-foreground">No data yet</div>
-        )}
-      </div>
-    </div>
   );
 }
 
