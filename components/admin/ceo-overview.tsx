@@ -3,7 +3,7 @@ import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
 import {
   Wallet, CreditCard, TrendingUp, Scale, ArrowRight, Star, PackageX,
-  TrendingDown, Boxes, ShoppingCart, ChevronRight,
+  TrendingDown, Boxes, ShoppingCart, ChevronRight, RotateCcw,
   FileBarChart, Users, ShieldAlert, Package, ScrollText, PiggyBank,
 } from "lucide-react";
 import type { CustomerIntelligence } from "@/lib/services/intelligence";
@@ -125,9 +125,11 @@ export function ExecutiveActions() {
 
 export function RevenueCollectionOverview({
   cashRevenue, creditRevenue, collectedMonth, collectionRate, dueThisWeek, overdueTotal, overdueCount,
+  activeCreditCustomers, goodPayers, atRiskCustomers,
 }: {
   cashRevenue: number; creditRevenue: number; collectedMonth: number;
   collectionRate: number; dueThisWeek: number; overdueTotal: number; overdueCount: number;
+  activeCreditCustomers: number; goodPayers: number; atRiskCustomers: number;
 }) {
   const total = cashRevenue + creditRevenue;
   const cashPct = total > 0 ? (cashRevenue / total) * 100 : 0;
@@ -172,6 +174,21 @@ export function RevenueCollectionOverview({
             <MiniFigure label="Collection rate" value={`${collectionRate}%`} tone="info" />
             <MiniFigure label="Due this week" value={formatCurrency(dueThisWeek)} tone="primary" />
             <MiniFigure label="Overdue" value={formatCurrency(overdueTotal)} tone={overdueTotal > 0 ? "danger" : "success"} hint={overdueCount > 0 ? `${overdueCount} past due` : "on track"} />
+          </div>
+          {/* Credit-book health — how the customers on credit are behaving */}
+          <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border/60 pt-4">
+            <div>
+              <p className="font-display text-xl font-bold">{formatNumber(activeCreditCustomers)}</p>
+              <p className="text-[11px] text-muted-foreground">on credit</p>
+            </div>
+            <div>
+              <p className="font-display text-xl font-bold text-success">{formatNumber(goodPayers)}</p>
+              <p className="text-[11px] text-muted-foreground">good standing</p>
+            </div>
+            <div>
+              <p className={cn("font-display text-xl font-bold", atRiskCustomers > 0 ? "text-destructive" : "text-success")}>{formatNumber(atRiskCustomers)}</p>
+              <p className="text-[11px] text-muted-foreground">at risk</p>
+            </div>
           </div>
         </div>
       </div>
@@ -327,31 +344,37 @@ export function CustomerSummaryStrip({ cust }: { cust: CustomerIntelligence }) {
   );
 }
 
-// ── 7 · Product performance — compact ────────────────────────────────────────
+// ── 7 · Product performance — visual product intelligence ────────────────────
 
 type Perf = { name: string; sku: string; qty: number; caption: string } | null | undefined;
 
-export function ProductPerformanceCompact({ best, low, slow }: { best: Perf; low: Perf; slow: Perf }) {
+export function ProductPerformance({
+  best, slow, low, returned, requested,
+}: {
+  best: Perf; slow: Perf; low: Perf; returned: Perf; requested: Perf;
+}) {
   const items: { icon: LucideIcon; accent: string; title: string; p: Perf }[] = [
     { icon: Star, accent: "text-success", title: "Best seller", p: best },
-    { icon: PackageX, accent: "text-warning", title: "Low stock", p: low },
-    { icon: TrendingDown, accent: "text-muted-foreground", title: "Slow moving", p: slow },
+    { icon: TrendingDown, accent: "text-muted-foreground", title: "Slow mover", p: slow },
+    { icon: PackageX, accent: "text-warning", title: "Lowest stock", p: low },
+    { icon: RotateCcw, accent: "text-info", title: "Most returned", p: returned },
+    { icon: ShoppingCart, accent: "text-primary", title: "Most requested", p: requested },
   ];
   return (
     <section>
       <SectionLabel action={<Link href="/admin/products" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">All products <ArrowRight className="size-3.5" /></Link>}>
         Product performance
       </SectionLabel>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {items.map((it) => (
-          <div key={it.title} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-soft">
-            <div className="relative size-12 shrink-0 overflow-hidden rounded-xl bg-muted">
-              {it.p && <Image src={productMeta(it.p.sku).image} alt={it.p.name} fill sizes="48px" className="object-cover" />}
+          <div key={it.title} className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
+            <div className="relative aspect-[4/3] bg-muted">
+              {it.p && <Image src={productMeta(it.p.sku).image} alt={it.p.name} fill sizes="220px" className="object-cover" />}
+              <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur">
+                <it.icon className={cn("size-3", it.accent)} /> {it.title}
+              </span>
             </div>
-            <div className="min-w-0">
-              <p className={cn("flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide", it.accent)}>
-                <it.icon className="size-3" /> {it.title}
-              </p>
+            <div className="p-3">
               <p className="truncate text-sm font-medium">{it.p?.name ?? "—"}</p>
               <p className="truncate text-xs text-muted-foreground">{it.p ? `${formatNumber(it.p.qty)} ${it.p.caption}` : "no data"}</p>
             </div>
