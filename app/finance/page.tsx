@@ -21,6 +21,9 @@ import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { getFinanceOverview, getLedger } from "@/lib/services/finance";
 import { getOperationalFundBalance } from "@/lib/services/operational-fund";
+import { getCollectionsIntelligence } from "@/lib/services/intelligence";
+import { getCashSummary } from "@/lib/services/cash";
+import { CollectionsAndCredit } from "@/components/admin/command-sections";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +57,8 @@ export default async function FinanceDashboardPage() {
     pendingCreditSales,
     pendingRepCollections,
     opFund,
+    collections,
+    cash,
   ] = await Promise.all([
     getFinanceOverview("month"),
     getLedger("month", 8),
@@ -75,9 +80,12 @@ export default async function FinanceDashboardPage() {
       where: { financeStatus: "PENDING", sale: { voided: false } },
     }),
     getOperationalFundBalance(),
+    getCollectionsIntelligence(),
+    getCashSummary(),
   ]);
 
   const fundBalance = opFund.balance;
+  const cashAwaitingDeposit = cash.onHand.total;
   const p = overview.position;
   const w = overview.window;
   const todayCollections = overview.today.moneyIn - overview.today.capitalIn;
@@ -147,7 +155,7 @@ export default async function FinanceDashboardPage() {
             </p>
             <div className="mt-5 grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:gap-8">
               <HeroStat label="Collections today" value={formatCurrency(todayCollections)} sub="customer money in" />
-              <HeroStat label="Paid out today" value={formatCurrency(overview.today.moneyOut)} sub="money out" />
+              <HeroStat label="Cash awaiting deposit" value={formatCurrency(cashAwaitingDeposit)} sub="in hand — bank it" />
               <HeroStat label="Operational Fund" value={formatCurrency(fundBalance)} sub="left to spend" />
               <HeroStat label="Outstanding debt" value={formatCurrency(p.creditOutstanding)} sub="still owed to ORA" />
             </div>
@@ -191,6 +199,9 @@ export default async function FinanceDashboardPage() {
           <StatCard label="Today's payments" value={formatCurrency(overview.today.moneyOut)} hint="money out today" icon={ArrowUpFromLine} accent="warning" />
         </div>
       </section>
+
+      {/* ── Collections & follow-up (due, overdue, performance) ── */}
+      <CollectionsAndCredit ci={collections} creditHref="/finance/credit" />
 
       {/* ── Cash flow + spending composition ─────────────────── */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">

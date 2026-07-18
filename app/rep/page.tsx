@@ -128,6 +128,51 @@ export default async function RepOverviewPage() {
         </div>
       </section>
 
+      {/* Sales performance — cash vs credit + credit to collect */}
+      <section>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Sales performance · this month
+        </h2>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm text-muted-foreground">Sold this month</span>
+              <span className="font-display text-lg font-bold">{formatCurrency(d.salesMonth)}</span>
+            </div>
+            <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-muted">
+              <div className="bg-success" style={{ width: `${d.salesMonth > 0 ? (d.cashSalesMonth / d.salesMonth) * 100 : 0}%` }} />
+              <div className="bg-warning" style={{ width: `${d.salesMonth > 0 ? (d.creditSalesMonth / d.salesMonth) * 100 : 0}%` }} />
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-4">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full bg-success" />
+                  <span className="text-xs text-muted-foreground">Cash sales</span>
+                </div>
+                <p className="mt-0.5 font-display text-base font-bold">{formatCurrency(d.cashSalesMonth)}</p>
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full bg-warning" />
+                  <span className="text-xs text-muted-foreground">Credit sales</span>
+                </div>
+                <p className="mt-0.5 font-display text-base font-bold">{formatCurrency(d.creditSalesMonth)}</p>
+              </div>
+            </div>
+          </div>
+          <Link href="/rep/collections" className="block rounded-2xl border border-border bg-card p-5 shadow-soft transition-transform hover:-translate-y-0.5 hover:border-primary/40">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm text-muted-foreground">Credit still to collect</span>
+              <CreditCard className={cn("size-4", d.creditOutstanding > 0 ? "text-warning" : "text-success")} />
+            </div>
+            <p className="mt-2 font-display text-2xl font-bold">{formatCurrency(d.creditOutstanding)}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {d.openCreditCount} open · {d.overdueCount > 0 ? `${d.overdueCount} overdue — chase now` : "none overdue"}
+            </p>
+          </Link>
+        </div>
+      </section>
+
       {/* Monthly targets */}
       {targets.length > 0 && (
         <Reveal>
