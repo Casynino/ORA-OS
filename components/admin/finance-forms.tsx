@@ -157,12 +157,6 @@ export function AddExpenseButton({
                       placeholder="Amount"
                     />
                   </div>
-                  <Input
-                    value={it.purpose}
-                    onChange={(e) => patch(it.key, { purpose: e.target.value })}
-                    className="mt-2"
-                    placeholder="What it was for (optional)"
-                  />
                 </div>
               ))}
               <div className="flex items-center justify-between">
@@ -556,25 +550,20 @@ export function IssueFundsButton({
             <div className="space-y-2">
               <Label>Items</Label>
               {items.map((it) => (
-                <div key={it.key} className="space-y-2 rounded-xl border border-border p-2.5">
-                  <div className="flex items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                      <Select value={it.category} onChange={(e) => patch(it.key, { category: e.target.value })}>
-                        {OFFICE_FUND_CATEGORIES.map((c) => (
-                          <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
-                        ))}
-                      </Select>
-                    </div>
-                    {items.length > 1 && (
-                      <button type="button" onClick={() => removeItem(it.key)} className="mt-1 rounded-md p-1 text-muted-foreground hover:text-destructive" aria-label="Remove item">
-                        <Trash2 className="size-4" />
-                      </button>
-                    )}
+                <div key={it.key} className="flex items-center gap-2 rounded-xl border border-border p-2.5">
+                  <div className="min-w-0 flex-1">
+                    <Select value={it.category} onChange={(e) => patch(it.key, { category: e.target.value })}>
+                      {OFFICE_FUND_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
+                      ))}
+                    </Select>
                   </div>
-                  <div className="grid grid-cols-[1fr_8rem] gap-2">
-                    <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What it's for (optional)" className="h-9" />
-                    <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="h-9" />
-                  </div>
+                  <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="w-28 shrink-0" />
+                  {items.length > 1 && (
+                    <button type="button" onClick={() => removeItem(it.key)} className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-destructive" aria-label="Remove item">
+                      <Trash2 className="size-4" />
+                    </button>
+                  )}
                 </div>
               ))}
               <Button size="sm" variant="outline" className="rounded-full" onClick={addItem}>
