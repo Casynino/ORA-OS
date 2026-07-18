@@ -160,22 +160,31 @@ export default async function AccountLedgerPage({
         <ArrowLeft className="size-4" /> All accounts
       </Link>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <Icon className="size-6" />
-        </span>
-        <div>
-          <h1 className="flex items-center gap-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">
-            {account.name}
-            {!account.isActive && <Badge variant="secondary">inactive</Badge>}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {TYPE_LABEL[account.type]}
-            {account.accountName ? ` · ${account.accountName}` : ""}
-            {account.accountNumber
-              ? ` · ${account.type === "MOBILE_MONEY" ? "Lipa" : "A/C"} ${account.accountNumber}`
-              : ""}
-          </p>
+      {/* Banking-style account card */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-accent to-primary p-5 text-white shadow-glow sm:p-6">
+        <div className="absolute inset-0 bg-grid opacity-20" />
+        <div className="pointer-events-none absolute -right-10 -top-14 size-44 rounded-full bg-white/15 blur-3xl" />
+        <div className="relative flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold">
+              <Icon className="size-3.5" /> {TYPE_LABEL[account.type]}
+            </span>
+            <h1 className="mt-2 flex flex-wrap items-center gap-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">
+              {account.name}
+              {!account.isActive && <Badge variant="secondary">inactive</Badge>}
+            </h1>
+            {account.accountName && <p className="text-sm text-white/80">{account.accountName}</p>}
+            {account.accountNumber && (
+              <p className="mt-1 font-mono text-sm tracking-[0.2em] text-white/90">
+                {account.type === "MOBILE_MONEY" ? "LIPA" : "A/C"} ···· ···· {account.accountNumber.slice(-4)}
+              </p>
+            )}
+          </div>
+          <div className="text-right">
+            <p className="text-[11px] uppercase tracking-wide text-white/70">Received all-time</p>
+            <p className="font-display text-3xl font-extrabold tracking-tight">{formatCurrency(total)}</p>
+            <p className="text-xs text-white/70">{formatNumber(rows.length)} transactions</p>
+          </div>
         </div>
       </div>
 
@@ -209,7 +218,7 @@ export default async function AccountLedgerPage({
               {rows.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell data-cardtitle className="text-sm">{formatDateTime(r.at)}</TableCell>
-                  <TableCell data-label="Type" className="text-sm">{r.kind}</TableCell>
+                  <TableCell data-label="Type"><Badge variant="secondary" className="text-[11px]">{r.kind}</Badge></TableCell>
                   <TableCell data-label="Customer" className="text-sm font-medium">{r.customer}</TableCell>
                   <TableCell data-label="Sales rep" className="text-sm text-muted-foreground">{r.rep ?? "—"}</TableCell>
                   <TableCell data-label="Amount" className="text-right font-semibold text-success">
