@@ -337,10 +337,27 @@ export async function getCommandCenter() {
   const repUnits =
     (repStockAgg._sum.sellableQty ?? 0) + (repStockAgg._sum.sampleQty ?? 0);
   const partnerCommittedUnits = Math.max(0, assignedUnits - repUnits);
-  const creditUnits = creditAccounts.reduce(
+  // Units out with customers on CREDIT (delivered, still owed) — BOTH channels:
+  // partner credit orders AND field/rep credit sales still open. Drops out when a
+  // sale is fully paid (creditStatus leaves PENDING/PARTIAL/OVERDUE) or voided.
+  const partnerCreditUnits = creditAccounts.reduce(
     (s, c) => s + c.request.items.reduce((t, i) => t + i.quantity, 0),
     0,
   );
+  const fieldCreditUnitsAgg = await prisma.fieldSaleItem.aggregate({
+    _sum: { quantity: true },
+    where: {
+      sale: {
+        is: {
+          type: "CREDIT",
+          voided: false,
+          financeStatus: "APPROVED",
+          creditStatus: { in: ["PENDING", "PARTIAL", "OVERDUE"] },
+        },
+      },
+    },
+  });
+  const creditUnits = partnerCreditUnits + (fieldCreditUnitsAgg._sum.quantity ?? 0);
   const totalInventory = warehouseUnits + assignedUnits;
 
   // Per-warehouse on-hand for the distribution view. Only buckets that are
