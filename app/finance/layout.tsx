@@ -11,32 +11,35 @@ import {
 const nav: NavGroup[] = [
   { items: [{ href: "/finance", label: "Dashboard", icon: "dashboard" }] },
   {
-    label: "Customers & credit",
+    label: "Customers",
     items: [
-      { href: "/finance/applications", label: "Partner applications", icon: "customers" },
-      { href: "/finance/customers", label: "Customer database", icon: "customers" },
-      { href: "/finance/partners", label: "Partner accounts", icon: "customers" },
-      { href: "/finance/credit", label: "Debt & settlements", icon: "credit" },
+      { href: "/finance/customers", label: "Customers", icon: "customers" },
+      { href: "/finance/applications", label: "Applications", icon: "customers" },
+      { href: "/finance/partners", label: "Partners", icon: "customers" },
     ],
   },
   {
-    label: "Verification",
+    label: "Verify",
     items: [
       { href: "/finance/sales-approvals", label: "Sales approvals", icon: "sales" },
-      { href: "/finance/payments", label: "Payment confirmations", icon: "payments" },
+      { href: "/finance/payments", label: "Payments", icon: "payments" },
       { href: "/finance/returns", label: "Returns", icon: "warehouses" },
     ],
   },
   {
-    label: "Operations",
+    label: "Money",
     items: [
-      { href: "/finance/cash", label: "Cash on hand & deposits", icon: "settlements" },
+      { href: "/finance/cash", label: "Cash & deposits", icon: "settlements" },
       { href: "/finance/operational-fund", label: "Operational Fund", icon: "finance" },
     ],
   },
   {
-    label: "Reporting",
-    items: [{ href: "/finance/reports", label: "Financial reports", icon: "reports" }],
+    label: "Credit",
+    items: [{ href: "/finance/credit", label: "Debts & settlements", icon: "credit" }],
+  },
+  {
+    label: "Reports",
+    items: [{ href: "/finance/reports", label: "Reports", icon: "reports" }],
   },
 ];
 
