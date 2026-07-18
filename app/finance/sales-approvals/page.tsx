@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Banknote, CreditCard, ClipboardCheck, CheckCircle2 } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
@@ -10,7 +11,8 @@ import {
   SaleApprovalActions,
   CollectionApprovalActions,
 } from "@/components/finance/sales-approval-actions";
-import { formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
+import { cn, formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
+import type { FinanceApproval } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -21,29 +23,65 @@ function isDirectPayment(method: string | null): boolean {
   return !!method && /bank|mobile|lipa|transfer|cheque|chek|m-?pesa|tigo|airtel|voda|halo|nmb/i.test(method);
 }
 
+// Finance acts on rep records; a record is PENDING → APPROVED / REJECTED. The
+// default view is the actionable queue (everything still pending), newest
+// first, so fresh requests are never buried under old ones.
+const FILTERS = [
+  { key: "new", label: "New requests" },
+  { key: "approved", label: "Approved" },
+  { key: "rejected", label: "Rejected" },
+  { key: "all", label: "All" },
+] as const;
+type FilterKey = (typeof FILTERS)[number]["key"];
+const STATUS_FOR: Record<Exclude<FilterKey, "all">, FinanceApproval> = {
+  new: "PENDING",
+  approved: "APPROVED",
+  rejected: "REJECTED",
+};
+
 /**
  * Finance verification queue — no rep-recorded shilling becomes official
- * company money until it's confirmed here.
+ * company money until it's confirmed here. Filterable by status; opens on the
+ * new/pending queue with the newest requests on top.
  */
-export default async function FinanceSalesApprovalsPage() {
+export default async function FinanceSalesApprovalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
   await requireRole("FINANCE");
+  const { status: raw = "new" } = await searchParams;
+  const filter = (FILTERS.some((f) => f.key === raw) ? raw : "new") as FilterKey;
+  const statusWhere =
+    filter === "all" ? {} : { financeStatus: STATUS_FOR[filter] };
+  const listLimit = filter === "new" ? 200 : 60;
 
-  const [pendingSales, pendingCollections, recentReviewed] = await Promise.all([
+  const [
+    sales,
+    collections,
+    pendingSaleGroups,
+    pendingCollAgg,
+    recentReviewed,
+  ] = await Promise.all([
     prisma.fieldSale.findMany({
-      where: { financeStatus: "PENDING", voided: false },
-      orderBy: { createdAt: "asc" },
+      where: { voided: false, ...statusWhere },
+      orderBy: { createdAt: "desc" }, // newest first — the whole point
+      take: listLimit,
       include: {
         rep: { select: { name: true } },
         customer: { select: { id: true, name: true, businessName: true, creditSuspended: true } },
         paymentAccount: { select: { id: true, name: true, accountNumber: true } },
+        financeReviewedBy: { select: { name: true } },
         items: { include: { product: { select: { name: true } } } },
       },
     }),
     prisma.fieldPayment.findMany({
-      where: { financeStatus: "PENDING", sale: { voided: false } },
-      orderBy: { createdAt: "asc" },
+      where: { sale: { voided: false }, ...statusWhere },
+      orderBy: { createdAt: "desc" },
+      take: listLimit,
       include: {
         recordedBy: { select: { name: true } },
+        financeReviewedBy: { select: { name: true } },
         paymentAccount: { select: { id: true, name: true, accountNumber: true } },
         sale: {
           include: {
@@ -53,31 +91,50 @@ export default async function FinanceSalesApprovalsPage() {
         },
       },
     }),
-    prisma.fieldSale.findMany({
-      // Genuinely reviewed rows only — a person acted on these. Backfilled
-      // auto-approvals have a null financeReviewedAt and don't belong here.
-      where: {
-        financeStatus: { in: ["APPROVED", "REJECTED"] },
-        voided: false,
-        financeReviewedAt: { not: null },
-      },
-      orderBy: { financeReviewedAt: "desc" },
-      take: 10,
-      include: {
-        rep: { select: { name: true } },
-        customer: { select: { name: true } },
-        financeReviewedBy: { select: { name: true } },
-      },
+    // Always-on "needs action" counts for the KPI cards, independent of filter.
+    prisma.fieldSale.groupBy({
+      by: ["type"],
+      where: { financeStatus: "PENDING", voided: false },
+      _count: { _all: true },
+      _sum: { total: true },
     }),
+    prisma.fieldPayment.aggregate({
+      where: { financeStatus: "PENDING", sale: { voided: false } },
+      _count: true,
+      _sum: { amount: true },
+    }),
+    filter === "new"
+      ? prisma.fieldSale.findMany({
+          where: {
+            financeStatus: { in: ["APPROVED", "REJECTED"] },
+            voided: false,
+            financeReviewedAt: { not: null },
+          },
+          orderBy: { financeReviewedAt: "desc" },
+          take: 10,
+          include: {
+            rep: { select: { name: true } },
+            customer: { select: { name: true } },
+            financeReviewedBy: { select: { name: true } },
+          },
+        })
+      : Promise.resolve([]),
   ]);
 
-  const cashPending = pendingSales.filter((s) => s.type === "CASH");
-  const creditPending = pendingSales.filter((s) => s.type === "CREDIT");
+  const cashGroup = pendingSaleGroups.find((g) => g.type === "CASH");
+  const creditGroup = pendingSaleGroups.find((g) => g.type === "CREDIT");
+  const cashPendingCount = cashGroup?._count._all ?? 0;
+  const creditPendingCount = creditGroup?._count._all ?? 0;
+  const collPendingCount = pendingCollAgg._count;
+  const totalPending = cashPendingCount + creditPendingCount + collPendingCount;
+
+  const cashSales = sales.filter((s) => s.type === "CASH");
+  const creditSales = sales.filter((s) => s.type === "CREDIT");
 
   // Credit context: each customer's existing outstanding across their already
   // APPROVED credit sales — so finance sees total exposure before approving.
   const creditCustomerIds = [
-    ...new Set(creditPending.map((s) => s.customer?.id).filter(Boolean)),
+    ...new Set(creditSales.map((s) => s.customer?.id).filter(Boolean)),
   ] as string[];
   const priorCredit = creditCustomerIds.length
     ? await prisma.fieldSale.groupBy({
@@ -101,12 +158,35 @@ export default async function FinanceSalesApprovalsPage() {
     }
   }
 
-  const saleCard = (s: (typeof pendingSales)[number]) => (
+  const reviewedTag = (s: {
+    financeStatus: FinanceApproval;
+    financeReviewedBy: { name: string } | null;
+    financeReviewedAt: Date | null;
+  }) => (
+    <div className="flex shrink-0 flex-col items-end gap-1">
+      <Badge variant={s.financeStatus === "APPROVED" ? "success" : "destructive"}>
+        {s.financeStatus.toLowerCase()}
+      </Badge>
+      {s.financeReviewedBy && (
+        <span className="text-[11px] text-muted-foreground">
+          {s.financeReviewedBy.name}
+          {s.financeReviewedAt ? ` · ${timeAgo(s.financeReviewedAt)}` : ""}
+        </span>
+      )}
+    </div>
+  );
+
+  const saleCard = (s: (typeof sales)[number]) => (
     <div
       key={s.id}
-      className={`rounded-2xl border p-4 ${
-        s.type === "CASH" ? "border-warning/30 bg-warning/[0.04]" : "border-info/30 bg-info/[0.04]"
-      }`}
+      className={cn(
+        "rounded-2xl border p-4",
+        s.financeStatus !== "PENDING"
+          ? "border-border bg-card"
+          : s.type === "CASH"
+            ? "border-warning/30 bg-warning/[0.04]"
+            : "border-info/30 bg-info/[0.04]",
+      )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
@@ -127,16 +207,17 @@ export default async function FinanceSalesApprovalsPage() {
                   : ""}
                 {s.reference ? ` · ref ${s.reference}` : ""}
               </p>
-              {isDirectPayment(s.paymentMethod) && (
+              {s.financeStatus === "PENDING" && isDirectPayment(s.paymentMethod) && (
                 <p className="mt-1 text-xs font-medium text-warning">
                   Direct {s.paymentMethod} payment — verify the proof reached ORA&apos;s account before confirming.
                 </p>
               )}
               {s.paymentProofUrl ? (
                 <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2">
-                  <ProofViewer url={s.paymentProofUrl} label="View payment proof" />
+                  <ProofViewer url={s.paymentProofUrl} label="View payment proof" compact />
                 </div>
               ) : (
+                s.financeStatus === "PENDING" &&
                 isDirectPayment(s.paymentMethod) && (
                   <p className="mt-1 text-xs text-destructive">No proof image attached by the rep.</p>
                 )
@@ -145,21 +226,27 @@ export default async function FinanceSalesApprovalsPage() {
           ) : (
             <>
               <p className="mt-1 text-xs text-muted-foreground">
-                Due {s.dueDate ? new Date(s.dueDate).toLocaleDateString("en-GB") : "—"} · verify the customer &amp; terms before approving
+                Due {s.dueDate ? new Date(s.dueDate).toLocaleDateString("en-GB") : "—"}
+                {s.financeStatus === "PENDING" ? " · verify the customer & terms before approving" : ""}
               </p>
-              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-                <span className="text-muted-foreground">
-                  Customer owes{" "}
-                  <span className="font-semibold text-foreground">
-                    {formatCurrency(s.customer ? outstandingByCustomer.get(s.customer.id) ?? 0 : 0)}
-                  </span>{" "}
-                  now → {formatCurrency((s.customer ? outstandingByCustomer.get(s.customer.id) ?? 0 : 0) + s.total)} after this sale
-                </span>
-                {s.customer?.creditSuspended && (
-                  <Badge variant="destructive" className="text-[10px]">credit suspended</Badge>
-                )}
-              </p>
+              {s.financeStatus === "PENDING" && (
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                  <span className="text-muted-foreground">
+                    Customer owes{" "}
+                    <span className="font-semibold text-foreground">
+                      {formatCurrency(s.customer ? outstandingByCustomer.get(s.customer.id) ?? 0 : 0)}
+                    </span>{" "}
+                    now → {formatCurrency((s.customer ? outstandingByCustomer.get(s.customer.id) ?? 0 : 0) + s.total)} after this sale
+                  </span>
+                  {s.customer?.creditSuspended && (
+                    <Badge variant="destructive" className="text-[10px]">credit suspended</Badge>
+                  )}
+                </p>
+              )}
             </>
+          )}
+          {s.financeNote && s.financeStatus !== "PENDING" && (
+            <p className="mt-1 text-xs text-muted-foreground">“{s.financeNote}”</p>
           )}
           <ul className="mt-2 space-y-0.5 border-t border-border/40 pt-2">
             {s.items.map((i) => (
@@ -170,80 +257,126 @@ export default async function FinanceSalesApprovalsPage() {
             ))}
           </ul>
         </div>
-        <SaleApprovalActions
-          saleId={s.id}
-          kind={s.type as "CASH" | "CREDIT"}
-          method={s.paymentMethod}
-        />
+        {s.financeStatus === "PENDING" ? (
+          <SaleApprovalActions
+            saleId={s.id}
+            kind={s.type as "CASH" | "CREDIT"}
+            method={s.paymentMethod}
+          />
+        ) : (
+          reviewedTag(s)
+        )}
       </div>
     </div>
   );
+
+  const heading = (icon: React.ReactNode, label: string, count: number) => (
+    <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold">
+      {icon} {label}
+      <span className="text-sm font-normal text-muted-foreground">({formatNumber(count)})</span>
+    </h2>
+  );
+  const emptyFor =
+    filter === "new"
+      ? "Nothing pending here."
+      : filter === "approved"
+        ? "No approved records in this view."
+        : filter === "rejected"
+          ? "No rejected records in this view."
+          : "Nothing here yet.";
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Sales approvals"
-        description="Verify each rep-recorded transaction — nothing becomes official revenue or receivables until you confirm it."
+        description="Verify each rep-recorded transaction — nothing becomes official revenue or receivables until you confirm it. New requests show first."
       />
 
+      {/* Filters — default to the actionable queue */}
+      <div className="flex flex-wrap gap-1.5">
+        {FILTERS.map((f) => {
+          const active = f.key === filter;
+          const badge = f.key === "new" && totalPending > 0 ? totalPending : null;
+          return (
+            <Link
+              key={f.key}
+              href={`/finance/sales-approvals${f.key === "new" ? "" : `?status=${f.key}`}`}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {f.label}
+              {badge !== null && (
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 text-xs font-semibold",
+                    active ? "bg-primary-foreground/20" : "bg-warning/15 text-warning",
+                  )}
+                >
+                  {badge}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Always-on "needs action" KPIs */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           label="Cash sales to verify"
-          value={formatNumber(cashPending.length)}
-          hint={formatCurrency(cashPending.reduce((s, x) => s + x.total, 0))}
+          value={formatNumber(cashPendingCount)}
+          hint={formatCurrency(cashGroup?._sum.total ?? 0)}
           icon={Banknote}
-          accent={cashPending.length > 0 ? "warning" : "success"}
+          accent={cashPendingCount > 0 ? "warning" : "success"}
         />
         <StatCard
           label="Credit sales to review"
-          value={formatNumber(creditPending.length)}
-          hint={formatCurrency(creditPending.reduce((s, x) => s + x.total, 0))}
+          value={formatNumber(creditPendingCount)}
+          hint={formatCurrency(creditGroup?._sum.total ?? 0)}
           icon={CreditCard}
-          accent={creditPending.length > 0 ? "warning" : "success"}
+          accent={creditPendingCount > 0 ? "warning" : "success"}
         />
         <StatCard
           label="Collections to verify"
-          value={formatNumber(pendingCollections.length)}
-          hint={formatCurrency(pendingCollections.reduce((s, x) => s + x.amount, 0))}
+          value={formatNumber(collPendingCount)}
+          hint={formatCurrency(pendingCollAgg._sum.amount ?? 0)}
           icon={ClipboardCheck}
-          accent={pendingCollections.length > 0 ? "warning" : "success"}
+          accent={collPendingCount > 0 ? "warning" : "success"}
         />
       </div>
 
       {/* Cash sales */}
       <section>
-        <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold">
-          <Banknote className="size-5 text-warning" /> Cash sales — verify the money arrived
-        </h2>
-        {cashPending.length === 0 ? (
-          <EmptyState icon={CheckCircle2} title="Nothing to verify" description="New rep cash sales land here for confirmation." />
+        {heading(<Banknote className="size-5 text-warning" />, "Cash sales", cashSales.length)}
+        {cashSales.length === 0 ? (
+          <EmptyState icon={CheckCircle2} title={emptyFor} description="Rep cash sales appear here for confirmation." />
         ) : (
-          <div className="space-y-2">{cashPending.map(saleCard)}</div>
+          <div className="space-y-2">{cashSales.map(saleCard)}</div>
         )}
       </section>
 
       {/* Credit sales */}
       <section>
-        <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold">
-          <CreditCard className="size-5 text-info" /> Credit sales — validate the terms
-        </h2>
-        {creditPending.length === 0 ? (
-          <EmptyState icon={CheckCircle2} title="Nothing to review" description="New rep credit sales land here before they become receivables." />
+        {heading(<CreditCard className="size-5 text-info" />, "Credit sales", creditSales.length)}
+        {creditSales.length === 0 ? (
+          <EmptyState icon={CheckCircle2} title={emptyFor} description="Rep credit sales appear here before they become receivables." />
         ) : (
-          <div className="space-y-2">{creditPending.map(saleCard)}</div>
+          <div className="space-y-2">{creditSales.map(saleCard)}</div>
         )}
       </section>
 
       {/* Collections */}
       <section>
-        <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold">
-          <ClipboardCheck className="size-5 text-primary" /> Collections — verify & post to balances
-        </h2>
-        {pendingCollections.length === 0 ? (
-          <EmptyState icon={CheckCircle2} title="Nothing to post" description="Rep-collected repayments land here before they reduce customer balances." />
+        {heading(<ClipboardCheck className="size-5 text-primary" />, "Collections", collections.length)}
+        {collections.length === 0 ? (
+          <EmptyState icon={CheckCircle2} title={emptyFor} description="Rep-collected repayments appear here before they reduce customer balances." />
         ) : (
           <div className="space-y-2">
-            {pendingCollections.map((p) => (
+            {collections.map((p) => (
               <div key={p.id} className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -268,11 +401,15 @@ export default async function FinanceSalesApprovalsPage() {
                     )}
                     {p.paymentProofUrl && (
                       <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2">
-                        <ProofViewer url={p.paymentProofUrl} label="View payment proof" />
+                        <ProofViewer url={p.paymentProofUrl} label="View payment proof" compact />
                       </div>
                     )}
                   </div>
-                  <CollectionApprovalActions paymentId={p.id} />
+                  {p.financeStatus === "PENDING" ? (
+                    <CollectionApprovalActions paymentId={p.id} />
+                  ) : (
+                    reviewedTag(p)
+                  )}
                 </div>
               </div>
             ))}
@@ -280,8 +417,8 @@ export default async function FinanceSalesApprovalsPage() {
         )}
       </section>
 
-      {/* Recently reviewed */}
-      {recentReviewed.length > 0 && (
+      {/* Recently reviewed — only on the default queue, as a quick glance back */}
+      {filter === "new" && recentReviewed.length > 0 && (
         <section>
           <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-semibold">
             <CheckCircle2 className="size-5 text-success" /> Recently reviewed
