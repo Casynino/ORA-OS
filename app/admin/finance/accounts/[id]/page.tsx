@@ -15,14 +15,20 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { WALKIN_EMAIL } from "@/lib/constants";
-import { formatCurrency, formatDateTime, formatNumber } from "@/lib/utils";
+import { cn, formatCurrency, formatDateTime, formatNumber } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 const TYPE_ICON = { CASH: Banknote, BANK: Landmark, MOBILE_MONEY: Smartphone } as const;
 const TYPE_LABEL = { CASH: "Cash", BANK: "Bank", MOBILE_MONEY: "Mobile Money" } as const;
+const EXPENSE_KIND: Record<string, string> = {
+  DIRECT: "Expense",
+  OPERATIONAL_FUND: "Fund allocation",
+  PAYROLL: "Payroll",
+};
 
-/** Full audit trail of one receiving account — every shilling that landed. */
+/** Full audit trail of one account — every shilling in AND out, netting to a
+ *  true bank balance. */
 export default async function AccountLedgerPage({
   params,
 }: {
@@ -34,9 +40,12 @@ export default async function AccountLedgerPage({
   const account = await prisma.paymentAccount.findUnique({ where: { id } });
   if (!account) notFound();
 
-  const [cashSales, fieldPays, partnerPays, orderPays] = await Promise.all([
+  const [cashSales, fieldPays, partnerPays, orderPays, capital, expenses] = await Promise.all([
     prisma.fieldSale.findMany({
-      where: { paymentAccountId: id, voided: false, financeStatus: "APPROVED" },
+      // type CASH mirrors the list page + accounts service so all three balance
+      // computations stay byte-for-byte aligned (credit field sales are never
+      // account-tagged today, but this keeps them out if that ever changes).
+      where: { paymentAccountId: id, voided: false, financeStatus: "APPROVED", type: "CASH" },
       include: {
         rep: { select: { name: true } },
         customer: { select: { name: true } },
@@ -76,18 +85,28 @@ export default async function AccountLedgerPage({
         reviewedBy: { select: { name: true } },
       },
     }),
+    // Money out / capital in — attributed to this account.
+    prisma.capitalEntry.findMany({
+      where: { paymentAccountId: id },
+      include: { recordedBy: { select: { name: true } } },
+    }),
+    prisma.expense.findMany({
+      where: { paymentAccountId: id },
+      include: { recordedBy: { select: { name: true } } },
+    }),
   ]);
 
   type Row = {
     id: string;
     at: Date;
     kind: string;
-    customer: string;
+    detail: string;
     rep: string | null;
     method: string | null;
     amount: number;
+    out: boolean;
     reference: string | null;
-    saleCode: string;
+    ref: string;
     recordedBy: string;
   };
   const rows: Row[] = [
@@ -95,60 +114,96 @@ export default async function AccountLedgerPage({
       id: `fs-${s.id}`,
       at: s.createdAt,
       kind: "Cash sale",
-      customer: s.customer?.name ?? s.customerName ?? "Walk-in",
+      detail: s.customer?.name ?? s.customerName ?? "Walk-in",
       rep: s.rep.name,
       method: s.paymentMethod,
       amount: s.total,
+      out: false,
       reference: s.reference,
-      saleCode: s.code,
+      ref: s.code,
       recordedBy: s.rep.name,
     })),
     ...fieldPays.map((p) => ({
       id: `fp-${p.id}`,
       at: p.createdAt,
       kind: "Credit collection",
-      customer: p.sale.customer?.name ?? p.sale.customerName ?? "—",
+      detail: p.sale.customer?.name ?? p.sale.customerName ?? "—",
       rep: p.sale.rep.name,
       method: p.method,
       amount: p.amount,
+      out: false,
       reference: p.reference,
-      saleCode: p.sale.code,
+      ref: p.sale.code,
       recordedBy: p.recordedBy.name,
     })),
     ...partnerPays.map((p) => ({
       id: `pp-${p.id}`,
       at: p.createdAt,
       kind: "Partner repayment",
-      customer: p.creditAccount.agent.name,
+      detail: p.creditAccount.agent.name,
       rep: null,
       method: p.method,
       amount: p.amount,
+      out: false,
       reference: p.reference,
-      saleCode: p.creditAccount.request.code,
+      ref: p.creditAccount.request.code,
       recordedBy: p.recordedBy.name,
     })),
     ...orderPays.map((r) => ({
       id: `op-${r.id}`,
       at: r.paidAt ?? r.createdAt,
       kind: r.requester.email === WALKIN_EMAIL ? "Counter sale" : "Order payment",
-      customer:
+      detail:
         r.requester.email === WALKIN_EMAIL
           ? r.deliverTo?.trim() || "Walk-in customer"
           : r.requester.name,
       rep: null,
       method: r.paymentMethod,
       amount: r.totalAmount ?? 0,
+      out: false,
       reference: r.paymentReference,
-      saleCode:
-        r.requester.email === WALKIN_EMAIL ? r.code.replace("REQ", "SALE") : r.code,
+      ref: r.requester.email === WALKIN_EMAIL ? r.code.replace("REQ", "SALE") : r.code,
       recordedBy: r.reviewedBy?.name ?? "—",
+    })),
+    ...capital.map((c) => {
+      const out = c.amount < 0;
+      return {
+        id: `cap-${c.id}`,
+        at: c.entryDate,
+        kind: out ? "Withdrawal" : "Investment",
+        detail: c.source,
+        rep: null,
+        method: null,
+        amount: Math.abs(c.amount),
+        out,
+        reference: null,
+        ref: c.code,
+        recordedBy: c.recordedBy.name,
+      };
+    }),
+    ...expenses.map((e) => ({
+      id: `exp-${e.id}`,
+      at: e.expenseDate,
+      kind: EXPENSE_KIND[e.source] ?? "Expense",
+      detail: e.vendor?.trim() || e.purpose,
+      rep: null,
+      method: e.paymentMethod,
+      amount: e.amount,
+      out: true,
+      reference: e.receiptRef,
+      ref: e.code,
+      recordedBy: e.recordedBy.name,
     })),
   ].sort((a, b) => +b.at - +a.at);
 
-  const total = rows.reduce((s, r) => s + r.amount, 0);
+  const inTotal = rows.filter((r) => !r.out).reduce((s, r) => s + r.amount, 0);
+  const outTotal = rows.filter((r) => r.out).reduce((s, r) => s + r.amount, 0);
+  const balance = inTotal - outTotal;
   const now = new Date();
   const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthIn = rows.filter((r) => r.at >= startMonth).reduce((s, r) => s + r.amount, 0);
+  const monthNet = rows
+    .filter((r) => r.at >= startMonth)
+    .reduce((s, r) => s + (r.out ? -r.amount : r.amount), 0);
   const Icon = TYPE_ICON[account.type];
 
   return (
@@ -181,24 +236,24 @@ export default async function AccountLedgerPage({
             )}
           </div>
           <div className="text-right">
-            <p className="text-[11px] uppercase tracking-wide text-white/70">Received all-time</p>
-            <p className="font-display text-3xl font-extrabold tracking-tight">{formatCurrency(total)}</p>
-            <p className="text-xs text-white/70">{formatNumber(rows.length)} transactions</p>
+            <p className="text-[11px] uppercase tracking-wide text-white/70">Balance</p>
+            <p className="font-display text-3xl font-extrabold tracking-tight">{formatCurrency(balance)}</p>
+            <p className="text-xs text-white/70">in {formatCurrency(inTotal)} · out {formatCurrency(outTotal)}</p>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Received (all time)" value={formatCurrency(total)} accent="success" hint={`${formatNumber(rows.length)} transactions`} />
-        <StatCard label="Received this month" value={formatCurrency(monthIn)} accent="primary" />
-        <StatCard label="Received today" value={formatCurrency(rows.filter((r) => r.at >= new Date(now.getFullYear(), now.getMonth(), now.getDate())).reduce((s, r) => s + r.amount, 0))} accent="info" />
+        <StatCard label="Balance" value={formatCurrency(balance)} accent={balance < 0 ? "warning" : "success"} hint={`${formatNumber(rows.length)} movements`} />
+        <StatCard label="Received (all time)" value={formatCurrency(inTotal)} accent="primary" />
+        <StatCard label="Paid / withdrawn (all time)" value={formatCurrency(outTotal)} accent="warning" hint={`net this month ${formatCurrency(monthNet)}`} />
       </div>
 
       {rows.length === 0 ? (
         <EmptyState
           icon={Banknote}
-          title="No transactions yet"
-          description="Payments received into this account will appear here with the full trail."
+          title="No movements yet"
+          description="Money received into and paid out of this account will appear here with the full trail."
         />
       ) : (
         <div className="rounded-2xl border border-border bg-card">
@@ -207,26 +262,26 @@ export default async function AccountLedgerPage({
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Customer</TableHead>
+                <TableHead>Detail</TableHead>
                 <TableHead>Sales rep</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Reference</TableHead>
-                <TableHead>Related sale</TableHead>
+                <TableHead>Related</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell data-cardtitle className="text-sm">{formatDateTime(r.at)}</TableCell>
-                  <TableCell data-label="Type"><Badge variant="secondary" className="text-[11px]">{r.kind}</Badge></TableCell>
-                  <TableCell data-label="Customer" className="text-sm font-medium">{r.customer}</TableCell>
+                  <TableCell data-label="Type"><Badge variant={r.out ? "warning" : "secondary"} className="text-[11px]">{r.kind}</Badge></TableCell>
+                  <TableCell data-label="Detail" className="text-sm font-medium">{r.detail}</TableCell>
                   <TableCell data-label="Sales rep" className="text-sm text-muted-foreground">{r.rep ?? "—"}</TableCell>
-                  <TableCell data-label="Amount" className="text-right font-semibold text-success">
-                    +{formatCurrency(r.amount)}
+                  <TableCell data-label="Amount" className={cn("text-right font-semibold", r.out ? "text-destructive" : "text-success")}>
+                    {r.out ? "−" : "+"}{formatCurrency(r.amount)}
                   </TableCell>
                   <TableCell data-label="Reference" className="text-sm text-muted-foreground">{r.reference ?? "—"}</TableCell>
-                  <TableCell data-label="Related sale" className="text-sm text-muted-foreground">
-                    {r.saleCode} · by {r.recordedBy}
+                  <TableCell data-label="Related" className="text-sm text-muted-foreground">
+                    {r.ref} · by {r.recordedBy}
                   </TableCell>
                 </TableRow>
               ))}

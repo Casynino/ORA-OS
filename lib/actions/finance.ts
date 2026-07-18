@@ -8,6 +8,7 @@ import { logActivity } from "@/lib/activity";
 import { refCode } from "@/lib/utils";
 import { EXPENSE_CATEGORY_VALUES } from "@/lib/expense-categories";
 import { getBusinessCapital } from "@/lib/services/finance";
+import { resolveReceivingAccount } from "@/lib/payment-methods";
 import { formatCurrency } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
@@ -32,6 +33,7 @@ const expenseSchema = z.object({
   purpose: z.string().min(3, "What was this expense for?").max(200),
   vendor: z.string().max(160).optional().or(z.literal("")),
   paymentMethod: z.string().max(40).optional().or(z.literal("")),
+  paymentAccountId: z.string().optional().or(z.literal("")), // company account paid from
   expenseDate: z.string().optional().or(z.literal("")), // ISO date
   receiptUrl: z.string().max(15000000).optional().or(z.literal("")), // data-URL image ok
   note: z.string().max(500).optional().or(z.literal("")),
@@ -49,6 +51,9 @@ export async function recordExpense(
     if (!parsed.success)
       return fail(parsed.error.issues[0]?.message ?? "Invalid expense.");
     const d = parsed.data;
+    // Validate the source account (rejects unknown/deactivated); null when the
+    // expense was paid outside a tracked account (cheque / other).
+    const account = await resolveReceivingAccount(prisma, d.paymentAccountId || null, d.paymentMethod || null);
     const code = refCode("EXP");
     await prisma.expense.create({
       data: {
@@ -58,7 +63,8 @@ export async function recordExpense(
         amount: d.amount,
         purpose: d.purpose,
         vendor: d.vendor?.trim() || null,
-        paymentMethod: d.paymentMethod || null,
+        paymentMethod: d.paymentMethod || account.method || null,
+        paymentAccountId: account.paymentAccountId,
         expenseDate: d.expenseDate ? new Date(d.expenseDate) : new Date(),
         receiptUrl: d.receiptUrl || null,
         note: d.note || null,
@@ -114,6 +120,7 @@ const capitalSchema = z.object({
   type: z.enum(CAPITAL_TYPES),
   amount: z.number().int().positive().max(10000000000),
   source: z.string().min(2, "Where did this come from / go to?").max(160),
+  paymentAccountId: z.string().optional().or(z.literal("")), // account it lands in / leaves
   entryDate: z.string().optional().or(z.literal("")),
   receiptUrl: z.string().max(15000000).optional().or(z.literal("")),
   note: z.string().max(500).optional().or(z.literal("")),
@@ -142,6 +149,8 @@ export async function recordCapital(
       }
     }
 
+    // Validate the account the money lands in (investment) or leaves (withdrawal).
+    const account = await resolveReceivingAccount(prisma, d.paymentAccountId || null, null);
     const signedAmount = isWithdrawal ? -d.amount : d.amount;
     const code = refCode("CAP");
     await prisma.capitalEntry.create({
@@ -150,6 +159,7 @@ export async function recordCapital(
         type: d.type,
         amount: signedAmount,
         source: d.source,
+        paymentAccountId: account.paymentAccountId,
         entryDate: d.entryDate ? new Date(d.entryDate) : new Date(),
         receiptUrl: d.receiptUrl || null,
         note: d.note || null,
