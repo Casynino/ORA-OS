@@ -174,7 +174,7 @@ export default async function FinanceAccountsPage() {
                                 {a.accountName && <p className="truncate text-xs text-muted-foreground">{a.accountName}</p>}
                                 {a.accountNumber && (
                                   <p className="mt-0.5 font-mono text-xs tracking-wider text-muted-foreground">
-                                    {a.type === "MOBILE_MONEY" ? "Lipa" : "A/C"} ···· {a.accountNumber.slice(-4)}
+                                    {a.type === "MOBILE_MONEY" ? "Lipa" : "A/C"} {a.accountNumber}
                                   </p>
                                 )}
                               </div>
