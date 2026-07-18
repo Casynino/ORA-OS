@@ -102,14 +102,20 @@ export function FinancialOverview({
 
 // ── Collections required + credit monitoring ─────────────────────────────────
 
-export function CollectionsAndCredit({ ci }: { ci: CollectionsIntelligence }) {
+export function CollectionsAndCredit({
+  ci,
+  creditHref = "/admin/credit",
+}: {
+  ci: CollectionsIntelligence;
+  creditHref?: string;
+}) {
   return (
     <section className="space-y-4">
       <SectionLabel>Collections required · money to bring in</SectionLabel>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat icon={CalendarClock} accent="info" label="Due this week" value={formatCurrency(ci.dueThisWeek)} hint="next 7 days" href="/admin/credit" />
-        <Stat icon={CalendarClock} accent="primary" label="Due this month" value={formatCurrency(ci.dueThisMonth)} hint="before month-end" href="/admin/credit" />
-        <Stat icon={AlertTriangle} accent={ci.overdueTotal > 0 ? "danger" : "success"} label="Overdue" value={formatCurrency(ci.overdueTotal)} hint={`${ci.overdueCount} ${ci.overdueCount === 1 ? "customer" : "customers"} past due`} href="/admin/credit" />
+        <Stat icon={CalendarClock} accent="info" label="Due this week" value={formatCurrency(ci.dueThisWeek)} hint="next 7 days" href={creditHref} />
+        <Stat icon={CalendarClock} accent="primary" label="Due this month" value={formatCurrency(ci.dueThisMonth)} hint="before month-end" href={creditHref} />
+        <Stat icon={AlertTriangle} accent={ci.overdueTotal > 0 ? "danger" : "success"} label="Overdue" value={formatCurrency(ci.overdueTotal)} hint={`${ci.overdueCount} ${ci.overdueCount === 1 ? "customer" : "customers"} past due`} href={creditHref} />
         <Stat icon={ShieldCheck} accent="success" label="Collection rate" value={`${ci.collectionRate}%`} hint="collected ÷ billed, all credit" />
       </div>
 
