@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   Banknote,
   Landmark,
-  Wallet,
   ArrowDownToLine,
   ArrowUpFromLine,
   CreditCard,
@@ -12,28 +11,38 @@ import {
   ClipboardCheck,
   AlertTriangle,
   ChevronRight,
+  BadgeCheck,
+  UserCheck,
+  Users,
+  PieChart,
+  type LucideIcon,
 } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { getFinanceOverview, getLedger } from "@/lib/services/finance";
 import { getOperationalFundBalance } from "@/lib/services/operational-fund";
-import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { BarChart } from "@/components/ui/charts";
-import { formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
+import { DonutChart } from "@/components/ui/charts";
+import { Reveal } from "@/components/ui/reveal";
+import { cn, formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-/** The Finance & Accounting dashboard — financial, not operational. */
+const DONUT_COLORS = [
+  "hsl(var(--primary))",
+  "hsl(var(--accent))",
+  "hsl(var(--info))",
+  "hsl(var(--warning))",
+  "hsl(var(--success))",
+  "hsl(280 6% 55%)",
+];
+
+/** The Finance & Accounting dashboard — a premium financial workspace. */
 export default async function FinanceDashboardPage() {
   const me = await requireRole("FINANCE");
-
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 6);
-  weekAgo.setHours(0, 0, 0, 0);
 
   const [
     overview,
@@ -68,10 +77,10 @@ export default async function FinanceDashboardPage() {
     getOperationalFundBalance(),
   ]);
 
-  // Operational Fund balance = CEO-approved funding − operational spend. One
-  // shared pool the CEO tops up and finance spends down, accounting for every
-  // shilling.
   const fundBalance = opFund.balance;
+  const p = overview.position;
+  const w = overview.window;
+  const todayCollections = overview.today.moneyIn - overview.today.capitalIn;
 
   // Weekly cash flow — bucket the ledger into the last 7 days.
   const days: { label: string; in: number; out: number }[] = [];
@@ -84,220 +93,280 @@ export default async function FinanceDashboardPage() {
   for (const e of weekLedger) {
     const at = new Date(e.date);
     at.setHours(0, 0, 0, 0);
-    const idx = days.findIndex(
-      (_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (6 - i));
-        d.setHours(0, 0, 0, 0);
-        return d.getTime() === at.getTime();
-      },
-    );
+    const idx = days.findIndex((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      d.setHours(0, 0, 0, 0);
+      return d.getTime() === at.getTime();
+    });
     if (idx >= 0) {
       if (e.amount >= 0) days[idx].in += e.amount;
       else days[idx].out += -e.amount;
     }
   }
+  const weekMax = Math.max(1, ...days.map((d) => Math.max(d.in, d.out)));
 
-  const todayCollections = overview.today.moneyIn - overview.today.capitalIn;
+  // Greeting + date (Tanzania time, EAT)
+  const eatHour = Number(
+    new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Dar_es_Salaam", hour: "2-digit", hour12: false }).format(new Date()),
+  );
+  const greeting = eatHour >= 5 && eatHour < 12 ? "Good morning" : eatHour >= 12 && eatHour < 17 ? "Good afternoon" : "Good evening";
+  const dateLabel = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Africa/Dar_es_Salaam",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(new Date());
+  const firstName = me.name?.split(" ")[0] ?? "Finance";
+
+  // Spending composition for the donut (this month, by group).
+  const spendSegments = w.expenseBreakdown
+    .map((g, i) => ({ label: g.label, value: g.amount, color: DONUT_COLORS[i % DONUT_COLORS.length] }))
+    .filter((s) => s.value > 0);
+  const spendTotal = spendSegments.reduce((s, x) => s + x.value, 0);
 
   return (
-    <div className="space-y-7">
-      <PageHeader
-        title={`Karibu, ${me.name?.split(" ")[0] ?? "Finance"}`}
-        description="You collect, verify, deposit and follow up ORA's money — the CEO owns the accounts. Here's what needs you today."
-      />
-
-      {/* ── Needs your attention — the finance operations queue ── */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground">Needs your attention</h2>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Link href="/finance/sales-approvals" className="transition-transform hover:-translate-y-0.5">
-            <StatCard
-              label="Pending cash confirmations"
-              value={formatNumber(pendingCashSales)}
-              hint="rep cash sales to receive & bank"
-              icon={Banknote}
-              accent={pendingCashSales > 0 ? "warning" : "success"}
-            />
-          </Link>
-          <Link href="/finance/sales-approvals" className="transition-transform hover:-translate-y-0.5">
-            <StatCard
-              label="Pending credit confirmations"
-              value={formatNumber(pendingCreditSales)}
-              hint="rep credit sales to approve"
-              icon={CreditCard}
-              accent={pendingCreditSales > 0 ? "warning" : "success"}
-            />
-          </Link>
-          <Link href="/finance/payments" className="transition-transform hover:-translate-y-0.5">
-            <StatCard
-              label="Pending customer payments"
-              value={formatNumber(pendingPayments)}
-              hint={claimedPayments > 0 ? `${claimedPayments} claimed — verify the receipt` : "direct payments to verify"}
-              icon={ClipboardCheck}
-              accent={pendingPayments > 0 ? "warning" : "success"}
-            />
-          </Link>
-          <Link href="/finance/sales-approvals" className="transition-transform hover:-translate-y-0.5">
-            <StatCard
-              label="Deposits waiting to be verified"
-              value={formatNumber(pendingRepCollections)}
-              hint="rep-collected repayments to post"
-              icon={Landmark}
-              accent={pendingRepCollections > 0 ? "warning" : "success"}
-            />
-          </Link>
+    <div className="space-y-6">
+      {/* ── Hero ─────────────────────────────────────────────── */}
+      <Reveal>
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-accent to-primary p-5 text-white shadow-glow sm:p-8">
+          <div className="absolute inset-0 bg-grid opacity-20" />
+          <div className="pointer-events-none absolute -right-12 -top-16 size-56 rounded-full bg-white/15 blur-3xl animate-float-slow" />
+          <div className="pointer-events-none absolute -bottom-20 left-1/3 size-48 rounded-full bg-white/10 blur-3xl animate-float-slow-rev" />
+          <div className="relative min-w-0">
+            <p className="flex items-center gap-2 text-xs text-white/80 sm:text-sm">
+              <span className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-white" />
+              <span className="min-w-0 truncate">{dateLabel}</span>
+              <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold">Finance</span>
+            </p>
+            <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight sm:text-4xl">
+              {greeting}, {firstName} 👋
+            </h1>
+            <p className="mt-1.5 max-w-xl text-sm text-white/90 sm:text-base">
+              You collect, verify, deposit and follow up ORA&apos;s money — the CEO owns the accounts. Here&apos;s what needs you today.
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:gap-8">
+              <HeroStat label="Collections today" value={formatCurrency(todayCollections)} sub="customer money in" />
+              <HeroStat label="Paid out today" value={formatCurrency(overview.today.moneyOut)} sub="money out" />
+              <HeroStat label="Operational Fund" value={formatCurrency(fundBalance)} sub="left to spend" />
+              <HeroStat label="Outstanding debt" value={formatCurrency(p.creditOutstanding)} sub="still owed to ORA" />
+            </div>
+          </div>
         </div>
+      </Reveal>
+
+      {/* ── Quick actions ────────────────────────────────────── */}
+      <Reveal>
+        <section>
+          <SectionLabel>Quick actions</SectionLabel>
+          <div className="flex flex-wrap gap-2">
+            <QuickAction icon={ClipboardCheck} label="Confirm payment" href="/finance/payments" />
+            <QuickAction icon={BadgeCheck} label="Approve credit" href="/finance/sales-approvals" />
+            <QuickAction icon={Landmark} label="Record deposit" href="/finance/cash" />
+            <QuickAction icon={Receipt} label="Operational expense" href="/finance/operational-fund" />
+            <QuickAction icon={UserCheck} label="Review application" href="/finance/applications" />
+            <QuickAction icon={Users} label="View customers" href="/finance/customers" />
+          </div>
+        </section>
+      </Reveal>
+
+      {/* ── Needs your attention ─────────────────────────────── */}
+      <section>
+        <SectionLabel>Needs your attention</SectionLabel>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Link href="/finance/credit" className="transition-transform hover:-translate-y-0.5">
-            <StatCard
-              label="Outstanding debts"
-              value={formatCurrency(overview.position.creditOutstanding)}
-              hint="customer credit still owed"
-              icon={CreditCard}
-              accent={overview.position.creditOutstanding > 0 ? "info" : "success"}
-            />
-          </Link>
-          <Link href="/finance/credit" className="transition-transform hover:-translate-y-0.5">
-            <StatCard
-              label="Overdue customers"
-              value={formatNumber(overview.position.overdueCount)}
-              hint="past due — chase for settlement"
-              icon={AlertTriangle}
-              accent={overview.position.overdueCount > 0 ? "warning" : "success"}
-            />
-          </Link>
-          <StatCard
-            label="Today's collections"
-            value={formatCurrency(todayCollections)}
-            hint="customer money in today"
-            icon={ArrowDownToLine}
-            accent="success"
-          />
-          <Link href="/finance/operational-fund" className="transition-transform hover:-translate-y-0.5">
-            <StatCard
-              label="Operational Fund"
-              value={formatCurrency(fundBalance)}
-              hint="available balance to spend"
-              icon={Wallet}
-              accent={fundBalance > 0 ? "primary" : "info"}
-            />
-          </Link>
+          <AttnCard href="/finance/sales-approvals" icon={Banknote} label="Cash to confirm" value={formatNumber(pendingCashSales)} hint="rep cash sales to receive & bank" active={pendingCashSales > 0} />
+          <AttnCard href="/finance/sales-approvals" icon={CreditCard} label="Credit to approve" value={formatNumber(pendingCreditSales)} hint="rep credit sales to review" active={pendingCreditSales > 0} />
+          <AttnCard href="/finance/payments" icon={ClipboardCheck} label="Customer payments" value={formatNumber(pendingPayments)} hint={claimedPayments > 0 ? `${claimedPayments} claimed — verify receipt` : "direct payments to verify"} active={pendingPayments > 0} />
+          <AttnCard href="/finance/sales-approvals" icon={Landmark} label="Deposits to post" value={formatNumber(pendingRepCollections)} hint="rep-collected repayments" active={pendingRepCollections > 0} />
         </div>
       </section>
 
-      {/* This month */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard label="Today's payments" value={formatCurrency(overview.today.moneyOut)} hint="money out today" icon={ArrowUpFromLine} accent="warning" />
-        <StatCard label="Revenue this month" value={formatCurrency(overview.window.revenue)} hint={`collected ${formatCurrency(overview.window.income.total - overview.window.income.capital)}`} icon={TrendingUp} accent="primary" />
-        <StatCard
-          label="Expenses this month"
-          value={formatCurrency(overview.window.expenses)}
-          hint={`net ${overview.window.netProfit >= 0 ? "+" : ""}${formatCurrency(overview.window.netProfit)}`}
-          icon={TrendingDown}
-          accent={overview.window.netProfit >= 0 ? "success" : "warning"}
-        />
-      </div>
+      {/* ── This month ───────────────────────────────────────── */}
+      <section>
+        <SectionLabel>This month</SectionLabel>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Revenue" value={formatCurrency(w.revenue)} hint={`collected ${formatCurrency(w.income.total - w.income.capital)}`} icon={TrendingUp} accent="primary" />
+          <StatCard label="Expenses" value={formatCurrency(w.expenses)} hint={`net ${w.netProfit >= 0 ? "+" : ""}${formatCurrency(w.netProfit)}`} icon={TrendingDown} accent={w.netProfit >= 0 ? "success" : "warning"} />
+          <StatCard label="Today's collections" value={formatCurrency(todayCollections)} hint="customer money in today" icon={ArrowDownToLine} accent="success" />
+          <StatCard label="Today's payments" value={formatCurrency(overview.today.moneyOut)} hint="money out today" icon={ArrowUpFromLine} accent="warning" />
+        </div>
+      </section>
 
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        {/* Weekly cash flow */}
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle>Weekly cash flow</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <BarChart
-              data={days.map((d) => ({ label: d.label, value: d.in }))}
-            />
-            <div className="mt-3 grid grid-cols-7 gap-1 text-center">
-              {days.map((d, i) => (
-                <div key={i} className="min-w-0">
-                  <p className="truncate text-[10px] text-muted-foreground">{d.label}</p>
-                  <p className="truncate text-[11px] font-medium text-success">+{formatNumber(d.in)}</p>
-                  <p className="truncate text-[11px] text-muted-foreground">−{formatNumber(d.out)}</p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Money in per day · last 7 days — figures under each bar show in / out.
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Receivables */}
+      {/* ── Cash flow + spending composition ─────────────────── */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <Card className="glass-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CreditCard className="size-4" /> Accounts receivable
+              <TrendingUp className="size-4 text-primary" /> Cash flow · last 7 days
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-7 items-end gap-2 sm:gap-3" style={{ height: 160 }}>
+              {days.map((d, i) => (
+                <div key={i} className="flex h-full flex-col items-center justify-end gap-1">
+                  <div className="flex w-full flex-1 items-end justify-center gap-1">
+                    <div className="w-1/2 rounded-t-md bg-success/80" style={{ height: `${Math.max((d.in / weekMax) * 100, d.in > 0 ? 4 : 0)}%` }} title={`In ${formatCurrency(d.in)}`} />
+                    <div className="w-1/2 rounded-t-md bg-destructive/70" style={{ height: `${Math.max((d.out / weekMax) * 100, d.out > 0 ? 4 : 0)}%` }} title={`Out ${formatCurrency(d.out)}`} />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">{d.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-success/80" /> Money in</span>
+              <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-destructive/70" /> Money out</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span className="flex items-center gap-2"><PieChart className="size-4 text-primary" /> Where money went · this month</span>
+              {spendSegments.length > 0 && <span className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground">TSh &rsquo;000</span>}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {spendSegments.length === 0 ? (
+              <EmptyState icon={PieChart} title="No spending yet" description="Recorded expenses appear here, grouped by type." />
+            ) : (
+              <DonutChart
+                segments={spendSegments.map((s) => ({ ...s, value: Math.round(s.value / 1000) }))}
+                centerLabel="spent"
+                centervalue={<span className="text-lg">{formatCurrency(spendTotal)}</span>}
+              />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Receivables + recent activity ────────────────────── */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="size-4 text-primary" /> Accounts receivable
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="rounded-xl bg-muted/50 p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Outstanding customer credit</p>
-              <p className="mt-1 font-display text-3xl font-bold">{formatCurrency(overview.position.creditOutstanding)}</p>
-              {overview.position.overdueCount > 0 && (
+              <p className="mt-1 font-display text-3xl font-bold">{formatCurrency(p.creditOutstanding)}</p>
+              {p.overdueCount > 0 && (
                 <p className="mt-1 flex items-center gap-1.5 text-xs text-warning">
                   <AlertTriangle className="size-3.5" />
-                  {overview.position.overdueCount} overdue account{overview.position.overdueCount === 1 ? "" : "s"} need chasing
+                  {p.overdueCount} overdue account{p.overdueCount === 1 ? "" : "s"} need chasing
                 </p>
               )}
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-lg border border-border p-3">
                 <p className="text-xs text-muted-foreground">Partners</p>
-                <p className="font-semibold">{formatCurrency(overview.position.creditOutstandingPartner)}</p>
+                <p className="font-semibold">{formatCurrency(p.creditOutstandingPartner)}</p>
               </div>
               <div className="rounded-lg border border-border p-3">
                 <p className="text-xs text-muted-foreground">Field customers</p>
-                <p className="font-semibold">{formatCurrency(overview.position.creditOutstandingField)}</p>
+                <p className="font-semibold">{formatCurrency(p.creditOutstandingField)}</p>
               </div>
             </div>
-            <Link
-              href="/finance/credit"
-              className="flex items-center justify-between rounded-lg border border-border/60 p-3 text-sm font-medium transition hover:bg-muted/40"
-            >
-              Manage credit & settlements
+            <Link href="/finance/credit" className="flex items-center justify-between rounded-lg border border-border/60 p-3 text-sm font-medium transition hover:bg-muted/40">
+              Manage credit &amp; settlements
               <ChevronRight className="size-4 text-muted-foreground" />
             </Link>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Recent transactions */}
-      <Card className="glass-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Receipt className="size-4" /> Recent financial activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {recent.length === 0 ? (
-            <EmptyState icon={Receipt} title="No activity yet" description="Money movements appear here as they happen." />
-          ) : (
-            <ul className="divide-y divide-border/60">
-              {recent.map((e) => (
-                <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
-                  <span className="min-w-0">
-                    <span className="font-medium">{e.label}</span>{" "}
-                    <span className="text-muted-foreground">
-                      · {e.reference}
-                      {e.method ? ` · ${e.method}` : ""}
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Receipt className="size-4 text-primary" /> Recent financial activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recent.length === 0 ? (
+              <EmptyState icon={Receipt} title="No activity yet" description="Money movements appear here as they happen." />
+            ) : (
+              <ul className="divide-y divide-border/60">
+                {recent.map((e) => (
+                  <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
+                    <span className="min-w-0">
+                      <span className="font-medium">{e.label}</span>{" "}
+                      <span className="text-muted-foreground">· {e.reference}{e.method ? ` · ${e.method}` : ""}</span>
                     </span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    <Badge variant="secondary">{e.category}</Badge>
-                    <span className={`font-semibold ${e.amount >= 0 ? "text-success" : "text-destructive"}`}>
-                      {e.amount >= 0 ? "+" : "−"}
-                      {formatCurrency(Math.abs(e.amount))}
+                    <span className="flex shrink-0 items-center gap-2">
+                      <Badge variant="secondary">{e.category}</Badge>
+                      <span className={cn("font-semibold", e.amount >= 0 ? "text-success" : "text-destructive")}>
+                        {e.amount >= 0 ? "+" : "−"}{formatCurrency(Math.abs(e.amount))}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{timeAgo(e.date)}</span>
                     </span>
-                    <span className="text-xs text-muted-foreground">{timeAgo(e.date)}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
+  );
+}
+
+// ── Local premium bits (styling mirrors the Admin dashboard) ─────────────────
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{children}</p>;
+}
+
+function HeroStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="truncate text-[11px] uppercase tracking-wide text-white/70">{label}</p>
+      <p className="truncate font-display text-xl font-bold sm:text-2xl">{value}</p>
+      {sub && <p className="truncate text-[11px] text-white/60">{sub}</p>}
+    </div>
+  );
+}
+
+function QuickAction({ icon: Icon, label, href }: { icon: LucideIcon; label: string; href: string }) {
+  return (
+    <Link href={href} className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2 text-sm font-medium shadow-soft transition-colors hover:border-primary/40 hover:bg-muted/40">
+      <Icon className="size-4 text-primary" />
+      {label}
+    </Link>
+  );
+}
+
+function AttnCard({
+  href,
+  icon: Icon,
+  label,
+  value,
+  hint,
+  active,
+}: {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  hint: string;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "group rounded-2xl border p-4 shadow-soft transition-all hover:-translate-y-0.5",
+        active ? "border-warning/30 bg-warning/[0.05] hover:border-warning/50" : "border-border bg-card hover:border-primary/30",
+      )}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate text-xs font-medium text-muted-foreground">{label}</span>
+        <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", active ? "bg-warning/15 text-warning" : "bg-success/12 text-success")}>
+          <Icon className="size-4" />
+        </span>
+      </div>
+      <p className="mt-2 font-display text-2xl font-bold tracking-tight">{value}</p>
+      <p className="mt-0.5 truncate text-xs text-muted-foreground">{hint}</p>
+    </Link>
   );
 }
