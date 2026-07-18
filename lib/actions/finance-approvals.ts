@@ -20,7 +20,6 @@ function revalidateApprovals() {
     "/finance",
     "/finance/sales-approvals",
     "/finance/credit",
-    "/finance/accounts",
     "/finance/cash",
     "/admin",
     "/admin/credit",
