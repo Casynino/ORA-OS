@@ -208,17 +208,23 @@ export async function rejectOperationalFundRequest(id: string, note?: string): P
 
 // ── CEO-initiated issue → Finance confirms receipt ──────────────────────────
 
-const issueSchema = z.object({
-  amount: z.number().int().positive("Enter an amount.").max(1000000000),
-  purpose: z.string().trim().min(3, "What are the funds for?").max(300),
+const issueItemSchema = z.object({
   category: fundCategory,
+  description: z.string().trim().min(2, "Describe the item.").max(200),
+  amount: z.number().int().positive("Enter an amount.").max(1000000000),
+});
+const issueSchema = z.object({
+  purpose: z.string().trim().min(3, "What are the funds for?").max(300),
+  items: z.array(issueItemSchema).min(1, "Add at least one item.").max(50),
   paymentAccountId: z.string().optional().or(z.literal("")), // account the money is issued FROM
   note: z.string().max(500).optional().or(z.literal("")),
 });
 
-/** CEO pushes funds to Finance without waiting for a request. Money leaves the
- *  chosen account NOW (Expense booked), status ISSUED — Finance confirms receipt
- *  to unlock the spendable balance. Same money-out timing as an approval. */
+/** CEO pushes funds to Finance without waiting for a request — one or more line
+ *  items in a single allocation. Money leaves the chosen account NOW (one Expense
+ *  per line, booked immediately), status ISSUED — Finance confirms receipt to
+ *  unlock the spendable balance. Same money-out timing/reversal as an approval,
+ *  and the lines are stored so a recall deletes exactly this allocation. */
 export async function issueOperationalFunds(
   input: z.infer<typeof issueSchema>,
 ): Promise<ActionResult<{ code: string }>> {
@@ -227,39 +233,50 @@ export async function issueOperationalFunds(
     const parsed = issueSchema.safeParse(input);
     if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid amount.");
     const d = parsed.data;
+    const total = d.items.reduce((s, it) => s + it.amount, 0);
     let code = "";
     await prisma.$transaction(async (tx) => {
       const account = await resolveReceivingAccount(tx, d.paymentAccountId || null, null);
       const req = await tx.pettyCashRequest.create({
         data: {
           code: refCode("OF"),
-          amount: d.amount,
+          amount: total,
           purpose: d.purpose,
-          category: d.category,
+          category: d.items[0].category, // representative; each item carries its own
           status: "ISSUED",
           note: d.note?.trim() || null,
           requestedById: admin.id,
           approvedById: admin.id,
           approvedAt: new Date(),
           paymentAccountId: account.paymentAccountId,
+          items: {
+            create: d.items.map((it) => ({
+              category: it.category,
+              customCategory: null,
+              description: it.description,
+              amount: it.amount,
+            })),
+          },
         },
       });
       code = req.code;
-      // Money-out now — drawing down the chosen account.
-      await tx.expense.create({
-        data: {
-          code: refCode("EXP"),
-          source: "OPERATIONAL_FUND",
-          category: d.category,
-          amount: d.amount,
-          purpose: `Operational Fund ${req.code} — ${d.purpose}`,
-          note: `Issued by CEO — awaiting Finance confirmation`,
-          paymentMethod: account.method,
-          paymentAccountId: account.paymentAccountId,
-          pettyCashRequestId: req.id,
-          recordedById: admin.id,
-        },
-      });
+      // Money-out now — one Expense per line, drawing down the chosen account.
+      for (const it of d.items) {
+        await tx.expense.create({
+          data: {
+            code: refCode("EXP"),
+            source: "OPERATIONAL_FUND",
+            category: it.category,
+            amount: it.amount,
+            purpose: `Operational Fund ${req.code} — ${it.description}`,
+            note: `Issued by CEO — awaiting Finance confirmation`,
+            paymentMethod: account.method,
+            paymentAccountId: account.paymentAccountId,
+            pettyCashRequestId: req.id,
+            recordedById: admin.id,
+          },
+        });
+      }
     });
     await logActivity({
       actorId: admin.id,
@@ -267,10 +284,10 @@ export async function issueOperationalFunds(
       action: "OPERATIONAL_FUND_ISSUED",
       entity: "PettyCashRequest",
       entityId: code,
-      summary: `CEO issued ${formatCurrency(d.amount)} to the Operational Fund (${code}) — money-out booked; awaiting Finance's receipt confirmation.`,
+      summary: `CEO issued ${formatCurrency(total)} to the Operational Fund (${code}, ${d.items.length} item${d.items.length === 1 ? "" : "s"}) — money-out booked; awaiting Finance's receipt confirmation.`,
     });
     revalidateFund();
-    return ok({ code }, `${formatCurrency(d.amount)} issued — Finance will confirm receipt.`);
+    return ok({ code }, `${formatCurrency(total)} issued — Finance will confirm receipt.`);
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -376,22 +393,29 @@ export async function cancelIssuedFund(id: string): Promise<ActionResult> {
 
 // ── Spending ────────────────────────────────────────────────────────────────
 
-const spendSchema = z.object({
-  amount: z.number().int().positive("Enter the amount spent.").max(1000000000),
+const spendItemSchema = z.object({
   category: z.enum(EXPENSE_CATEGORY_VALUES).default("OFFICE"),
   description: z.string().trim().min(3, "What was this spent on?").max(300),
+  amount: z.number().int().positive("Enter the amount spent.").max(1000000000),
+});
+const spendSchema = z.object({
+  items: z.array(spendItemSchema).min(1, "Add at least one item.").max(50),
   vendor: z.string().max(160).optional().or(z.literal("")),
-  expenseDate: z.string().optional().or(z.literal("")), // ISO date
+  expenseDate: z.string().optional().or(z.literal("")), // ISO date (shared)
   receiptRef: z.string().max(120).optional().or(z.literal("")),
   receiptUrl: z.string().max(15000000).optional().or(z.literal("")),
   note: z.string().max(500).optional().or(z.literal("")),
 });
 
-/** Finance records money spent from the Operational Fund — one Expense
- *  (source OPERATIONAL_FUND) that auto-reduces the balance. */
+/** Finance records money spent from the Operational Fund — one OR several line
+ *  items in a single transaction, all sharing one vendor/date/receipt. Each line
+ *  becomes its own OperationalSpend (an accountability record, NOT a company
+ *  Expense — the allocation was already expensed, so the P&L is never double
+ *  counted) tied by a shared batchCode. The fund balance is reduced by the TOTAL,
+ *  checked once under the advisory lock so concurrent spends can't overspend. */
 export async function recordOperationalExpense(
   input: z.infer<typeof spendSchema>,
-): Promise<ActionResult<{ code: string }>> {
+): Promise<ActionResult<{ count: number; total: number }>> {
   try {
     const actor = await requireActor(["FINANCE", "ADMIN"]);
     const parsed = spendSchema.safeParse(input);
@@ -400,10 +424,15 @@ export async function recordOperationalExpense(
     if (d.expenseDate && Number.isNaN(new Date(d.expenseDate).getTime()))
       return fail("The expense date is invalid.");
 
-    const code = refCode("OS");
+    const total = d.items.reduce((s, it) => s + it.amount, 0);
+    const multi = d.items.length > 1;
+    const batchCode = multi ? refCode("OSB") : null;
+    const expenseDate = d.expenseDate ? new Date(d.expenseDate) : new Date();
+    const sharedNote =
+      [d.vendor?.trim() ? `Vendor: ${d.vendor.trim()}` : "", d.note?.trim() ?? ""].filter(Boolean).join(" · ") || null;
     let remaining = 0;
     await prisma.$transaction(async (tx) => {
-      // Serialize every fund spend so two concurrent expenses can't each slip
+      // Serialize every fund spend so two concurrent transactions can't each slip
       // under the balance and overspend the CEO's allocation.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('operational_fund'))`;
       const [funded, spent] = await Promise.all([
@@ -411,38 +440,48 @@ export async function recordOperationalExpense(
         tx.operationalSpend.aggregate({ _sum: { amount: true } }),
       ]);
       const balance = (funded._sum.amount ?? 0) - (spent._sum.amount ?? 0);
-      // Can't spend money the fund doesn't have.
-      if (d.amount > balance)
+      // Can't spend money the fund doesn't have — checked once on the TOTAL.
+      if (total > balance)
         throw new Error(
           `The Operational Fund only has ${formatCurrency(Math.max(0, balance))} left — request more funds before recording this.`,
         );
-      remaining = balance - d.amount;
-      // An accountability record — NOT a company Expense (the allocation was
-      // already expensed at approval), so the P&L is never double-counted.
-      await tx.operationalSpend.create({
-        data: {
-          code,
-          category: d.category,
-          amount: d.amount,
-          description: d.description,
-          note: [d.vendor?.trim() ? `Vendor: ${d.vendor.trim()}` : "", d.note?.trim() ?? ""].filter(Boolean).join(" · ") || null,
-          receiptRef: d.receiptRef?.trim() || null,
-          receiptUrl: d.receiptUrl?.trim() || null,
-          expenseDate: d.expenseDate ? new Date(d.expenseDate) : new Date(),
-          recordedById: actor.id,
-        },
-      });
+      remaining = balance - total;
+      // One accountability record per line, tied by batchCode; individually
+      // traceable, but they draw the balance down together.
+      for (const it of d.items) {
+        await tx.operationalSpend.create({
+          data: {
+            code: refCode("OS"),
+            category: it.category,
+            amount: it.amount,
+            description: it.description,
+            note: sharedNote,
+            receiptRef: d.receiptRef?.trim() || null,
+            receiptUrl: d.receiptUrl?.trim() || null,
+            expenseDate,
+            batchCode,
+            recordedById: actor.id,
+          },
+        });
+      }
     });
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
       action: "OPERATIONAL_EXPENSE_RECORDED",
-      entity: "Expense",
-      entityId: code,
-      summary: `${actor.name} spent ${formatCurrency(d.amount)} from the Operational Fund — ${d.description} (${EXPENSE_LABELS[d.category]})${d.vendor?.trim() ? ` · ${d.vendor.trim()}` : ""}.`,
+      entity: "OperationalSpend",
+      entityId: batchCode ?? "spend",
+      summary: multi
+        ? `${actor.name} recorded ${d.items.length} operational-fund expenses totalling ${formatCurrency(total)}${d.vendor?.trim() ? ` · ${d.vendor.trim()}` : ""}.`
+        : `${actor.name} spent ${formatCurrency(total)} from the Operational Fund — ${d.items[0].description} (${EXPENSE_LABELS[d.items[0].category]})${d.vendor?.trim() ? ` · ${d.vendor.trim()}` : ""}.`,
     });
     revalidateFund();
-    return ok({ code }, `Expense ${code} recorded — ${formatCurrency(remaining)} left in the fund.`);
+    return ok(
+      { count: d.items.length, total },
+      multi
+        ? `${d.items.length} expenses recorded — ${formatCurrency(total)} total · ${formatCurrency(remaining)} left in the fund.`
+        : `Expense recorded — ${formatCurrency(remaining)} left in the fund.`,
+    );
   } catch (e) {
     return fail(errorMessage(e));
   }

@@ -484,9 +484,12 @@ export function DeleteCapitalButton({ id }: { id: string }) {
   );
 }
 
-/** CEO pushes funds to Finance from anywhere (e.g. the Finance overview). The
- *  money isn't an expense until Finance confirms receipt. Mirrors the modal on
- *  the Operational Fund page. */
+// One line of a multi-item fund issue: office-fund category + description + amount.
+type IssueLine = { key: number; category: string; description: string; amount: string };
+
+/** CEO pushes funds to Finance from anywhere (e.g. the Finance overview) — one or
+ *  more line items. The money isn't spendable until Finance confirms receipt.
+ *  Mirrors the multi-item modal on the Operational Fund page. */
 export function IssueFundsButton({
   accounts = [],
   label = "Issue funds to Finance",
@@ -501,27 +504,37 @@ export function IssueFundsButton({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState("");
+  const keyRef = useRef(2);
+  const [items, setItems] = useState<IssueLine[]>([{ key: 1, category: "OFFICE", description: "", amount: "" }]);
   const [purpose, setPurpose] = useState("");
-  const [category, setCategory] = useState("OFFICE");
   const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
 
+  const total = items.reduce((s, it) => s + Math.round(Number(it.amount) || 0), 0);
+  const addItem = () => setItems((p) => [...p, { key: keyRef.current++, category: "OFFICE", description: "", amount: "" }]);
+  const removeItem = (key: number) => setItems((p) => (p.length > 1 ? p.filter((i) => i.key !== key) : p));
+  const patch = (key: number, ch: Partial<IssueLine>) => setItems((p) => p.map((i) => (i.key === key ? { ...i, ...ch } : i)));
+  function reset() {
+    setItems([{ key: keyRef.current++, category: "OFFICE", description: "", amount: "" }]);
+    setPurpose(""); setNote("");
+  }
+
   function submit() {
-    if (Number(amount) <= 0) return toast({ variant: "error", title: "Enter an amount." });
     if (purpose.trim().length < 3) return toast({ variant: "error", title: "What are the funds for?" });
+    const parsed = items.map((it) => ({ category: it.category, description: it.description.trim(), amount: Math.round(Number(it.amount) || 0) }));
+    if (parsed.some((it) => it.amount <= 0 || it.description.length < 2))
+      return toast({ variant: "error", title: "Give every item a description and an amount." });
     start(async () => {
       const res = await issueOperationalFunds({
-        amount: Math.round(Number(amount) || 0),
         purpose: purpose.trim(),
-        category: category as never,
+        items: parsed as never,
         paymentAccountId: accountId || undefined,
         note: note.trim() || undefined,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         setOpen(false);
-        setAmount(""); setPurpose(""); setNote(""); setCategory("OFFICE");
+        reset();
         router.refresh();
       } else toast({ variant: "error", title: res.error });
     });
@@ -538,34 +551,52 @@ export function IssueFundsButton({
           open
           onClose={() => setOpen(false)}
           title="Issue funds to Finance"
-          description="Push money to the Operational Fund. Finance confirms receipt before it's booked as a company expense."
+          description="Push money to the Operational Fund — add one or more line items. Finance confirms receipt before it's booked as a company expense."
         >
           <div className="space-y-3.5">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Amount (TSh)</Label>
-                <Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1.5" placeholder="e.g. 500000" />
-              </div>
-              <div>
-                <Label>Category</Label>
-                <Select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1.5">
-                  {OFFICE_FUND_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
-                  ))}
-                </Select>
-              </div>
-            </div>
             <div>
               <Label>Purpose</Label>
-              <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="mt-1.5" placeholder="What the funds are for" />
+              <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="mt-1.5" placeholder="e.g. Weekly operations float" />
+            </div>
+            <div className="space-y-2">
+              <Label>Items</Label>
+              {items.map((it) => (
+                <div key={it.key} className="space-y-2 rounded-xl border border-border p-2.5">
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <Select value={it.category} onChange={(e) => patch(it.key, { category: e.target.value })}>
+                        {OFFICE_FUND_CATEGORIES.map((c) => (
+                          <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
+                        ))}
+                      </Select>
+                    </div>
+                    {items.length > 1 && (
+                      <button type="button" onClick={() => removeItem(it.key)} className="mt-1 rounded-md p-1 text-muted-foreground hover:text-destructive" aria-label="Remove item">
+                        <Trash2 className="size-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-[1fr_8rem] gap-2">
+                    <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What it's for" className="h-9" />
+                    <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="h-9" />
+                  </div>
+                </div>
+              ))}
+              <Button size="sm" variant="outline" className="rounded-full" onClick={addItem}>
+                <Plus className="size-3.5" /> Add item
+              </Button>
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2">
+              <span className="text-sm font-medium">Total to issue</span>
+              <span className="font-display text-lg font-bold">{formatCurrency(total)}</span>
             </div>
             <CompanyAccountSelect accounts={accounts} value={accountId} onChange={setAccountId} label="Issue from account" />
             <div>
               <Label>Note (optional)</Label>
               <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" />
             </div>
-            <Button className="w-full rounded-full" disabled={pending || !amount || purpose.trim().length < 3} onClick={submit}>
-              {pending ? "Issuing…" : "Issue to Finance"}
+            <Button className="w-full rounded-full" disabled={pending || total <= 0} onClick={submit}>
+              {pending ? "Issuing…" : items.length > 1 ? `Issue ${items.length} items · ${formatCurrency(total)}` : "Issue to Finance"}
             </Button>
           </div>
         </Modal>

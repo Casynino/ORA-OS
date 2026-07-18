@@ -356,22 +356,31 @@ export function OperationalFundManager({
   );
 }
 
-/** CEO pushes funds to Finance — money-out is deferred until Finance confirms. */
+/** CEO pushes funds to Finance — one or more line items in a single allocation.
+ *  Money-out is booked now (one Expense per line); Finance confirms receipt. */
+type SimpleLine = { key: number; category: string; description: string; amount: string };
 function IssueModal({ accounts, onClose }: { accounts: SelectableAccount[]; onClose: () => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [amount, setAmount] = useState("");
   const [purpose, setPurpose] = useState("");
-  const [category, setCategory] = useState<string>("OFFICE");
   const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
+  const nextKey = useRef(2);
+  const [items, setItems] = useState<SimpleLine[]>([{ key: 1, category: "OFFICE", description: "", amount: "" }]);
+
+  const total = items.reduce((s, it) => s + Math.round(Number(it.amount) || 0), 0);
+  const addItem = () => setItems((p) => [...p, { key: nextKey.current++, category: "OFFICE", description: "", amount: "" }]);
+  const removeItem = (key: number) => setItems((p) => (p.length > 1 ? p.filter((i) => i.key !== key) : p));
+  const patch = (key: number, ch: Partial<SimpleLine>) => setItems((p) => p.map((i) => (i.key === key ? { ...i, ...ch } : i)));
+
   function submit() {
-    const amt = Math.round(Number(amount) || 0);
-    if (amt <= 0) return toast({ variant: "error", title: "Enter an amount." });
     if (purpose.trim().length < 3) return toast({ variant: "error", title: "What are the funds for?" });
+    const parsed = items.map((it) => ({ category: it.category, description: it.description.trim(), amount: Math.round(Number(it.amount) || 0) }));
+    if (parsed.some((it) => it.amount <= 0 || it.description.length < 2))
+      return toast({ variant: "error", title: "Give every item a description and an amount." });
     start(async () => {
       const res = await issueOperationalFunds({
-        amount: amt, purpose: purpose.trim(), category: category as ExpenseCategory,
+        purpose: purpose.trim(), items: parsed as never,
         paymentAccountId: accountId || undefined, note: note.trim() || undefined,
       });
       if (res.ok) { toast({ variant: "success", title: res.message }); onClose(); router.refresh(); }
@@ -379,32 +388,50 @@ function IssueModal({ accounts, onClose }: { accounts: SelectableAccount[]; onCl
     });
   }
   return (
-    <Modal open onClose={onClose} title="Issue funds to Finance" description="Push money to the Operational Fund without waiting for a request. Finance confirms receipt before it's booked as a company expense.">
+    <Modal open onClose={onClose} title="Issue funds to Finance" description="Push money to the Operational Fund without waiting for a request — add one or more line items. Finance confirms receipt before it's booked as a company expense.">
       <div className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label>Amount (TSh) *</Label>
-            <Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1.5" placeholder="e.g. 500000" />
-          </div>
-          <div>
-            <Label>Category</Label>
-            <Select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1.5">
-              {OFFICE_FUND_CATEGORIES.map((c) => (
-                <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
-              ))}
-            </Select>
-          </div>
-        </div>
         <div>
           <Label>Purpose *</Label>
-          <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="mt-1.5" placeholder="What the funds are for" />
+          <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} className="mt-1.5" placeholder="e.g. Weekly operations float" />
+        </div>
+        <div className="space-y-2">
+          <Label>Items *</Label>
+          {items.map((it) => (
+            <div key={it.key} className="space-y-2 rounded-xl border border-border p-2.5">
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <Select value={it.category} onChange={(e) => patch(it.key, { category: e.target.value })}>
+                    {OFFICE_FUND_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
+                    ))}
+                  </Select>
+                </div>
+                {items.length > 1 && (
+                  <button type="button" onClick={() => removeItem(it.key)} className="mt-1 rounded-md p-1 text-muted-foreground hover:text-destructive" aria-label="Remove item">
+                    <Trash2 className="size-4" />
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-[1fr_8rem] gap-2">
+                <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What it's for" className="h-9" />
+                <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="h-9" />
+              </div>
+            </div>
+          ))}
+          <Button size="sm" variant="outline" onClick={addItem}>
+            <Plus className="size-4" /> Add item
+          </Button>
+        </div>
+        <div className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2">
+          <span className="text-sm font-medium">Total to issue</span>
+          <span className="font-display text-lg font-bold">{formatCurrency(total)}</span>
         </div>
         <CompanyAccountSelect accounts={accounts} value={accountId} onChange={setAccountId} label="Issue from account" />
         <div>
           <Label>Note (optional)</Label>
           <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" placeholder="Anything Finance should know" />
         </div>
-        <Button className="w-full" onClick={submit} disabled={pending}>
+        <Button className="w-full" onClick={submit} disabled={pending || total <= 0}>
           {pending ? "Issuing…" : "Issue to Finance"}
         </Button>
       </div>
@@ -638,23 +665,28 @@ function RequestModal({ categories, onClose }: { categories: CategoryOption[]; o
 function SpendModal({ balance, onClose }: { balance: number; onClose: () => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState<string>("OFFICE");
-  const [description, setDescription] = useState("");
+  const nextKey = useRef(2);
+  const [items, setItems] = useState<SimpleLine[]>([{ key: 1, category: "OFFICE", description: "", amount: "" }]);
   const [vendor, setVendor] = useState("");
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
   const [receiptRef, setReceiptRef] = useState("");
   const [receiptUrl, setReceiptUrl] = useState("");
   const [note, setNote] = useState("");
+
+  const total = items.reduce((s, it) => s + Math.round(Number(it.amount) || 0), 0);
+  const addItem = () => setItems((p) => [...p, { key: nextKey.current++, category: "OFFICE", description: "", amount: "" }]);
+  const removeItem = (key: number) => setItems((p) => (p.length > 1 ? p.filter((i) => i.key !== key) : p));
+  const patch = (key: number, ch: Partial<SimpleLine>) => setItems((p) => p.map((i) => (i.key === key ? { ...i, ...ch } : i)));
+
   function submit() {
-    const amt = Math.round(Number(amount) || 0);
-    if (amt <= 0) return toast({ variant: "error", title: "Enter the amount spent." });
-    if (amt > balance) return toast({ variant: "error", title: `Only ${formatCurrency(balance)} left in the fund.` });
-    if (description.trim().length < 3) return toast({ variant: "error", title: "What was this spent on?" });
+    const parsed = items.map((it) => ({ category: it.category, description: it.description.trim(), amount: Math.round(Number(it.amount) || 0) }));
+    if (parsed.some((it) => it.amount <= 0 || it.description.length < 3))
+      return toast({ variant: "error", title: "Give every item a description and an amount." });
+    if (total > balance) return toast({ variant: "error", title: `Only ${formatCurrency(balance)} left in the fund.` });
     start(async () => {
       const res = await recordOperationalExpense({
-        amount: amt, category: category as ExpenseCategory, description: description.trim(),
+        items: parsed as never,
         vendor: vendor.trim() || undefined, expenseDate: date, receiptRef: receiptRef.trim() || undefined,
         receiptUrl: receiptUrl || undefined, note: note.trim() || undefined,
       });
@@ -662,27 +694,43 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
       else toast({ variant: "error", title: res.error });
     });
   }
+  const over = total > balance;
   return (
-    <Modal open onClose={onClose} title="Record an expense" description={`Money spent from the Operational Fund. ${formatCurrency(balance)} available.`}>
+    <Modal open onClose={onClose} title="Record an expense" description={`Money spent from the Operational Fund — add one or more items. ${formatCurrency(balance)} available.`}>
       <div className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label>Amount (TSh) *</Label>
-            <Input type="number" min={1} max={balance} value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1.5" />
-          </div>
-          <div>
-            <Label>Category *</Label>
-            <Select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1.5">
-              {OFFICE_FUND_CATEGORIES.map((c) => (
-                <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
-              ))}
-            </Select>
-          </div>
+        <div className="space-y-2">
+          <Label>Items *</Label>
+          {items.map((it) => (
+            <div key={it.key} className="space-y-2 rounded-xl border border-border p-2.5">
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <Select value={it.category} onChange={(e) => patch(it.key, { category: e.target.value })}>
+                    {OFFICE_FUND_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
+                    ))}
+                  </Select>
+                </div>
+                {items.length > 1 && (
+                  <button type="button" onClick={() => removeItem(it.key)} className="mt-1 rounded-md p-1 text-muted-foreground hover:text-destructive" aria-label="Remove item">
+                    <Trash2 className="size-4" />
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-[1fr_8rem] gap-2">
+                <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="What was bought" className="h-9" />
+                <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="h-9" />
+              </div>
+            </div>
+          ))}
+          <Button size="sm" variant="outline" onClick={addItem}>
+            <Plus className="size-4" /> Add item
+          </Button>
         </div>
-        <div>
-          <Label>Description *</Label>
-          <Input value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1.5" placeholder="What was bought" />
+        <div className={`flex items-center justify-between rounded-xl px-3 py-2 ${over ? "bg-destructive/10" : "bg-muted/40"}`}>
+          <span className="text-sm font-medium">Total spent</span>
+          <span className={`font-display text-lg font-bold ${over ? "text-destructive" : ""}`}>{formatCurrency(total)}</span>
         </div>
+        {over && <p className="text-xs text-destructive">Exceeds the {formatCurrency(balance)} available in the fund.</p>}
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <Label>Vendor / recipient</Label>
@@ -695,7 +743,7 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
         </div>
         <div>
           <Label>Receipt / voucher reference</Label>
-          <Input value={receiptRef} onChange={(e) => setReceiptRef(e.target.value)} className="mt-1.5" placeholder="Optional" />
+          <Input value={receiptRef} onChange={(e) => setReceiptRef(e.target.value)} className="mt-1.5" placeholder="Optional — shared across items" />
         </div>
         <div>
           <Label className="mb-1.5 block">Supporting document (receipt / invoice / voucher)</Label>
@@ -705,8 +753,8 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
           <Label>Notes (optional)</Label>
           <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" />
         </div>
-        <Button className="w-full" onClick={submit} disabled={pending}>
-          {pending ? "Recording…" : "Record expense"}
+        <Button className="w-full" onClick={submit} disabled={pending || total <= 0 || over}>
+          {pending ? "Recording…" : items.length > 1 ? `Record ${items.length} expenses · ${formatCurrency(total)}` : "Record expense"}
         </Button>
       </div>
     </Modal>
