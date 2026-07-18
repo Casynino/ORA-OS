@@ -1416,12 +1416,14 @@ model OperationalSpend {
   note         String?
   receiptRef   String? // receipt / invoice / voucher number
   receiptUrl   String? // uploaded supporting document
+  batchCode    String? // links line items recorded together as one spend transaction
   recordedBy   User            @relation("OperationalSpender", fields: [recordedById], references: [id])
   recordedById String
   createdAt    DateTime        @default(now())
 
   @@index([category])
   @@index([expenseDate])
+  @@index([batchCode])
 }
 
 /// Payroll staff registry — employees are paid people, not system logins.
