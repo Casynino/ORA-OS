@@ -415,6 +415,8 @@ const spendItemSchema = z.object({
   category: z.enum(EXPENSE_CATEGORY_VALUES).default("OFFICE"),
   description: z.string().max(300).optional().or(z.literal("")),
   amount: z.number().int().positive("Enter the amount spent.").max(1000000000),
+  // Who this line was paid to / where the money went (per line).
+  vendor: z.string().max(160).optional().or(z.literal("")),
 });
 const spendSchema = z
   .object({
@@ -448,8 +450,7 @@ export async function recordOperationalExpense(
     const multi = d.items.length > 1;
     const batchCode = multi ? refCode("OSB") : null;
     const expenseDate = d.expenseDate ? new Date(d.expenseDate) : new Date();
-    const sharedNote =
-      [d.vendor?.trim() ? `Vendor: ${d.vendor.trim()}` : "", d.note?.trim() ?? ""].filter(Boolean).join(" · ") || null;
+    const sharedNote = d.note?.trim() ?? "";
     let remaining = 0;
     await prisma.$transaction(async (tx) => {
       // Serialize every fund spend so two concurrent transactions can't each slip
@@ -475,7 +476,8 @@ export async function recordOperationalExpense(
             category: it.category,
             amount: it.amount,
             description: fundItemDescription(it),
-            note: sharedNote,
+            // Per-line vendor lives in the note (kept with any shared note).
+            note: [it.vendor?.trim() ? `Vendor: ${it.vendor.trim()}` : "", sharedNote].filter(Boolean).join(" · ") || null,
             receiptRef: d.receiptRef?.trim() || null,
             receiptUrl: d.receiptUrl?.trim() || null,
             expenseDate,

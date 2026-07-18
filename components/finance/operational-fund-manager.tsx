@@ -358,7 +358,7 @@ export function OperationalFundManager({
 
 /** CEO pushes funds to Finance — one or more line items in a single allocation.
  *  Money-out is booked now (one Expense per line); Finance confirms receipt. */
-type SimpleLine = { key: number; category: string; description: string; amount: string };
+type SimpleLine = { key: number; category: string; description: string; amount: string; vendor?: string };
 function IssueModal({ accounts, onClose }: { accounts: SelectableAccount[]; onClose: () => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -656,26 +656,25 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
   const router = useRouter();
   const [pending, start] = useTransition();
   const nextKey = useRef(2);
-  const [items, setItems] = useState<SimpleLine[]>([{ key: 1, category: "OFFICE", description: "", amount: "" }]);
-  const [vendor, setVendor] = useState("");
+  const [items, setItems] = useState<SimpleLine[]>([{ key: 1, category: "OFFICE", description: "", amount: "", vendor: "" }]);
   const [receiptRef, setReceiptRef] = useState("");
   const [receiptUrl, setReceiptUrl] = useState("");
   const [note, setNote] = useState("");
 
   const total = items.reduce((s, it) => s + Math.round(Number(it.amount) || 0), 0);
-  const addItem = () => setItems((p) => [...p, { key: nextKey.current++, category: "OFFICE", description: "", amount: "" }]);
+  const addItem = () => setItems((p) => [...p, { key: nextKey.current++, category: "OFFICE", description: "", amount: "", vendor: "" }]);
   const removeItem = (key: number) => setItems((p) => (p.length > 1 ? p.filter((i) => i.key !== key) : p));
   const patch = (key: number, ch: Partial<SimpleLine>) => setItems((p) => p.map((i) => (i.key === key ? { ...i, ...ch } : i)));
 
   function submit() {
-    const parsed = items.map((it) => ({ category: it.category, description: it.description.trim() || undefined, amount: Math.round(Number(it.amount) || 0) }));
+    const parsed = items.map((it) => ({ category: it.category, amount: Math.round(Number(it.amount) || 0), vendor: it.vendor?.trim() || undefined }));
     if (parsed.some((it) => it.amount <= 0))
       return toast({ variant: "error", title: "Give every item an amount." });
     if (total > balance) return toast({ variant: "error", title: `Only ${formatCurrency(balance)} left in the fund.` });
     start(async () => {
       const res = await recordOperationalExpense({
         items: parsed as never,
-        vendor: vendor.trim() || undefined, receiptRef: receiptRef.trim() || undefined,
+        receiptRef: receiptRef.trim() || undefined,
         receiptUrl: receiptUrl || undefined, note: note.trim() || undefined,
       });
       if (res.ok) { toast({ variant: "success", title: res.message }); onClose(); router.refresh(); }
@@ -689,20 +688,23 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
         <div className="space-y-2">
           <Label>Items *</Label>
           {items.map((it) => (
-            <div key={it.key} className="flex items-center gap-2 rounded-xl border border-border p-2.5">
-              <div className="min-w-0 flex-1">
-                <Select value={it.category} onChange={(e) => patch(it.key, { category: e.target.value })}>
-                  {OFFICE_FUND_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
-                  ))}
-                </Select>
+            <div key={it.key} className="space-y-2 rounded-xl border border-border p-2.5">
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <Select value={it.category} onChange={(e) => patch(it.key, { category: e.target.value })}>
+                    {OFFICE_FUND_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
+                    ))}
+                  </Select>
+                </div>
+                <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="w-28 shrink-0" />
+                {items.length > 1 && (
+                  <button type="button" onClick={() => removeItem(it.key)} className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-destructive" aria-label="Remove item">
+                    <Trash2 className="size-4" />
+                  </button>
+                )}
               </div>
-              <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="w-28 shrink-0" />
-              {items.length > 1 && (
-                <button type="button" onClick={() => removeItem(it.key)} className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-destructive" aria-label="Remove item">
-                  <Trash2 className="size-4" />
-                </button>
-              )}
+              <Input value={it.vendor ?? ""} onChange={(e) => patch(it.key, { vendor: e.target.value })} placeholder="Vendor / payee — who was paid (optional)" className="h-9" />
             </div>
           ))}
           <Button size="sm" variant="outline" onClick={addItem}>
@@ -714,11 +716,7 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
           <span className={`font-display text-lg font-bold ${over ? "text-destructive" : ""}`}>{formatCurrency(total)}</span>
         </div>
         {over && <p className="text-xs text-destructive">Exceeds the {formatCurrency(balance)} available in the fund.</p>}
-        {/* The spend date is stamped automatically when it's recorded. */}
-        <div>
-          <Label>Vendor / recipient <span className="font-normal text-muted-foreground">(optional)</span></Label>
-          <Input value={vendor} onChange={(e) => setVendor(e.target.value)} className="mt-1.5" placeholder="Who was paid" />
-        </div>
+        {/* Vendor is per line above; the spend date is stamped automatically. */}
         <div>
           <Label>Receipt / voucher reference</Label>
           <Input value={receiptRef} onChange={(e) => setReceiptRef(e.target.value)} className="mt-1.5" placeholder="Optional — shared across items" />

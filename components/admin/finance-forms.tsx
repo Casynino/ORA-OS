@@ -28,7 +28,7 @@ import { toast } from "@/components/ui/use-toast";
 type BtnVariant = "default" | "accent" | "secondary" | "outline" | "ghost" | "destructive" | "success";
 
 // One editable expense line in the multi-item builder.
-type DraftExpense = { key: number; category: string; customCategory: string | null; purpose: string; amount: string };
+type DraftExpense = { key: number; category: string; customCategory: string | null; vendor: string; amount: string };
 
 /**
  * CEO direct-expense form — record ONE or SEVERAL expenses at once, all paid from
@@ -54,9 +54,8 @@ export function AddExpenseButton({
   const [open, setOpen] = useState(false);
   const keyRef = useRef(2);
   const [items, setItems] = useState<DraftExpense[]>([
-    { key: 1, category: "RENT", customCategory: null, purpose: "", amount: "" },
+    { key: 1, category: "RENT", customCategory: null, vendor: "", amount: "" },
   ]);
-  const [vendor, setVendor] = useState("");
   // Default to the first company account; the CEO can switch to "Other / cheque".
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [method, setMethod] = useState("Cheque"); // only used when no account
@@ -71,7 +70,7 @@ export function AddExpenseButton({
   function addItem() {
     setItems((prev) => [
       ...prev,
-      { key: keyRef.current++, category: "RENT", customCategory: null, purpose: "", amount: "" },
+      { key: keyRef.current++, category: "RENT", customCategory: null, vendor: "", amount: "" },
     ]);
   }
   function removeItem(key: number) {
@@ -81,8 +80,8 @@ export function AddExpenseButton({
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...changes } : it)));
   }
   function reset() {
-    setItems([{ key: keyRef.current++, category: "RENT", customCategory: null, purpose: "", amount: "" }]);
-    setVendor(""); setNote(""); setReceiptUrl("");
+    setItems([{ key: keyRef.current++, category: "RENT", customCategory: null, vendor: "", amount: "" }]);
+    setNote(""); setReceiptUrl("");
   }
 
   function submit() {
@@ -93,9 +92,8 @@ export function AddExpenseButton({
           category: it.category as never,
           customCategory: it.customCategory || undefined,
           amount: Math.round(Number(it.amount) || 0),
-          purpose: it.purpose.trim() || undefined,
+          vendor: it.vendor.trim() || undefined,
         })),
-        vendor: vendor.trim() || undefined,
         paymentAccountId: accountId || undefined,
         paymentMethod: accountId ? undefined : method,
         receiptUrl: receiptUrl || undefined,
@@ -157,6 +155,12 @@ export function AddExpenseButton({
                       placeholder="Amount"
                     />
                   </div>
+                  <Input
+                    value={it.vendor}
+                    onChange={(e) => patch(it.key, { vendor: e.target.value })}
+                    className="mt-2"
+                    placeholder="Vendor / payee — who was paid (optional)"
+                  />
                 </div>
               ))}
               <div className="flex items-center justify-between">
@@ -171,11 +175,7 @@ export function AddExpenseButton({
             </div>
 
             {/* Shared payment envelope — one account / receipt for all lines. The
-                date is stamped automatically when the expense is recorded. */}
-            <div>
-              <Label>Vendor / payee <span className="font-normal text-muted-foreground">(optional)</span></Label>
-              <Input value={vendor} onChange={(e) => setVendor(e.target.value)} className="mt-1.5" placeholder="Who was paid" />
-            </div>
+                vendor is per line above; the date is stamped automatically. */}
             <CompanyAccountSelect
               accounts={accounts}
               value={accountId}

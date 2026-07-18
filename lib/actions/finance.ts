@@ -35,6 +35,8 @@ const expenseItemSchema = z.object({
   amount: z.number().int().positive().max(1000000000),
   // Optional — the category names the expense; a description just adds detail.
   purpose: z.string().max(200).optional().or(z.literal("")),
+  // Who this line was paid to / where the money went (per line).
+  vendor: z.string().max(160).optional().or(z.literal("")),
 });
 
 /** What an expense line is "for" — its own description, else the category name
@@ -107,7 +109,7 @@ export async function recordExpenses(
             customCategory: it.customCategory?.trim() || null,
             amount: it.amount,
             purpose: expensePurpose(it),
-            vendor,
+            vendor: it.vendor?.trim() || vendor,
             paymentMethod: method,
             paymentAccountId: account.paymentAccountId,
             expenseDate,
