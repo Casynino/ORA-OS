@@ -104,7 +104,14 @@ export default async function AdminSalesApprovalsPage() {
           <ul className="mt-2 space-y-0.5 border-t border-border/40 pt-2">
             {s.items.map((i) => (
               <li key={i.id} className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                <span className="min-w-0 truncate">{i.product.name} ×{i.quantity}</span>
+                <span className="min-w-0 truncate">
+                  {i.product.name} ×{i.quantity} @ {formatCurrency(i.unitPrice)}
+                  {i.defaultPrice != null && i.defaultPrice !== i.unitPrice && (
+                    <span className={cn("ml-1", i.unitPrice < i.defaultPrice ? "text-warning" : "text-success")}>
+                      (list {formatCurrency(i.defaultPrice)})
+                    </span>
+                  )}
+                </span>
                 <span className="shrink-0">{formatCurrency(i.lineTotal)}</span>
               </li>
             ))}

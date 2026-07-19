@@ -77,9 +77,9 @@ async function main() {
 
   // ── The ONLY 3 real Ora products (system-locked) ───────────────────────────
   const productSeed = [
-    { sku: "ORA-360", name: "Ora Pads 360mm — Purple", category: "PADS", unitLabel: "360mm · Night Flow", desc: "Night Flow Protection — full overnight coverage, 100% air breathable.", iconKey: "purple", cost: 2000, price: 3500, stock: 150 },
-    { sku: "ORA-290", name: "Ora Pads 290mm — Blue", category: "PADS", unitLabel: "290mm · Day Flow", desc: "Day Flow Comfort — discreet, breathable daytime protection.", iconKey: "blue", cost: 2000, price: 3500, stock: 150 },
-    { sku: "ORA-180", name: "Ora Pant Liners 180mm", category: "HYGIENE", unitLabel: "180mm · Daily", desc: "Daily Freshness — light, breathable everyday liners.", iconKey: "pink", cost: 1800, price: 3000, stock: 200 },
+    { sku: "ORA-360", name: "Ora Pads 360mm — Purple", category: "PADS", unitLabel: "360mm · Night Flow", desc: "Night Flow Protection — full overnight coverage, 100% air breathable.", iconKey: "purple", cost: 2000, price: 2800, stock: 150 },
+    { sku: "ORA-290", name: "Ora Pads 290mm — Blue", category: "PADS", unitLabel: "290mm · Day Flow", desc: "Day Flow Comfort — discreet, breathable daytime protection.", iconKey: "blue", cost: 2000, price: 2800, stock: 150 },
+    { sku: "ORA-180", name: "Ora Pant Liners 180mm", category: "HYGIENE", unitLabel: "180mm · Daily", desc: "Daily Freshness — light, breathable everyday liners.", iconKey: "pink", cost: 1800, price: 2500, stock: 200 },
   ] as const;
 
   const products: { id: string; sku: string }[] = [];

@@ -1094,7 +1094,10 @@ model FieldSaleItem {
   product   Product   @relation(fields: [productId], references: [id])
   productId String
   quantity  Int
-  unitPrice Int // TSh per unit at time of sale
+  unitPrice Int // TSh per unit actually charged (rep/finance may adjust per customer)
+  // The product's standard selling price at the moment of sale — captured so
+  // reporting can compare actual vs default (discounts/mark-ups). null on legacy rows.
+  defaultPrice Int?
   lineTotal Int
 
   @@index([saleId])
