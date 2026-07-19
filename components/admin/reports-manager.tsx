@@ -3,7 +3,7 @@
 import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  FileText, Send, Download, Share2, Search, Settings2, Clock, Zap, ExternalLink, Calendar,
+  FileText, Send, Download, Share2, Search, Settings2, Clock, Zap, ExternalLink, Calendar, ChevronDown,
 } from "lucide-react";
 import { generateReportNow, updateReportSettings, sendTestWhatsApp } from "@/lib/actions/reports";
 import { Button } from "@/components/ui/button";
@@ -160,7 +160,7 @@ export function ReportsManager({ settings, reports }: { settings: Settings | nul
           // Bounded, scrolling archive — caps at ~6 rows so a long history scrolls
           // INSIDE the card instead of stretching the page down.
           <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/50">
-            <div className="max-h-[25rem] divide-y divide-border/50 overflow-y-auto scrollbar-thin">
+            <div className="max-h-[13rem] divide-y divide-border/50 overflow-y-auto scrollbar-thin">
               {filtered.map((r) => (
                 <div key={r.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><FileText className="size-[18px]" /></span>
@@ -180,9 +180,9 @@ export function ReportsManager({ settings, reports }: { settings: Settings | nul
                 </div>
               ))}
             </div>
-            {filtered.length > 6 && (
+            {filtered.length > 3 && (
               <div className="flex items-center justify-center gap-1.5 border-t border-border/50 bg-muted/20 py-1.5 text-[11px] font-medium text-muted-foreground">
-                {filtered.length} reports · scroll for more
+                <ChevronDown className="size-3" /> scroll for {filtered.length - 3} more
               </div>
             )}
           </div>
