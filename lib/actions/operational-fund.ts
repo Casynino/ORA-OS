@@ -8,6 +8,7 @@ import { logActivity } from "@/lib/activity";
 import { refCode, formatCurrency } from "@/lib/utils";
 import { EXPENSE_CATEGORY_VALUES, EXPENSE_LABELS, OFFICE_FUND_CATEGORIES } from "@/lib/expense-categories";
 import { resolveReceivingAccount, METHOD_LABEL } from "@/lib/payment-methods";
+import { notifyFundRequest } from "@/lib/notifications/ceo-alerts";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 import type { ExpenseCategory } from "@prisma/client";
 
@@ -116,6 +117,8 @@ export async function requestOperationalFunds(
       summary: `${actor.name} requested ${formatCurrency(total)} for the Operational Fund (${req.code}, ${d.items.length} item${d.items.length === 1 ? "" : "s"}) — awaiting CEO approval.`,
     });
     revalidateFund();
+    // Executive alert: WhatsApp the CEO so they can review/approve promptly.
+    await notifyFundRequest(actor.name, total, d.items.map((it) => fundItemDescription(it)));
     return ok({ code: req.code }, `${req.code} sent to the CEO for approval.`);
   } catch (e) {
     return fail(errorMessage(e));

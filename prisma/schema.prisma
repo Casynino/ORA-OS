@@ -1586,3 +1586,40 @@ model RepTarget {
   @@unique([repId, year, month])
   @@index([repId])
 }
+
+// ── Executive reporting (WhatsApp + archived PDFs) ───────────────────────────
+enum ReportType {
+  DAILY
+  MONTHLY
+}
+
+/// An archived executive report. `summary` holds the structured figures used to
+/// build the PDF (so the archive can re-display without recomputing); `pdfUrl`
+/// is the public Blob link included in the WhatsApp message.
+model Report {
+  id           String     @id @default(cuid())
+  type         ReportType
+  periodStart  DateTime // the day (DAILY) or first-of-month (MONTHLY) covered
+  periodEnd    DateTime?
+  title        String
+  summary      Json // structured figures rendered into the PDF + archive card
+  pdfUrl       String? // Vercel Blob public URL (secure, unguessable, no login)
+  whatsappSent Boolean    @default(false)
+  recipients   String? // phone numbers notified (comma-separated)
+  createdAt    DateTime   @default(now())
+
+  @@index([type, periodStart])
+  @@index([createdAt])
+}
+
+/// Singleton config for the executive reporting system (one row, id "singleton").
+model ReportSettings {
+  id                    String   @id @default("singleton")
+  dailyEnabled          Boolean  @default(true)
+  dailyHourEat          Int      @default(19) // 0–23, EAT (UTC+3); default 19:00
+  monthlyEnabled        Boolean  @default(true)
+  creditReminderEnabled Boolean  @default(true)
+  fundRequestAlerts     Boolean  @default(true)
+  repReportAlerts       Boolean  @default(true)
+  updatedAt             DateTime @updatedAt
+}
