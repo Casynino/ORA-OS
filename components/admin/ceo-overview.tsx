@@ -3,7 +3,7 @@ import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
 import {
   Wallet, CreditCard, TrendingUp, Scale, ArrowRight, Star, PackageX,
-  TrendingDown, Boxes, ShoppingCart, ChevronRight, RotateCcw, Banknote,
+  TrendingDown, Boxes, ShoppingCart, RotateCcw,
   FileBarChart, Users, ShieldAlert, Package, ScrollText,
   UserPlus, ClipboardList, BadgeCheck, Receipt, PackagePlus, Truck, Undo2, ArrowLeftRight,
 } from "lucide-react";
@@ -41,115 +41,8 @@ export function BusinessHealth({
   );
 }
 
-// ── 3 · Needs attention — the consolidated action center ─────────────────────
-
-export type AttentionItem = {
-  tone: "danger" | "warning" | "info";
-  icon: LucideIcon;
-  label: string;
-  hint: string;
-  href: string;
-};
-
-const ATTN_RANK: Record<AttentionItem["tone"], number> = { danger: 0, warning: 1, info: 2 };
-
-// Tone lives only in the small icon chip — keeps the row itself clean & light.
-const ROW_TONE: Record<string, string> = {
-  danger: "bg-destructive/12 text-destructive",
-  warning: "bg-warning/12 text-warning",
-  info: "bg-info/12 text-info",
-};
-
-// A slim, premium list row shared by "Needs attention" + "Awaiting sign-off".
-function ActionRow({
-  href, tone, icon: Icon, label, hint, amount,
-}: {
-  href: string; tone: string; icon: LucideIcon; label: string; hint: string; amount?: number;
-}) {
-  return (
-    <Link href={href} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40">
-      <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", ROW_TONE[tone] ?? ROW_TONE.info)}>
-        <Icon className="size-[18px]" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-foreground">{label}</p>
-        <p className="truncate text-xs text-muted-foreground">{hint}</p>
-      </div>
-      {amount != null && (
-        <span className="shrink-0 font-display text-sm font-semibold tabular-nums text-foreground">{formatCurrency(amount)}</span>
-      )}
-      <ChevronRight className="size-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />
-    </Link>
-  );
-}
-
-// Groups rows into one clean card with hairline dividers (no heavy per-row borders).
-function RowCard({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-card/50">
-      {children}
-    </div>
-  );
-}
-
-function AllClear({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="rounded-2xl border border-success/20 bg-success/[0.04] px-4 py-3 text-sm text-success">{children}</p>
-  );
-}
-
-export function NeedsAttention({ items }: { items: AttentionItem[] }) {
-  const sorted = [...items].sort((a, b) => ATTN_RANK[a.tone] - ATTN_RANK[b.tone]);
-  return (
-    <section>
-      <SectionLabel>Needs your attention</SectionLabel>
-      {sorted.length === 0 ? (
-        <AllClear>All clear — nothing needs your attention right now.</AllClear>
-      ) : (
-        <RowCard>
-          {sorted.map((a, i) => (
-            <ActionRow key={i} href={a.href} tone={a.tone} icon={a.icon} label={a.label} hint={a.hint} />
-          ))}
-        </RowCard>
-      )}
-    </section>
-  );
-}
-
-// ── 3a2 · Awaiting your sign-off — the finance pipeline the CEO can see & act on ─
-
-export type ApprovalCounts = {
-  cashSales: { count: number; amount: number };
-  creditSales: { count: number; amount: number };
-  collections: { count: number; amount: number };
-  fundRequests: { count: number; amount: number };
-};
-
-export function ExecutiveApprovals({ counts }: { counts: ApprovalCounts }) {
-  const rows = [
-    { show: counts.cashSales.count > 0, tone: "warning", icon: Banknote, label: `${counts.cashSales.count} cash ${counts.cashSales.count === 1 ? "sale" : "sales"} to confirm`, hint: "rep money awaiting your verification", amount: counts.cashSales.amount, href: "/admin/sales-approvals" },
-    { show: counts.creditSales.count > 0, tone: "info", icon: CreditCard, label: `${counts.creditSales.count} credit ${counts.creditSales.count === 1 ? "sale" : "sales"} to approve`, hint: "become receivables once you approve the terms", amount: counts.creditSales.amount, href: "/admin/sales-approvals" },
-    { show: counts.collections.count > 0, tone: "info", icon: Receipt, label: `${counts.collections.count} ${counts.collections.count === 1 ? "collection" : "collections"} to verify`, hint: "rep-collected repayments", amount: counts.collections.amount, href: "/admin/sales-approvals" },
-    { show: counts.fundRequests.count > 0, tone: "warning", icon: Wallet, label: `${counts.fundRequests.count} operational fund ${counts.fundRequests.count === 1 ? "request" : "requests"}`, hint: "Finance is waiting on your approval", amount: counts.fundRequests.amount, href: "/admin/finance/operational-fund" },
-  ].filter((r) => r.show);
-
-  return (
-    <section>
-      <SectionLabel action={<Link href="/admin/sales-approvals" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">Review all <ArrowRight className="size-3.5" /></Link>}>
-        Awaiting your sign-off · finance pipeline
-      </SectionLabel>
-      {rows.length === 0 ? (
-        <AllClear>Nothing awaiting your sign-off — Finance is all caught up.</AllClear>
-      ) : (
-        <RowCard>
-          {rows.map((r, i) => (
-            <ActionRow key={i} href={r.href} tone={r.tone} icon={r.icon} label={r.label} hint={r.hint} amount={r.amount} />
-          ))}
-        </RowCard>
-      )}
-    </section>
-  );
-}
+// The "Needs your attention" command center now lives in its own client
+// component — components/admin/attention-center.tsx (filter + scroll + animation).
 
 // ── 3b · Executive quick links — jump to the pages a CEO acts from. The money
 //        actions (record expense / issue funds / add capital) are rendered as
