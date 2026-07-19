@@ -10,7 +10,7 @@ Project → Settings → Environment Variables (Production), then **redeploy**:
 
 | Variable | Value |
 |---|---|
-| `CALLMEBOT_PHONE` | CEO number, international, no `+` — e.g. `255766790794` |
+| `CALLMEBOT_PHONE` | Admin WhatsApp number, international, no `+` — e.g. `447516239665` |
 | `CALLMEBOT_APIKEY` | Your CallMeBot API key |
 | `CRON_SECRET` | A random secret — generate with `openssl rand -hex 24` |
 | `BLOB_READ_WRITE_TOKEN` | Already set (used for PDF storage). Add a Vercel Blob store if missing. |
