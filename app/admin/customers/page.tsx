@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { MasterCustomersTables } from "@/components/admin/master-customers-tables";
 import { CustomerIntelligencePanel } from "@/components/admin/command-sections";
@@ -20,8 +21,15 @@ export default async function AdminCustomersPage() {
     <div className="space-y-8">
       <PageHeader
         title="Customers"
-        description="ORA's master customer database — partners and field customers acquired by the sales team, in one place."
-      />
+        description="ORA's master customer database — partners and field customers acquired by the sales team, in one place. Register new customers or onboard existing ones with their opening balances."
+      >
+        <Link
+          href="/admin/reps/customers/new"
+          className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          + Register customer
+        </Link>
+      </PageHeader>
       <CustomerIntelligencePanel cust={intelligence} />
       <MasterCustomersTables
         partners={partners}
