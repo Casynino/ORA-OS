@@ -13,6 +13,7 @@ import {
   releaseWarehouseReservation,
 } from "@/lib/services/warehouse-stock";
 import { resolveReceivingAccount, isCashMethod } from "@/lib/payment-methods";
+import { notifyRepReport } from "@/lib/notifications/ceo-alerts";
 import { refCode } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 import type { FieldCreditStatus } from "@prisma/client";
@@ -583,6 +584,7 @@ export async function submitFieldReport(
       summary: `${actor.name} filed a field report from ${d.location}.`,
     });
     revalidateField();
+    await notifyRepReport(actor.name, d.location); // WhatsApp the CEO
     return ok(undefined, "Report submitted — the ORA team can see it now.");
   } catch (e) {
     return fail(errorMessage(e));

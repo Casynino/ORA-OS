@@ -3,10 +3,12 @@ import { prisma } from "@/lib/db";
 import { getStockTotals } from "@/lib/services/inventory";
 import { PageHeader } from "@/components/ui/page-header";
 import { KpiCard } from "@/components/admin/kpi-card";
-import { formatCurrency, formatNumber } from "@/lib/utils";
+import { ReportsManager } from "@/components/admin/reports-manager";
+
+export const dynamic = "force-dynamic";
 
 export default async function AdminReportsPage() {
-  const [stock, salesAgg, impactAgg, activityCount, creditAgg, products] =
+  const [stock, salesAgg, impactAgg, activityCount, creditAgg, products, reportSettings, reportRows] =
     await Promise.all([
       getStockTotals(),
       prisma.request.aggregate({ _sum: { totalAmount: true }, _count: true, where: { status: "FULFILLED" } }),
@@ -17,7 +19,17 @@ export default async function AdminReportsPage() {
       prisma.impactActivity.count({ where: { isPublished: true } }),
       prisma.creditAccount.aggregate({ _sum: { principal: true, amountPaid: true }, where: { status: { not: "SETTLED" } } }),
       prisma.product.findMany({ include: { inventory: true } }),
+      prisma.reportSettings.findUnique({ where: { id: "singleton" } }),
+      prisma.report.findMany({ orderBy: { periodStart: "desc" }, take: 60, select: { id: true, type: true, title: true, periodStart: true, whatsappSent: true, pdfUrl: true } }),
     ]);
+
+  const reportsForClient = reportRows.map((r) => ({
+    id: r.id, type: r.type, title: r.title,
+    periodStart: r.periodStart.toISOString(), whatsappSent: r.whatsappSent, hasPdf: !!r.pdfUrl,
+  }));
+  const settingsForClient = reportSettings
+    ? { dailyEnabled: reportSettings.dailyEnabled, dailyHourEat: reportSettings.dailyHourEat, monthlyEnabled: reportSettings.monthlyEnabled, creditReminderEnabled: reportSettings.creditReminderEnabled, fundRequestAlerts: reportSettings.fundRequestAlerts, repReportAlerts: reportSettings.repReportAlerts }
+    : null;
 
   const inventoryValue = products.reduce((s, p) => s + (p.inventory?.warehouseQty ?? 0) * p.costPrice, 0);
   const outstanding = (creditAgg._sum.principal ?? 0) - (creditAgg._sum.amountPaid ?? 0);
@@ -31,7 +43,12 @@ export default async function AdminReportsPage() {
 
   return (
     <div className="space-y-7">
-      <PageHeader title="Reports" description="Live snapshot of stock, sales and finance across Ora." />
+      <PageHeader title="Reports" description="Automated executive reports (WhatsApp + archived PDFs) plus a live snapshot of stock, sales and finance." />
+
+      <section>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Executive reports · WhatsApp &amp; PDF archive</p>
+        <ReportsManager settings={settingsForClient} reports={reportsForClient} />
+      </section>
 
       <Section title="Stock report">
         <KpiCard label="On hand" value={stock.warehouse} suffix=" units" icon={Package} accent="primary" />

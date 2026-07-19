@@ -39,3 +39,4 @@ yarn-error.log*
 /public/uploads/
 
 .claude/
+/public/reports/
