@@ -260,6 +260,18 @@ export async function recordFieldSale(
         });
       }
 
+      // Capture each product's standard selling price NOW (server-side, not from
+      // the client) so reporting can compare the actual price charged vs the
+      // default — reps/finance may adjust per customer.
+      const defaultPrices = new Map(
+        (
+          await tx.product.findMany({
+            where: { id: { in: d.items.map((i) => i.productId) } },
+            select: { id: true, price: true },
+          })
+        ).map((p) => [p.id, p.price]),
+      );
+
       // CASH sales record how & where the money landed — the receiving
       // account is the anchor for finance reconciliation.
       const receiving =
@@ -293,6 +305,7 @@ export async function recordFieldSale(
               productId: i.productId,
               quantity: i.quantity,
               unitPrice: i.unitPrice,
+              defaultPrice: defaultPrices.get(i.productId) ?? null,
               lineTotal: i.quantity * i.unitPrice,
             })),
           },
