@@ -1621,5 +1621,6 @@ model ReportSettings {
   creditReminderEnabled Boolean  @default(true)
   fundRequestAlerts     Boolean  @default(true)
   repReportAlerts       Boolean  @default(true)
+  paymentConfirmAlerts  Boolean  @default(true)
   updatedAt             DateTime @updatedAt
 }

@@ -20,17 +20,15 @@ export default async function AdminReportsPage() {
       prisma.creditAccount.aggregate({ _sum: { principal: true, amountPaid: true }, where: { status: { not: "SETTLED" } } }),
       prisma.product.findMany({ include: { inventory: true } }),
       prisma.reportSettings.findUnique({ where: { id: "singleton" } }),
-      prisma.report.findMany({ orderBy: { periodStart: "desc" }, take: 60, select: { id: true, type: true, title: true, periodStart: true, whatsappSent: true, pdfUrl: true } }),
+      prisma.report.findMany({ orderBy: { createdAt: "desc" }, take: 200, select: { id: true, type: true, title: true, periodStart: true, createdAt: true, whatsappSent: true } }),
     ]);
 
   const reportsForClient = reportRows.map((r) => ({
     id: r.id, type: r.type, title: r.title,
-    // Always viewable — /r/[id] regenerates the PDF from archived data if it
-    // wasn't stored in Blob.
-    periodStart: r.periodStart.toISOString(), whatsappSent: r.whatsappSent, hasPdf: true,
+    periodStart: r.periodStart.toISOString(), createdAt: r.createdAt.toISOString(), whatsappSent: r.whatsappSent,
   }));
   const settingsForClient = reportSettings
-    ? { dailyEnabled: reportSettings.dailyEnabled, dailyHourEat: reportSettings.dailyHourEat, monthlyEnabled: reportSettings.monthlyEnabled, creditReminderEnabled: reportSettings.creditReminderEnabled, fundRequestAlerts: reportSettings.fundRequestAlerts, repReportAlerts: reportSettings.repReportAlerts }
+    ? { dailyEnabled: reportSettings.dailyEnabled, dailyHourEat: reportSettings.dailyHourEat, monthlyEnabled: reportSettings.monthlyEnabled, creditReminderEnabled: reportSettings.creditReminderEnabled, fundRequestAlerts: reportSettings.fundRequestAlerts, repReportAlerts: reportSettings.repReportAlerts, paymentConfirmAlerts: reportSettings.paymentConfirmAlerts }
     : null;
 
   const inventoryValue = products.reduce((s, p) => s + (p.inventory?.warehouseQty ?? 0) * p.costPrice, 0);
@@ -48,7 +46,7 @@ export default async function AdminReportsPage() {
       <PageHeader title="Reports" description="Automated executive reports (WhatsApp + archived PDFs) plus a live snapshot of stock, sales and finance." />
 
       <section>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Executive reports · WhatsApp &amp; PDF archive</p>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Report Center · automated WhatsApp &amp; PDF archive</p>
         <ReportsManager settings={settingsForClient} reports={reportsForClient} />
       </section>
 

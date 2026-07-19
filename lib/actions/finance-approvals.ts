@@ -8,6 +8,7 @@ import { logActivity } from "@/lib/activity";
 import { applyMovement } from "@/lib/services/inventory";
 import { refCode } from "@/lib/utils";
 import { isCashMethod } from "@/lib/payment-methods";
+import { notifyPaymentConfirmed } from "@/lib/notifications/ceo-alerts";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -103,6 +104,11 @@ export async function approveFieldSale(
             : `Finance verified the ${sale.paymentMethod ?? "payment"} for ${who} (${sale.code}, rep ${sale.rep.name}) — TSh ${sale.total.toLocaleString()}.`,
     });
     revalidateApprovals();
+    // Instant CEO alert on money-in (cash/bank/mobile received). Credit-sale
+    // approval isn't a payment, so it's excluded.
+    if (sale.type === "CASH") {
+      await notifyPaymentConfirmed({ customer: who, amount: sale.total, method: sale.paymentMethod, verifiedBy: actor.name });
+    }
     return ok(
       undefined,
       sale.type === "CREDIT"
@@ -279,6 +285,8 @@ export async function approveFieldCollection(
       summary: `Finance confirmed TSh ${payment.amount.toLocaleString()} collected on ${sale.code}${sale.customer ? ` (${sale.customer.name})` : ""} — submitted by ${payment.recordedBy.name}.`,
     });
     revalidateApprovals();
+    // Instant CEO alert — a customer credit payment was verified.
+    await notifyPaymentConfirmed({ customer: sale.customer?.name ?? "Customer", amount: payment.amount, method: payment.method, verifiedBy: actor.name });
     return ok(undefined, "Collection confirmed and posted to the customer's balance.");
   } catch (e) {
     return fail(errorMessage(e));

@@ -6,21 +6,22 @@ import { tsh } from "./pdf-kit";
 import { sendWhatsApp, appBaseUrl, type WhatsAppResult } from "@/lib/notifications/whatsapp";
 
 export function buildMonthlyWhatsApp(d: MonthlyReportData, link: string): string {
-  const lines = [
-    "📈 ORA Monthly Executive Report",
-    `Month: ${d.monthLabel}`,
+  return [
+    "📈 ORA Monthly Report",
+    d.monthLabel,
     "",
-    `• Revenue: ${tsh(d.revenue.total)}`,
-    `• Collections: ${tsh(d.collections)}`,
-    `• Expenses: ${tsh(d.expenses)}`,
-    `• Operating profit: ${tsh(d.profit)}`,
-    `• Outstanding credit: ${tsh(d.outstanding)}`,
-    `• New customers: ${d.newCustomers}`,
-  ];
-  if (d.growthPct != null) lines.push(`• Growth: ${d.growthPct >= 0 ? "+" : ""}${d.growthPct}% vs last month`);
-  if (d.topRep) lines.push(`• Top rep: ${d.topRep.name}`);
-  lines.push("", "Full monthly report:", link);
-  return lines.join("\n");
+    `Revenue:\n${tsh(d.revenue.total)}`,
+    "",
+    `Cash Revenue:\n${tsh(d.revenue.cash)}`,
+    "",
+    `Credit Revenue:\n${tsh(d.revenue.credit)}`,
+    "",
+    `Collections:\n${tsh(d.collections)}`,
+    "",
+    `Outstanding Credit:\n${tsh(d.outstanding)}`,
+    "",
+    `Full Report:\n${link}`,
+  ].join("\n");
 }
 
 export async function generateMonthlyReport(ref: Date = new Date(), opts?: { send?: boolean }) {

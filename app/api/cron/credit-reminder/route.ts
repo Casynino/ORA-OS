@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Morning credit-collection reminder (external scheduler, secret-gated).
- * Checks credit accounts due today or already overdue; WhatsApps the CEO a
- * short nudge. No message is sent when nothing is due.
+ * Lists customers due today or overdue with their status + total outstanding.
+ * No message is sent when nothing is due.
  */
 export async function GET(req: Request) {
   if (!cronAuthorized(req)) return new NextResponse("Unauthorized", { status: 401 });
@@ -25,28 +25,47 @@ export async function GET(req: Request) {
       creditStatus: { in: ["PENDING", "PARTIAL", "OVERDUE"] },
       OR: [{ creditStatus: "OVERDUE" }, { dueDate: { gte: start, lt: end } }],
     },
-    select: { customerId: true, total: true, amountPaid: true, creditStatus: true },
+    select: {
+      total: true, amountPaid: true, creditStatus: true, dueDate: true, customerName: true,
+      customer: { select: { name: true, businessName: true } },
+    },
   });
 
-  const byCustomer = new Map<string, number>();
-  let totalDue = 0, overdue = 0;
+  // Aggregate per customer: balance owed + the most-overdue status.
+  type Row = { name: string; balance: number; overdueDays: number };
+  const byCustomer = new Map<string, Row>();
+  let totalDue = 0;
   for (const s of sales) {
     const bal = Math.max(0, s.total - s.amountPaid);
     if (bal <= 0) continue;
     totalDue += bal;
-    if (s.creditStatus === "OVERDUE") overdue += 1;
-    const key = s.customerId ?? "walk-in";
-    byCustomer.set(key, (byCustomer.get(key) ?? 0) + bal);
+    const name = s.customer?.businessName ?? s.customer?.name ?? s.customerName ?? "Customer";
+    const overdueDays = s.creditStatus === "OVERDUE" && s.dueDate
+      ? Math.max(1, Math.round((start.getTime() - s.dueDate.getTime()) / 86_400_000))
+      : 0;
+    const cur = byCustomer.get(name) ?? { name, balance: 0, overdueDays: 0 };
+    cur.balance += bal;
+    cur.overdueDays = Math.max(cur.overdueDays, overdueDays);
+    byCustomer.set(name, cur);
   }
-  const customers = byCustomer.size;
-  if (customers === 0) return NextResponse.json({ skipped: "nothing due today" });
+
+  const rows = [...byCustomer.values()];
+  if (rows.length === 0) return NextResponse.json({ skipped: "nothing due today" });
+
+  // Most urgent first (overdue by most days), then biggest balance.
+  rows.sort((a, b) => b.overdueDays - a.overdueDays || b.balance - a.balance);
+  const list = rows.slice(0, 10)
+    .map((r) => `• ${r.name} — ${r.overdueDays > 0 ? `${r.overdueDays} day${r.overdueDays === 1 ? "" : "s"} overdue` : "Due today"}`)
+    .join("\n");
+  const more = rows.length > 10 ? `\n…and ${rows.length - 10} more` : "";
 
   const text =
-    `💳 Credit Collection Reminder\n\n` +
-    `${customers} customer${customers === 1 ? "" : "s"} ${overdue > 0 ? `(${overdue} overdue) ` : ""}need follow-up today.\n` +
-    `Total Due: ${formatCurrency(totalDue)}\n\n` +
-    `Finance should follow up on these accounts.\nOpen ORA OS for details.`;
+    `⚠️ Credit Collection Reminder\n\n` +
+    `${rows.length} customer${rows.length === 1 ? "" : "s"} require follow-up.\n\n` +
+    `Total Outstanding:\n${formatCurrency(totalDue)}\n\n` +
+    `Customers:\n${list}${more}\n\n` +
+    `Finance follow-up required.`;
 
   const whatsapp = await sendWhatsApp(text);
-  return NextResponse.json({ ok: true, customers, totalDue, overdue, whatsapp });
+  return NextResponse.json({ ok: true, customers: rows.length, totalDue, whatsapp });
 }
