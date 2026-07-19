@@ -11,7 +11,7 @@ import { CustomerInventorySummary } from "@/components/customers/customer-invent
 import { CustomerTimeline } from "@/components/customers/customer-timeline";
 import { CreditLimitControl } from "@/components/customers/credit-limit-control";
 import { CustomerEditControls } from "@/components/customers/customer-edit-controls";
-import { AssignRepControl, RecordOpeningBalanceButton } from "@/components/customers/customer-ownership-controls";
+import { AssignRepControl } from "@/components/customers/customer-ownership-controls";
 import { CustomerNoteForm } from "@/components/customers/customer-note-form";
 import { FieldCollectionButton } from "@/components/finance/field-collection-button";
 import { RequestExtensionButton } from "@/components/finance/request-extension-button";
@@ -146,7 +146,6 @@ export function CustomerProfileView({
             currentRepId={profile.rep?.id ?? null}
             reps={reps}
           />
-          <RecordOpeningBalanceButton customerId={profile.id} />
         </div>
       )}
 

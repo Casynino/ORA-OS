@@ -16,7 +16,7 @@ export default async function FinanceCustomersPage() {
     <div className="space-y-8">
       <PageHeader
         title="Customer database"
-        description="Every ORA customer in one place — partners and field customers. The customer belongs to ORA; a rep manages the relationship. Onboard existing customers here with their opening balances."
+        description="Every ORA customer in one place — partners and field customers. The customer belongs to ORA; a rep manages the relationship. Register new customers here."
       >
         <Link
           href="/finance/customers/new"
