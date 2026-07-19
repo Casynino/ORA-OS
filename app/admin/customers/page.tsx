@@ -21,7 +21,7 @@ export default async function AdminCustomersPage() {
     <div className="space-y-8">
       <PageHeader
         title="Customers"
-        description="ORA's master customer database — partners and field customers acquired by the sales team, in one place. Register new customers or onboard existing ones with their opening balances."
+        description="ORA's master customer database — partners and field customers acquired by the sales team, in one place. Register new customers here."
       >
         <Link
           href="/admin/reps/customers/new"

@@ -18,13 +18,12 @@ export default async function AdminRegisterCustomerPage() {
       </Link>
       <PageHeader
         title="Register customer"
-        description="Add a customer to ORA's central database. Assign a managing sales rep (or leave unassigned), set a credit limit, and record any existing outstanding debt as an opening balance."
+        description="Add a customer to ORA's central database. Assign a managing sales rep (or leave unassigned) and set a credit limit."
       />
       <CustomerForm
         startOpen
         canAssignRep
         canSetCreditLimit
-        canRecordOpeningBalance
         reps={reps}
         redirectTo="/admin/reps/customers"
       />
