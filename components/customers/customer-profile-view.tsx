@@ -11,6 +11,7 @@ import { CustomerInventorySummary } from "@/components/customers/customer-invent
 import { CustomerTimeline } from "@/components/customers/customer-timeline";
 import { CreditLimitControl } from "@/components/customers/credit-limit-control";
 import { CustomerEditControls } from "@/components/customers/customer-edit-controls";
+import { AssignRepControl, RecordOpeningBalanceButton } from "@/components/customers/customer-ownership-controls";
 import { CustomerNoteForm } from "@/components/customers/customer-note-form";
 import { FieldCollectionButton } from "@/components/finance/field-collection-button";
 import { RequestExtensionButton } from "@/components/finance/request-extension-button";
@@ -30,6 +31,7 @@ export function CustomerProfileView({
   backLabel,
   accounts,
   repHref,
+  reps = [],
 }: {
   profile: CustomerProfile;
   role: "SALES_REP" | "ADMIN" | "FINANCE";
@@ -37,6 +39,7 @@ export function CustomerProfileView({
   backLabel: string;
   accounts: ReceivingAccount[];
   repHref?: string;
+  reps?: { id: string; name: string }[];
 }) {
   const canManageCredit = role === "ADMIN" || role === "FINANCE";
 
@@ -76,15 +79,24 @@ export function CustomerProfileView({
             )}
             <span>customer since {formatDate(profile.createdAt)}</span>
           </div>
-          <p className="mt-2 text-sm">
-            <span className="text-muted-foreground">Assigned sales rep: </span>
-            {repHref ? (
-              <Link href={repHref} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
-                <BadgeCheck className="size-3.5" /> {profile.rep.name}
-              </Link>
-            ) : (
-              <span className="inline-flex items-center gap-1 font-medium">
-                <BadgeCheck className="size-3.5 text-primary" /> {profile.rep.name}
+          <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <span>
+              <span className="text-muted-foreground">Managed by: </span>
+              {profile.rep == null ? (
+                <span className="font-medium text-muted-foreground">Unassigned</span>
+              ) : repHref ? (
+                <Link href={repHref} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+                  <BadgeCheck className="size-3.5" /> {profile.rep.name}
+                </Link>
+              ) : (
+                <span className="inline-flex items-center gap-1 font-medium">
+                  <BadgeCheck className="size-3.5 text-primary" /> {profile.rep.name}
+                </span>
+              )}
+            </span>
+            {profile.registeredBy && (
+              <span className="text-muted-foreground">
+                Registered by <span className="font-medium text-foreground">{profile.registeredBy}</span>
               </span>
             )}
           </p>
@@ -129,6 +141,12 @@ export function CustomerProfileView({
             listHref={backHref}
             hasSales={profile.sales.length > 0}
           />
+          <AssignRepControl
+            customerId={profile.id}
+            currentRepId={profile.rep?.id ?? null}
+            reps={reps}
+          />
+          <RecordOpeningBalanceButton customerId={profile.id} />
         </div>
       )}
 
@@ -148,7 +166,11 @@ export function CustomerProfileView({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-display font-semibold">{s.code}</span>
-                    <StatusBadge status={s.type} />
+                    {s.isOpeningBalance ? (
+                      <Badge variant="secondary">opening balance</Badge>
+                    ) : (
+                      <StatusBadge status={s.type} />
+                    )}
                     {s.creditStatus && <StatusBadge status={s.creditStatus} />}
                     {s.financeStatus === "PENDING" && (
                       <Badge variant="warning">awaiting finance</Badge>

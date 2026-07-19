@@ -21,6 +21,9 @@ export default async function FinanceReturnsPage() {
         type: "CREDIT",
         financeStatus: "APPROVED",
         voided: false,
+        // Opening balances carry no goods — they're collected as cash, never
+        // recovered via a return — so they don't belong in the debt-return list.
+        isOpeningBalance: false,
       },
       orderBy: { createdAt: "asc" },
       include: {

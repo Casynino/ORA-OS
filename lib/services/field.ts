@@ -19,6 +19,15 @@ export function startOfMonth(d = new Date()) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
+/** Active sales reps for the "assign managing rep" picker (admin/finance forms). */
+export async function getSalesReps(): Promise<{ id: string; name: string }[]> {
+  return prisma.user.findMany({
+    where: { role: "SALES_REP", status: "ACTIVE" },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+}
+
 /** Flip stale PENDING/PARTIAL credit to OVERDUE once the due date passes. */
 export async function refreshOverdueFieldCredit() {
   await prisma.fieldSale.updateMany({
@@ -57,23 +66,25 @@ export async function getRepOverview(repId: string) {
   ] = await Promise.all([
     // Split every period by CASH vs CREDIT — the totals stay honest and the
     // rep (and admin) always see how a figure is composed.
+    // isOpeningBalance:false added inline (NOT to `live`, which also feeds the
+    // outstanding read below) — migrated debt is never a sale/revenue figure.
     prisma.fieldSale.groupBy({
       by: ["type"],
       _sum: { total: true },
       _count: { _all: true },
-      where: { ...live, createdAt: { gte: today } },
+      where: { ...live, isOpeningBalance: false, createdAt: { gte: today } },
     }),
     prisma.fieldSale.groupBy({
       by: ["type"],
       _sum: { total: true },
       _count: { _all: true },
-      where: { ...live, createdAt: { gte: week } },
+      where: { ...live, isOpeningBalance: false, createdAt: { gte: week } },
     }),
     prisma.fieldSale.groupBy({
       by: ["type"],
       _sum: { total: true },
       _count: { _all: true },
-      where: { ...live, createdAt: { gte: month } },
+      where: { ...live, isOpeningBalance: false, createdAt: { gte: month } },
     }),
     prisma.fieldSaleItem.aggregate({
       _sum: { quantity: true },
@@ -101,7 +112,7 @@ export async function getRepOverview(repId: string) {
       where: { repId_year_month: { repId, year: now.getFullYear(), month: now.getMonth() + 1 } },
     }),
     prisma.fieldSale.findMany({
-      where: { repId },
+      where: { repId, isOpeningBalance: false }, // recent SALES — an OB isn't one
       orderBy: { createdAt: "desc" },
       take: 8,
       include: { customer: { select: { name: true } }, items: { select: { quantity: true } } },
@@ -194,7 +205,7 @@ export async function getRepsPerformance(): Promise<RepPerformanceRow[]> {
     prisma.fieldSale.groupBy({
       by: ["repId", "type"],
       _sum: { total: true },
-      where: { repId: { in: ids }, voided: false, financeStatus: { not: "REJECTED" }, createdAt: { gte: month } },
+      where: { repId: { in: ids }, voided: false, financeStatus: { not: "REJECTED" }, isOpeningBalance: false, createdAt: { gte: month } },
     }),
     prisma.fieldSaleItem.groupBy({
       by: ["saleId"],

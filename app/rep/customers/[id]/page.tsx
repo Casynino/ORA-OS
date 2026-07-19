@@ -24,7 +24,8 @@ export default async function RepCustomerDetailPage({
       select: { id: true, name: true, type: true, accountName: true, accountNumber: true },
     }),
   ]);
-  if (!profile || profile.rep.id !== me.id) notFound();
+  // A rep sees only customers they manage — never unassigned ones.
+  if (!profile || profile.rep?.id !== me.id) notFound();
 
   return (
     <CustomerProfileView

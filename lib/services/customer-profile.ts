@@ -47,7 +47,8 @@ export type CustomerProfile = {
   creditSuspended: boolean;
   creditLimit: number | null;
   active: boolean;
-  rep: { id: string; name: string; region: string | null };
+  rep: { id: string; name: string; region: string | null } | null;
+  registeredBy: string | null;
   finance: {
     totalPurchases: number;
     totalCash: number;
@@ -79,6 +80,7 @@ export type CustomerProfile = {
     createdAt: Date;
     settledDate: Date | null;
     hasPendingExtension: boolean;
+    isOpeningBalance: boolean;
     items: { name: string; quantity: number }[];
   }[];
   extensions: ExtensionEntry[];
@@ -138,6 +140,7 @@ export async function getFieldCustomerRows(where: {
           type: true,
           creditStatus: true,
           createdAt: true,
+          isOpeningBalance: true,
           payments: { select: { createdAt: true, financeStatus: true } },
         },
       },
@@ -146,10 +149,13 @@ export async function getFieldCustomerRows(where: {
 
   const now = Date.now();
   return customers.map((c) => {
+    // Outstanding/overdue include opening balances (they're real debt); the
+    // "orders" count and purchase dates count only actual sales.
     const credit = c.sales.filter((s) => s.type === "CREDIT");
+    const realSales = c.sales.filter((s) => !s.isOpeningBalance);
     const outstanding = credit.reduce((a, s) => a + Math.max(0, s.total - s.amountPaid), 0);
     const overdue = credit.some((s) => s.creditStatus === "OVERDUE");
-    const purchaseDates = c.sales.map((s) => s.createdAt.getTime());
+    const purchaseDates = realSales.map((s) => s.createdAt.getTime());
     const lastPurchase = purchaseDates.length ? new Date(Math.max(...purchaseDates)) : null;
     const payDates = [
       ...c.sales.filter((s) => s.type === "CASH").map((s) => s.createdAt.getTime()),
@@ -175,7 +181,7 @@ export async function getFieldCustomerRows(where: {
       overdue,
       lastPurchase,
       lastPayment,
-      orders: c.sales.length,
+      orders: realSales.length,
     };
   });
 }
@@ -193,6 +199,7 @@ export async function getFieldCustomerProfile(
       where: { id },
       include: {
         rep: { select: { id: true, name: true, region: true } },
+        registeredBy: { select: { name: true } },
         sales: {
           orderBy: { createdAt: "desc" },
           include: {
@@ -222,12 +229,17 @@ export async function getFieldCustomerProfile(
   if (!customer) return null;
 
   const live = customer.sales.filter(isLive);
-  const creditSales = live.filter((s) => s.type === "CREDIT");
+  // Opening balances are migrated debt: they count toward outstanding/overdue and
+  // credit score (collections-facing), but NEVER toward revenue figures like
+  // "lifetime purchases" or credit billed (revenue-facing). Split the two here.
+  const creditSales = live.filter((s) => s.type === "CREDIT"); // incl. opening balances
   const cashSales = live.filter((s) => s.type === "CASH");
+  const revenueLive = live.filter((s) => !s.isOpeningBalance);
+  const revenueCreditSales = creditSales.filter((s) => !s.isOpeningBalance);
 
-  const totalPurchases = live.reduce((a, s) => a + s.total, 0);
+  const totalPurchases = revenueLive.reduce((a, s) => a + s.total, 0);
   const totalCash = cashSales.reduce((a, s) => a + s.total, 0);
-  const totalCredit = creditSales.reduce((a, s) => a + s.total, 0);
+  const totalCredit = revenueCreditSales.reduce((a, s) => a + s.total, 0); // revenue only
   // Money actually collected: cash sales + non-rejected collections (FieldPayment
   // rows). Uses payment records — NOT amountPaid — so debt-recovery returns that
   // bump amountPaid aren't miscounted as cash, and a pending collection counts the
@@ -255,16 +267,19 @@ export async function getFieldCustomerProfile(
       : null;
 
   // Simple 0–100 score: weighted mix of on-time (not overdue) and repaid ratio.
+  // Denominator is ALL credit incl. opening balances (collections-facing), so a
+  // migrated debt is scored on repayment — not excluded like the revenue total.
+  const creditBilled = creditSales.reduce((a, s) => a + s.total, 0);
   let creditScore: number | null = null;
-  if (totalCredit > 0) {
-    const onTime = 1 - overdue / totalCredit;
-    const repaid = (totalCredit - outstanding) / totalCredit;
+  if (creditBilled > 0) {
+    const onTime = 1 - overdue / creditBilled;
+    const repaid = (creditBilled - outstanding) / creditBilled;
     creditScore = Math.round(
       Math.max(0, Math.min(100, 100 * (0.6 * onTime + 0.4 * repaid))),
     );
   }
 
-  const lastPurchaseDate = live[0]?.createdAt ?? null;
+  const lastPurchaseDate = revenueLive[0]?.createdAt ?? null;
   const allPayDates = [
     ...cashSales.map((s) => s.createdAt),
     ...live.flatMap((s) =>
@@ -307,7 +322,7 @@ export async function getFieldCustomerProfile(
       id: `reg-${customer.id}`,
       kind: "registered",
       label: "Customer registered",
-      detail: `by ${customer.rep.name}`,
+      detail: `by ${customer.registeredBy?.name ?? customer.rep?.name ?? "ORA"}`,
       date: customer.createdAt,
     },
   ];
@@ -323,8 +338,12 @@ export async function getFieldCustomerProfile(
     timeline.push({
       id: `sale-${s.id}`,
       kind: s.type === "CASH" ? "cash" : "credit",
-      label: `${s.type === "CASH" ? "Cash" : "Credit"} sale ${s.code}`,
-      detail: s.items.map((i) => `${i.product.name} ×${i.quantity}`).join(" · "),
+      label: s.isOpeningBalance
+        ? `Opening balance ${s.code}`
+        : `${s.type === "CASH" ? "Cash" : "Credit"} sale ${s.code}`,
+      detail: s.isOpeningBalance
+        ? "migrated debt (pre-ORA-OS)"
+        : s.items.map((i) => `${i.product.name} ×${i.quantity}`).join(" · "),
       amount: s.total,
       date: s.createdAt,
       status: s.financeStatus === "PENDING" ? "awaiting finance" : s.creditStatus,
@@ -418,6 +437,7 @@ export async function getFieldCustomerProfile(
     creditLimit: customer.creditLimit,
     active,
     rep: customer.rep,
+    registeredBy: customer.registeredBy?.name ?? null,
     finance: {
       totalPurchases,
       totalCash,
@@ -445,6 +465,7 @@ export async function getFieldCustomerProfile(
       createdAt: s.createdAt,
       settledDate: settledDateFor(s),
       hasPendingExtension: pendingExtSaleIds.has(s.id),
+      isOpeningBalance: s.isOpeningBalance,
       items: s.items.map((i) => ({ name: i.product.name, quantity: i.quantity })),
     })),
     extensions,

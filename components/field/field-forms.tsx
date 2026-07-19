@@ -7,10 +7,9 @@ import {
   submitFieldReport,
   requestRepStock,
   recordFieldCollection,
-  createFieldCustomer,
 } from "@/lib/actions/field";
 import { toast } from "@/components/ui/use-toast";
-import { CUSTOMER_TYPES } from "@/lib/customer-types";
+import { CustomerForm } from "@/components/customers/customer-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -419,143 +418,9 @@ export function CollectForm({
   );
 }
 
-/** Add a customer to the rep's book — full profile, auto-owned by this rep.
- * `startOpen` renders the form expanded (for the dedicated Register page). */
+/** Add a customer to the rep's book — the shared CustomerForm with the base
+ * profile fields only (a rep sets neither the managing rep, credit limit, nor an
+ * opening balance). `startOpen` renders it expanded for the dedicated page. */
 export function NewCustomerForm({ startOpen = false }: { startOpen?: boolean }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const [open, setOpen] = useState(startOpen);
-  const [businessName, setBusinessName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [customerType, setCustomerType] = useState("");
-  const [region, setRegion] = useState("");
-  const [district, setDistrict] = useState("");
-  const [location, setLocation] = useState("");
-  const [expectedVolume, setExpectedVolume] = useState("");
-  const [preferredPayment, setPreferredPayment] = useState("");
-  const [businessLicense, setBusinessLicense] = useState("");
-  const [taxId, setTaxId] = useState("");
-  const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
-  const [gpsBusy, setGpsBusy] = useState(false);
-
-  function captureGps() {
-    if (!navigator.geolocation) {
-      toast({ variant: "error", title: "GPS isn't available on this device." });
-      return;
-    }
-    setGpsBusy(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setGpsBusy(false);
-        toast({ variant: "success", title: "GPS location captured." });
-      },
-      () => {
-        setGpsBusy(false);
-        toast({ variant: "error", title: "Couldn't get your location." });
-      },
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
-  }
-
-  function submit() {
-    if (businessName.trim().length < 2) {
-      toast({ variant: "error", title: "Enter the customer's business name." });
-      return;
-    }
-    start(async () => {
-      const res = await createFieldCustomer({
-        businessName,
-        email,
-        phone,
-        location,
-        region,
-        district,
-        customerType,
-        expectedVolume,
-        preferredPayment,
-        businessLicense,
-        taxId,
-        gpsLat: gps?.lat,
-        gpsLng: gps?.lng,
-        notes: "",
-      });
-      if (res.ok) {
-        toast({ variant: "success", title: res.message });
-        setOpen(false);
-        setBusinessName(""); setEmail(""); setPhone(""); setCustomerType("");
-        setRegion(""); setDistrict(""); setLocation(""); setExpectedVolume("");
-        setPreferredPayment(""); setBusinessLicense(""); setTaxId(""); setGps(null);
-        router.refresh();
-      } else toast({ variant: "error", title: res.error });
-    });
-  }
-
-  if (!open)
-    return (
-      <Button size="sm" className="rounded-full" onClick={() => setOpen(true)}>
-        Add customer
-      </Button>
-    );
-
-  return (
-    <div className="w-full space-y-2.5 rounded-xl border border-border p-3">
-      <div className="grid gap-2.5 sm:grid-cols-2">
-        <Input placeholder="Business / organisation name *" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="h-9 sm:col-span-2" />
-        <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-9" />
-        <Input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-9" />
-        <select
-          value={customerType}
-          onChange={(e) => setCustomerType(e.target.value)}
-          className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
-        >
-          <option value="">Business type…</option>
-          {CUSTOMER_TYPES.map((t) => (
-            <option key={t}>{t}</option>
-          ))}
-        </select>
-        <select
-          value={preferredPayment}
-          onChange={(e) => setPreferredPayment(e.target.value)}
-          className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
-        >
-          <option value="">Preferred payment…</option>
-          <option>Cash</option>
-          <option>Credit</option>
-        </select>
-        <Input placeholder="Region" value={region} onChange={(e) => setRegion(e.target.value)} className="h-9" />
-        <Input placeholder="District" value={district} onChange={(e) => setDistrict(e.target.value)} className="h-9" />
-        <div className="sm:col-span-2">
-          <Input placeholder="Street / physical address" value={location} onChange={(e) => setLocation(e.target.value)} className="h-9" />
-          <p className="mt-1 text-[11px] text-muted-foreground">This becomes their default delivery address.</p>
-        </div>
-        <Input placeholder="Expected monthly volume — e.g. 500 packs" value={expectedVolume} onChange={(e) => setExpectedVolume(e.target.value)} className="h-9" />
-        <Input placeholder="Business licence (optional)" value={businessLicense} onChange={(e) => setBusinessLicense(e.target.value)} className="h-9" />
-        <Input placeholder="Tax ID / TIN (optional)" value={taxId} onChange={(e) => setTaxId(e.target.value)} className="h-9 sm:col-span-2" />
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={captureGps}
-          disabled={gpsBusy}
-          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-            gps
-              ? "border-success/40 bg-success/10 text-success"
-              : "border-border text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {gpsBusy ? "Getting GPS…" : gps ? "✓ GPS captured" : "Capture GPS location"}
-        </button>
-        <div className="ml-auto flex gap-2">
-          <Button size="sm" className="rounded-full" disabled={pending || businessName.trim().length < 2} onClick={submit}>
-            {pending ? "Saving…" : "Save customer"}
-          </Button>
-          <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+  return <CustomerForm startOpen={startOpen} />;
 }

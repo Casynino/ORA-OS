@@ -43,7 +43,13 @@ function revalidateField() {
     "/rep/reports",
     "/rep/targets",
     "/admin/reps",
+    "/admin/reps/customers",
+    "/admin/customers",
+    "/admin/credit",
     "/admin",
+    "/finance",
+    "/finance/customers",
+    "/finance/credit",
     "/warehouse",
     "/warehouse/rep-requests",
   ])
@@ -184,7 +190,8 @@ export async function recordFieldSale(
             taxId: d.newCustomer.taxId || null,
             gpsLat: d.newCustomer.gpsLat ?? null,
             gpsLng: d.newCustomer.gpsLng ?? null,
-            repId: actor.id, // customer belongs to the rep who created them
+            repId: actor.id, // customer managed by the rep who created them
+            registeredById: actor.id,
           },
         });
         customerId = c.id;
@@ -571,6 +578,8 @@ export async function submitFieldReport(
 
 // ── Customers ───────────────────────────────────────────────────────────────
 
+const MAX_TSH = 2_147_483_647; // int4 ceiling — TSh amounts are whole ints
+
 const customerSchema = z.object({
   // Customers are identified by their business/trading name only — we never
   // capture a personal contact name (it can compromise the customer).
@@ -588,42 +597,135 @@ const customerSchema = z.object({
   gpsLat: z.number().min(-90).max(90).optional(),
   gpsLng: z.number().min(-180).max(180).optional(),
   notes: z.string().max(500).optional().or(z.literal("")),
+  // ── ADMIN/FINANCE-only extras (ignored/forced for reps) ──
+  repId: z.string().trim().optional().or(z.literal("")), // managing rep to assign
+  creditLimit: z.number().int().min(0).max(MAX_TSH).optional(), // per-customer cap
+  openingBalance: z.number().int().positive().max(MAX_TSH).optional(), // migrated debt
+  creditStartDate: z.string().optional().or(z.literal("")),
+  dueDate: z.string().optional().or(z.literal("")),
 });
+
+function parseDate(s?: string | null): Date | null {
+  if (!s) return null;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// Shape a migrated opening-balance FieldSale — an APPROVED CREDIT receivable
+// with NO line items (so it deducts no stock and never counts as a sale). Shared
+// by createFieldCustomer (at registration) and recordOpeningBalance (from the
+// profile later). Reuses creditStatusFor so overdue/partial math matches sales.
+function openingBalanceSaleData(opts: {
+  customerId: string;
+  repId: string; // managing rep, or the registering user when unassigned
+  reviewerId: string; // the ADMIN/FINANCE user recording it
+  amount: number;
+  createdAt: Date;
+  dueDate: Date;
+}) {
+  return {
+    code: refCode("OB"),
+    type: "CREDIT" as const,
+    isOpeningBalance: true,
+    repId: opts.repId,
+    customerId: opts.customerId,
+    total: opts.amount,
+    amountPaid: 0,
+    creditStatus: creditStatusFor(opts.amount, 0, opts.dueDate),
+    dueDate: opts.dueDate,
+    financeStatus: "APPROVED" as const,
+    financeReviewedById: opts.reviewerId,
+    financeReviewedAt: new Date(),
+    financeNote: "Opening balance (migrated)",
+    note: "Opening balance migration",
+    createdAt: opts.createdAt,
+  };
+}
 
 export async function createFieldCustomer(
   input: z.infer<typeof customerSchema>,
 ): Promise<ActionResult<{ id: string }>> {
   try {
-    const actor = await requireActor(["SALES_REP"]);
+    const actor = await requireActor(["SALES_REP", "ADMIN", "FINANCE"]);
     const parsed = customerSchema.safeParse(input);
     if (!parsed.success)
       return fail(parsed.error.issues[0]?.message ?? "Invalid customer.");
     const d = parsed.data;
     const biz = d.businessName.trim();
-    const c = await prisma.fieldCustomer.create({
-      data: {
-        // Business name is the sole identity; `name` mirrors it (NOT NULL column
-        // that every display reads).
-        name: biz,
-        businessName: biz,
-        email: d.email || null,
-        phone: d.phone || null,
-        location: d.location || null,
-        region: d.region || null,
-        district: d.district || null,
-        customerType: d.customerType || null,
-        expectedVolume: d.expectedVolume || null,
-        preferredPayment: d.preferredPayment || null,
-        businessLicense: d.businessLicense || null,
-        taxId: d.taxId || null,
-        gpsLat: d.gpsLat ?? null,
-        gpsLng: d.gpsLng ?? null,
-        notes: d.notes || null,
-        repId: actor.id, // ownership: the creating rep's book, never shared
-      },
+
+    // A rep only ever creates in their own book; ADMIN/FINANCE may assign a
+    // managing rep (or leave it unassigned) and record migration extras.
+    const isPrivileged = actor.role !== "SALES_REP";
+    let managingRepId: string | null = isPrivileged ? d.repId?.trim() || null : actor.id;
+    const creditLimit = isPrivileged ? (d.creditLimit ?? null) : null;
+
+    // Validate an assigned managing rep is actually a sales rep.
+    if (managingRepId) {
+      const rep = await prisma.user.findUnique({ where: { id: managingRepId }, select: { role: true } });
+      if (!rep || rep.role !== "SALES_REP") return fail("Assigned rep must be a sales representative.");
+    }
+
+    // Opening balance (migration) — privileged only.
+    const wantsOB = isPrivileged && !!d.openingBalance && d.openingBalance > 0;
+    const obDue = parseDate(d.dueDate);
+    const obStart = parseDate(d.creditStartDate) ?? new Date();
+    if (wantsOB && !obDue) return fail("An opening balance needs a payment due date.");
+
+    const created = await prisma.$transaction(async (tx) => {
+      const c = await tx.fieldCustomer.create({
+        data: {
+          // Business name is the sole identity; `name` mirrors it (NOT NULL column
+          // that every display reads).
+          name: biz,
+          businessName: biz,
+          email: d.email || null,
+          phone: d.phone || null,
+          location: d.location || null,
+          region: d.region || null,
+          district: d.district || null,
+          customerType: d.customerType || null,
+          expectedVolume: d.expectedVolume || null,
+          preferredPayment: d.preferredPayment || null,
+          businessLicense: d.businessLicense || null,
+          taxId: d.taxId || null,
+          gpsLat: d.gpsLat ?? null,
+          gpsLng: d.gpsLng ?? null,
+          notes: d.notes || null,
+          repId: managingRepId, // null = unassigned (managed by Finance/Admin)
+          registeredById: actor.id, // accountability: who created the profile
+          creditLimit,
+        },
+      });
+      if (wantsOB && obDue) {
+        await tx.fieldSale.create({
+          data: openingBalanceSaleData({
+            customerId: c.id,
+            repId: managingRepId ?? actor.id,
+            reviewerId: actor.id,
+            amount: d.openingBalance!,
+            createdAt: obStart,
+            dueDate: obDue,
+          }),
+        });
+      }
+      return c;
+    });
+
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "FIELD_CUSTOMER_REGISTERED",
+      entity: "FieldCustomer",
+      entityId: created.id,
+      summary: wantsOB
+        ? `${actor.name} registered ${biz} with an opening balance of TSh ${d.openingBalance!.toLocaleString()}.`
+        : `${actor.name} registered ${biz}.`,
     });
     revalidateField();
-    return ok({ id: c.id }, `${biz} added to your customers.`);
+    return ok(
+      { id: created.id },
+      isPrivileged ? `${biz} registered.` : `${biz} added to your customers.`,
+    );
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -1290,6 +1392,94 @@ export async function setFieldCustomerCreditLimit(
         ? `Credit limit removed for ${who}.`
         : `Credit limit set to TSh ${clean.toLocaleString()} for ${who}.`,
     );
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+/** ADMIN/FINANCE assign (or clear) the sales rep who manages this customer.
+ * null = unassigned (stays under Finance/Admin). Historical sales keep their
+ * original repId — only the customer's managing rep changes going forward. */
+export async function setFieldCustomerRep(
+  customerId: string,
+  repId: string | null,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["ADMIN", "FINANCE"]);
+    const cust = await prisma.fieldCustomer.findUnique({ where: { id: customerId } });
+    if (!cust) return fail("Customer not found.");
+    const clean = repId?.trim() || null;
+    if (clean) {
+      const rep = await prisma.user.findUnique({ where: { id: clean }, select: { role: true, name: true } });
+      if (!rep || rep.role !== "SALES_REP") return fail("Assigned rep must be a sales representative.");
+    }
+    await prisma.fieldCustomer.update({ where: { id: customerId }, data: { repId: clean } });
+    const who = cust.businessName ?? cust.name;
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "FIELD_CUSTOMER_REP_SET",
+      entity: "FieldCustomer",
+      entityId: customerId,
+      summary: clean
+        ? `${actor.name} assigned a managing rep to ${who}.`
+        : `${actor.name} left ${who} unassigned.`,
+    });
+    revalidateField();
+    return ok(undefined, clean ? `Managing rep assigned for ${who}.` : `${who} set to unassigned.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+const openingBalanceInputSchema = z.object({
+  amount: z.number().int().positive().max(MAX_TSH),
+  creditStartDate: z.string().optional().or(z.literal("")),
+  dueDate: z.string().min(1, "A due date is required."),
+});
+
+/** ADMIN/FINANCE record a pre-ORA-OS debt (opening balance) for an EXISTING
+ * customer — a migrated CREDIT receivable that behaves like an approved credit
+ * sale but is not a new sale (no stock, excluded from revenue). */
+export async function recordOpeningBalance(
+  customerId: string,
+  input: z.infer<typeof openingBalanceInputSchema>,
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const actor = await requireActor(["ADMIN", "FINANCE"]);
+    const parsed = openingBalanceInputSchema.safeParse(input);
+    if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid opening balance.");
+    const d = parsed.data;
+    const cust = await prisma.fieldCustomer.findUnique({
+      where: { id: customerId },
+      select: { id: true, name: true, businessName: true, repId: true },
+    });
+    if (!cust) return fail("Customer not found.");
+    const due = parseDate(d.dueDate);
+    if (!due) return fail("Enter a valid due date.");
+    const start = parseDate(d.creditStartDate) ?? new Date();
+
+    const sale = await prisma.fieldSale.create({
+      data: openingBalanceSaleData({
+        customerId: cust.id,
+        repId: cust.repId ?? actor.id, // managing rep, else the recorder
+        reviewerId: actor.id,
+        amount: d.amount,
+        createdAt: start,
+        dueDate: due,
+      }),
+    });
+    const who = cust.businessName ?? cust.name;
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "FIELD_OPENING_BALANCE_RECORDED",
+      entity: "FieldSale",
+      entityId: sale.code,
+      summary: `${actor.name} recorded a TSh ${d.amount.toLocaleString()} opening balance for ${who}.`,
+    });
+    revalidateField();
+    return ok({ id: sale.id }, `Opening balance of TSh ${d.amount.toLocaleString()} recorded for ${who}.`);
   } catch (e) {
     return fail(errorMessage(e));
   }

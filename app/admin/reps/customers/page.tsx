@@ -19,21 +19,22 @@ export default async function AdminFieldCustomersPage() {
     include: {
       rep: { select: { id: true, name: true } },
       // Rep-management view keeps PENDING visible but never counts finance-
-      // REJECTED sales toward revenue/owed.
+      // REJECTED sales toward revenue/owed. `isOpeningBalance` lets us keep
+      // migrated debt in outstanding while excluding it from lifetime sales.
       sales: {
         where: { voided: false, financeStatus: { not: "REJECTED" } },
-        select: { total: true, amountPaid: true, type: true },
+        select: { total: true, amountPaid: true, type: true, isOpeningBalance: true },
       },
     },
   });
 
+  const realTotal = (sales: { total: number; isOpeningBalance: boolean }[]) =>
+    sales.filter((x) => !x.isOpeningBalance).reduce((t, x) => t + x.total, 0);
+
   const totals = {
     customers: customers.length,
-    reps: new Set(customers.map((c) => c.repId)).size,
-    revenue: customers.reduce(
-      (s, c) => s + c.sales.reduce((t, x) => t + x.total, 0),
-      0,
-    ),
+    reps: new Set(customers.map((c) => c.repId).filter(Boolean)).size,
+    revenue: customers.reduce((s, c) => s + realTotal(c.sales), 0),
     outstanding: customers.reduce(
       (s, c) =>
         s +
@@ -48,14 +49,22 @@ export default async function AdminFieldCustomersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Field customers"
-        description="Every customer acquired by the sales team — each belongs to exactly one rep."
+        description="Every customer in ORA's central database — managed by a sales rep, or held by Finance/Admin until assigned."
       >
-        <Link
-          href="/admin/reps"
-          className="text-sm font-medium text-primary hover:underline"
-        >
-          ← Sales reps
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/reps"
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            ← Sales reps
+          </Link>
+          <Link
+            href="/admin/reps/customers/new"
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            + Register customer
+          </Link>
+        </div>
       </PageHeader>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -74,7 +83,8 @@ export default async function AdminFieldCustomersPage() {
       ) : (
         <div className="space-y-2">
           {customers.map((c) => {
-            const revenue = c.sales.reduce((s, x) => s + x.total, 0);
+            const revenue = realTotal(c.sales);
+            const realSaleCount = c.sales.filter((x) => !x.isOpeningBalance).length;
             const owed = c.sales
               .filter((x) => x.type === "CREDIT")
               .reduce((s, x) => s + Math.max(0, x.total - x.amountPaid), 0);
@@ -94,7 +104,7 @@ export default async function AdminFieldCustomersPage() {
                   </div>
                   <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                     <span className="font-medium text-foreground/80">
-                      Rep: {c.rep.name}
+                      Rep: {c.rep?.name ?? "Unassigned"}
                     </span>
                     {(c.location || c.region) && (
                       <span className="inline-flex items-center gap-1">
@@ -109,7 +119,7 @@ export default async function AdminFieldCustomersPage() {
                 <div className="shrink-0 text-right">
                   <p className="text-sm font-semibold">{formatCurrency(revenue)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {c.sales.length} sale{c.sales.length === 1 ? "" : "s"}
+                    {realSaleCount} sale{realSaleCount === 1 ? "" : "s"}
                     {owed > 0 ? ` · owes ${formatCurrency(owed)}` : ""}
                   </p>
                 </div>

@@ -86,10 +86,12 @@ export async function getCollectionsIntelligence(): Promise<CollectionsIntellige
         payments: { select: { createdAt: true }, orderBy: { createdAt: "desc" }, take: 1 },
       },
     }),
-    // Everything ever billed on credit, for the collection rate.
+    // Everything ever billed on credit ORA originated, for the collection rate.
+    // Opening balances are excluded — they measure legacy migration, not ORA's
+    // in-system collection performance.
     prisma.fieldSale.aggregate({
       _sum: { total: true, amountPaid: true },
-      where: { type: "CREDIT", voided: false, financeStatus: "APPROVED" },
+      where: { type: "CREDIT", voided: false, financeStatus: "APPROVED", isOpeningBalance: false },
     }),
     prisma.creditAccount.aggregate({ _sum: { principal: true, amountPaid: true } }),
   ]);
@@ -208,9 +210,10 @@ export async function getCustomerIntelligence(): Promise<CustomerIntelligence> {
     prisma.fieldCustomer.findMany({
       select: { id: true, name: true, businessName: true, customerType: true, createdAt: true },
     }),
-    // Approved, non-void sales — revenue + who's active this month.
+    // Approved, non-void sales — revenue + who's active this month. Opening
+    // balances excluded: they're migrated debt, not revenue or an active buy.
     prisma.fieldSale.findMany({
-      where: { voided: false, financeStatus: "APPROVED", customerId: { not: null } },
+      where: { voided: false, financeStatus: "APPROVED", isOpeningBalance: false, customerId: { not: null } },
       select: { customerId: true, total: true, createdAt: true },
     }),
     prisma.fieldSale.findMany({
@@ -321,7 +324,7 @@ export async function getBusinessTrends(months = 6): Promise<TrendPoint[]> {
 
   const [fieldSales, partnerOrders, payments, fieldPayments, expenses] = await Promise.all([
     prisma.fieldSale.findMany({
-      where: { voided: false, financeStatus: "APPROVED", createdAt: { gte: spanStart } },
+      where: { voided: false, financeStatus: "APPROVED", isOpeningBalance: false, createdAt: { gte: spanStart } },
       select: { type: true, total: true, createdAt: true },
     }),
     prisma.request.findMany({

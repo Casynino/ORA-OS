@@ -44,7 +44,7 @@ export default async function AdminRepDetailPage({
   const [d, sales, customers, samples, reports, inventories, accounts] = await Promise.all([
     getRepOverview(id),
     prisma.fieldSale.findMany({
-      where: { repId: id },
+      where: { repId: id, isOpeningBalance: false }, // sales list — exclude migrated debt
       orderBy: { createdAt: "desc" },
       take: 20,
       include: {

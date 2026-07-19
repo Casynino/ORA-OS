@@ -229,6 +229,7 @@ export async function getFinanceOverview(period: Period) {
         type: "CREDIT",
         voided: false,
         financeStatus: "APPROVED",
+        isOpeningBalance: false, // migrated debt is a receivable, not a credit sale
         ...(start ? { createdAt: { gte: start } } : {}),
       },
     }),

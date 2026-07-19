@@ -15,7 +15,7 @@ export default async function RepSalesHistoryPage() {
   const me = await requireRole("SALES_REP");
 
   const sales = await prisma.fieldSale.findMany({
-    where: { repId: me.id },
+    where: { repId: me.id, isOpeningBalance: false },
     orderBy: { createdAt: "desc" },
     take: 60,
     include: {
