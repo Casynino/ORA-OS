@@ -108,37 +108,44 @@ export function AttentionCenter({ items }: { items: AttnItem[] }) {
             </div>
           )}
 
-          {/* Bounded, scrolling priority list — fixed height, most urgent first. */}
-          <div key={active} className="max-h-[17.5rem] divide-y divide-border/50 overflow-y-auto scrollbar-thin">
+          {/* Bounded, scrolling priority list — a hard ~3-row cap so a busy queue
+              scrolls INSIDE the card and never pushes the dashboard down. */}
+          <div key={active} className="max-h-[10.5rem] divide-y divide-border/50 overflow-y-auto scrollbar-thin">
             {visible.map((item, i) => {
               const Icon = ICONS[item.iconKey];
               return (
                 <Link
                   key={item.key}
                   href={item.href}
-                  className="group flex animate-fade-in items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40"
-                  style={{ animationDelay: `${Math.min(i, 7) * 45}ms` }}
+                  className="group flex animate-fade-in items-center gap-2.5 px-3.5 py-2.5 transition-colors hover:bg-muted/40"
+                  style={{ animationDelay: `${Math.min(i, 7) * 40}ms` }}
                 >
-                  <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", TONE_CHIP[item.tone])}>
-                    <Icon className="size-[18px]" />
+                  <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", TONE_CHIP[item.tone])}>
+                    <Icon className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-foreground">{item.label}</p>
-                    <p className="truncate text-xs text-muted-foreground">{item.hint}</p>
+                    <p className="truncate text-sm font-semibold leading-tight text-foreground">{item.label}</p>
+                    <p className="truncate text-[11px] leading-tight text-muted-foreground">{item.hint}</p>
                   </div>
                   {item.amount != null && (
-                    <span className="shrink-0 font-display text-sm font-semibold tabular-nums text-foreground">{formatCurrency(item.amount)}</span>
+                    <span className="shrink-0 font-display text-[13px] font-semibold tabular-nums text-foreground">{formatCurrency(item.amount)}</span>
                   )}
                   <ChevronRight className="size-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />
                 </Link>
               );
             })}
             {visible.length === 0 && (
-              <p className="flex items-center gap-2 px-4 py-6 text-sm text-muted-foreground">
+              <p className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
                 <Bell className="size-4 shrink-0" /> Nothing in this group right now.
               </p>
             )}
           </div>
+          {/* Scroll cue — makes it obvious the list is capped, not truncated. */}
+          {visible.length > 3 && (
+            <div className="flex items-center justify-center gap-1.5 border-t border-border/50 bg-muted/20 py-1.5 text-[11px] font-medium text-muted-foreground">
+              <ChevronRight className="size-3 rotate-90" /> scroll for {visible.length - 3} more
+            </div>
+          )}
         </div>
       )}
     </section>
