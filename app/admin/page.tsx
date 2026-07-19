@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Clock, Wallet, PackageX, Users } from "lucide-react";
+import { Wallet, Users } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { getCommandCenter } from "@/lib/services/command-center";
@@ -12,16 +12,14 @@ import {
 } from "@/lib/services/intelligence";
 import {
   BusinessHealth,
-  NeedsAttention,
-  ExecutiveApprovals,
   ExecutiveActions,
   OperationsStatus,
   RevenueCollectionOverview,
   InventoryOverview,
   SalesPerformance,
   ProductPerformance,
-  type AttentionItem,
 } from "@/components/admin/ceo-overview";
+import { AttentionCenter, type AttnItem } from "@/components/admin/attention-center";
 import { RevenueTrends, HumanActivityFeed, CustomerIntelligencePanel } from "@/components/admin/command-sections";
 import { AddExpenseButton, IssueFundsButton, AddCapitalButton } from "@/components/admin/finance-forms";
 import { getSelectableAccounts } from "@/lib/services/accounts";
@@ -78,17 +76,26 @@ export default async function AdminCommandCenter() {
     timeZone: "Africa/Dar_es_Salaam", weekday: "long", month: "long", day: "numeric",
   }).format(new Date());
 
-  // ── "Needs attention" — the money/credit/stock decisions only the CEO makes.
-  //    The operational pipeline (approvals, transfers, returns…) lives in its own
-  //    Operations section below, so nothing is counted twice. ──────────────────
+  // ── "Needs your attention" — one bounded command center merging the CEO's
+  //    credit/stock alerts with the finance sign-off pipeline. Priority order:
+  //    overdue money → sign-offs → fund requests → due-soon → low stock. It scrolls
+  //    internally, so a busy queue never pushes the rest of the dashboard down. ──
   const o = d.operations;
-  const attention: AttentionItem[] = [];
+  const attnItems: AttnItem[] = [];
   if (collections.overdueCount > 0)
-    attention.push({ tone: "danger", icon: AlertTriangle, label: `${collections.overdueCount} overdue credit ${collections.overdueCount === 1 ? "account" : "accounts"}`, hint: "chase these before they age further", href: "/admin/credit" });
+    attnItems.push({ key: "overdue", category: "overdue", iconKey: "overdue", tone: "danger", label: `${collections.overdueCount} overdue credit ${collections.overdueCount === 1 ? "account" : "accounts"}`, hint: "chase these before they age further", amount: collections.overdueTotal || null, href: "/admin/credit" });
+  if (approvalCounts.cashSales.count > 0)
+    attnItems.push({ key: "cash", category: "signoff", iconKey: "cash", tone: "warning", label: `${approvalCounts.cashSales.count} cash ${approvalCounts.cashSales.count === 1 ? "sale" : "sales"} to confirm`, hint: "rep money awaiting your verification", amount: approvalCounts.cashSales.amount, href: "/admin/sales-approvals" });
+  if (approvalCounts.creditSales.count > 0)
+    attnItems.push({ key: "credit", category: "signoff", iconKey: "credit", tone: "info", label: `${approvalCounts.creditSales.count} credit ${approvalCounts.creditSales.count === 1 ? "sale" : "sales"} to approve`, hint: "become receivables once you approve the terms", amount: approvalCounts.creditSales.amount, href: "/admin/sales-approvals" });
+  if (approvalCounts.collections.count > 0)
+    attnItems.push({ key: "collect", category: "signoff", iconKey: "collect", tone: "info", label: `${approvalCounts.collections.count} ${approvalCounts.collections.count === 1 ? "collection" : "collections"} to verify`, hint: "rep-collected repayments awaiting sign-off", amount: approvalCounts.collections.amount, href: "/admin/sales-approvals" });
+  if (approvalCounts.fundRequests.count > 0)
+    attnItems.push({ key: "fund", category: "funds", iconKey: "fund", tone: "warning", label: `${approvalCounts.fundRequests.count} operational fund ${approvalCounts.fundRequests.count === 1 ? "request" : "requests"}`, hint: "Finance is waiting on your approval", amount: approvalCounts.fundRequests.amount, href: "/admin/finance/operational-fund" });
   if (collections.dueSoon.length > 0)
-    attention.push({ tone: "warning", icon: Clock, label: `${collections.dueSoon.length} ${collections.dueSoon.length === 1 ? "customer" : "customers"} approaching payment`, hint: "payment dates coming up — plan the follow-ups", href: "/admin/credit" });
+    attnItems.push({ key: "dueSoon", category: "dueSoon", iconKey: "dueSoon", tone: "warning", label: `${collections.dueSoon.length} ${collections.dueSoon.length === 1 ? "customer" : "customers"} approaching payment`, hint: "payment dates coming up — plan the follow-ups", amount: null, href: "/admin/credit" });
   if (d.network.lowStock > 0)
-    attention.push({ tone: "warning", icon: PackageX, label: `${d.network.lowStock} ${d.network.lowStock === 1 ? "product" : "products"} low on stock`, hint: "reorder before it runs out", href: "/admin/inventory" });
+    attnItems.push({ key: "stock", category: "stock", iconKey: "stock", tone: "warning", label: `${d.network.lowStock} ${d.network.lowStock === 1 ? "product" : "products"} low on stock`, hint: "reorder before it runs out", amount: null, href: "/admin/inventory" });
 
   const latestPayrollTotal = lastPaidPayroll?.items.reduce((s, i) => s + i.net, 0) ?? 0;
 
@@ -123,11 +130,10 @@ export default async function AdminCommandCenter() {
         netProfit={fin.window.netProfit}
       />
 
-      {/* ── 3 · Needs attention + awaiting sign-off + quick actions ── */}
-      <NeedsAttention items={attention} />
+      {/* ── 3 · Needs your attention — alerts + finance sign-off, one bounded panel ── */}
+      <AttentionCenter items={attnItems} />
 
-      {/* ── 3a2 · Finance pipeline the CEO can see & act on ── */}
-      <ExecutiveApprovals counts={approvalCounts} />
+      {/* ── 3b · Quick actions (money + navigation) ── */}
       <section>
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick actions</p>
         <div className="flex flex-wrap items-center gap-2">
