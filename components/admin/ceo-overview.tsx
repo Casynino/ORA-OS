@@ -3,7 +3,7 @@ import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
 import {
   Wallet, CreditCard, TrendingUp, Scale, ArrowRight, Star, PackageX,
-  TrendingDown, Boxes, ShoppingCart, ChevronRight, RotateCcw,
+  TrendingDown, Boxes, ShoppingCart, ChevronRight, RotateCcw, Banknote,
   FileBarChart, Users, ShieldAlert, Package, ScrollText,
   UserPlus, ClipboardList, BadgeCheck, Receipt, PackagePlus, Truck, Undo2, ArrowLeftRight,
 } from "lucide-react";
@@ -86,6 +86,63 @@ export function NeedsAttention({ items }: { items: AttentionItem[] }) {
                 <p className="truncate text-xs text-muted-foreground">{a.hint}</p>
               </div>
               <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ── 3a2 · Awaiting your sign-off — the finance pipeline the CEO can see & act on ─
+
+export type ApprovalCounts = {
+  cashSales: { count: number; amount: number };
+  creditSales: { count: number; amount: number };
+  collections: { count: number; amount: number };
+  fundRequests: { count: number; amount: number };
+};
+
+const APPROVAL_TONE: Record<string, string> = {
+  warning: "border-warning/30 bg-warning/[0.05] text-warning",
+  info: "border-info/25 bg-info/[0.04] text-info",
+};
+
+export function ExecutiveApprovals({ counts }: { counts: ApprovalCounts }) {
+  const rows = [
+    { show: counts.cashSales.count > 0, tone: "warning", icon: Banknote, label: `${counts.cashSales.count} cash ${counts.cashSales.count === 1 ? "sale" : "sales"} to confirm`, hint: "rep money awaiting your verification", amount: counts.cashSales.amount, href: "/admin/sales-approvals" },
+    { show: counts.creditSales.count > 0, tone: "info", icon: CreditCard, label: `${counts.creditSales.count} credit ${counts.creditSales.count === 1 ? "sale" : "sales"} to approve`, hint: "become receivables once you approve the terms", amount: counts.creditSales.amount, href: "/admin/sales-approvals" },
+    { show: counts.collections.count > 0, tone: "info", icon: Receipt, label: `${counts.collections.count} ${counts.collections.count === 1 ? "collection" : "collections"} to verify`, hint: "rep-collected repayments", amount: counts.collections.amount, href: "/admin/sales-approvals" },
+    { show: counts.fundRequests.count > 0, tone: "warning", icon: Wallet, label: `${counts.fundRequests.count} operational fund ${counts.fundRequests.count === 1 ? "request" : "requests"}`, hint: "Finance is waiting on your approval", amount: counts.fundRequests.amount, href: "/admin/finance/operational-fund" },
+  ].filter((r) => r.show);
+
+  return (
+    <section>
+      <SectionLabel action={<Link href="/admin/sales-approvals" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">Review all <ArrowRight className="size-3.5" /></Link>}>
+        Awaiting your sign-off · finance pipeline
+      </SectionLabel>
+      {rows.length === 0 ? (
+        <div className="rounded-2xl border border-success/25 bg-success/[0.04] p-4 text-sm text-success">
+          Nothing awaiting your sign-off — Finance is all caught up.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((r, i) => (
+            <Link
+              key={i}
+              href={r.href}
+              className={cn("flex items-center justify-between gap-3 rounded-2xl border p-4 shadow-soft transition-all hover:-translate-y-0.5", APPROVAL_TONE[r.tone])}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-background/60">
+                  <r.icon className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">{r.label}</p>
+                  <p className="truncate text-xs text-muted-foreground">{r.hint}</p>
+                </div>
+              </div>
+              <span className="shrink-0 font-display font-semibold text-foreground">{formatCurrency(r.amount)}</span>
             </Link>
           ))}
         </div>

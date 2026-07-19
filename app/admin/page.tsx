@@ -13,6 +13,7 @@ import {
 import {
   BusinessHealth,
   NeedsAttention,
+  ExecutiveApprovals,
   ExecutiveActions,
   OperationsStatus,
   RevenueCollectionOverview,
@@ -33,7 +34,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminCommandCenter() {
   const me = await requireRole("ADMIN");
 
-  const [d, fin, collections, customers, trends, opFund, accounts, categories, pettyPending, lastPaidPayroll, meUser] =
+  const [d, fin, collections, customers, trends, opFund, accounts, categories, pettyPendingAgg, pendingSaleGroups, pendingCollAgg, lastPaidPayroll, meUser] =
     await Promise.all([
       getCommandCenter(),
       getFinanceOverview("month"),
@@ -43,7 +44,10 @@ export default async function AdminCommandCenter() {
       getOperationalFund(),
       getSelectableAccounts(),
       getSelectableCategories(),
-      prisma.pettyCashRequest.count({ where: { status: "PENDING" } }),
+      prisma.pettyCashRequest.aggregate({ _count: true, _sum: { amount: true }, where: { status: "PENDING" } }),
+      // Rep-recorded money awaiting finance/CEO sign-off (not yet company money).
+      prisma.fieldSale.groupBy({ by: ["type"], where: { financeStatus: "PENDING", voided: false }, _count: { _all: true }, _sum: { total: true } }),
+      prisma.fieldPayment.aggregate({ _count: true, _sum: { amount: true }, where: { financeStatus: "PENDING", sale: { voided: false } } }),
       prisma.payrollRun.findFirst({
         where: { status: "PAID" },
         orderBy: { paidAt: "desc" },
@@ -51,6 +55,17 @@ export default async function AdminCommandCenter() {
       }),
       prisma.user.findUnique({ where: { id: me.id }, select: { name: true, preferredName: true } }),
     ]);
+
+  // Finance sign-off pipeline the CEO can see (and act on at /admin/sales-approvals).
+  const cashGroup = pendingSaleGroups.find((g) => g.type === "CASH");
+  const creditGroup = pendingSaleGroups.find((g) => g.type === "CREDIT");
+  const pettyPending = pettyPendingAgg._count;
+  const approvalCounts = {
+    cashSales: { count: cashGroup?._count._all ?? 0, amount: cashGroup?._sum.total ?? 0 },
+    creditSales: { count: creditGroup?._count._all ?? 0, amount: creditGroup?._sum.total ?? 0 },
+    collections: { count: pendingCollAgg._count, amount: pendingCollAgg._sum.amount ?? 0 },
+    fundRequests: { count: pettyPending, amount: pettyPendingAgg._sum.amount ?? 0 },
+  };
 
   const firstName = meUser?.preferredName || (meUser?.name ?? "there").split(" ")[0];
 
@@ -72,8 +87,6 @@ export default async function AdminCommandCenter() {
     attention.push({ tone: "danger", icon: AlertTriangle, label: `${collections.overdueCount} overdue credit ${collections.overdueCount === 1 ? "account" : "accounts"}`, hint: "chase these before they age further", href: "/admin/credit" });
   if (collections.dueSoon.length > 0)
     attention.push({ tone: "warning", icon: Clock, label: `${collections.dueSoon.length} ${collections.dueSoon.length === 1 ? "customer" : "customers"} approaching payment`, hint: "payment dates coming up — plan the follow-ups", href: "/admin/credit" });
-  if (pettyPending > 0)
-    attention.push({ tone: "warning", icon: Wallet, label: `${pettyPending} operational fund ${pettyPending === 1 ? "request" : "requests"}`, hint: "Finance is waiting on your approval", href: "/admin/finance/operational-fund" });
   if (d.network.lowStock > 0)
     attention.push({ tone: "warning", icon: PackageX, label: `${d.network.lowStock} ${d.network.lowStock === 1 ? "product" : "products"} low on stock`, hint: "reorder before it runs out", href: "/admin/inventory" });
 
@@ -110,8 +123,11 @@ export default async function AdminCommandCenter() {
         netProfit={fin.window.netProfit}
       />
 
-      {/* ── 3 · Needs attention + quick actions (money + navigation) ── */}
+      {/* ── 3 · Needs attention + awaiting sign-off + quick actions ── */}
       <NeedsAttention items={attention} />
+
+      {/* ── 3a2 · Finance pipeline the CEO can see & act on ── */}
+      <ExecutiveApprovals counts={approvalCounts} />
       <section>
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick actions</p>
         <div className="flex flex-wrap items-center gap-2">
