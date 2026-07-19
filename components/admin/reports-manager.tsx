@@ -9,7 +9,6 @@ import { generateReportNow, updateReportSettings, sendTestWhatsApp } from "@/lib
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { StatCard } from "@/components/ui/stat-card";
 import { toast } from "@/components/ui/use-toast";
 import { formatDate, timeAgo } from "@/lib/utils";
 
@@ -86,12 +85,23 @@ export function ReportsManager({ settings, reports }: { settings: Settings | nul
 
   return (
     <div className="space-y-6">
-      {/* Overview */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Latest daily report" value={latestDaily ? formatDate(new Date(latestDaily.periodStart)) : "—"} hint={latestDaily ? timeAgo(new Date(latestDaily.createdAt)) : "none yet"} icon={FileText} accent="primary" />
-        <StatCard label="This month's report" value={latestMonthly ? formatDate(new Date(latestMonthly.periodStart)) : "—"} hint={latestMonthly ? timeAgo(new Date(latestMonthly.createdAt)) : "generated month-end"} icon={Calendar} accent="accent" />
-        <StatCard label="Total reports" value={reports.length} hint="in the archive" icon={FileText} accent="info" />
-        <StatCard label="Last generated" value={lastGenerated ? timeAgo(new Date(lastGenerated.createdAt)) : "—"} hint={lastGenerated ? lastGenerated.type.toLowerCase() : "—"} icon={Clock} accent="success" />
+      {/* Compact overview strip — small, not big stat cards. */}
+      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+        {[
+          { icon: FileText, label: "Latest daily", value: latestDaily ? formatDate(new Date(latestDaily.periodStart)) : "—", hint: latestDaily ? timeAgo(new Date(latestDaily.createdAt)) : "none yet" },
+          { icon: Calendar, label: "This month", value: latestMonthly ? formatDate(new Date(latestMonthly.periodStart)) : "—", hint: latestMonthly ? timeAgo(new Date(latestMonthly.createdAt)) : "month-end" },
+          { icon: FileText, label: "Total reports", value: String(reports.length), hint: "in archive" },
+          { icon: Clock, label: "Last generated", value: lastGenerated ? timeAgo(new Date(lastGenerated.createdAt)) : "—", hint: lastGenerated ? lastGenerated.type.toLowerCase() : "—" },
+        ].map((s, i) => (
+          <div key={i} className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card/50 px-3 py-2.5">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><s.icon className="size-4" /></span>
+            <div className="min-w-0">
+              <p className="truncate text-[11px] leading-tight text-muted-foreground">{s.label}</p>
+              <p className="truncate text-sm font-bold leading-tight">{s.value}</p>
+              <p className="truncate text-[10px] leading-tight text-muted-foreground">{s.hint}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Automation status */}

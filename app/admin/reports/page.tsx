@@ -45,13 +45,7 @@ export default async function AdminReportsPage() {
     <div className="space-y-8">
       <PageHeader title="Reports" description="Automated executive reports (WhatsApp + archived PDFs), a live business snapshot, and links to your detailed reports — all in one place." />
 
-      {/* ── 1 · Report Center (the archive + automation) ── */}
-      <section>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Report Center · automated WhatsApp &amp; PDF archive</p>
-        <ReportsManager settings={settingsForClient} reports={reportsForClient} />
-      </section>
-
-      {/* ── 2 · Detailed reports (jump to the full report pages) ── */}
+      {/* ── 1 · Detailed reports (jump to the full report pages) ── */}
       <section>
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Detailed reports</p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -68,7 +62,7 @@ export default async function AdminReportsPage() {
         </div>
       </section>
 
-      {/* ── 3 · Live business snapshot (at-a-glance figures) ── */}
+      {/* ── 2 · Live business snapshot (at-a-glance figures) ── */}
       <section>
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Live business snapshot</p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -81,6 +75,12 @@ export default async function AdminReportsPage() {
           <KpiCard label="Outstanding credit" value={outstanding} prefix="TSh " icon={Wallet} accent="warning" />
           <KpiCard label="People reached" value={impactAgg._sum.peopleReached ?? 0} icon={HeartHandshake} accent="accent" />
         </div>
+      </section>
+
+      {/* ── 3 · Report Center (the automated WhatsApp + PDF archive) ── */}
+      <section>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Report Center · automated WhatsApp &amp; PDF archive</p>
+        <ReportsManager settings={settingsForClient} reports={reportsForClient} />
       </section>
     </div>
   );
