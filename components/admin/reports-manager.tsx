@@ -157,25 +157,34 @@ export function ReportsManager({ settings, reports }: { settings: Settings | nul
             {reports.length === 0 ? "No reports yet — they'll appear here automatically on schedule." : "No reports match your filters."}
           </p>
         ) : (
-          <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-card/50">
-            {filtered.map((r) => (
-              <div key={r.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><FileText className="size-[18px]" /></span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{r.title}</p>
-                  <p className="flex flex-wrap items-center gap-x-2 truncate text-xs text-muted-foreground">
-                    <Badge variant="secondary" className="text-[10px]">{r.type === "DAILY" ? "Daily" : "Monthly"}</Badge>
-                    {formatDate(new Date(r.periodStart))} · {timeAgo(new Date(r.createdAt))}
-                    {r.whatsappSent && <Badge variant="success" className="text-[10px]">WhatsApp sent</Badge>}
-                  </p>
+          // Bounded, scrolling archive — caps at ~6 rows so a long history scrolls
+          // INSIDE the card instead of stretching the page down.
+          <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/50">
+            <div className="max-h-[25rem] divide-y divide-border/50 overflow-y-auto scrollbar-thin">
+              {filtered.map((r) => (
+                <div key={r.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><FileText className="size-[18px]" /></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{r.title}</p>
+                    <p className="flex flex-wrap items-center gap-x-2 truncate text-xs text-muted-foreground">
+                      <Badge variant="secondary" className="text-[10px]">{r.type === "DAILY" ? "Daily" : "Monthly"}</Badge>
+                      {formatDate(new Date(r.periodStart))} · {timeAgo(new Date(r.createdAt))}
+                      {r.whatsappSent && <Badge variant="success" className="text-[10px]">WhatsApp sent</Badge>}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <a href={`/r/${r.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:border-primary/40" title="Open PDF"><ExternalLink className="size-3.5" /> View</a>
+                    <a href={`/r/${r.id}?dl=1`} className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground" title="Download PDF"><Download className="size-3.5" /></a>
+                    <button onClick={() => share(r.id)} className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground" title="Copy share link"><Share2 className="size-3.5" /></button>
+                  </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <a href={`/r/${r.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:border-primary/40" title="Open PDF"><ExternalLink className="size-3.5" /> View</a>
-                  <a href={`/r/${r.id}?dl=1`} className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground" title="Download PDF"><Download className="size-3.5" /></a>
-                  <button onClick={() => share(r.id)} className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground" title="Copy share link"><Share2 className="size-3.5" /></button>
-                </div>
+              ))}
+            </div>
+            {filtered.length > 6 && (
+              <div className="flex items-center justify-center gap-1.5 border-t border-border/50 bg-muted/20 py-1.5 text-[11px] font-medium text-muted-foreground">
+                {filtered.length} reports · scroll for more
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
