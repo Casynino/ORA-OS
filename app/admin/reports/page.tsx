@@ -25,7 +25,9 @@ export default async function AdminReportsPage() {
 
   const reportsForClient = reportRows.map((r) => ({
     id: r.id, type: r.type, title: r.title,
-    periodStart: r.periodStart.toISOString(), whatsappSent: r.whatsappSent, hasPdf: !!r.pdfUrl,
+    // Always viewable — /r/[id] regenerates the PDF from archived data if it
+    // wasn't stored in Blob.
+    periodStart: r.periodStart.toISOString(), whatsappSent: r.whatsappSent, hasPdf: true,
   }));
   const settingsForClient = reportSettings
     ? { dailyEnabled: reportSettings.dailyEnabled, dailyHourEat: reportSettings.dailyHourEat, monthlyEnabled: reportSettings.monthlyEnabled, creditReminderEnabled: reportSettings.creditReminderEnabled, fundRequestAlerts: reportSettings.fundRequestAlerts, repReportAlerts: reportSettings.repReportAlerts }
