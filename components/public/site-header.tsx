@@ -13,7 +13,7 @@ const nav = [
   { href: "/education", label: "Education" },
   { href: "/find-ora", label: "Find ORA" },
   { href: "/contact", label: "Contact" },
-  { href: "/request-access", label: "Join Us" },
+  { href: "/login", label: "Join Us" },
 ];
 
 function dash(role?: string) {

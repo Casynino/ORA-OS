@@ -235,7 +235,7 @@ export default async function HomePage() {
             <div className="glow-hover relative h-full overflow-hidden rounded-3xl bg-gradient-to-br from-accent to-accent/40 p-7">
               <h3 className="font-display text-2xl font-bold text-white">Join the Movement</h3>
               <p className="mt-2 max-w-[18rem] text-sm text-white/85">Bring ORA to your school or community — agents, distributors, NGOs and schools all welcome.</p>
-              <Link href="/request-access" className={cn(buttonVariants(), "mt-6 rounded-full bg-white text-accent hover:bg-white/90")}>
+              <Link href="/login" className={cn(buttonVariants(), "mt-6 rounded-full bg-white text-accent hover:bg-white/90")}>
                 Join Us
                 <ArrowRight className="size-4" />
               </Link>
@@ -375,7 +375,7 @@ export default async function HomePage() {
           <div>
             <h4 className="font-semibold">Get Involved</h4>
             <ul className="mt-3 space-y-2 text-sm text-white/60">
-              {[["Our Impact", "/impact"], ["Find ORA", "/find-ora"], ["Join Us", "/request-access"], ["Sign in", "/login"]].map(([l, h]) => (
+              {[["Our Impact", "/impact"], ["Find ORA", "/find-ora"], ["Join Us", "/login"], ["Sign in", "/login"]].map(([l, h]) => (
                 <li key={l}><Link href={h} className="hover:text-primary">{l}</Link></li>
               ))}
             </ul>
