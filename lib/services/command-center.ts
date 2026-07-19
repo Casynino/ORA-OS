@@ -266,23 +266,24 @@ export async function getCommandCenter() {
     // Finance-raised credit extensions waiting on the CEO's decision.
     prisma.creditExtensionRequest.count({ where: { status: "PENDING" } }),
     // ── Field sales (sales reps) — split CASH vs CREDIT per period ──────────
+    // isOpeningBalance:false — migrated debts are receivables, never revenue/sales.
     prisma.fieldSale.groupBy({
       by: ["type"],
       _sum: { total: true },
       _count: { _all: true },
-      where: { voided: false, financeStatus: "APPROVED", createdAt: { gte: startToday } },
+      where: { voided: false, financeStatus: "APPROVED", isOpeningBalance: false, createdAt: { gte: startToday } },
     }),
     prisma.fieldSale.groupBy({
       by: ["type"],
       _sum: { total: true },
       _count: { _all: true },
-      where: { voided: false, financeStatus: "APPROVED", createdAt: { gte: startWeek } },
+      where: { voided: false, financeStatus: "APPROVED", isOpeningBalance: false, createdAt: { gte: startWeek } },
     }),
     prisma.fieldSale.groupBy({
       by: ["type"],
       _sum: { total: true },
       _count: { _all: true },
-      where: { voided: false, financeStatus: "APPROVED", createdAt: { gte: startMonth } },
+      where: { voided: false, financeStatus: "APPROVED", isOpeningBalance: false, createdAt: { gte: startMonth } },
     }),
     // Partner cash orders per period (today's version already exists above).
     prisma.request.aggregate({
@@ -318,7 +319,7 @@ export async function getCommandCenter() {
       where: { voided: false, type: "CREDIT", financeStatus: "APPROVED", creditStatus: "OVERDUE" },
     }),
     prisma.fieldSale.findMany({
-      where: { voided: false, financeStatus: "APPROVED", createdAt: { gte: sixMonthsAgo } },
+      where: { voided: false, financeStatus: "APPROVED", isOpeningBalance: false, createdAt: { gte: sixMonthsAgo } },
       select: { createdAt: true, total: true },
     }),
   ]);

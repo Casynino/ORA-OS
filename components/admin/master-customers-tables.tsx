@@ -35,8 +35,9 @@ type FieldRow = {
   region: string | null;
   creditSuspended: boolean;
   createdAt: Date;
-  rep: { id: string; name: string };
-  sales: { total: number; amountPaid: number; type: string; financeStatus: string }[];
+  rep: { id: string; name: string } | null;
+  registeredBy?: { name: string } | null;
+  sales: { total: number; amountPaid: number; type: string; financeStatus: string; isOpeningBalance: boolean }[];
 };
 
 /** Master customer tables (partners + field customers). Link targets are
@@ -146,10 +147,14 @@ export function MasterCustomersTables({
                 </TableHeader>
                 <TableBody>
                   {fieldCustomers.map((c) => {
-                    // Verified figures come from APPROVED sales only.
+                    // Verified figures come from APPROVED sales only. Lifetime
+                    // sales (revenue) excludes migrated opening balances; owed
+                    // (outstanding) keeps them — they're real debt.
                     const approved = c.sales.filter((x) => x.financeStatus === "APPROVED");
                     const pending = c.sales.filter((x) => x.financeStatus === "PENDING");
-                    const revenue = approved.reduce((s, x) => s + x.total, 0);
+                    const revenue = approved
+                      .filter((x) => !x.isOpeningBalance)
+                      .reduce((s, x) => s + x.total, 0);
                     const owed = approved
                       .filter((x) => x.type === "CREDIT")
                       .reduce((s, x) => s + Math.max(0, x.total - x.amountPaid), 0);
@@ -168,7 +173,9 @@ export function MasterCustomersTables({
                           </div>
                         </TableCell>
                         <TableCell data-label="Sales rep">
-                          {repHref ? (
+                          {c.rep == null ? (
+                            <span className="text-sm text-muted-foreground">Unassigned</span>
+                          ) : repHref ? (
                             <Link href={repHref(c.rep.id)} className="text-sm font-medium text-primary hover:underline">
                               {c.rep.name}
                             </Link>

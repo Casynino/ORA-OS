@@ -187,6 +187,7 @@ model User {
   repStockRequests      RepStockRequest[]        @relation("RepStockRequestRep")
   repRequestsPrepared   RepStockRequest[]        @relation("RepRequestPreparer")
   fieldCustomers        FieldCustomer[]          @relation("RepCustomers")
+  registeredCustomers   FieldCustomer[]          @relation("RegisteredCustomers")
   fieldSales            FieldSale[]              @relation("RepSales")
   fieldPaymentsRecorded FieldPayment[]           @relation("FieldPaymentRecorder")
   fieldSalesReviewed    FieldSale[]              @relation("FieldSaleReviewer")
@@ -972,8 +973,10 @@ model RepStockRequestItem {
   @@index([requestId])
 }
 
-/// A rep's field customer. Each customer belongs to exactly ONE sales rep
-/// (the rep who created them) — customer books are never shared between reps.
+/// ORA's centralized customer. Belongs to ORA, not a person. `registeredBy`
+/// records who created the profile (rep/finance/admin); `rep` is the OPTIONAL
+/// sales rep who manages the relationship (null = unassigned, managed by
+/// Finance/Admin until a rep is assigned). One shared database across roles.
 model FieldCustomer {
   id               String   @id @default(cuid())
   name             String
@@ -992,8 +995,10 @@ model FieldCustomer {
   gpsLat           Float? // captured on creation when the device allows it
   gpsLng           Float?
   notes            String?
-  rep              User     @relation("RepCustomers", fields: [repId], references: [id])
-  repId            String
+  rep              User?    @relation("RepCustomers", fields: [repId], references: [id])
+  repId            String? // OPTIONAL managing sales rep (null = unassigned)
+  registeredBy     User?    @relation("RegisteredCustomers", fields: [registeredById], references: [id])
+  registeredById   String? // who created the profile (rep/finance/admin) — accountability
   creditSuspended  Boolean  @default(false) // admin can cut off credit access
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -1002,6 +1007,7 @@ model FieldCustomer {
   creditExtensions CreditExtensionRequest[]
 
   @@index([repId])
+  @@index([registeredById])
 }
 
 /// A field sale (cash or credit). Stock is deducted atomically on creation.
@@ -1059,6 +1065,10 @@ model FieldSale {
   cashReceivedAt      DateTime? // when finance confirmed the cash in hand
   voided              Boolean            @default(false) // admin correction — restores stock
   voidReason          String?
+  // Migrated pre-ORA-OS debt (opening balance). Behaves like an approved CREDIT
+  // receivable for credit/collections, but is NOT a new sale: no stock moves, no
+  // line items, and it is excluded from every revenue/sales/trends figure.
+  isOpeningBalance    Boolean            @default(false)
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
@@ -1074,6 +1084,7 @@ model FieldSale {
   @@index([cashStatus])
   @@index([cashDepositId])
   @@index([createdAt])
+  @@index([isOpeningBalance])
 }
 
 model FieldSaleItem {

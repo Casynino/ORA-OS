@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
-import { refreshOverdueFieldCredit } from "@/lib/services/field";
+import { refreshOverdueFieldCredit, getSalesReps } from "@/lib/services/field";
 import { getFieldCustomerProfile } from "@/lib/services/customer-profile";
 import { CustomerProfileView } from "@/components/customers/customer-profile-view";
 
@@ -16,13 +16,14 @@ export default async function FinanceCustomerDetailPage({
   const { id } = await params;
   await refreshOverdueFieldCredit();
 
-  const [profile, accounts] = await Promise.all([
+  const [profile, accounts, reps] = await Promise.all([
     getFieldCustomerProfile(id),
     prisma.paymentAccount.findMany({
       where: { isActive: true },
       orderBy: [{ type: "asc" }, { name: "asc" }],
       select: { id: true, name: true, type: true, accountName: true, accountNumber: true },
     }),
+    getSalesReps(),
   ]);
   if (!profile) notFound();
 
@@ -33,6 +34,7 @@ export default async function FinanceCustomerDetailPage({
       backHref="/finance/customers"
       backLabel="All customers"
       accounts={accounts}
+      reps={reps}
     />
   );
 }
