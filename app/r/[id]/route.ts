@@ -21,17 +21,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   });
   if (!report) return new NextResponse("Report not found.", { status: 404 });
 
-  if (report.pdfUrl) return NextResponse.redirect(new URL(report.pdfUrl, req.url));
+  const download = new URL(req.url).searchParams.get("dl") === "1";
+
+  if (report.pdfUrl && !download) return NextResponse.redirect(new URL(report.pdfUrl, req.url));
 
   const bytes =
     report.type === "MONTHLY"
       ? buildMonthlyReportPdf(report.summary as unknown as MonthlyReportData)
       : buildDailyReportPdf(report.summary as unknown as DailyReportData);
+  const name = (report.title || "report").replace(/[^\w.-]+/g, "-");
 
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${(report.title || "report").replace(/[^\w.-]+/g, "-")}.pdf"`,
+      "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${name}.pdf"`,
       "Cache-Control": "private, max-age=3600",
     },
   });

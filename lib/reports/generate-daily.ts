@@ -7,24 +7,26 @@ import { sendWhatsApp, appBaseUrl, type WhatsAppResult } from "@/lib/notificatio
 
 /** The short executive WhatsApp summary (minimal emoji, action-oriented). */
 export function buildDailyWhatsApp(d: DailyReportData, link: string): string {
-  const pendingColl = d.credit.overdueCount + d.credit.dueSoonCount;
-  const lines = [
-    "📊 ORA Daily Executive Report",
-    `Date: ${d.dateLabel}`,
+  return [
+    "📊 ORA Daily Report",
+    d.dateLabel,
     "",
-    "Today's Highlights",
-    `• Revenue: ${tsh(d.sales.revenue)}`,
-    `• Cash: ${tsh(d.sales.cash)} · Credit: ${tsh(d.sales.credit)}`,
-    `• Collected: ${tsh(d.credit.collectedToday)}`,
-    `• New customers: ${d.customers.newCount}`,
-    `• Dispatched: ${d.inventory.dispatchedCartons} cartons`,
-    `• Pending collections: ${pendingColl} customer${pendingColl === 1 ? "" : "s"}`,
-    `• Warehouse requests: ${d.warehouse.pendingRequests}`,
-    `• Office expenses: ${tsh(d.finance.officeExpenses)}`,
-  ];
-  if (d.team.reps[0]) lines.push(`• Top rep: ${d.team.reps[0].name} (${d.team.reps[0].a} sales)`);
-  lines.push("", "Full report:", link);
-  return lines.join("\n");
+    "Today's Overview",
+    "",
+    `Sales:\n${tsh(d.sales.revenue)}`,
+    "",
+    `Cash Revenue:\n${tsh(d.sales.cash)}`,
+    "",
+    `Credit Revenue:\n${tsh(d.sales.credit)}`,
+    "",
+    `Collections:\n${tsh(d.credit.collectedToday)}`,
+    "",
+    `Expenses:\n${tsh(d.finance.officeExpenses)}`,
+    "",
+    `Stock Movement:\n${d.inventory.dispatchedCartons} cartons dispatched`,
+    "",
+    `Full Report:\n${link}`,
+  ].join("\n");
 }
 
 /**

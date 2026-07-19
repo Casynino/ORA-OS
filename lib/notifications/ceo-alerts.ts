@@ -12,9 +12,9 @@ export async function notifyFundRequest(requesterName: string | null | undefined
   try {
     const s = await reportSettings();
     if (s && !s.fundRequestAlerts) return;
-    const list = items.slice(0, 10).map((i) => `• ${i}`).join("\n");
+    const purpose = items.slice(0, 12).map((i) => `• ${i}`).join("\n");
     await sendWhatsApp(
-      `💼 Operational Fund Request\n${requesterName || "Finance"} has requested ${formatCurrency(amount)}\n\nItems Requested\n${list}\n\nOpen ORA OS to review and approve.`,
+      `💰 ORA Fund Request\n\n${requesterName || "Finance"} has submitted a fund request.\n\nTotal Amount:\n${formatCurrency(amount)}\n\nPurpose:\n${purpose}\n\nPlease review in ORA OS.`,
     );
   } catch (e) {
     console.error("[notifyFundRequest]", e);
@@ -31,5 +31,23 @@ export async function notifyRepReport(repName: string | null | undefined, locati
     );
   } catch (e) {
     console.error("[notifyRepReport]", e);
+  }
+}
+
+/** Notify the CEO that Finance verified a payment (cash / bank / mobile / credit). */
+export async function notifyPaymentConfirmed(opts: {
+  customer: string;
+  amount: number;
+  method: string | null | undefined;
+  verifiedBy: string | null | undefined;
+}) {
+  try {
+    const s = await reportSettings();
+    if (s && !s.paymentConfirmAlerts) return;
+    await sendWhatsApp(
+      `✅ Payment Confirmed\n\nCustomer:\n${opts.customer}\n\nAmount:\n${formatCurrency(opts.amount)}\n\nMethod:\n${opts.method || "—"}\n\nVerified by:\n${opts.verifiedBy || "Finance"}`,
+    );
+  } catch (e) {
+    console.error("[notifyPaymentConfirmed]", e);
   }
 }
