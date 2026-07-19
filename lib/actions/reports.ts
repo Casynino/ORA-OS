@@ -65,8 +65,8 @@ export async function sendTestWhatsApp(): Promise<ActionResult> {
     await requireRole("ADMIN");
     const res = await sendWhatsApp("✅ ORA OS — test message. Your executive WhatsApp notifications are working.");
     if (res.ok) return ok(undefined, "Test message sent — check WhatsApp.");
-    if (res.skipped) return fail("WhatsApp isn't configured (missing CALLMEBOT_PHONE / CALLMEBOT_APIKEY) or is disabled in this environment.");
-    return fail(`WhatsApp failed: ${res.error}`);
+    if (res.skipped) return fail(`Not sent — ${res.reason}. Set the CallMeBot env vars on Vercel and redeploy.`);
+    return fail(`Not delivered — ${res.reason ?? res.error ?? "unknown"}${res.body ? ` (CallMeBot: ${res.body})` : ""}.`);
   } catch (e) {
     return fail(errorMessage(e));
   }
