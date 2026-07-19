@@ -19,7 +19,7 @@ const nav = [
   { name: "News", href: "/news" },
   { name: "Activities", href: "#activities" },
   { name: "Contact", href: "/contact" },
-  { name: "Join Us", href: "/request-access" },
+  { name: "Join Us", href: "/login" },
 ];
 
 export function LandingHeader() {
