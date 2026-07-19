@@ -51,12 +51,52 @@ export type AttentionItem = {
   href: string;
 };
 
-const ATTN_TONE: Record<AttentionItem["tone"], string> = {
-  danger: "border-destructive/30 bg-destructive/[0.05] text-destructive",
-  warning: "border-warning/30 bg-warning/[0.05] text-warning",
-  info: "border-info/25 bg-info/[0.04] text-info",
-};
 const ATTN_RANK: Record<AttentionItem["tone"], number> = { danger: 0, warning: 1, info: 2 };
+
+// Tone lives only in the small icon chip — keeps the row itself clean & light.
+const ROW_TONE: Record<string, string> = {
+  danger: "bg-destructive/12 text-destructive",
+  warning: "bg-warning/12 text-warning",
+  info: "bg-info/12 text-info",
+};
+
+// A slim, premium list row shared by "Needs attention" + "Awaiting sign-off".
+function ActionRow({
+  href, tone, icon: Icon, label, hint, amount,
+}: {
+  href: string; tone: string; icon: LucideIcon; label: string; hint: string; amount?: number;
+}) {
+  return (
+    <Link href={href} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40">
+      <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", ROW_TONE[tone] ?? ROW_TONE.info)}>
+        <Icon className="size-[18px]" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-foreground">{label}</p>
+        <p className="truncate text-xs text-muted-foreground">{hint}</p>
+      </div>
+      {amount != null && (
+        <span className="shrink-0 font-display text-sm font-semibold tabular-nums text-foreground">{formatCurrency(amount)}</span>
+      )}
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />
+    </Link>
+  );
+}
+
+// Groups rows into one clean card with hairline dividers (no heavy per-row borders).
+function RowCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-card/50">
+      {children}
+    </div>
+  );
+}
+
+function AllClear({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="rounded-2xl border border-success/20 bg-success/[0.04] px-4 py-3 text-sm text-success">{children}</p>
+  );
+}
 
 export function NeedsAttention({ items }: { items: AttentionItem[] }) {
   const sorted = [...items].sort((a, b) => ATTN_RANK[a.tone] - ATTN_RANK[b.tone]);
@@ -64,31 +104,13 @@ export function NeedsAttention({ items }: { items: AttentionItem[] }) {
     <section>
       <SectionLabel>Needs your attention</SectionLabel>
       {sorted.length === 0 ? (
-        <div className="rounded-2xl border border-success/25 bg-success/[0.04] p-5 text-sm text-success">
-          All clear — nothing needs your attention right now.
-        </div>
+        <AllClear>All clear — nothing needs your attention right now.</AllClear>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <RowCard>
           {sorted.map((a, i) => (
-            <Link
-              key={i}
-              href={a.href}
-              className={cn(
-                "group flex items-center gap-3 rounded-2xl border p-4 shadow-soft transition-all hover:-translate-y-0.5",
-                ATTN_TONE[a.tone],
-              )}
-            >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-background/60">
-                <a.icon className="size-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-foreground">{a.label}</p>
-                <p className="truncate text-xs text-muted-foreground">{a.hint}</p>
-              </div>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-            </Link>
+            <ActionRow key={i} href={a.href} tone={a.tone} icon={a.icon} label={a.label} hint={a.hint} />
           ))}
-        </div>
+        </RowCard>
       )}
     </section>
   );
@@ -101,11 +123,6 @@ export type ApprovalCounts = {
   creditSales: { count: number; amount: number };
   collections: { count: number; amount: number };
   fundRequests: { count: number; amount: number };
-};
-
-const APPROVAL_TONE: Record<string, string> = {
-  warning: "border-warning/30 bg-warning/[0.05] text-warning",
-  info: "border-info/25 bg-info/[0.04] text-info",
 };
 
 export function ExecutiveApprovals({ counts }: { counts: ApprovalCounts }) {
@@ -122,30 +139,13 @@ export function ExecutiveApprovals({ counts }: { counts: ApprovalCounts }) {
         Awaiting your sign-off · finance pipeline
       </SectionLabel>
       {rows.length === 0 ? (
-        <div className="rounded-2xl border border-success/25 bg-success/[0.04] p-4 text-sm text-success">
-          Nothing awaiting your sign-off — Finance is all caught up.
-        </div>
+        <AllClear>Nothing awaiting your sign-off — Finance is all caught up.</AllClear>
       ) : (
-        <div className="space-y-2">
+        <RowCard>
           {rows.map((r, i) => (
-            <Link
-              key={i}
-              href={r.href}
-              className={cn("flex items-center justify-between gap-3 rounded-2xl border p-4 shadow-soft transition-all hover:-translate-y-0.5", APPROVAL_TONE[r.tone])}
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-background/60">
-                  <r.icon className="size-5" />
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-foreground">{r.label}</p>
-                  <p className="truncate text-xs text-muted-foreground">{r.hint}</p>
-                </div>
-              </div>
-              <span className="shrink-0 font-display font-semibold text-foreground">{formatCurrency(r.amount)}</span>
-            </Link>
+            <ActionRow key={i} href={r.href} tone={r.tone} icon={r.icon} label={r.label} hint={r.hint} amount={r.amount} />
           ))}
-        </div>
+        </RowCard>
       )}
     </section>
   );
