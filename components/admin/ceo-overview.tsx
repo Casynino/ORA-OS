@@ -52,7 +52,7 @@ const EXEC_ACTIONS: { icon: LucideIcon; label: string; href: string }[] = [
   { icon: ClipboardList, label: "Approve orders", href: "/admin/requests" },
   { icon: PackagePlus, label: "Receive stock", href: "/admin/imports" },
   { icon: Package, label: "Inventory", href: "/admin/inventory" },
-  { icon: FileBarChart, label: "Reports", href: "/admin/finance/profit" },
+  { icon: FileBarChart, label: "Profit & Loss", href: "/admin/finance/profit" },
   { icon: Users, label: "Customers", href: "/admin/customers" },
   { icon: ShieldAlert, label: "Credit risk", href: "/admin/credit" },
   { icon: ScrollText, label: "General Ledger", href: "/admin/finance/ledger" },

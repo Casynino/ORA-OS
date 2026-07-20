@@ -284,7 +284,7 @@ export default async function FinanceReportsPage() {
                   <span>
                     Payroll
                     <span className="block text-xs font-normal text-muted-foreground">
-                      paid in full the moment the boss runs it — no salary ever left owing
+                      paid in full the moment payroll is run — no salary ever left owing
                     </span>
                   </span>
                 </span>
