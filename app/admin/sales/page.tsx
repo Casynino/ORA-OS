@@ -66,7 +66,7 @@ export default async function AdminSalesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Sales" description="Confirmed sales — fulfilled orders and recorded cash sales. Open any row for the full record.">
+      <PageHeader title="Sales history" description="Confirmed sales — fulfilled partner orders and recorded cash sales. Open any row for the full record.">
         <RecordCashSale
           partners={partners}
           products={saleProducts}

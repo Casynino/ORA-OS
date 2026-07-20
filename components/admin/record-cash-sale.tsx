@@ -121,15 +121,15 @@ export function RecordCashSale({
     <>
       <Button onClick={() => setOpen(true)}>
         <ShoppingCart className="size-4" />
-        Record cash sale
+        Record partner sale
       </Button>
 
       {open && (
         <Modal
           open
           onClose={() => setOpen(false)}
-          title="Record cash sale"
-          description="Log a paid, over-the-counter sale. Stock is deducted immediately."
+          title="Record partner sale"
+          description="Log a paid cash sale to a partner / agent (or a walk-in). Stock is deducted immediately. For a direct sale to a shop, use Record sale."
         >
           <div className="space-y-4">
             <div>
