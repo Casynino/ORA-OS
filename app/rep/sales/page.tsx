@@ -21,7 +21,8 @@ export default async function RepSalesHistoryPage() {
   const cashTotal = confirmed.filter((r) => r.paymentType === "CASH").reduce((s, r) => s + r.total, 0);
   const creditTotal = confirmed.filter((r) => r.paymentType === "CREDIT").reduce((s, r) => s + r.total, 0);
   const pending = rows.filter((r) => r.status === "Awaiting confirmation").length;
-  const outstanding = rows.reduce((s, r) => s + r.balance, 0);
+  // Owed on CONFIRMED credit only — reconciles with credit sales (owed ≤ sold).
+  const outstanding = confirmed.filter((r) => r.paymentType === "CREDIT").reduce((s, r) => s + r.balance, 0);
 
   return (
     <div className="space-y-6">
