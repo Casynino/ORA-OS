@@ -2,23 +2,14 @@ import Link from "next/link";
 import { ClipboardList, Package, ArrowRight } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/ui/page-header";
-import { Badge } from "@/components/ui/badge";
 import { KpiCard } from "@/components/admin/kpi-card";
-import { RejectStockRequestButton } from "@/components/admin/rep-controls";
+import { RepStockOrders } from "@/components/admin/rep-stock-orders";
 import {
   AdminRequestsList,
   type RequestDTO,
 } from "@/components/admin/admin-requests-list";
-import { formatNumber, formatDate, timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-
-const REP_STATUS: Record<string, { label: string; tone: "warning" | "info" | "success" | "destructive" | "secondary" }> = {
-  PENDING: { label: "Awaiting review", tone: "warning" },
-  READY: { label: "Prepared · awaiting pickup", tone: "info" },
-  ISSUED: { label: "Collected", tone: "success" },
-  REJECTED: { label: "Rejected", tone: "destructive" },
-};
 
 export default async function AdminOrdersPage() {
   const [requests, creditAgg, repRequests] = await Promise.all([
@@ -81,6 +72,16 @@ export default async function AdminOrdersPage() {
   const partnerPending = requests.filter((r) => r.status === "PENDING" || r.status === "PRICED").length;
   const repPending = repRequests.filter((r) => r.status === "PENDING").length;
 
+  const repOrders = repRequests.map((r) => ({
+    id: r.id,
+    code: r.code,
+    repName: r.rep.name,
+    status: r.status,
+    createdAt: r.createdAt.toISOString(),
+    warehouseName: r.warehouse?.name ?? null,
+    items: r.items.map((i) => ({ name: i.product.name, quantity: i.quantity })),
+  }));
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -113,50 +114,7 @@ export default async function AdminOrdersPage() {
             Prepare / issue at Sales Reps <ArrowRight className="size-4" />
           </Link>
         </div>
-        {repRequests.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-            No stock requests from sales reps.
-          </p>
-        ) : (
-          <div className="overflow-x-auto rounded-2xl border border-border">
-            <table className="w-full min-w-[44rem] text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-3 py-2.5 font-medium">Request</th>
-                  <th className="px-3 py-2.5 font-medium">Rep</th>
-                  <th className="px-3 py-2.5 font-medium">Items</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Pieces</th>
-                  <th className="px-3 py-2.5 font-medium">Status</th>
-                  <th className="px-3 py-2.5" />
-                </tr>
-              </thead>
-              <tbody>
-                {repRequests.map((r) => {
-                  const pieces = r.items.reduce((s, i) => s + i.quantity, 0);
-                  const st = REP_STATUS[r.status] ?? { label: r.status, tone: "secondary" as const };
-                  return (
-                    <tr key={r.id} className="border-b border-border/60 last:border-0">
-                      <td className="px-3 py-2.5 align-top">
-                        <p className="font-display font-semibold">{r.code}</p>
-                        <p className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(r.createdAt)} · {timeAgo(r.createdAt)}</p>
-                      </td>
-                      <td className="px-3 py-2.5 align-top">{r.rep.name}</td>
-                      <td className="px-3 py-2.5 align-top text-muted-foreground">
-                        {r.items.map((i) => `${i.product.name} ×${formatNumber(i.quantity)}`).join(" · ")}
-                        {r.warehouse && <span className="block text-xs">from {r.warehouse.name}</span>}
-                      </td>
-                      <td className="px-3 py-2.5 text-right align-top tabular-nums">{formatNumber(pieces)}</td>
-                      <td className="px-3 py-2.5 align-top"><Badge variant={st.tone}>{st.label}</Badge></td>
-                      <td className="px-3 py-2.5 align-top text-right">
-                        {r.status === "PENDING" && <RejectStockRequestButton id={r.id} />}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <RepStockOrders orders={repOrders} />
       </section>
     </div>
   );
