@@ -1,33 +1,24 @@
-import { ShoppingCart, TrendingUp } from "lucide-react";
+import { ShoppingCart, TrendingUp, Banknote, CreditCard, AlertTriangle } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { productMeta } from "@/lib/product-meta";
 import { PageHeader } from "@/components/ui/page-header";
 import { KpiCard } from "@/components/admin/kpi-card";
 import { RecordCashSale } from "@/components/admin/record-cash-sale";
-import { SalesTable, type SaleRow } from "@/components/admin/sales-table";
+import { SalesHistoryTable } from "@/components/admin/sales-history-table";
+import { getSalesHistory } from "@/lib/services/sales-history";
 import { WALKIN_EMAIL } from "@/lib/constants";
 
-export default async function AdminSalesPage() {
-  const [sales, partners, products, partnerPrices, receivingAccounts] = await Promise.all([
-    prisma.request.findMany({
-      where: { status: "FULFILLED" },
-      orderBy: { fulfilledAt: "desc" },
-      include: { requester: { select: { name: true, email: true } } },
-    }),
+export const dynamic = "force-dynamic";
+
+export default async function AdminSalesHistoryPage() {
+  const [rows, partners, products, partnerPrices, receivingAccounts] = await Promise.all([
+    getSalesHistory(),
     prisma.user.findMany({
-      where: {
-        role: "PARTNER",
-        status: "ACTIVE",
-        email: { not: WALKIN_EMAIL },
-      },
+      where: { role: "PARTNER", status: "ACTIVE", email: { not: WALKIN_EMAIL } },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
-    prisma.product.findMany({
-      where: { isActive: true },
-      include: { inventory: true },
-      orderBy: { price: "desc" },
-    }),
+    prisma.product.findMany({ where: { isActive: true }, include: { inventory: true }, orderBy: { price: "desc" } }),
     prisma.partnerPrice.findMany(),
     prisma.paymentAccount.findMany({
       where: { isActive: true },
@@ -35,7 +26,14 @@ export default async function AdminSalesPage() {
       select: { id: true, name: true, type: true, accountName: true, accountNumber: true },
     }),
   ]);
-  const total = sales.reduce((s, r) => s + (r.totalAmount ?? 0), 0);
+
+  // Headline figures — revenue counts CONFIRMED sales only; outstanding is what
+  // credit customers still owe across everything shown.
+  const confirmed = rows.filter((r) => r.confirmed);
+  const revenue = confirmed.reduce((s, r) => s + r.total, 0);
+  const cashTotal = confirmed.filter((r) => r.paymentType === "CASH").reduce((s, r) => s + r.total, 0);
+  const creditTotal = confirmed.filter((r) => r.paymentType === "CREDIT").reduce((s, r) => s + r.total, 0);
+  const outstanding = rows.reduce((s, r) => s + r.balance, 0);
 
   const saleProducts = products.map((p) => ({
     id: p.id,
@@ -45,40 +43,26 @@ export default async function AdminSalesPage() {
     stock: p.inventory?.warehouseQty ?? 0,
   }));
   const priceMap: Record<string, number> = {};
-  for (const pp of partnerPrices) {
-    priceMap[`${pp.partnerId}:${pp.productId}`] = pp.price;
-  }
-
-  const rows: SaleRow[] = sales.map((r) => {
-    const isWalkin = r.requester.email === WALKIN_EMAIL;
-    return {
-      id: r.id,
-      code: r.code.replace("REQ", "SALE"),
-      buyer: isWalkin
-        ? r.deliverTo?.trim() || "Walk-in customer"
-        : r.requester.name,
-      isWalkin,
-      paymentType: r.paymentType,
-      total: r.totalAmount ?? 0,
-      dateISO: (r.fulfilledAt ?? r.createdAt).toISOString(),
-    };
-  });
+  for (const pp of partnerPrices) priceMap[`${pp.partnerId}:${pp.productId}`] = pp.price;
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Sales history" description="Confirmed sales — fulfilled partner orders and recorded cash sales. Open any row for the full record.">
-        <RecordCashSale
-          partners={partners}
-          products={saleProducts}
-          priceMap={priceMap}
-          receivingAccounts={receivingAccounts}
-        />
+      <PageHeader
+        title="Sales history"
+        description="Every sale, every channel — field, office, partner and direct. Who sold what, to whom, how much, when, and whether the money is in."
+      >
+        <RecordCashSale partners={partners} products={saleProducts} priceMap={priceMap} receivingAccounts={receivingAccounts} />
       </PageHeader>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <KpiCard label="Confirmed sales" value={sales.length} icon={ShoppingCart} accent="primary" />
-        <KpiCard label="Total value" value={total} prefix="TSh " icon={TrendingUp} accent="success" />
+
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+        <KpiCard label="Total sales" value={rows.length} icon={ShoppingCart} accent="primary" />
+        <KpiCard label="Revenue (confirmed)" value={revenue} prefix="TSh " icon={TrendingUp} accent="success" />
+        <KpiCard label="Cash sales" value={cashTotal} prefix="TSh " icon={Banknote} accent="success" />
+        <KpiCard label="Credit sales" value={creditTotal} prefix="TSh " icon={CreditCard} accent="accent" />
+        <KpiCard label="Outstanding credit" value={outstanding} prefix="TSh " icon={AlertTriangle} accent={outstanding > 0 ? "warning" : "success"} />
       </div>
-      <SalesTable rows={rows} />
+
+      <SalesHistoryTable rows={rows} />
     </div>
   );
 }
