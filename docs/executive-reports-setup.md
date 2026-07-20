@@ -1,8 +1,16 @@
 # Executive WhatsApp Reports — Setup
 
-ORA OS now generates executive PDF reports, archives them, and WhatsApps the CEO
-via **CallMeBot**. Scheduling is done by an **external cron** (e.g. cron-job.org)
-hitting secure routes. Two setup steps: (1) Vercel env vars, (2) cron schedules.
+ORA OS generates executive PDF reports, archives them, and WhatsApps the CEO via
+**CallMeBot**.
+
+**Two kinds of notification — only one is scheduled:**
+- **Event alerts fire instantly, no scheduler** — a fund request, a confirmed
+  payment, or a rep's daily report is sent the moment it happens, straight from
+  the server action. Nothing to configure.
+- **Time-of-day reports are scheduled** — the daily 7pm summary, the month-end
+  report, and the morning credit reminder. These run on **Vercel Cron**
+  (declared in `vercel.json`), triggered automatically by Vercel — no external
+  service. Setup is just the env vars below + a redeploy.
 
 ## 1. Vercel environment variables
 
@@ -19,22 +27,29 @@ Project → Settings → Environment Variables (Production), then **redeploy**:
 > To pause all WhatsApp sending, set `NOTIFICATIONS_DISABLED=1`. Or toggle
 > individual notifications in **Admin → Reports → Notification settings**.
 
-## 2. Schedule the routes (cron-job.org)
+## 2. Scheduling — Vercel Cron (automatic, no external service)
 
-Create 3 cron jobs. Each URL must include `?secret=<CRON_SECRET>` (same value as
-the Vercel env var). Times below are **EAT (UTC+3)** — set cron-job.org's timezone
-to Africa/Dar_es_Salaam.
+The schedules live in **`vercel.json`** (`crons`) and run on Vercel itself. When
+`CRON_SECRET` is set in the project env, **Vercel automatically sends it as
+`Authorization: Bearer <CRON_SECRET>`** on every cron request, which the routes
+verify — so there's nothing to keep in sync and no public `?secret=` URL. Just
+have `CRON_SECRET` set and **redeploy**; the crons register on deploy.
 
-| Report | URL | Schedule |
-|---|---|---|
-| **Daily** | `https://ora-os-eight.vercel.app/api/cron/daily-report?secret=SECRET` | Daily at 19:00 |
-| **Credit reminder** | `https://ora-os-eight.vercel.app/api/cron/credit-reminder?secret=SECRET` | Daily at 08:00 |
-| **Monthly** | `https://ora-os-eight.vercel.app/api/cron/monthly-report?secret=SECRET` | Daily at 20:00 (it self-fires only on the last day of the month) |
+> **Vercel Cron runs in UTC**, and ORA operates in **EAT (UTC+3)**. The schedules
+> below are already converted, and the routes double-check the EAT clock/date
+> themselves (via `Africa/Dar_es_Salaam`), so the send times are timezone-correct.
 
-**Configurable daily time:** to change the daily send time from the app instead
-of the schedule, run the daily job **hourly** with `&checkHour=1`
-(`…/daily-report?secret=SECRET&checkHour=1`). It then sends only at the hour set
-in Admin → Reports → *Daily send time (EAT)*.
+| Report | `vercel.json` path | Schedule (UTC) | Effect |
+|---|---|---|---|
+| **Daily** | `/api/cron/daily-report?checkHour=1` | `0 * * * *` (hourly) | Sends only at the EAT hour set in **Admin → Reports → Daily send time** (default 19:00 EAT). Change it in the app — no redeploy. |
+| **Monthly** | `/api/cron/monthly-report` | `0 18 * * *` (21:00 EAT daily) | Self-fires only on the **last EAT day** of the month. |
+| **Credit reminder** | `/api/cron/credit-reminder` | `0 4 * * *` (07:00 EAT) | Morning list of customers due/overdue (silent if nothing is due). |
+
+To change a fixed time, edit `vercel.json` and redeploy. The daily send time is
+adjustable in-app without a redeploy (hourly cron + the `checkHour` gate).
+
+> Verify in the Vercel dashboard: **Project → Settings → Cron Jobs** lists the
+> three jobs and their last run. You can **Run** any of them manually there.
 
 ## Testing
 
