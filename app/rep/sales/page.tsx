@@ -21,8 +21,6 @@ export default async function RepSalesHistoryPage() {
   const cashTotal = confirmed.filter((r) => r.paymentType === "CASH").reduce((s, r) => s + r.total, 0);
   const creditTotal = confirmed.filter((r) => r.paymentType === "CREDIT").reduce((s, r) => s + r.total, 0);
   const pending = rows.filter((r) => r.status === "Awaiting confirmation").length;
-  // Owed on CONFIRMED credit only — reconciles with credit sales (owed ≤ sold).
-  const outstanding = confirmed.filter((r) => r.paymentType === "CREDIT").reduce((s, r) => s + r.balance, 0);
 
   return (
     <div className="space-y-6">
@@ -37,7 +35,7 @@ export default async function RepSalesHistoryPage() {
         <KpiCard label="Confirmed value" value={confirmed.reduce((s, r) => s + r.total, 0)} prefix="TSh " icon={TrendingUp} accent="success" />
         <KpiCard label="Cash sales" value={cashTotal} prefix="TSh " icon={Banknote} accent="success" />
         <KpiCard label="Credit sales" value={creditTotal} prefix="TSh " icon={CreditCard} accent="accent" />
-        <KpiCard label={pending > 0 ? "Awaiting finance" : "Outstanding credit"} value={pending > 0 ? pending : outstanding} prefix={pending > 0 ? "" : "TSh "} icon={AlertTriangle} accent="warning" />
+        <KpiCard label="Awaiting finance" value={pending} icon={AlertTriangle} accent={pending > 0 ? "warning" : "success"} />
       </div>
 
       <SalesHistoryTable rows={rows} />
