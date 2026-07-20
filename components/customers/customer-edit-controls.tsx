@@ -26,17 +26,20 @@ type EditableCustomer = {
   taxId: string | null;
 };
 
-/** ADMIN/FINANCE edit & delete controls for a field customer. Never rendered
- * for a sales rep. The registered address here is the customer's one delivery
- * address. */
+/** ADMIN/FINANCE edit controls for a field customer. Never rendered for a sales
+ * rep. The registered address here is the customer's one delivery address.
+ * Deletion is Admin-only (customers belong to ORA) — Finance sees Edit but not
+ * Delete, gated by `canDelete`. */
 export function CustomerEditControls({
   customer,
   listHref,
   hasSales,
+  canDelete = false,
 }: {
   customer: EditableCustomer;
   listHref: string;
   hasSales: boolean;
+  canDelete?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -101,14 +104,16 @@ export function CustomerEditControls({
           <Button size="sm" variant="outline" className="rounded-full" onClick={() => setEditing(true)}>
             <Pencil className="size-3.5" /> Edit details
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="rounded-full text-destructive hover:text-destructive"
-            onClick={() => setConfirming(true)}
-          >
-            <Trash2 className="size-3.5" /> Delete
-          </Button>
+          {canDelete && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="rounded-full text-destructive hover:text-destructive"
+              onClick={() => setConfirming(true)}
+            >
+              <Trash2 className="size-3.5" /> Delete
+            </Button>
+          )}
         </div>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">

@@ -46,10 +46,17 @@ export function FieldSaleForm({
   products,
   customers,
   accounts = [],
+  initialCustomerId,
+  warehouse = false,
 }: {
   products: ProductRow[];
   customers: CustomerRow[];
   accounts?: ReceivingAccount[];
+  // Preselect a customer (e.g. launched from that customer's profile).
+  initialCustomerId?: string;
+  // Office (Admin/Finance) sale: stock is drawn from the warehouse, so the copy
+  // says "available" / "the warehouse" instead of "in hand" / "your book".
+  warehouse?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -74,7 +81,7 @@ export function FieldSaleForm({
   const [price, setPrice] = useState<Record<string, string>>(
     Object.fromEntries(products.map((p) => [p.id, String(p.price)])),
   );
-  const [customerId, setCustomerId] = useState("");
+  const [customerId, setCustomerId] = useState(initialCustomerId ?? "");
   const [newCustomer, setNewCustomer] = useState(false);
   // Customers saved during this visit — visible & selectable immediately,
   // before the server refresh lands.
@@ -210,7 +217,9 @@ export function FieldSaleForm({
       if (i.quantity > p.inHand)
         return toast({
           variant: "error",
-          title: `You only have ${p.inHand} of ${p.name} in hand.`,
+          title: warehouse
+            ? `Only ${p.inHand} of ${p.name} available in the warehouse.`
+            : `You only have ${p.inHand} of ${p.name} in hand.`,
         });
     }
     if (type === "CREDIT" && !customerId)
@@ -333,7 +342,9 @@ export function FieldSaleForm({
         <div className="space-y-2">
           {products.length === 0 && (
             <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-              You have no sellable stock in hand — request stock first.
+              {warehouse
+                ? "No stock available in the warehouse right now."
+                : "You have no sellable stock in hand — request stock first."}
             </p>
           )}
           {products.map((p) => (
@@ -348,7 +359,7 @@ export function FieldSaleForm({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{p.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {formatNumber(p.inHand)} in hand · {p.unitLabel}
+                    {formatNumber(p.inHand)} {warehouse ? "available" : "in hand"} · {p.unitLabel}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -672,7 +683,9 @@ export function FieldSaleForm({
             : "Record sale"}
       </Button>
       <p className="text-center text-xs text-muted-foreground">
-        Stock is deducted from your hand the moment the sale is recorded.
+        {warehouse
+          ? "Stock is deducted from the warehouse the moment the sale is recorded."
+          : "Stock is deducted from your hand the moment the sale is recorded."}
       </p>
     </div>
   );

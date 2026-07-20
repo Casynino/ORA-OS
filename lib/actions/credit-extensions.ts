@@ -35,6 +35,8 @@ function revalidateExtensions() {
     "/finance/credit",
     "/finance/customers",
     "/admin",
+    "/rep",
+    "/rep/customers",
   ])
     revalidatePath(p);
 }
@@ -46,12 +48,14 @@ const createSchema = z.object({
   financeNotes: z.string().max(500).optional().or(z.literal("")),
 });
 
-/** FINANCE (or ADMIN) files an extension request against a credit sale. */
+/** A SALES_REP, FINANCE or ADMIN files an extension request against a credit
+ *  sale. A rep may only request one for their OWN customers' sales; the request
+ *  always goes to Admin — only Admin can approve or reject it. */
 export async function createCreditExtension(
   input: z.infer<typeof createSchema>,
 ): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["FINANCE", "ADMIN"]);
+    const actor = await requireActor(["SALES_REP", "FINANCE", "ADMIN"]);
     const parsed = createSchema.safeParse(input);
     if (!parsed.success)
       return fail(parsed.error.issues[0]?.message ?? "Invalid request.");
@@ -59,9 +63,20 @@ export async function createCreditExtension(
 
     const sale = await prisma.fieldSale.findUnique({
       where: { id: d.saleId },
-      include: { customer: { select: { id: true, name: true, businessName: true } } },
+      include: { customer: { select: { id: true, name: true, businessName: true, repId: true } } },
     });
     if (!sale || sale.type !== "CREDIT") return fail("Credit sale not found.");
+    // A rep can raise extensions on any credit sale of a customer they currently
+    // manage — whether they recorded that sale themselves (sale.repId) or it was
+    // recorded by Finance / a prior rep before the customer was assigned to them
+    // (customer.repId). Both are scoped to the rep's own book and only create an
+    // Admin-approved request, so there's no privilege escalation.
+    if (
+      actor.role === "SALES_REP" &&
+      sale.repId !== actor.id &&
+      sale.customer?.repId !== actor.id
+    )
+      return fail("You can only request extensions for your own customers.");
     if (sale.voided) return fail("This sale was voided.");
     if (sale.financeStatus === "REJECTED")
       return fail("This sale was rejected by finance — it can't be extended.");
