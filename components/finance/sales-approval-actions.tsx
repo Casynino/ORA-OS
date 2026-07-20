@@ -2,10 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, X } from "lucide-react";
+import { Check, X, Undo2 } from "lucide-react";
 import {
   approveFieldSale,
   rejectFieldSale,
+  revertFieldSaleApproval,
   approveFieldCollection,
   rejectFieldCollection,
 } from "@/lib/actions/finance-approvals";
@@ -147,6 +148,65 @@ export function SaleApprovalActions({
         />
       )}
     </div>
+  );
+}
+
+/** Undo an accidental confirmation — sends a confirmed sale back to the pending
+ *  queue for review. Stock is untouched; any physical cash it added to Cash on
+ *  Hand is pulled back out until it's confirmed again. */
+export function RevertApprovalButton({
+  saleId,
+  saleCode,
+}: {
+  saleId: string;
+  saleCode: string;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, start] = useTransition();
+
+  function submit() {
+    start(async () => {
+      const res = await revertFieldSaleApproval(saleId);
+      if (res.ok) {
+        toast({ variant: "success", title: res.message });
+        setOpen(false);
+        router.refresh();
+      } else {
+        toast({ variant: "error", title: res.error });
+      }
+    });
+  }
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        className="shrink-0"
+        onClick={() => setOpen(true)}
+      >
+        <Undo2 className="size-3.5" /> Undo
+      </Button>
+      {open && (
+        <Modal
+          open
+          onClose={() => setOpen(false)}
+          title={`Send ${saleCode} back to pending?`}
+          description="This undoes the confirmation — the sale returns to the review queue, and any cash it added to Cash on Hand is removed until it's confirmed again. Stock is not affected."
+        >
+          <div className="mt-2 flex justify-end gap-2">
+            <Button variant="ghost" className="rounded-full" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button className="rounded-full" onClick={submit} disabled={pending}>
+              <Undo2 className="size-4" />
+              {pending ? "Sending back…" : "Send back to pending"}
+            </Button>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }
 

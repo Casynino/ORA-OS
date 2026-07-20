@@ -39,14 +39,19 @@ have `CRON_SECRET` set and **redeploy**; the crons register on deploy.
 > below are already converted, and the routes double-check the EAT clock/date
 > themselves (via `Africa/Dar_es_Salaam`), so the send times are timezone-correct.
 
+Only **2 cron jobs** are used, both daily — so this is valid on **every Vercel
+plan** (Hobby allows 2 crons, daily-only; Pro allows more/faster). The monthly
+report is folded into the daily trigger (fires only on the last EAT day).
+
 | Report | `vercel.json` path | Schedule (UTC) | Effect |
 |---|---|---|---|
-| **Daily** | `/api/cron/daily-report?checkHour=1` | `0 * * * *` (hourly) | Sends only at the EAT hour set in **Admin → Reports → Daily send time** (default 19:00 EAT). Change it in the app — no redeploy. |
-| **Monthly** | `/api/cron/monthly-report` | `0 18 * * *` (21:00 EAT daily) | Self-fires only on the **last EAT day** of the month. |
+| **Daily (+ month-end monthly)** | `/api/cron/daily-report` | `0 16 * * *` (19:00 EAT) | Sends the daily report; on the **last EAT day** it also sends the monthly. |
 | **Credit reminder** | `/api/cron/credit-reminder` | `0 4 * * *` (07:00 EAT) | Morning list of customers due/overdue (silent if nothing is due). |
 
-To change a fixed time, edit `vercel.json` and redeploy. The daily send time is
-adjustable in-app without a redeploy (hourly cron + the `checkHour` gate).
+On a **Pro** plan you can instead make the daily send time adjustable in-app: set
+the daily cron to `0 * * * *` (hourly) with path `/api/cron/daily-report?checkHour=1`
+— it then sends only at the EAT hour in **Admin → Reports → Daily send time**.
+(`/api/cron/monthly-report?force=1` still works for a manual monthly.)
 
 > Verify in the Vercel dashboard: **Project → Settings → Cron Jobs** lists the
 > three jobs and their last run. You can **Run** any of them manually there.

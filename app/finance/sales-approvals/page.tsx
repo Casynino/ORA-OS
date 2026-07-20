@@ -10,6 +10,7 @@ import { ProofViewer } from "@/components/ui/proof-viewer";
 import {
   SaleApprovalActions,
   CollectionApprovalActions,
+  RevertApprovalButton,
 } from "@/components/finance/sales-approval-actions";
 import { cn, formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
 import type { FinanceApproval } from "@prisma/client";
@@ -271,7 +272,14 @@ export default async function FinanceSalesApprovalsPage({
             method={s.paymentMethod}
           />
         ) : (
-          reviewedTag(s)
+          <div className="flex shrink-0 items-center gap-2">
+            {reviewedTag(s)}
+            {/* Undo an accidental confirmation → back to the pending queue. Not for
+                head-office direct sales (void those) or already-banked cash. */}
+            {s.financeStatus === "APPROVED" && !s.directSale && s.cashStatus !== "DEPOSITED" && (
+              <RevertApprovalButton saleId={s.id} saleCode={s.code} />
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -451,6 +459,10 @@ export default async function FinanceSalesApprovalsPage({
                     <span className="text-xs text-muted-foreground">
                       {s.financeReviewedBy?.name ?? ""} {s.financeReviewedAt ? timeAgo(s.financeReviewedAt) : ""}
                     </span>
+                    {/* Just confirmed something by mistake? Undo it right here. */}
+                    {s.financeStatus === "APPROVED" && !s.directSale && s.cashStatus !== "DEPOSITED" && (
+                      <RevertApprovalButton saleId={s.id} saleCode={s.code} />
+                    )}
                   </span>
                 </li>
               ))}
