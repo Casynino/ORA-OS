@@ -169,7 +169,7 @@ export default async function FinanceDashboardPage() {
           <SectionLabel>Quick actions</SectionLabel>
           <div className="flex flex-wrap gap-2">
             <QuickAction icon={ClipboardCheck} label="Confirm payment" href="/finance/payments" />
-            <QuickAction icon={BadgeCheck} label="Approve credit" href="/finance/sales-approvals" />
+            <QuickAction icon={BadgeCheck} label="Review credit sales" href="/finance/sales-approvals" />
             <QuickAction icon={Landmark} label="Record deposit" href="/finance/cash" />
             <QuickAction icon={Receipt} label="Operational expense" href="/finance/operational-fund" />
             <QuickAction icon={UserCheck} label="Review application" href="/finance/applications" />

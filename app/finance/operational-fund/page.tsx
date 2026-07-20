@@ -19,7 +19,7 @@ export default async function FinanceOperationalFundPage() {
     <div className="space-y-6">
       <PageHeader
         title="Operational Fund"
-        description="Money the CEO allocates to Finance for day-to-day operations. Request funds, spend from the balance, and record every expense with receipts — all in one place."
+        description="Funds allocated to Finance for day-to-day operations. Request funds, spend from the balance, and record every expense with receipts — all in one place."
       />
       <OperationalFundManager fund={fund} categories={categories} canManage />
     </div>

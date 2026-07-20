@@ -133,7 +133,7 @@ export default async function AdminSalesApprovalsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Sales approvals"
-        description="Rep-recorded money awaiting sign-off. Finance handles these day-to-day — but as CEO you can review and act on any of them directly here. Nothing is official until confirmed."
+        description="Rep-recorded money awaiting sign-off. Finance handles these day-to-day; you can review and act on any of them directly here. Nothing is official until confirmed."
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

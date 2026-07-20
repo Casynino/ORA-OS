@@ -185,7 +185,7 @@ export function OperationalFundManager({
                   {canApprove ? (
                     <ApproveControls id={r.id} accounts={accounts} />
                   ) : (
-                    <Badge variant="warning">Awaiting CEO</Badge>
+                    <Badge variant="warning">Awaiting approval</Badge>
                   )}
                 </div>
               </div>
@@ -600,7 +600,7 @@ function RequestModal({ categories, onClose }: { categories: CategoryOption[]; o
   }
 
   return (
-    <Modal open onClose={onClose} title="Request operational funds" description="Build a request with one or more line items — the CEO approves and funds the total from a company account.">
+    <Modal open onClose={onClose} title="Request operational funds" description="Build a request with one or more line items — it's reviewed and the total is funded from a company account.">
       <div className="space-y-4">
         <div>
           <Label>Purpose *</Label>
@@ -642,10 +642,10 @@ function RequestModal({ categories, onClose }: { categories: CategoryOption[]; o
         </div>
         <div>
           <Label>Notes (optional)</Label>
-          <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" placeholder="Anything the CEO should know" />
+          <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" placeholder="Anything worth noting for the reviewer" />
         </div>
         <Button className="w-full" onClick={submit} disabled={pending || total <= 0}>
-          {pending ? "Sending…" : "Send to CEO for approval"}
+          {pending ? "Sending…" : "Submit request for review"}
         </Button>
       </div>
     </Modal>

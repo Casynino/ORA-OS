@@ -12,7 +12,7 @@ export default async function FinanceApplicationsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Partner applications"
-        description="Verify the business, set credit eligibility, limit, pricing and financial notes, then approve — the CEO sees every decision."
+        description="Verify the business, set credit eligibility, limit, pricing and financial notes, then approve — every decision is recorded."
       />
       <ApplicationsList apps={apps} basePath="/finance/applications" />
     </div>
