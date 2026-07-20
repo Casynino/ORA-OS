@@ -271,10 +271,18 @@ export async function recordFieldSale(
           // (respecting units reserved for rep pickups). The org buckets move
           // warehouse → distributed, composed as ASSIGNED then DISTRIBUTED (net
           // warehouse −qty / distributed +qty) — nobody carries this stock.
-          await deductWarehouseStock(tx, {
-            productId: item.productId,
-            quantity: item.quantity,
-          });
+          try {
+            await deductWarehouseStock(tx, {
+              productId: item.productId,
+              quantity: item.quantity,
+            });
+          } catch (e) {
+            // Finance never sees raw warehouse counts (only Admin/Warehouse do),
+            // so a shortfall on a Finance sale is reported without the number.
+            if (actor.role === "FINANCE")
+              throw new Error("Not enough stock available in the warehouse for that quantity.");
+            throw e;
+          }
           await applyMovement(tx, {
             productId: item.productId,
             type: "ASSIGNED",

@@ -29,6 +29,7 @@ export default async function FinanceSellPage({
           accounts={accounts}
           initialCustomerId={customer}
           warehouse
+          hideStockCount
         />
       </div>
     </div>

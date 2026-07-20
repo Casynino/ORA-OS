@@ -48,6 +48,7 @@ export function FieldSaleForm({
   accounts = [],
   initialCustomerId,
   warehouse = false,
+  hideStockCount = false,
 }: {
   products: ProductRow[];
   customers: CustomerRow[];
@@ -57,6 +58,9 @@ export function FieldSaleForm({
   // Office (Admin/Finance) sale: stock is drawn from the warehouse, so the copy
   // says "available" / "the warehouse" instead of "in hand" / "your book".
   warehouse?: boolean;
+  // Show only "In stock" / "Out of stock" instead of the exact quantity. Warehouse
+  // counts are visible only to Admin & Warehouse; Finance (and reps) see status.
+  hideStockCount?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -217,9 +221,11 @@ export function FieldSaleForm({
       if (i.quantity > p.inHand)
         return toast({
           variant: "error",
-          title: warehouse
-            ? `Only ${p.inHand} of ${p.name} available in the warehouse.`
-            : `You only have ${p.inHand} of ${p.name} in hand.`,
+          title: hideStockCount
+            ? `Not enough ${p.name} in stock for that quantity.`
+            : warehouse
+              ? `Only ${p.inHand} of ${p.name} available in the warehouse.`
+              : `You only have ${p.inHand} of ${p.name} in hand.`,
         });
     }
     if (type === "CREDIT" && !customerId)
@@ -347,19 +353,30 @@ export function FieldSaleForm({
                 : "You have no sellable stock in hand — request stock first."}
             </p>
           )}
-          {products.map((p) => (
+          {products.map((p) => {
+            const out = p.inHand <= 0;
+            return (
             <div
               key={p.id}
               className={cn(
                 "rounded-2xl border p-3 transition-colors",
                 Number(qty[p.id]) > 0 ? "border-primary/50 bg-primary/[0.04]" : "border-border",
+                out && "opacity-60",
               )}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{p.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {formatNumber(p.inHand)} {warehouse ? "available" : "in hand"} · {p.unitLabel}
+                    {hideStockCount ? (
+                      <span className={out ? "text-muted-foreground" : "text-success"}>
+                        {out ? "Out of stock" : "In stock"}
+                      </span>
+                    ) : (
+                      `${formatNumber(p.inHand)} ${warehouse ? "available" : "in hand"}`
+                    )}
+                    {" · "}
+                    {p.unitLabel}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -367,7 +384,8 @@ export function FieldSaleForm({
                     type="number"
                     inputMode="numeric"
                     min={0}
-                    max={p.inHand}
+                    max={hideStockCount ? undefined : p.inHand}
+                    disabled={out}
                     placeholder="Qty"
                     value={qty[p.id] ?? ""}
                     onChange={(e) => setQty((s) => ({ ...s, [p.id]: e.target.value }))}
@@ -379,6 +397,7 @@ export function FieldSaleForm({
                       type="number"
                       inputMode="numeric"
                       min={0}
+                      disabled={out}
                       value={price[p.id] ?? ""}
                       onChange={(e) => setPrice((s) => ({ ...s, [p.id]: e.target.value }))}
                       className="h-9 w-24"
@@ -387,7 +406,8 @@ export function FieldSaleForm({
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
