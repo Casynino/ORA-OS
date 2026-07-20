@@ -23,6 +23,7 @@ const nav: NavGroup[] = [
     label: "Verify",
     items: [
       { href: "/finance/sales-approvals", label: "Sales approvals", icon: "sales" },
+      { href: "/finance/sales", label: "Sales history", icon: "audit" },
       { href: "/finance/payments", label: "Payments", icon: "payments" },
       { href: "/finance/returns", label: "Returns", icon: "warehouses" },
     ],
