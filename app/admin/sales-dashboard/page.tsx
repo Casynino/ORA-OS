@@ -16,7 +16,7 @@ export default async function AdminSalesDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Sales dashboard" description="Sales performance at a glance — across every channel, always in sync with Sales history.">
+      <PageHeader title="Sales insights" description="Sales performance and trends across every channel — always in sync with Sales history.">
         <Link href="/admin/sales" className={cn(buttonVariants({ size: "sm", variant: "outline" }), "rounded-full")}>
           Sales history <ArrowRight className="ml-1.5 size-4" />
         </Link>
@@ -38,11 +38,60 @@ export default async function AdminSalesDashboardPage() {
         <KpiCard label="Awaiting confirmation" value={d.counts.pending} icon={Clock} accent={d.counts.pending > 0 ? "warning" : "success"} />
       </div>
 
+      {/* Trend + mix */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 lg:col-span-2">
+          <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Revenue — last 14 days</p>
+          {(() => {
+            const max = Math.max(1, ...d.trend.map((t) => t.value));
+            return (
+              <div className="flex h-40 items-end gap-1.5">
+                {d.trend.map((t, i) => (
+                  <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                    <div className="flex w-full flex-1 items-end">
+                      <div
+                        className="w-full rounded-t-md bg-primary/70 transition-colors hover:bg-primary"
+                        style={{ height: `${Math.max((t.value / max) * 100, t.value > 0 ? 4 : 0)}%` }}
+                        title={`Day ${t.label}: ${formatCurrency(t.value)}`}
+                      />
+                    </div>
+                    <span className="text-[9px] text-muted-foreground">{t.label}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sales mix</p>
+          <MixRow label="Field & office" value={d.channelMix.field} total={d.revenue} tone="bg-primary" />
+          <MixRow label="Partner & direct" value={d.channelMix.partner} total={d.revenue} tone="bg-accent" />
+          <div className="my-3 border-t border-border/60" />
+          <MixRow label="Cash" value={d.cash} total={d.revenue} tone="bg-success" />
+          <MixRow label="Credit" value={d.credit} total={d.revenue} tone="bg-info" />
+        </div>
+      </div>
+
       {/* Leaderboards */}
       <div className="grid gap-4 lg:grid-cols-3">
         <LeaderCard title="Top products" icon={<Package className="size-4" />} rows={d.topProducts.map((p) => ({ name: p.name, value: p.value, sub: `${formatNumber(p.pieces)} pcs` }))} />
         <LeaderCard title="Top sales reps" icon={<BadgeCheck className="size-4" />} rows={d.topReps.map((r) => ({ name: r.name, value: r.value, sub: `${formatNumber(r.count)} sale${r.count === 1 ? "" : "s"}` }))} />
         <LeaderCard title="Top customers" icon={<Building2 className="size-4" />} rows={d.topCustomers.map((c) => ({ name: c.name, value: c.value, sub: `${formatNumber(c.count)} order${c.count === 1 ? "" : "s"}` }))} />
+      </div>
+    </div>
+  );
+}
+
+function MixRow({ label, value, total, tone }: { label: string; value: number; total: number; tone: string }) {
+  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className="mb-2.5">
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="shrink-0 font-medium tabular-nums">{formatCurrency(value)} · {pct}%</span>
+      </div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className={cn("h-full rounded-full", tone)} style={{ width: `${pct}%` }} />
       </div>
     </div>
   );

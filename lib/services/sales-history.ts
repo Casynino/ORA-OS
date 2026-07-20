@@ -229,6 +229,23 @@ export async function getSalesDashboard() {
   const top = <T extends { value: number }>(m: Map<string, T>) =>
     [...m.values()].sort((a, b) => b.value - a.value).slice(0, 5);
 
+  // 14-day revenue trend (confirmed), EAT days, oldest → newest.
+  const DAY = 24 * 60 * 60 * 1000;
+  const trend: { label: string; value: number }[] = [];
+  for (let i = 13; i >= 0; i--) {
+    const start = todayStart - i * DAY;
+    const end = start + DAY;
+    const label = String(new Date(start).getUTCDate());
+    const value = confirmed
+      .filter((r) => eatMs(r.dateISO) >= start && eatMs(r.dateISO) < end)
+      .reduce((s, r) => s + r.total, 0);
+    trend.push({ label, value });
+  }
+
+  // Where the money comes from — channel mix (confirmed revenue).
+  const fieldRev = confirmed.filter((r) => r.channel === "FIELD").reduce((s, r) => s + r.total, 0);
+  const partnerRev = confirmed.filter((r) => r.channel === "PARTNER").reduce((s, r) => s + r.total, 0);
+
   return {
     counts: {
       total: rows.length,
@@ -247,5 +264,7 @@ export async function getSalesDashboard() {
     topProducts: [...prod.values()].sort((a, b) => b.value - a.value).slice(0, 5),
     topReps: top(reps),
     topCustomers: top(custs),
+    trend,
+    channelMix: { field: fieldRev, partner: partnerRev },
   };
 }

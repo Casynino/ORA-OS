@@ -21,7 +21,7 @@ const nav: NavGroup[] = [
   {
     label: "Sales",
     items: [
-      { href: "/admin/sales-dashboard", label: "Sales dashboard", icon: "profit" },
+      { href: "/admin/sales-dashboard", label: "Sales insights", icon: "profit" },
       { href: "/admin/requests", label: "Orders", icon: "requests" },
       { href: "/admin/sales-approvals", label: "Sales approvals", icon: "approvals" },
       { href: "/admin/sales", label: "Sales history", icon: "sales" },
