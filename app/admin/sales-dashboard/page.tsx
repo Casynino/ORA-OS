@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
   CalendarDays, CalendarRange, CalendarClock, TrendingUp, Banknote, CreditCard,
-  AlertTriangle, Clock, Package, BadgeCheck, Building2, ArrowRight,
+  Clock, Package, BadgeCheck, Building2, ArrowRight,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { KpiCard } from "@/components/admin/kpi-card";
@@ -34,7 +34,7 @@ export default async function AdminSalesDashboardPage() {
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Cash sales" value={d.cash} prefix="TSh " icon={Banknote} accent="success" />
         <KpiCard label="Credit sales" value={d.credit} prefix="TSh " icon={CreditCard} accent="accent" />
-        <KpiCard label="Outstanding credit" value={d.outstanding} prefix="TSh " icon={AlertTriangle} accent={d.outstanding > 0 ? "warning" : "success"} />
+        <KpiCard label="Credit collected" value={d.collected} prefix="TSh " icon={Banknote} accent={d.collected > 0 ? "success" : "warning"} />
         <KpiCard label="Awaiting confirmation" value={d.counts.pending} icon={Clock} accent={d.counts.pending > 0 ? "warning" : "success"} />
       </div>
 

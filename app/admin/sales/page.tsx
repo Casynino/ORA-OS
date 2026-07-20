@@ -33,8 +33,7 @@ export default async function AdminSalesHistoryPage() {
   const revenue = confirmed.reduce((s, r) => s + r.total, 0);
   const cashTotal = confirmed.filter((r) => r.paymentType === "CASH").reduce((s, r) => s + r.total, 0);
   const creditTotal = confirmed.filter((r) => r.paymentType === "CREDIT").reduce((s, r) => s + r.total, 0);
-  // Owed on CONFIRMED credit only — reconciles with credit sales (owed ≤ sold).
-  const outstanding = confirmed.filter((r) => r.paymentType === "CREDIT").reduce((s, r) => s + r.balance, 0);
+  const pending = rows.filter((r) => r.status === "Awaiting confirmation").length;
 
   const saleProducts = products.map((p) => ({
     id: p.id,
@@ -60,7 +59,7 @@ export default async function AdminSalesHistoryPage() {
         <KpiCard label="Revenue (confirmed)" value={revenue} prefix="TSh " icon={TrendingUp} accent="success" />
         <KpiCard label="Cash sales" value={cashTotal} prefix="TSh " icon={Banknote} accent="success" />
         <KpiCard label="Credit sales" value={creditTotal} prefix="TSh " icon={CreditCard} accent="accent" />
-        <KpiCard label="Outstanding credit" value={outstanding} prefix="TSh " icon={AlertTriangle} accent={outstanding > 0 ? "warning" : "success"} />
+        <KpiCard label="Awaiting confirmation" value={pending} icon={AlertTriangle} accent={pending > 0 ? "warning" : "success"} />
       </div>
 
       <SalesHistoryTable rows={rows} />
