@@ -68,6 +68,7 @@ export async function getSalesHistory(opts?: {
     prisma.fieldSale.findMany({
       where: {
         voided: false,
+        isOpeningBalance: false, // migrated debt is a receivable, not a sale
         ...(opts?.repId ? { repId: opts.repId } : {}),
         ...(opts?.confirmedOnly ? { financeStatus: "APPROVED" } : {}),
       },
@@ -179,4 +180,70 @@ export async function getSalesHistory(opts?: {
   });
 
   return [...fieldRows, ...reqRows].sort((a, b) => b.dateISO.localeCompare(a.dateISO));
+}
+
+export type SalesLeader = { name: string; value: number; count: number };
+
+/** Sales dashboard summary — today/week/month, cash/credit split, outstanding,
+ *  and the top products / reps / customers. Everything is derived from the same
+ *  unified rows, so it always agrees with the Sales History list. EAT (UTC+3). */
+export async function getSalesDashboard() {
+  const rows = await getSalesHistory();
+  const confirmed = rows.filter((r) => r.confirmed);
+
+  const EAT = 3 * 60 * 60 * 1000;
+  const nowE = new Date(Date.now() + EAT);
+  const y = nowE.getUTCFullYear();
+  const mo = nowE.getUTCMonth();
+  const day = nowE.getUTCDate();
+  const dow = (nowE.getUTCDay() + 6) % 7; // 0 = Monday
+  const todayStart = Date.UTC(y, mo, day);
+  const weekStart = Date.UTC(y, mo, day - dow);
+  const monthStart = Date.UTC(y, mo, 1);
+  const eatMs = (iso: string) => new Date(iso).getTime() + EAT;
+
+  const sum = (arr: SalesHistoryRow[]) => arr.reduce((s, r) => s + r.total, 0);
+  const since = (start: number) => confirmed.filter((r) => eatMs(r.dateISO) >= start);
+
+  const prod = new Map<string, { name: string; value: number; pieces: number }>();
+  for (const r of confirmed)
+    for (const i of r.items) {
+      const cur = prod.get(i.name) ?? { name: i.name, value: 0, pieces: 0 };
+      cur.value += i.quantity * i.unitPrice;
+      cur.pieces += i.quantity;
+      prod.set(i.name, cur);
+    }
+
+  const bump = (m: Map<string, SalesLeader>, key: string, total: number) => {
+    const cur = m.get(key) ?? { name: key, value: 0, count: 0 };
+    cur.value += total;
+    cur.count += 1;
+    m.set(key, cur);
+  };
+  const reps = new Map<string, SalesLeader>();
+  const custs = new Map<string, SalesLeader>();
+  for (const r of confirmed) {
+    if (r.createdByRole === "Sales rep") bump(reps, r.createdBy, r.total);
+    bump(custs, r.customer, r.total);
+  }
+  const top = <T extends { value: number }>(m: Map<string, T>) =>
+    [...m.values()].sort((a, b) => b.value - a.value).slice(0, 5);
+
+  return {
+    counts: {
+      total: rows.length,
+      confirmed: confirmed.length,
+      pending: rows.filter((r) => r.status === "Awaiting confirmation").length,
+    },
+    revenue: sum(confirmed),
+    revenueToday: sum(since(todayStart)),
+    revenueWeek: sum(since(weekStart)),
+    revenueMonth: sum(since(monthStart)),
+    cash: sum(confirmed.filter((r) => r.paymentType === "CASH")),
+    credit: sum(confirmed.filter((r) => r.paymentType === "CREDIT")),
+    outstanding: rows.reduce((s, r) => s + r.balance, 0),
+    topProducts: [...prod.values()].sort((a, b) => b.value - a.value).slice(0, 5),
+    topReps: top(reps),
+    topCustomers: top(custs),
+  };
 }
