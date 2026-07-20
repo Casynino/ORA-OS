@@ -101,11 +101,21 @@ export function CustomerProfileView({
             )}
           </p>
         </div>
-        {role === "SALES_REP" && (
-          <Link href="/rep/sell" className={cn(buttonVariants({ size: "sm" }), "rounded-full")}>
-            <ShoppingCart className="mr-1.5 size-4" /> Record sale
-          </Link>
-        )}
+        {/* Record a sale for this customer. Reps sell from their carried stock;
+            Admin/Finance record a head-office sale drawn from the warehouse,
+            pre-scoped to this customer. */}
+        <Link
+          href={
+            role === "SALES_REP"
+              ? "/rep/sell"
+              : role === "FINANCE"
+                ? `/finance/sell?customer=${profile.id}`
+                : `/admin/sell?customer=${profile.id}`
+          }
+          className={cn(buttonVariants({ size: "sm" }), "rounded-full")}
+        >
+          <ShoppingCart className="mr-1.5 size-4" /> Record sale
+        </Link>
       </div>
 
       <CustomerFinancialSummary f={profile.finance} />
@@ -140,6 +150,7 @@ export function CustomerProfileView({
             }}
             listHref={backHref}
             hasSales={profile.sales.length > 0}
+            canDelete={role === "ADMIN"}
           />
           <AssignRepControl
             customerId={profile.id}
@@ -191,15 +202,15 @@ export function CustomerProfileView({
                 </p>
                 {s.type === "CREDIT" && s.balance > 0 && (
                   <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-3">
-                    {canManageCredit && (
-                      <RequestExtensionButton
-                        saleId={s.id}
-                        saleCode={s.code}
-                        owing={s.balance}
-                        currentDueDate={s.dueDate ? s.dueDate.toISOString().slice(0, 10) : null}
-                        hasPendingExtension={s.hasPendingExtension}
-                      />
-                    )}
+                    {/* Reps, Finance and Admin can all raise an extension request;
+                        only Admin can approve it. */}
+                    <RequestExtensionButton
+                      saleId={s.id}
+                      saleCode={s.code}
+                      owing={s.balance}
+                      currentDueDate={s.dueDate ? s.dueDate.toISOString().slice(0, 10) : null}
+                      hasPendingExtension={s.hasPendingExtension}
+                    />
                     <FieldCollectionButton
                       saleId={s.id}
                       saleCode={s.code}

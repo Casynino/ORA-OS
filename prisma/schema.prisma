@@ -1065,6 +1065,11 @@ model FieldSale {
   cashReceivedAt      DateTime? // when finance confirmed the cash in hand
   voided              Boolean            @default(false) // admin correction — restores stock
   voidReason          String?
+  // A head-office sale recorded directly by Admin/Finance: stock is drawn from
+  // the WAREHOUSE (not a rep's carried stock) and it is confirmed on the spot
+  // (they are the finance authority). Drives the warehouse-return reversal path
+  // in voidFieldSale instead of the rep-restock path.
+  directSale          Boolean            @default(false)
   // Migrated pre-ORA-OS debt (opening balance). Behaves like an approved CREDIT
   // receivable for credit/collections, but is NOT a new sale: no stock moves, no
   // line items, and it is excluded from every revenue/sales/trends figure.

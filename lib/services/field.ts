@@ -28,6 +28,59 @@ export async function getSalesReps(): Promise<{ id: string; name: string }[]> {
   });
 }
 
+/** Data for a head-office (Admin/Finance) sale: products with WAREHOUSE stock
+ *  available to sell (on hand minus units reserved for rep pickups), the full
+ *  customer book, and the active receiving accounts. Mirrors the shape the rep
+ *  sell page passes to FieldSaleForm, but sourced from the warehouse. */
+export async function getOfficeSaleData() {
+  const [products, stock, customers, accounts] = await Promise.all([
+    prisma.product.findMany({
+      where: { isActive: true, notForSale: false },
+      orderBy: { price: "desc" },
+      select: { id: true, name: true, sku: true, unitLabel: true, price: true },
+    }),
+    prisma.warehouseStock.groupBy({
+      by: ["productId"],
+      _sum: { onHand: true, reserved: true },
+    }),
+    prisma.fieldCustomer.findMany({
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        businessName: true,
+        phone: true,
+        location: true,
+        creditSuspended: true,
+        creditLimit: true,
+      },
+    }),
+    prisma.paymentAccount.findMany({
+      where: { isActive: true },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, type: true, accountName: true, accountNumber: true },
+    }),
+  ]);
+
+  // Sellable = on hand minus units reserved for prepared rep collections
+  // (reserved ≤ onHand per warehouse, so the summed difference is exact).
+  const available = new Map(
+    stock.map((s) => [s.productId, Math.max(0, (s._sum.onHand ?? 0) - (s._sum.reserved ?? 0))]),
+  );
+  const productRows = products
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      sku: p.sku,
+      unitLabel: p.unitLabel,
+      price: p.price,
+      inHand: available.get(p.id) ?? 0,
+    }))
+    .filter((p) => p.inHand > 0);
+
+  return { products: productRows, customers, accounts };
+}
+
 /** Flip stale PENDING/PARTIAL credit to OVERDUE once the due date passes. */
 export async function refreshOverdueFieldCredit() {
   await prisma.fieldSale.updateMany({

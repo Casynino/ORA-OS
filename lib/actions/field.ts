@@ -13,10 +13,10 @@ import {
   releaseWarehouseReservation,
 } from "@/lib/services/warehouse-stock";
 import { resolveReceivingAccount, isCashMethod } from "@/lib/payment-methods";
-import { notifyRepReport } from "@/lib/notifications/ceo-alerts";
+import { notifyRepReport, notifyPaymentConfirmed } from "@/lib/notifications/ceo-alerts";
 import { refCode } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
-import type { FieldCreditStatus } from "@prisma/client";
+import type { FieldCreditStatus, FinanceApproval, CashStatus } from "@prisma/client";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Field sales actions — Warehouse → Sales Rep → Customer.
@@ -137,7 +137,11 @@ export async function recordFieldSale(
   input: z.infer<typeof saleSchema>,
 ): Promise<ActionResult<{ code: string }>> {
   try {
-    const actor = await requireActor(["SALES_REP"]);
+    const actor = await requireActor(["SALES_REP", "ADMIN", "FINANCE"]);
+    // Admin/Finance record head-office sales: stock is drawn from the WAREHOUSE
+    // (not a rep's carried stock) and the sale is confirmed on the spot — they
+    // are the finance authority, so it never sits in the approval queue.
+    const isOffice = actor.role !== "SALES_REP";
     const parsed = saleSchema.safeParse(input);
     if (!parsed.success)
       return fail(parsed.error.issues[0]?.message ?? "Invalid sale.");
@@ -169,6 +173,10 @@ export async function recordFieldSale(
 
     const code = refCode("FS");
     const dueDate = d.dueDate ? new Date(d.dueDate) : null;
+    // Hoisted out of the transaction so the post-commit activity log and CEO
+    // alert can still name the buyer and the resolved payment method.
+    let soldTo = d.customerName?.trim() || "walk-in customer";
+    let resolvedMethod: string | null = null;
 
     await prisma.$transaction(async (tx) => {
       if (!customerId && d.newCustomer) {
@@ -191,17 +199,21 @@ export async function recordFieldSale(
             taxId: d.newCustomer.taxId || null,
             gpsLat: d.newCustomer.gpsLat ?? null,
             gpsLng: d.newCustomer.gpsLng ?? null,
-            repId: actor.id, // customer managed by the rep who created them
+            // A rep owns the customers they create; an office-recorded customer
+            // starts Unassigned (managed by Finance/Admin) until a rep is set.
+            repId: isOffice ? null : actor.id,
             registeredById: actor.id,
           },
         });
         customerId = c.id;
       }
 
-      let soldTo = d.customerName?.trim() || "walk-in customer";
       if (customerId) {
         const cust = await tx.fieldCustomer.findUnique({ where: { id: customerId } });
-        if (!cust || cust.repId !== actor.id)
+        if (!cust) throw new Error("That customer no longer exists.");
+        // A rep can only sell to customers in their own book; Admin/Finance may
+        // record a sale for any customer.
+        if (!isOffice && cust.repId !== actor.id)
           throw new Error("That customer isn't in your book.");
         if (d.type === "CREDIT" && cust.creditSuspended)
           throw new Error(`${cust.name}'s credit access is suspended.`);
@@ -233,8 +245,54 @@ export async function recordFieldSale(
         soldTo = cust.name;
       }
 
-      // Deduct rep stock atomically — a sale can never exceed stock in hand.
+      // Office sales aren't bounded by a rep's sellable RepStock, so guard the
+      // product status server-side: never sell a discontinued (isActive:false)
+      // or not-for-sale (e.g. free sample) product, even if a crafted payload or
+      // a stale form supplies its id.
+      if (isOffice) {
+        const prods = await tx.product.findMany({
+          where: { id: { in: d.items.map((i) => i.productId) } },
+          select: { id: true, name: true, isActive: true, notForSale: true },
+        });
+        const byId = new Map(prods.map((p) => [p.id, p]));
+        for (const it of d.items) {
+          const pr = byId.get(it.productId);
+          if (!pr) throw new Error("That product no longer exists.");
+          if (!pr.isActive) throw new Error(`${pr.name} is no longer active and can't be sold.`);
+          if (pr.notForSale) throw new Error(`${pr.name} is not for sale.`);
+        }
+      }
+
+      // Deduct stock atomically — a sale can never exceed stock on hand.
       for (const item of d.items) {
+        if (isOffice) {
+          // Head-office sale: draw from the WAREHOUSE. deductWarehouseStock keeps
+          // the per-location ledger (Σ onHand) reconciled and throws on shortfall
+          // (respecting units reserved for rep pickups). The org buckets move
+          // warehouse → distributed, composed as ASSIGNED then DISTRIBUTED (net
+          // warehouse −qty / distributed +qty) — nobody carries this stock.
+          await deductWarehouseStock(tx, {
+            productId: item.productId,
+            quantity: item.quantity,
+          });
+          await applyMovement(tx, {
+            productId: item.productId,
+            type: "ASSIGNED",
+            quantity: item.quantity,
+            createdById: actor.id,
+            reference: code,
+            note: `Warehouse → ${soldTo} (head-office ${d.type.toLowerCase()} sale)`,
+          });
+          await applyMovement(tx, {
+            productId: item.productId,
+            type: "DISTRIBUTED",
+            quantity: item.quantity,
+            createdById: actor.id,
+            reference: code,
+            note: `${actor.name} → ${soldTo} (head-office ${d.type.toLowerCase()} sale)`,
+          });
+          continue;
+        }
         const stock = await tx.repStock.findUnique({
           where: { repId_productId: { repId: actor.id, productId: item.productId } },
           include: { product: { select: { name: true } } },
@@ -279,6 +337,31 @@ export async function recordFieldSale(
         d.type === "CASH"
           ? await resolveReceivingAccount(tx, d.paymentAccountId || null, d.paymentMethod)
           : { paymentAccountId: null, method: null };
+      resolvedMethod = receiving.method;
+      // A head-office CASH sale in physical cash lands in Cash on Hand at once;
+      // bank / mobile / cheque money already sits in its account (cashStatus null).
+      const officePhysicalCash =
+        isOffice && d.type === "CASH" && isCashMethod(receiving.method);
+      // Admin/Finance are the finance authority, so their sale is confirmed on
+      // the spot rather than queued for approval.
+      const officeConfirmation: {
+        financeStatus?: FinanceApproval;
+        financeReviewedById?: string;
+        financeReviewedAt?: Date;
+        financeNote?: string;
+        cashStatus?: CashStatus;
+        cashReceivedAt?: Date;
+      } = isOffice
+        ? {
+            financeStatus: "APPROVED",
+            financeReviewedById: actor.id,
+            financeReviewedAt: new Date(),
+            financeNote: `Recorded & confirmed by ${actor.name}`,
+            ...(officePhysicalCash
+              ? { cashStatus: "RECEIVED", cashReceivedAt: new Date() }
+              : {}),
+          }
+        : {};
 
       await tx.fieldSale.create({
         data: {
@@ -301,6 +384,8 @@ export async function recordFieldSale(
           chequeDate: isCheque ? new Date(d.chequeDate!) : null,
           dueDate,
           note: d.note || null,
+          directSale: isOffice,
+          ...officeConfirmation,
           items: {
             create: d.items.map((i) => ({
               productId: i.productId,
@@ -320,13 +405,27 @@ export async function recordFieldSale(
       action: d.type === "CASH" ? "FIELD_SALE_CASH" : "FIELD_SALE_CREDIT",
       entity: "FieldSale",
       entityId: code,
-      summary: `${actor.name} recorded a ${d.type.toLowerCase()} sale ${code} of TSh ${total.toLocaleString()} — awaiting finance confirmation.`,
+      summary: isOffice
+        ? `${actor.name} recorded & confirmed a ${d.type.toLowerCase()} sale ${code} of TSh ${total.toLocaleString()}${customerId ? ` for ${soldTo}` : ""}.`
+        : `${actor.name} recorded a ${d.type.toLowerCase()} sale ${code} of TSh ${total.toLocaleString()} — awaiting finance confirmation.`,
     });
     revalidateField();
     revalidatePath("/finance/sales-approvals");
+    // A head-office cash sale is money-in the instant it's recorded — alert the
+    // CEO, exactly as when finance confirms a rep's cash sale.
+    if (isOffice && d.type === "CASH") {
+      await notifyPaymentConfirmed({
+        customer: soldTo,
+        amount: total,
+        method: resolvedMethod,
+        verifiedBy: actor.name,
+      });
+    }
     return ok(
       { code },
-      `Sale ${code} submitted — finance will ${d.type === "CASH" ? "verify the payment" : "review the credit terms"} and confirm it.`,
+      isOffice
+        ? `Sale ${code} recorded${d.type === "CASH" ? " — payment received and now official." : " — credit terms confirmed."}`
+        : `Sale ${code} submitted — finance will ${d.type === "CASH" ? "verify the payment" : "review the credit terms"} and confirm it.`,
     );
   } catch (e) {
     return fail(errorMessage(e));
@@ -1596,11 +1695,12 @@ export async function updateFieldCustomer(
   }
 }
 
-/** ADMIN/FINANCE delete a field customer — only when they have no sales, so we
- * never destroy financial history. Reps can never delete customers. */
+/** ADMIN deletes a field customer — only when they have no sales, so we never
+ * destroy financial history. Customers belong to ORA, so only the CEO/Admin may
+ * permanently remove one; Finance and reps never can. */
 export async function deleteFieldCustomer(id: string): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["ADMIN", "FINANCE"]);
+    const actor = await requireActor(["ADMIN"]);
     const cust = await prisma.fieldCustomer.findUnique({ where: { id } });
     if (!cust) return fail("Customer not found.");
     const sales = await prisma.fieldSale.count({ where: { customerId: id } });
@@ -1646,6 +1746,17 @@ export async function voidFieldSale(
       return fail("This sale was already rejected by finance — its stock is back with the rep.");
     if (sale.cashStatus === "DEPOSITED")
       return fail("This cash sale has already been banked in a deposit — it can't be voided. Reverse the deposit first.");
+    // The sale's own cashStatus only covers a CASH sale's money. A CREDIT sale
+    // can carry cash COLLECTIONS that were already banked — voiding the sale
+    // would drop them from account inflow while the bank deposit still counts
+    // them, so the deposit stops reconciling. Block it until the deposit is
+    // reversed (mirrors the sale-level guard above for collections).
+    const bankedCollection = await prisma.fieldPayment.findFirst({
+      where: { saleId, cashStatus: "DEPOSITED" },
+      select: { id: true },
+    });
+    if (bankedCollection)
+      return fail("A collection on this sale has already been banked in a deposit — reverse the deposit first, then void.");
 
     await prisma.$transaction(async (tx) => {
       // Atomic claim: a sale can only be voided once, and never after finance
@@ -1659,6 +1770,25 @@ export async function voidFieldSale(
         throw new Error("This sale was already voided or rejected.");
 
       for (const item of sale.items) {
+        if (sale.directSale) {
+          // A head-office sale drew its stock from the WAREHOUSE, so a void puts
+          // it back there — not into a rep's hands (there is no RepStock row).
+          // RESTOCKED nets warehouse +qty / distributed −qty; addWarehouseStock
+          // restores the per-location ledger so Σ onHand stays reconciled.
+          await applyMovement(tx, {
+            productId: item.productId,
+            type: "RESTOCKED",
+            quantity: item.quantity,
+            createdById: actor.id,
+            reference: `VOID ${sale.code}`,
+            note: `Customer → warehouse (head-office sale voided: ${reason})`,
+          });
+          await addWarehouseStock(tx, {
+            productId: item.productId,
+            quantity: item.quantity,
+          });
+          continue;
+        }
         // Put the units back in the rep's hands and reconcile the org ledger:
         // RESTOCKED (+warehouse, -distributed) then ASSIGNED (-warehouse, +assigned)
         // nets to assigned +qty / distributed -qty with a clean audit trail.
@@ -1709,7 +1839,7 @@ export async function voidFieldSale(
       action: "FIELD_SALE_VOIDED",
       entity: "FieldSale",
       entityId: sale.code,
-      summary: `${actor.name} voided sale ${sale.code} (${reason || "no reason given"}). Stock restored to ${sale.rep.name}.`,
+      summary: `${actor.name} voided sale ${sale.code} (${reason || "no reason given"}). Stock restored to ${sale.directSale ? "the warehouse" : sale.rep.name}.`,
     });
     revalidateField();
     return ok(undefined, `Sale ${sale.code} voided and stock restored.`);

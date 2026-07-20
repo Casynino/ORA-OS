@@ -38,20 +38,44 @@ export async function sendWhatsApp(
     return { ok: false, skipped: true, reason: `missing ${missing}` };
   }
 
-  try {
-    const url = `${BASE}?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(apikey)}`;
-    const res = await fetch(url, { method: "GET", signal: AbortSignal.timeout(20000) });
-    const body = (await res.text().catch(() => "")).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-    const queued = /queued|will receive|message to/i.test(body);
-    if (!res.ok || !queued) {
-      console.error(`[whatsapp:not-delivered] HTTP ${res.status}: ${body.slice(0, 200)}`);
-      return { ok: false, status: res.status, body: body.slice(0, 300), reason: "CallMeBot did not queue the message" };
+  const url = `${BASE}?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(apikey)}`;
+
+  // These are business-critical alerts (fund requests, confirmed payments), so a
+  // single transient CallMeBot hiccup must not silently drop them — we retry.
+  // BUT this runs awaited AFTER the DB commit of the triggering action, so the
+  // total time is HARD-CAPPED (well under any serverless limit) to guarantee the
+  // function returns and the user never sees a false failure that prompts a
+  // duplicate resubmit. The cap (15s) is below the original single-attempt
+  // budget (20s), so this is both more reliable AND faster in the worst case.
+  const DEADLINE_MS = 15000;
+  const PER_ATTEMPT_MS = 8000;
+  const started = Date.now();
+  let last: WhatsAppResult = { ok: false, reason: "not attempted" };
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const remaining = DEADLINE_MS - (Date.now() - started);
+    if (remaining <= 500) break; // out of budget — stop rather than risk a kill
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        signal: AbortSignal.timeout(Math.min(PER_ATTEMPT_MS, remaining)),
+      });
+      const body = (await res.text().catch(() => "")).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+      const queued = /queued|will receive|message to/i.test(body);
+      if (res.ok && queued) {
+        return { ok: true, status: res.status, body: body.slice(0, 300) };
+      }
+      last = { ok: false, status: res.status, body: body.slice(0, 300), reason: "CallMeBot did not queue the message" };
+      console.error(`[whatsapp:not-delivered attempt ${attempt}/3] HTTP ${res.status}: ${body.slice(0, 200)}`);
+    } catch (e) {
+      last = { ok: false, error: e instanceof Error ? e.message : String(e), reason: "request failed" };
+      console.error(`[whatsapp:error attempt ${attempt}/3]`, e);
     }
-    return { ok: true, status: res.status, body: body.slice(0, 300) };
-  } catch (e) {
-    console.error("[whatsapp:error]", e);
-    return { ok: false, error: e instanceof Error ? e.message : String(e), reason: "request failed" };
+    // Brief back-off before retrying, but never past the deadline.
+    const budget = DEADLINE_MS - (Date.now() - started);
+    if (attempt < 3 && budget > 1500) await new Promise((r) => setTimeout(r, Math.min(1000 * attempt, budget - 500)));
+    else break;
   }
+  return last;
 }
 
 /** Public base URL for building report links in messages. */
