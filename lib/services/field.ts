@@ -67,16 +67,16 @@ export async function getOfficeSaleData() {
   const available = new Map(
     stock.map((s) => [s.productId, Math.max(0, (s._sum.onHand ?? 0) - (s._sum.reserved ?? 0))]),
   );
-  const productRows = products
-    .map((p) => ({
-      id: p.id,
-      name: p.name,
-      sku: p.sku,
-      unitLabel: p.unitLabel,
-      price: p.price,
-      inHand: available.get(p.id) ?? 0,
-    }))
-    .filter((p) => p.inHand > 0);
+  // Every active, sellable product is returned (even at 0 stock) so the sell
+  // form can show an "Out of stock" state; the form disables 0-stock rows.
+  const productRows = products.map((p) => ({
+    id: p.id,
+    name: p.name,
+    sku: p.sku,
+    unitLabel: p.unitLabel,
+    price: p.price,
+    inHand: available.get(p.id) ?? 0,
+  }));
 
   return { products: productRows, customers, accounts };
 }
