@@ -33,7 +33,8 @@ export default async function AdminSalesHistoryPage() {
   const revenue = confirmed.reduce((s, r) => s + r.total, 0);
   const cashTotal = confirmed.filter((r) => r.paymentType === "CASH").reduce((s, r) => s + r.total, 0);
   const creditTotal = confirmed.filter((r) => r.paymentType === "CREDIT").reduce((s, r) => s + r.total, 0);
-  const outstanding = rows.reduce((s, r) => s + r.balance, 0);
+  // Owed on CONFIRMED credit only — reconciles with credit sales (owed ≤ sold).
+  const outstanding = confirmed.filter((r) => r.paymentType === "CREDIT").reduce((s, r) => s + r.balance, 0);
 
   const saleProducts = products.map((p) => ({
     id: p.id,

@@ -241,7 +241,9 @@ export async function getSalesDashboard() {
     revenueMonth: sum(since(monthStart)),
     cash: sum(confirmed.filter((r) => r.paymentType === "CASH")),
     credit: sum(confirmed.filter((r) => r.paymentType === "CREDIT")),
-    outstanding: rows.reduce((s, r) => s + r.balance, 0),
+    // Owed on CONFIRMED credit only, so it reconciles with credit sales
+    // (outstanding ≤ credit sales). Pending sales sit in `counts.pending`.
+    outstanding: confirmed.filter((r) => r.paymentType === "CREDIT").reduce((s, r) => s + r.balance, 0),
     topProducts: [...prod.values()].sort((a, b) => b.value - a.value).slice(0, 5),
     topReps: top(reps),
     topCustomers: top(custs),
