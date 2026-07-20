@@ -122,6 +122,79 @@ export async function approveFieldSale(
   }
 }
 
+/** Undo an accidental confirmation: send an APPROVED sale back to PENDING so it
+ *  can be reviewed again. Stock is NOT touched (it was deducted at recording and
+ *  the sale still stands) — only the finance confirmation is reversed, and any
+ *  physical cash it put into Cash on Hand is pulled back out until re-confirmed.
+ *  Blocked once the money is banked or collections are posted (reverse those
+ *  first), and for head-office direct sales (void those instead). */
+export async function revertFieldSaleApproval(id: string): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["FINANCE", "ADMIN"]);
+    // All checks + the flip run inside ONE transaction with the sale row LOCKED
+    // (SELECT … FOR UPDATE), so a concurrent bank deposit or collection can't
+    // slip between a check and the write. Without the lock, createCashDeposit
+    // could bank the cash (cashStatus=DEPOSITED, cashDepositId set) right after
+    // our guard passed but before our write — and our write, keyed only on
+    // financeStatus, would then wipe the DEPOSITED state and strand the deposit.
+    let saleCode = "";
+    let cashLine = false;
+    let who = "walk-in customer";
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "FieldSale" WHERE id = ${id} FOR UPDATE`;
+      const sale = await tx.fieldSale.findUnique({
+        where: { id },
+        include: { customer: { select: { name: true } } },
+      });
+      if (!sale) throw new Error("Sale not found.");
+      if (sale.voided) throw new Error("This sale was voided.");
+      if (sale.financeStatus !== "APPROVED")
+        throw new Error("Only a confirmed sale can be sent back to pending.");
+      if (sale.directSale)
+        throw new Error("This is a head-office sale — void it to reverse it, rather than sending it to the review queue.");
+      // Banked cash (guard on the deposit LINK too, not just the status flag).
+      if (sale.cashStatus === "DEPOSITED" || sale.cashDepositId)
+        throw new Error("This cash was already banked in a deposit — reverse the deposit first, then send it back.");
+      // Collections are only posted against an APPROVED sale; undoing the
+      // approval beneath them would strand that money. Re-counted inside the
+      // lock so a collection posted mid-revert can't slip through.
+      const posted = await tx.fieldPayment.count({
+        where: { saleId: id, financeStatus: { not: "REJECTED" } },
+      });
+      if (posted > 0)
+        throw new Error("This sale has collections posted against it — reject those first, then send it back.");
+
+      await tx.fieldSale.update({
+        where: { id },
+        data: {
+          financeStatus: "PENDING",
+          financeReviewedById: null,
+          financeReviewedAt: null,
+          financeNote: null,
+          cashStatus: null,
+          cashReceivedAt: null,
+        },
+      });
+      saleCode = sale.code;
+      who = sale.customer?.name ?? sale.customerName ?? "walk-in customer";
+      cashLine = sale.type === "CASH" && isCashMethod(sale.paymentMethod);
+    });
+
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "FIELD_SALE_REVERTED",
+      entity: "FieldSale",
+      entityId: saleCode,
+      summary: `${actor.name} sent ${saleCode} (${who}) back to pending — the earlier confirmation was undone${cashLine ? "; the cash left Cash on Hand" : ""}.`,
+    });
+    revalidateApprovals();
+    return ok(undefined, `${saleCode} sent back to pending for review.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
 /** Finance rejects a rep sale — it never becomes company money. The rep sees
  * the comment; an admin void remains the tool to put stock back. */
 export async function rejectFieldSale(
