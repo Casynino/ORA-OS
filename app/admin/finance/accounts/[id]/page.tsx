@@ -93,7 +93,11 @@ export default async function AccountLedgerPage({
     }),
     prisma.expense.findMany({
       where: { paymentAccountId: id },
-      include: { recordedBy: { select: { name: true } } },
+      include: {
+        recordedBy: { select: { name: true } },
+        // Operational-fund spend belongs to the Finance requester, not the CEO approver.
+        pettyCashRequest: { select: { requestedBy: { select: { name: true } } } },
+      },
     }),
   ]);
 
@@ -200,7 +204,10 @@ export default async function AccountLedgerPage({
       out: true,
       reference: e.receiptRef,
       ref: e.code,
-      recordedBy: e.recordedBy.name,
+      recordedBy:
+        e.source === "OPERATIONAL_FUND" && e.pettyCashRequest?.requestedBy
+          ? e.pettyCashRequest.requestedBy.name
+          : e.recordedBy.name,
     })),
   ].sort((a, b) => +b.at - +a.at);
 
