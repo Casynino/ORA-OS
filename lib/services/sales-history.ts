@@ -36,6 +36,10 @@ export type SalesHistoryRow = {
   statusTone: "success" | "warning" | "info" | "destructive" | "secondary";
   confirmed: boolean;
   confirmedBy: string | null;
+  /** Uploaded payment/deposit proof image (finance or rep attached it). */
+  paymentProofUrl: string | null;
+  /** Deposit-slip / receipt reference captured with the payment. */
+  paymentProofRef: string | null;
   items: SalesHistoryItem[];
 };
 
@@ -142,6 +146,8 @@ export async function getSalesHistory(opts?: {
       statusTone: tone,
       confirmed: s.financeStatus === "APPROVED",
       confirmedBy: s.financeReviewedBy?.name ?? null,
+      paymentProofUrl: s.paymentProofUrl,
+      paymentProofRef: s.depositProofRef,
       items,
     };
   });
@@ -175,6 +181,8 @@ export async function getSalesHistory(opts?: {
       statusTone: fulfilled ? "success" : "info",
       confirmed: fulfilled,
       confirmedBy: null,
+      paymentProofUrl: null,
+      paymentProofRef: null,
       items,
     };
   });

@@ -1,10 +1,11 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { Search, ChevronDown, Package } from "lucide-react";
+import { Search, ChevronDown, Package, Paperclip } from "lucide-react";
 import type { SalesHistoryRow } from "@/lib/services/sales-history";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { ProofViewer } from "@/components/ui/proof-viewer";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 
 type ChannelFilter = "all" | "FIELD" | "PARTNER";
@@ -173,6 +174,28 @@ export function SalesHistoryTable({ rows }: { rows: SalesHistoryRow[] }) {
                               </div>
                             ))}
                           </div>
+
+                          {/* Payment proof — so the admin can verify the money went in. */}
+                          {(r.paymentProofUrl || r.paymentProofRef) && (
+                            <div className="mt-3 border-t border-border/60 pt-3">
+                              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                <Paperclip className="size-3.5" /> Payment proof
+                              </div>
+                              <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm">
+                                {r.paymentProofUrl ? (
+                                  <ProofViewer url={r.paymentProofUrl} label="View payment proof" />
+                                ) : (
+                                  <span className="text-muted-foreground">No image attached</span>
+                                )}
+                                {r.paymentProofRef && (
+                                  <span className="text-muted-foreground">
+                                    Reference:{" "}
+                                    <span className="font-medium text-foreground">{r.paymentProofRef}</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )}
