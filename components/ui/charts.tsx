@@ -110,12 +110,15 @@ export function DonutChart({
   thickness = 20,
   centerLabel,
   centervalue,
+  formatValue,
 }: {
   segments: { label: string; value: number; color: string }[];
   size?: number;
   thickness?: number;
   centerLabel?: string;
   centervalue?: React.ReactNode;
+  /** Optionally format each legend value (e.g. as currency). Ring math still uses the raw value. */
+  formatValue?: (value: number) => React.ReactNode;
 }) {
   const total = segments.reduce((s, x) => s + x.value, 0) || 1;
   const radius = (size - thickness) / 2;
@@ -171,7 +174,7 @@ export function DonutChart({
               style={{ background: seg.color }}
             />
             <span className="min-w-0 flex-1 truncate text-muted-foreground">{seg.label}</span>
-            <span className="shrink-0 font-medium">{seg.value}</span>
+            <span className="shrink-0 font-medium">{formatValue ? formatValue(seg.value) : seg.value}</span>
           </div>
         ))}
       </div>
