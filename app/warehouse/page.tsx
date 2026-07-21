@@ -18,6 +18,7 @@ import {
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { Reveal } from "@/components/ui/reveal";
+import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -215,27 +216,11 @@ export default async function WarehouseOverviewPage() {
 
   return (
     <div className="space-y-7">
-      <Reveal>
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-accent to-primary p-5 text-white shadow-glow sm:p-8">
-          <div className="absolute inset-0 bg-grid opacity-20" />
-          <div className="pointer-events-none absolute -right-10 -top-16 size-56 rounded-full bg-white/15 blur-3xl animate-float-slow" />
-          <div className="pointer-events-none absolute -bottom-20 right-1/3 size-48 rounded-full bg-white/10 blur-3xl animate-float-slow-rev" />
-          <div className="pointer-events-none absolute -left-12 top-1/2 size-40 rounded-full bg-accent/30 blur-3xl animate-float-slow" />
-          <div className="relative min-w-0">
-            <p className="flex items-center gap-2 text-xs text-white/80 sm:text-sm">
-              <span className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-white" />
-              <span className="min-w-0 truncate">
-                {whName}
-                {me.position ? ` · ${me.position}` : ""}
-              </span>
-            </p>
-            <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-balance sm:text-4xl">
-              {greeting}, {me.name?.split(" ")[0] ?? "Team"}.
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-white/90 sm:text-base">{summary}</p>
-          </div>
-        </div>
-      </Reveal>
+      <DashboardHero
+        eyebrow={`${whName}${me.position ? ` · ${me.position}` : ""}`}
+        title={<>{greeting}, {me.name?.split(" ")[0] ?? "Team"}.</>}
+        subtitle={summary}
+      />
 
       {/* Available stock — the first thing the warehouse sees on open. */}
       <Reveal>
