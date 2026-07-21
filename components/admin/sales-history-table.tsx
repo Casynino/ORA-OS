@@ -183,7 +183,7 @@ export function SalesHistoryTable({ rows }: { rows: SalesHistoryRow[] }) {
                               </div>
                               <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm">
                                 {r.paymentProofUrl ? (
-                                  <ProofViewer url={r.paymentProofUrl} label="View payment proof" />
+                                  <ProofViewer url={r.paymentProofUrl} label="View payment proof" compact />
                                 ) : (
                                   <span className="text-muted-foreground">No image attached</span>
                                 )}
