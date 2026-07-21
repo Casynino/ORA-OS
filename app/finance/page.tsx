@@ -29,6 +29,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DonutChart } from "@/components/ui/charts";
+import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { Reveal } from "@/components/ui/reveal";
 import { cn, formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
 
@@ -136,32 +137,18 @@ export default async function FinanceDashboardPage() {
   return (
     <div className="space-y-6">
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <Reveal>
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-accent to-primary p-5 text-white shadow-glow sm:p-8">
-          <div className="absolute inset-0 bg-grid opacity-20" />
-          <div className="pointer-events-none absolute -right-12 -top-16 size-56 rounded-full bg-white/15 blur-3xl animate-float-slow" />
-          <div className="pointer-events-none absolute -bottom-20 left-1/3 size-48 rounded-full bg-white/10 blur-3xl animate-float-slow-rev" />
-          <div className="relative min-w-0">
-            <p className="flex items-center gap-2 text-xs text-white/80 sm:text-sm">
-              <span className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-white" />
-              <span className="min-w-0 truncate">{dateLabel}</span>
-              <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold">Finance</span>
-            </p>
-            <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight sm:text-4xl">
-              {greeting}, {firstName} 👋
-            </h1>
-            <p className="mt-1.5 max-w-xl text-sm text-white/90 sm:text-base">
-              Manage payments, track collections, and keep ORA&apos;s financial records organized and up to date.
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:gap-8">
-              <HeroStat label="Collections today" value={formatCurrency(todayCollections)} sub="customer money in" />
-              <HeroStat label="Cash awaiting deposit" value={formatCurrency(cashAwaitingDeposit)} sub="in hand — bank it" />
-              <HeroStat label="Operational Fund" value={formatCurrency(fundBalance)} sub="left to spend" />
-              <HeroStat label="Outstanding debt" value={formatCurrency(p.creditOutstanding)} sub="still owed to ORA" />
-            </div>
-          </div>
-        </div>
-      </Reveal>
+      <DashboardHero
+        eyebrow={dateLabel}
+        pill="Finance"
+        title={<>{greeting}, {firstName} 👋</>}
+        subtitle="Manage payments, track collections, and keep ORA's financial records organized and up to date."
+        stats={[
+          { label: "Collections today", value: formatCurrency(todayCollections), sub: "customer money in" },
+          { label: "Cash awaiting deposit", value: formatCurrency(cashAwaitingDeposit), sub: "in hand — bank it" },
+          { label: "Operational Fund", value: formatCurrency(fundBalance), sub: "left to spend" },
+          { label: "Outstanding debt", value: formatCurrency(p.creditOutstanding), sub: "still owed to ORA" },
+        ]}
+      />
 
       {/* ── Quick actions ────────────────────────────────────── */}
       <Reveal>
@@ -326,16 +313,6 @@ export default async function FinanceDashboardPage() {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{children}</p>;
-}
-
-function HeroStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="min-w-0">
-      <p className="truncate text-[11px] uppercase tracking-wide text-white/70">{label}</p>
-      <p className="truncate font-display text-xl font-bold sm:text-2xl">{value}</p>
-      {sub && <p className="truncate text-[11px] text-white/60">{sub}</p>}
-    </div>
-  );
 }
 
 function QuickAction({ icon: Icon, label, href }: { icon: LucideIcon; label: string; href: string }) {

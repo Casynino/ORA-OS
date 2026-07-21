@@ -24,7 +24,7 @@ import { RevenueTrends, HumanActivityFeed, CustomerIntelligencePanel } from "@/c
 import { AddExpenseButton, IssueFundsButton, AddCapitalButton } from "@/components/admin/finance-forms";
 import { getSelectableAccounts } from "@/lib/services/accounts";
 import { getSelectableCategories } from "@/lib/services/categories";
-import { Reveal } from "@/components/ui/reveal";
+import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { formatCurrency, timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -102,25 +102,12 @@ export default async function AdminCommandCenter() {
   return (
     <div className="space-y-6">
       {/* ── 1 · Welcome banner (no numbers — they live in Business health) ── */}
-      <Reveal>
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-accent to-primary p-6 text-white shadow-glow sm:p-8">
-          <div className="absolute inset-0 bg-grid opacity-20" />
-          <div className="pointer-events-none absolute -right-12 -top-16 size-56 rounded-full bg-white/15 blur-3xl animate-float-slow" />
-          <div className="pointer-events-none absolute -bottom-20 left-1/3 size-48 rounded-full bg-white/10 blur-3xl animate-float-slow-rev" />
-          <div className="relative min-w-0">
-            <p className="flex items-center gap-2 text-xs text-white/80 sm:text-sm">
-              <span className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-white" />
-              <span className="min-w-0 truncate">{dateLabel}</span>
-            </p>
-            <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight sm:text-4xl">
-              {greeting}, {firstName}. 👋
-            </h1>
-            <p className="mt-1.5 max-w-xl text-sm text-white/90 sm:text-base">
-              Here&apos;s what&apos;s happening across ORA today.
-            </p>
-          </div>
-        </div>
-      </Reveal>
+      <DashboardHero
+        eyebrow={dateLabel}
+        pill="CEO"
+        title={<>{greeting}, {firstName}. 👋</>}
+        subtitle="Here's what's happening across ORA today."
+      />
 
       {/* ── 2 · Business health summary ── */}
       <BusinessHealth

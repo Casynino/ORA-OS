@@ -16,6 +16,7 @@ import { requireRole } from "@/lib/rbac";
 import { getRepOverview } from "@/lib/services/field";
 import { StatCard } from "@/components/ui/stat-card";
 import { DonutChart } from "@/components/ui/charts";
+import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { Reveal } from "@/components/ui/reveal";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 
@@ -84,37 +85,23 @@ export default async function RepOverviewPage() {
 
   return (
     <div className="space-y-6">
-      {/* ── Hero — same premium banner as the other roles ── */}
-      <Reveal>
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-accent to-primary p-5 text-white shadow-glow sm:p-8">
-          <div className="absolute inset-0 bg-grid opacity-20" />
-          <div className="pointer-events-none absolute -right-12 -top-16 size-56 rounded-full bg-white/15 blur-3xl animate-float-slow" />
-          <div className="pointer-events-none absolute -bottom-20 left-1/3 size-48 rounded-full bg-white/10 blur-3xl animate-float-slow-rev" />
-          <div className="relative min-w-0">
-            <p className="flex items-center gap-2 text-xs text-white/80 sm:text-sm">
-              <span className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-white" />
-              <span className="min-w-0 truncate">{dateLabel}</span>
-              <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold">Sales Rep</span>
-            </p>
-            <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight sm:text-4xl">
-              {greeting}, {firstName} 👋
-            </h1>
-            <p className="mt-1.5 max-w-xl text-sm text-white/90 sm:text-base">
-              Record your sales, look after your customers, and stay on top of every shilling you collect.
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:gap-8">
-              <HeroStat label="Today so far" value={formatCurrency(d.salesToday)} sub="sales recorded today" />
-              <HeroStat label="Sales this month" value={formatCurrency(d.salesMonth)} sub="your running total" />
-              <HeroStat
-                label="Credit to collect"
-                value={formatCurrency(d.creditOutstanding)}
-                sub={d.overdueCount > 0 ? `${d.openCreditCount} open · ${d.overdueCount} overdue` : `${d.openCreditCount} open · none overdue`}
-              />
-              <HeroStat label="Stock on hand" value={`${formatNumber(d.stockInHand)} pcs`} sub="ready to sell" />
-            </div>
-          </div>
-        </div>
-      </Reveal>
+      {/* ── Hero — shared premium banner ── */}
+      <DashboardHero
+        eyebrow={dateLabel}
+        pill="Sales Rep"
+        title={<>{greeting}, {firstName} 👋</>}
+        subtitle="Record your sales, look after your customers, and stay on top of every shilling you collect."
+        stats={[
+          { label: "Today so far", value: formatCurrency(d.salesToday), sub: "sales recorded today" },
+          { label: "Sales this month", value: formatCurrency(d.salesMonth), sub: "your running total" },
+          {
+            label: "Credit to collect",
+            value: formatCurrency(d.creditOutstanding),
+            sub: d.overdueCount > 0 ? `${d.openCreditCount} open · ${d.overdueCount} overdue` : `${d.openCreditCount} open · none overdue`,
+          },
+          { label: "Stock on hand", value: `${formatNumber(d.stockInHand)} pcs`, sub: "ready to sell" },
+        ]}
+      />
 
       {/* Quick actions — always at the top */}
       <section>
@@ -241,17 +228,6 @@ export default async function RepOverviewPage() {
           </div>
         </Reveal>
       )}
-    </div>
-  );
-}
-
-/** Hero KPI — white-on-gradient, matches the Finance/Warehouse banners. */
-function HeroStat({ label, value, sub }: { label: string; value: string; sub: string }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">{label}</p>
-      <p className="mt-0.5 truncate font-display text-xl font-bold sm:text-2xl">{value}</p>
-      <p className="truncate text-[11px] text-white/70">{sub}</p>
     </div>
   );
 }
