@@ -4,6 +4,7 @@ export const CUSTOMER_TYPES = [
   "Distributor",
   "Agent",
   "Pharmacy",
+  "Cosmetics Shop",
   "Retail Shop",
   "Kiosk",
   "Mini Supermarket",
