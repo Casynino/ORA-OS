@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Search, Download, ArrowUpDown, ExternalLink, ScrollText } from "lucide-react";
 import type { LedgerEntry } from "@/lib/services/finance";
+import { ProofViewer } from "@/components/ui/proof-viewer";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -285,6 +286,11 @@ export function GeneralLedgerTable({ rows }: { rows: LedgerEntry[] }) {
                         )}
                         {r.method ? ` · ${r.method}` : ""}
                       </div>
+                      {r.proofUrl && (
+                        <div className="mt-1">
+                          <ProofViewer url={r.proofUrl} label="Payment proof" compact />
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 capitalize text-muted-foreground">{r.category}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{r.accountName ?? "—"}</td>

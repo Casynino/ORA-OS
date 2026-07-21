@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
+import { ProofViewer } from "@/components/ui/proof-viewer";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
@@ -108,10 +109,12 @@ export default async function AccountLedgerPage({
     reference: string | null;
     ref: string;
     recordedBy: string;
+    proofUrl: string | null;
   };
   const rows: Row[] = [
     ...cashSales.map((s) => ({
       id: `fs-${s.id}`,
+      proofUrl: s.paymentProofUrl,
       at: s.createdAt,
       kind: "Cash sale",
       detail: s.customer?.name ?? s.customerName ?? "Walk-in",
@@ -125,6 +128,7 @@ export default async function AccountLedgerPage({
     })),
     ...fieldPays.map((p) => ({
       id: `fp-${p.id}`,
+      proofUrl: p.paymentProofUrl,
       at: p.createdAt,
       kind: "Credit collection",
       detail: p.sale.customer?.name ?? p.sale.customerName ?? "—",
@@ -138,6 +142,7 @@ export default async function AccountLedgerPage({
     })),
     ...partnerPays.map((p) => ({
       id: `pp-${p.id}`,
+      proofUrl: null,
       at: p.createdAt,
       kind: "Partner repayment",
       detail: p.creditAccount.agent.name,
@@ -151,6 +156,7 @@ export default async function AccountLedgerPage({
     })),
     ...orderPays.map((r) => ({
       id: `op-${r.id}`,
+      proofUrl: null,
       at: r.paidAt ?? r.createdAt,
       kind: r.requester.email === WALKIN_EMAIL ? "Counter sale" : "Order payment",
       detail:
@@ -169,6 +175,7 @@ export default async function AccountLedgerPage({
       const out = c.amount < 0;
       return {
         id: `cap-${c.id}`,
+        proofUrl: c.receiptUrl,
         at: c.entryDate,
         kind: out ? "Withdrawal" : "Investment",
         detail: c.source,
@@ -183,6 +190,7 @@ export default async function AccountLedgerPage({
     }),
     ...expenses.map((e) => ({
       id: `exp-${e.id}`,
+      proofUrl: e.receiptUrl,
       at: e.expenseDate,
       kind: EXPENSE_KIND[e.source] ?? "Expense",
       detail: e.vendor?.trim() || e.purpose,
@@ -267,6 +275,7 @@ export default async function AccountLedgerPage({
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Reference</TableHead>
                 <TableHead>Related</TableHead>
+                <TableHead>Proof</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -282,6 +291,13 @@ export default async function AccountLedgerPage({
                   <TableCell data-label="Reference" className="text-sm text-muted-foreground">{r.reference ?? "—"}</TableCell>
                   <TableCell data-label="Related" className="text-sm text-muted-foreground">
                     {r.ref} · by {r.recordedBy}
+                  </TableCell>
+                  <TableCell data-label="Proof">
+                    {r.proofUrl ? (
+                      <ProofViewer url={r.proofUrl} label="View" compact />
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

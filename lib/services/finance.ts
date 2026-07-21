@@ -447,6 +447,7 @@ export type LedgerEntry = {
   accountId: string | null; // company account the money moved through
   accountName: string | null;
   linkedHref: string | null; // where to open the source document
+  proofUrl: string | null; // uploaded proof / receipt image for this movement
 };
 
 export async function getLedger(period: Period, take = 120): Promise<LedgerEntry[]> {
@@ -483,6 +484,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
         take,
         select: {
           id: true, code: true, total: true, createdAt: true, customerName: true,
+          paymentProofUrl: true,
           paymentAccountId: true, paymentAccount: { select: { name: true } },
           rep: { select: { name: true } }, customer: { select: { name: true } },
         },
@@ -520,6 +522,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
   const rows: LedgerEntry[] = [
     ...orders.map((o) => ({
       id: `req-${o.id}`,
+      proofUrl: null,
       date: o.fulfilledAt ?? o.createdAt,
       kind: "SALE" as const,
       label: `Sale to ${o.requester.organization ?? o.requester.name}`,
@@ -534,6 +537,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
     })),
     ...payments.map((p) => ({
       id: `pay-${p.id}`,
+      proofUrl: null,
       date: p.createdAt,
       kind: "CREDIT_COLLECTED" as const,
       label: `Credit payment — ${p.creditAccount.agent.name}`,
@@ -548,6 +552,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
     })),
     ...fieldSales.map((s) => ({
       id: `fs-${s.id}`,
+      proofUrl: s.paymentProofUrl,
       date: s.createdAt,
       kind: "FIELD_SALE" as const,
       label: `Field cash sale — ${s.customer?.name ?? s.customerName ?? "walk-in"} (${s.rep.name})`,
@@ -562,6 +567,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
     })),
     ...fieldPayments.map((p) => ({
       id: `fp-${p.id}`,
+      proofUrl: p.paymentProofUrl,
       date: p.createdAt,
       kind: "FIELD_COLLECTION" as const,
       label: `Field credit collection${p.sale.customer ? ` — ${p.sale.customer.name}` : ""}`,
@@ -576,6 +582,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
     })),
     ...expenses.map((e) => ({
       id: `exp-${e.id}`,
+      proofUrl: e.receiptUrl,
       date: e.expenseDate,
       kind: "EXPENSE" as const,
       label: e.purpose,
@@ -591,6 +598,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
     })),
     ...capital.map((c) => ({
       id: `cap-${c.id}`,
+      proofUrl: c.receiptUrl,
       date: c.entryDate,
       kind: "CAPITAL" as const,
       label: `Capital — ${c.source}`,
