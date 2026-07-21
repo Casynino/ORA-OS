@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { Search, ChevronDown, Package, Paperclip } from "lucide-react";
+import { Search, ChevronDown, Package } from "lucide-react";
 import type { SalesHistoryRow } from "@/lib/services/sales-history";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -92,7 +92,7 @@ export function SalesHistoryTable({ rows }: { rows: SalesHistoryRow[] }) {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-border">
-          <table className="w-full min-w-[56rem] text-sm">
+          <table className="w-full min-w-[62rem] text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-3 py-2.5 font-medium">Sale</th>
@@ -100,6 +100,7 @@ export function SalesHistoryTable({ rows }: { rows: SalesHistoryRow[] }) {
                 <th className="px-3 py-2.5 font-medium">Sold by</th>
                 <th className="px-3 py-2.5 text-right font-medium">Units</th>
                 <th className="px-3 py-2.5 font-medium">Payment</th>
+                <th className="px-3 py-2.5 font-medium">Proof</th>
                 <th className="px-3 py-2.5 text-right font-medium">Total</th>
                 <th className="px-3 py-2.5 font-medium">Status</th>
                 <th className="px-3 py-2.5" />
@@ -138,6 +139,13 @@ export function SalesHistoryTable({ rows }: { rows: SalesHistoryRow[] }) {
                           <p className="mt-0.5 whitespace-nowrap text-xs text-muted-foreground">{r.paymentMethod}</p>
                         )}
                       </td>
+                      <td className="px-3 py-2.5 align-top" onClick={(e) => e.stopPropagation()}>
+                        {r.paymentProofUrl ? (
+                          <ProofViewer url={r.paymentProofUrl} label="View" compact />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2.5 text-right align-top">
                         <p className="whitespace-nowrap font-semibold tabular-nums">{formatCurrency(r.total)}</p>
                         {r.paymentType === "CREDIT" && r.balance > 0 && (
@@ -156,7 +164,7 @@ export function SalesHistoryTable({ rows }: { rows: SalesHistoryRow[] }) {
                     </tr>
                     {isOpen && (
                       <tr className="border-b border-border/60 bg-muted/20">
-                        <td colSpan={8} className="px-3 py-3">
+                        <td colSpan={9} className="px-3 py-3">
                           <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             <Package className="size-3.5" /> Items
                           </div>
@@ -175,26 +183,12 @@ export function SalesHistoryTable({ rows }: { rows: SalesHistoryRow[] }) {
                             ))}
                           </div>
 
-                          {/* Payment proof — so the admin can verify the money went in. */}
-                          {(r.paymentProofUrl || r.paymentProofRef) && (
-                            <div className="mt-3 border-t border-border/60 pt-3">
-                              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                <Paperclip className="size-3.5" /> Payment proof
-                              </div>
-                              <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm">
-                                {r.paymentProofUrl ? (
-                                  <ProofViewer url={r.paymentProofUrl} label="View payment proof" compact />
-                                ) : (
-                                  <span className="text-muted-foreground">No image attached</span>
-                                )}
-                                {r.paymentProofRef && (
-                                  <span className="text-muted-foreground">
-                                    Reference:{" "}
-                                    <span className="font-medium text-foreground">{r.paymentProofRef}</span>
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                          {/* Deposit / receipt reference, when captured (the image lives in the Proof column). */}
+                          {r.paymentProofRef && (
+                            <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+                              Payment reference:{" "}
+                              <span className="font-medium text-foreground">{r.paymentProofRef}</span>
+                            </p>
                           )}
                         </td>
                       </tr>
