@@ -506,6 +506,9 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
         include: {
           paymentAccount: { select: { name: true } },
           recordedBy: { select: { name: true } },
+          // Operational-fund spend belongs to the Finance requester, not the CEO
+          // who approved the allocation.
+          pettyCashRequest: { select: { requestedBy: { select: { name: true } } } },
         },
       }),
       prisma.capitalEntry.findMany({
@@ -591,7 +594,12 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
       category: e.customCategory || EXPENSE_LABELS[e.category],
       amount: -e.amount,
       method: e.paymentMethod,
-      actor: e.recordedBy.name,
+      // Operational-fund expenses are attributed to the Finance owner who
+      // requested & spends them; the CEO only approved the allocation.
+      actor:
+        e.source === "OPERATIONAL_FUND" && e.pettyCashRequest?.requestedBy
+          ? e.pettyCashRequest.requestedBy.name
+          : e.recordedBy.name,
       accountId: e.paymentAccountId ?? null,
       accountName: e.paymentAccount?.name ?? null,
       linkedHref: null,
