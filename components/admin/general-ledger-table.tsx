@@ -242,7 +242,7 @@ export function GeneralLedgerTable({ rows }: { rows: LedgerEntry[] }) {
         />
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-soft">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full min-w-[1000px] text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3 font-semibold">
@@ -261,6 +261,7 @@ export function GeneralLedgerTable({ rows }: { rows: LedgerEntry[] }) {
                 </th>
                 <th className="px-4 py-3 text-right font-semibold">Credit</th>
                 <th className="px-4 py-3 text-right font-semibold">Balance</th>
+                <th className="px-4 py-3 font-semibold">Proof</th>
               </tr>
             </thead>
             <tbody>
@@ -286,11 +287,6 @@ export function GeneralLedgerTable({ rows }: { rows: LedgerEntry[] }) {
                         )}
                         {r.method ? ` · ${r.method}` : ""}
                       </div>
-                      {r.proofUrl && (
-                        <div className="mt-1">
-                          <ProofViewer url={r.proofUrl} label="Payment proof" compact />
-                        </div>
-                      )}
                     </td>
                     <td className="px-4 py-3 capitalize text-muted-foreground">{r.category}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{r.accountName ?? "—"}</td>
@@ -303,6 +299,13 @@ export function GeneralLedgerTable({ rows }: { rows: LedgerEntry[] }) {
                     </td>
                     <td className={cn("whitespace-nowrap px-4 py-3 text-right font-semibold", bal >= 0 ? "text-foreground" : "text-destructive")}>
                       {formatCurrency(bal)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      {r.proofUrl ? (
+                        <ProofViewer url={r.proofUrl} label="View" compact />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </td>
                   </tr>
                 );
