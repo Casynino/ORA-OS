@@ -51,12 +51,14 @@ export default async function AdminFinancePage({
   const { period: raw = "month" } = await searchParams;
   const period = (["today", "week", "month", "all"].includes(raw) ? raw : "month") as Period;
 
-  const [d, recent, cash, accounts, categories] = await Promise.all([
+  const [d, recent, cash, accounts, categories, fundCategories] = await Promise.all([
     getFinanceOverview(period),
     getLedger("all", 8),
     getCashSummary(),
     getSelectableAccounts(),
     getSelectableCategories(),
+    // Issuing funds uses the Operational-Fund list, not the full expense list.
+    getSelectableCategories("operational"),
   ]);
   const w = d.window;
   const p = d.position;
@@ -127,7 +129,7 @@ export default async function AdminFinancePage({
               it rhythm instead of four identical pills. */}
           <div className="flex w-full shrink-0 flex-col items-stretch gap-2 lg:w-60">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Quick actions</p>
-            <IssueFundsButton accounts={accounts} variant="default" className="w-full justify-center rounded-full" />
+            <IssueFundsButton accounts={accounts} categories={fundCategories} variant="default" className="w-full justify-center rounded-full" />
             <AddExpenseButton accounts={accounts} categories={categories} variant="outline" className="w-full justify-center rounded-full" />
             <AddCapitalButton accounts={accounts} variant="success" className="w-full justify-center rounded-full" />
             <RecordWithdrawalButton accounts={accounts} variant="outline" className="w-full justify-center rounded-full" />

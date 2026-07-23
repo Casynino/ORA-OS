@@ -229,6 +229,7 @@ export async function rejectOperationalFundRequest(id: string, note?: string): P
 
 const issueItemSchema = z.object({
   category: fundCategory,
+  customCategory: z.string().max(60).optional().or(z.literal("")),
   description: z.string().max(200).optional().or(z.literal("")),
   amount: z.number().int().positive("Enter an amount.").max(1000000000),
 });
@@ -273,7 +274,7 @@ export async function issueOperationalFunds(
           items: {
             create: d.items.map((it) => ({
               category: it.category,
-              customCategory: null,
+              customCategory: it.customCategory?.trim() || null,
               description: fundItemDescription(it),
               amount: it.amount,
             })),
@@ -288,6 +289,7 @@ export async function issueOperationalFunds(
             code: refCode("EXP"),
             source: "OPERATIONAL_FUND",
             category: it.category,
+            customCategory: it.customCategory?.trim() || null,
             amount: it.amount,
             purpose: `Operational Fund ${req.code} — ${fundItemDescription(it)}`,
             note: `Issued by CEO — awaiting Finance confirmation`,

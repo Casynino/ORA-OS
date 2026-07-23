@@ -351,31 +351,39 @@ export function OperationalFundManager({
 
       {requestOpen && <RequestModal categories={categories} onClose={() => setRequestOpen(false)} />}
       {spendOpen && <SpendModal balance={fund.balance} onClose={() => setSpendOpen(false)} />}
-      {issueOpen && <IssueModal accounts={accounts} onClose={() => setIssueOpen(false)} />}
+      {issueOpen && <IssueModal accounts={accounts} categories={categories} onClose={() => setIssueOpen(false)} />}
     </div>
   );
 }
 
 /** CEO pushes funds to Finance — one or more line items in a single allocation.
  *  Money-out is booked now (one Expense per line); Finance confirms receipt. */
-type SimpleLine = { key: number; category: string; description: string; amount: string; vendor?: string };
-function IssueModal({ accounts, onClose }: { accounts: SelectableAccount[]; onClose: () => void }) {
+type SimpleLine = { key: number; category: string; customCategory?: string | null; description: string; amount: string; vendor?: string };
+function IssueModal({
+  accounts,
+  categories,
+  onClose,
+}: {
+  accounts: SelectableAccount[];
+  categories: CategoryOption[];
+  onClose: () => void;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [purpose, setPurpose] = useState("");
   const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
   const nextKey = useRef(2);
-  const [items, setItems] = useState<SimpleLine[]>([{ key: 1, category: "OFFICE", description: "", amount: "" }]);
+  const [items, setItems] = useState<SimpleLine[]>([{ key: 1, category: "OFFICE", customCategory: null, description: "", amount: "" }]);
 
   const total = items.reduce((s, it) => s + Math.round(Number(it.amount) || 0), 0);
-  const addItem = () => setItems((p) => [...p, { key: nextKey.current++, category: "OFFICE", description: "", amount: "" }]);
+  const addItem = () => setItems((p) => [...p, { key: nextKey.current++, category: "OFFICE", customCategory: null, description: "", amount: "" }]);
   const removeItem = (key: number) => setItems((p) => (p.length > 1 ? p.filter((i) => i.key !== key) : p));
   const patch = (key: number, ch: Partial<SimpleLine>) => setItems((p) => p.map((i) => (i.key === key ? { ...i, ...ch } : i)));
 
   function submit() {
     if (purpose.trim().length < 3) return toast({ variant: "error", title: "What are the funds for?" });
-    const parsed = items.map((it) => ({ category: it.category, description: it.description.trim() || undefined, amount: Math.round(Number(it.amount) || 0) }));
+    const parsed = items.map((it) => ({ category: it.category, customCategory: it.customCategory ?? undefined, description: it.description.trim() || undefined, amount: Math.round(Number(it.amount) || 0) }));
     if (parsed.some((it) => it.amount <= 0))
       return toast({ variant: "error", title: "Give every item an amount." });
     start(async () => {
@@ -399,11 +407,13 @@ function IssueModal({ accounts, onClose }: { accounts: SelectableAccount[]; onCl
           {items.map((it) => (
             <div key={it.key} className="flex items-center gap-2 rounded-xl border border-border p-2.5">
               <div className="min-w-0 flex-1">
-                <Select value={it.category} onChange={(e) => patch(it.key, { category: e.target.value })}>
-                  {OFFICE_FUND_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
-                  ))}
-                </Select>
+                <CategorySelect
+                  categories={categories}
+                  category={it.category}
+                  customCategory={it.customCategory ?? null}
+                  onChange={(v) => patch(it.key, v)}
+                  label=""
+                />
               </div>
               <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="w-28 shrink-0" />
               {items.length > 1 && (
