@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import {
   PRESET_CATEGORY_OPTIONS,
+  OPERATIONAL_FUND_PRESETS,
   OFFICE_FUND_CATEGORIES,
   type CategoryOption,
 } from "@/lib/expense-categories";
@@ -20,9 +21,9 @@ export async function getSelectableCategories(
 ): Promise<CategoryOption[]> {
   const allowed = scope === "operational" ? new Set(OFFICE_FUND_CATEGORIES) : null;
 
-  const presets = allowed
-    ? PRESET_CATEGORY_OPTIONS.filter((o) => allowed.has(o.category))
-    : PRESET_CATEGORY_OPTIONS;
+  // Operational Fund gets its own richer, Finance-worded preset list; every
+  // other form keeps the plain enum-backed presets.
+  const presets = allowed ? OPERATIONAL_FUND_PRESETS : PRESET_CATEGORY_OPTIONS;
 
   const customs = await prisma.expenseCategoryOption.findMany({
     where: { active: true },

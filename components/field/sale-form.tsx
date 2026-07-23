@@ -24,15 +24,6 @@ import { ProofUpload } from "@/components/ui/proof-upload";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { CUSTOMER_TYPES } from "@/lib/customer-types";
 
-/**
- * Quantity/price fields must never change value on their own. A native number
- * input silently bumps its value when the wheel scrolls over it while focused
- * (and when the tiny steppers are mis-clicked) — that's how reps were ending up
- * with a quantity they never typed. We blur on wheel and hide the steppers.
- */
-const NUM_FIELD =
-  "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
-
 type ProductRow = {
   id: string;
   name: string;
@@ -400,8 +391,7 @@ export function FieldSaleForm({
                     placeholder="Qty"
                     value={qty[p.id] ?? ""}
                     onChange={(e) => setQty((s) => ({ ...s, [p.id]: e.target.value }))}
-                    onWheel={(e) => e.currentTarget.blur()}
-                    className={cn("h-9 w-20", NUM_FIELD)}
+                    className="h-9 w-20"
                   />
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground">@</span>
@@ -412,8 +402,7 @@ export function FieldSaleForm({
                       disabled={out}
                       value={price[p.id] ?? ""}
                       onChange={(e) => setPrice((s) => ({ ...s, [p.id]: e.target.value }))}
-                      onWheel={(e) => e.currentTarget.blur()}
-                      className={cn("h-9 w-24", NUM_FIELD)}
+                      className="h-9 w-24"
                     />
                   </div>
                 </div>

@@ -101,3 +101,60 @@ export const PRESET_CATEGORY_OPTIONS: CategoryOption[] = EXPENSE_GROUPS.flatMap(
     group: g.label,
   })),
 );
+
+/** Build an Operational-Fund preset: its own name, stored against the enum it
+ *  rolls up under (so P&L / grouped reports stay correct). */
+const fundPreset = (
+  label: string,
+  category: ExpenseCategory,
+  group: string,
+): CategoryOption => ({
+  value: `of:${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+  label,
+  category,
+  customCategory: label,
+  group,
+});
+
+/**
+ * The Operational Fund's own preset list — the spend Finance actually requests
+ * week to week, named the way Finance names it.
+ *
+ * These are display presets: each carries its real name plus the
+ * ExpenseCategory it rolls up under, using the very same mechanism as a
+ * user-created custom category. That keeps the list as rich as Finance needs
+ * without minting a new database enum value (and a risky migration) for every
+ * line. Anything not listed is still covered by the picker's "+ New category…",
+ * which persists the new name for future requests.
+ *
+ * Every `category` used here must stay inside OFFICE_FUND_CATEGORIES — that's
+ * what the server validates a fund request against.
+ */
+export const OPERATIONAL_FUND_PRESETS: CategoryOption[] = [
+  // Vehicle & travel
+  fundPreset("Fuel", "DELIVERY", "Vehicle & travel"),
+  fundPreset("Sales Team Travel & Field Allowance", "TRANSPORT_REIMBURSEMENT", "Vehicle & travel"),
+  fundPreset("Parking Fees", "TRANSPORT_REIMBURSEMENT", "Vehicle & travel"),
+  fundPreset("Vehicle Maintenance", "EQUIPMENT", "Vehicle & travel"),
+  fundPreset("Police Fines / Traffic Fines", "OTHER", "Vehicle & travel"),
+  // Delivery & logistics
+  fundPreset("Regional Delivery Costs", "DELIVERY", "Delivery & logistics"),
+  fundPreset("Courier Services", "DELIVERY", "Delivery & logistics"),
+  fundPreset("Packaging Materials", "PACKAGING", "Delivery & logistics"),
+  // Office
+  fundPreset("Office Rent", "RENT", "Office"),
+  fundPreset("Office Utilities", "UTILITIES", "Office"),
+  fundPreset("Electricity", "UTILITIES", "Office"),
+  fundPreset("Stationery & Office Supplies", "STATIONERY", "Office"),
+  fundPreset("Office Refreshments", "OFFICE", "Office"),
+  fundPreset("Cleaning Supplies", "OFFICE", "Office"),
+  fundPreset("Staff Meals", "OFFICE", "Office"),
+  // Tech & equipment
+  fundPreset("Internet", "INTERNET", "Tech & equipment"),
+  fundPreset("Equipment Repairs & Maintenance", "EQUIPMENT", "Tech & equipment"),
+  // Marketing
+  fundPreset("Marketing & Promotions", "MARKETING", "Marketing"),
+  fundPreset("External Activities / Events", "MARKETING", "Marketing"),
+  // Other
+  fundPreset("Miscellaneous", "OTHER", "Other"),
+];
