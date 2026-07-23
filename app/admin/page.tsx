@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminCommandCenter() {
   const me = await requireRole("ADMIN");
 
-  const [d, fin, collections, customers, trends, opFund, accounts, categories, pettyPendingAgg, pendingSaleGroups, pendingCollAgg, lastPaidPayroll, meUser] =
+  const [d, fin, collections, customers, trends, opFund, accounts, categories, fundCategories, pettyPendingAgg, pendingSaleGroups, pendingCollAgg, lastPaidPayroll, meUser] =
     await Promise.all([
       getCommandCenter(),
       getFinanceOverview("month"),
@@ -42,6 +42,8 @@ export default async function AdminCommandCenter() {
       getOperationalFund(),
       getSelectableAccounts(),
       getSelectableCategories(),
+      // Issuing funds uses the Operational-Fund list, not the full expense list.
+      getSelectableCategories("operational"),
       prisma.pettyCashRequest.aggregate({ _count: true, _sum: { amount: true }, where: { status: "PENDING" } }),
       // Rep-recorded money awaiting finance/CEO sign-off (not yet company money).
       prisma.fieldSale.groupBy({ by: ["type"], where: { financeStatus: "PENDING", voided: false }, _count: { _all: true }, _sum: { total: true } }),
@@ -125,7 +127,7 @@ export default async function AdminCommandCenter() {
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick actions</p>
         <div className="flex flex-wrap items-center gap-2">
           <AddExpenseButton accounts={accounts} categories={categories} label="Record expense" variant="default" className="rounded-xl" />
-          <IssueFundsButton accounts={accounts} label="Issue funds" variant="accent" className="rounded-xl" />
+          <IssueFundsButton accounts={accounts} categories={fundCategories} label="Issue funds" variant="accent" className="rounded-xl" />
           <AddCapitalButton accounts={accounts} label="Add capital" variant="outline" className="rounded-xl" />
           <ExecutiveActions />
         </div>

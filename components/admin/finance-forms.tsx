@@ -10,7 +10,6 @@ import {
   removeCapital,
 } from "@/lib/actions/finance";
 import { issueOperationalFunds } from "@/lib/actions/operational-fund";
-import { OFFICE_FUND_CATEGORIES, EXPENSE_LABELS } from "@/lib/expense-categories";
 import type { CategoryOption } from "@/lib/expense-categories";
 import { formatCurrency } from "@/lib/utils";
 import { Modal } from "@/components/ui/dialog";
@@ -474,18 +473,21 @@ export function DeleteCapitalButton({ id }: { id: string }) {
 }
 
 // One line of a multi-item fund issue: office-fund category + description + amount.
-type IssueLine = { key: number; category: string; description: string; amount: string };
+type IssueLine = { key: number; category: string; customCategory: string | null; description: string; amount: string };
 
 /** CEO pushes funds to Finance from anywhere (e.g. the Finance overview) — one or
  *  more line items. The money isn't spendable until Finance confirms receipt.
  *  Mirrors the multi-item modal on the Operational Fund page. */
 export function IssueFundsButton({
   accounts = [],
+  categories = [],
   label = "Issue funds to Finance",
   variant = "default",
   className = "rounded-full",
 }: {
   accounts?: SelectableAccount[];
+  /** Operational-Fund categories (presets + custom) for the line-item picker. */
+  categories?: CategoryOption[];
   label?: string;
   variant?: BtnVariant;
   className?: string;
@@ -494,23 +496,23 @@ export function IssueFundsButton({
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
   const keyRef = useRef(2);
-  const [items, setItems] = useState<IssueLine[]>([{ key: 1, category: "OFFICE", description: "", amount: "" }]);
+  const [items, setItems] = useState<IssueLine[]>([{ key: 1, category: "OFFICE", customCategory: null, description: "", amount: "" }]);
   const [purpose, setPurpose] = useState("");
   const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
 
   const total = items.reduce((s, it) => s + Math.round(Number(it.amount) || 0), 0);
-  const addItem = () => setItems((p) => [...p, { key: keyRef.current++, category: "OFFICE", description: "", amount: "" }]);
+  const addItem = () => setItems((p) => [...p, { key: keyRef.current++, category: "OFFICE", customCategory: null, description: "", amount: "" }]);
   const removeItem = (key: number) => setItems((p) => (p.length > 1 ? p.filter((i) => i.key !== key) : p));
   const patch = (key: number, ch: Partial<IssueLine>) => setItems((p) => p.map((i) => (i.key === key ? { ...i, ...ch } : i)));
   function reset() {
-    setItems([{ key: keyRef.current++, category: "OFFICE", description: "", amount: "" }]);
+    setItems([{ key: keyRef.current++, category: "OFFICE", customCategory: null, description: "", amount: "" }]);
     setPurpose(""); setNote("");
   }
 
   function submit() {
     if (purpose.trim().length < 3) return toast({ variant: "error", title: "What are the funds for?" });
-    const parsed = items.map((it) => ({ category: it.category, description: it.description.trim() || undefined, amount: Math.round(Number(it.amount) || 0) }));
+    const parsed = items.map((it) => ({ category: it.category, customCategory: it.customCategory ?? undefined, description: it.description.trim() || undefined, amount: Math.round(Number(it.amount) || 0) }));
     if (parsed.some((it) => it.amount <= 0))
       return toast({ variant: "error", title: "Give every item an amount." });
     start(async () => {
@@ -552,11 +554,13 @@ export function IssueFundsButton({
               {items.map((it) => (
                 <div key={it.key} className="flex items-center gap-2 rounded-xl border border-border p-2.5">
                   <div className="min-w-0 flex-1">
-                    <Select value={it.category} onChange={(e) => patch(it.key, { category: e.target.value })}>
-                      {OFFICE_FUND_CATEGORIES.map((c) => (
-                        <option key={c} value={c}>{EXPENSE_LABELS[c]}</option>
-                      ))}
-                    </Select>
+                    <CategorySelect
+                      categories={categories}
+                      category={it.category}
+                      customCategory={it.customCategory}
+                      onChange={(v) => patch(it.key, v)}
+                      label=""
+                    />
                   </div>
                   <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} placeholder="Amount" className="w-28 shrink-0" />
                   {items.length > 1 && (
