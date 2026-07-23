@@ -194,7 +194,16 @@ export default async function AdminSalesApprovalsPage() {
                       </div>
                     )}
                   </div>
-                  <CollectionApprovalActions paymentId={p.id} />
+                  {p.sale.financeStatus !== "APPROVED" ? (
+                    // Same guard as the finance queue: posting a collection onto an
+                    // unconfirmed sale is rejected server-side, so don't offer it.
+                    <p className="max-w-[13rem] shrink-0 rounded-lg border border-warning/30 bg-warning/10 px-2.5 py-2 text-xs text-warning">
+                      Confirm credit sale <span className="font-semibold">{p.sale.code}</span> first
+                      — then this payment can be posted.
+                    </p>
+                  ) : (
+                    <CollectionApprovalActions paymentId={p.id} />
+                  )}
                 </div>
               </div>
             ))}

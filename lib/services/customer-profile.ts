@@ -54,6 +54,8 @@ export type CustomerProfile = {
     totalCash: number;
     totalCredit: number;
     totalPayments: number;
+    /** Rep collections submitted but NOT yet verified by finance — not money in hand. */
+    pendingCollections: number;
     outstanding: number;
     overdue: number;
     creditLimit: number | null;
@@ -244,11 +246,25 @@ export async function getFieldCustomerProfile(
   // rows). Uses payment records — NOT amountPaid — so debt-recovery returns that
   // bump amountPaid aren't miscounted as cash, and a pending collection counts the
   // same whether the sale was cash or credit.
+  //
+  // Only APPROVED collections count as received. A rep's claim is unverified
+  // money: counting it here while `outstanding` (below) derives from amountPaid —
+  // which only an approval moves — made the profile assert both "payment
+  // received" and "nothing paid off" at once. Pending money is reported
+  // separately so the UI shows it as awaiting verification, not as cash in hand.
   const totalCollections = live.reduce(
     (a, s) =>
       a +
       s.payments
-        .filter((p) => p.financeStatus !== "REJECTED")
+        .filter((p) => p.financeStatus === "APPROVED")
+        .reduce((x, p) => x + p.amount, 0),
+    0,
+  );
+  const pendingCollections = live.reduce(
+    (a, s) =>
+      a +
+      s.payments
+        .filter((p) => p.financeStatus === "PENDING")
         .reduce((x, p) => x + p.amount, 0),
     0,
   );
@@ -443,6 +459,7 @@ export async function getFieldCustomerProfile(
       totalCash,
       totalCredit,
       totalPayments,
+      pendingCollections,
       outstanding,
       overdue,
       creditLimit: customer.creditLimit,

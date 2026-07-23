@@ -9,6 +9,8 @@ export type CreditPaymentDTO = {
   note: string | null;
   proofUrl: string | null;
   recordedBy: string;
+  /** APPROVED = verified money that reduced the balance; PENDING = awaiting finance. */
+  status: "APPROVED" | "PENDING";
   createdAt: string; // ISO
 };
 
@@ -65,7 +67,11 @@ export async function getCreditSaleDetail(
         rep: { select: { name: true, region: true } },
         items: { include: { product: { select: { name: true } } } },
         payments: {
-          where: { financeStatus: "APPROVED" },
+          // Include collections finance hasn't verified yet — hiding them made
+          // this page claim "Nothing collected yet" on a sale that already had a
+          // submitted payment. They're returned with their status so the UI can
+          // show them as awaiting verification rather than as settled money.
+          where: { financeStatus: { in: ["APPROVED", "PENDING"] } },
           orderBy: { createdAt: "asc" },
           include: {
             recordedBy: { select: { name: true } },
@@ -118,6 +124,7 @@ export async function getCreditSaleDetail(
         note: p.note,
         proofUrl: p.paymentProofUrl,
         recordedBy: p.recordedBy.name,
+        status: p.financeStatus === "APPROVED" ? "APPROVED" : "PENDING",
         createdAt: p.createdAt.toISOString(),
       })),
     },

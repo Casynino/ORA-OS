@@ -13,11 +13,23 @@ export function CustomerFinancialSummary({ f }: { f: CustomerProfile["finance"] 
           ? "text-warning"
           : "text-destructive";
 
-  const rows: { label: string; value: string; tone?: string }[] = [
+  const rows: { label: string; value: string; tone?: string; hint?: string }[] = [
     { label: "Total purchases", value: formatCurrency(f.totalPurchases) },
     { label: "Cash sales", value: formatCurrency(f.totalCash) },
     { label: "Credit sales", value: formatCurrency(f.totalCredit) },
-    { label: "Payments received", value: formatCurrency(f.totalPayments), tone: "text-success" },
+    {
+      // Verified money only. Anything a rep has submitted but finance hasn't
+      // checked yet is called out below it, never added in — otherwise this
+      // reads as cash in hand while the balance it should have reduced is
+      // untouched.
+      label: "Payments received",
+      value: formatCurrency(f.totalPayments),
+      tone: "text-success",
+      hint:
+        f.pendingCollections > 0
+          ? `+ ${formatCurrency(f.pendingCollections)} awaiting finance verification`
+          : undefined,
+    },
     {
       label: "Outstanding balance",
       value: formatCurrency(f.outstanding),
@@ -64,6 +76,7 @@ export function CustomerFinancialSummary({ f }: { f: CustomerProfile["finance"] 
             <dd className={`truncate font-display text-lg font-semibold ${r.tone ?? ""}`}>
               {r.value}
             </dd>
+            {r.hint && <p className="mt-0.5 text-[11px] font-medium text-warning">{r.hint}</p>}
           </div>
         ))}
       </dl>
