@@ -425,10 +425,18 @@ export default async function FinanceSalesApprovalsPage({
                       </div>
                     )}
                   </div>
-                  {p.financeStatus === "PENDING" ? (
-                    <CollectionApprovalActions paymentId={p.id} />
-                  ) : (
+                  {p.financeStatus !== "PENDING" ? (
                     reviewedTag(p)
+                  ) : p.sale.financeStatus !== "APPROVED" ? (
+                    // A collection can't post onto a sale finance hasn't confirmed
+                    // (approveFieldCollection rejects it). Say so here instead of
+                    // offering a button whose only outcome is an error toast.
+                    <p className="max-w-[13rem] shrink-0 rounded-lg border border-warning/30 bg-warning/10 px-2.5 py-2 text-xs text-warning">
+                      Confirm credit sale <span className="font-semibold">{p.sale.code}</span> above
+                      first — then this payment can be posted.
+                    </p>
+                  ) : (
+                    <CollectionApprovalActions paymentId={p.id} />
                   )}
                 </div>
               </div>

@@ -156,7 +156,20 @@ export function CreditSaleDetail({
               {sale.payments.map((p, idx) => (
                 <li key={idx} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
                   <span className="min-w-0">
-                    <span className="font-semibold text-success">+{formatCurrency(p.amount)}</span>
+                    <span
+                      className={
+                        p.status === "APPROVED"
+                          ? "font-semibold text-success"
+                          : "font-semibold text-warning"
+                      }
+                    >
+                      +{formatCurrency(p.amount)}
+                    </span>
+                    {p.status === "PENDING" && (
+                      <span className="ml-2 rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
+                        Awaiting finance
+                      </span>
+                    )}
                     <span className="ml-2 text-muted-foreground">
                       {p.method ?? "payment"}
                       {p.account ? ` → ${p.account}` : ""}
