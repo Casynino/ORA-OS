@@ -465,7 +465,15 @@ export default async function FinanceSalesApprovalsPage({
                     )}
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
-                    <span className="font-semibold">{formatCurrency(s.total)}</span>
+                    {/* Say WHAT the figure is. On a credit sale this is the value of
+                        goods taken on credit — approving it creates the debt, it is
+                        not money received — which reads as cash without this label. */}
+                    <span className="text-right">
+                      <span className="font-semibold">{formatCurrency(s.total)}</span>
+                      <span className="block text-[11px] font-normal text-muted-foreground">
+                        {s.type === "CREDIT" ? "credit sale · debt created" : "cash received"}
+                      </span>
+                    </span>
                     <Badge variant={s.financeStatus === "APPROVED" ? "success" : "destructive"}>
                       {s.financeStatus.toLowerCase()}
                     </Badge>
