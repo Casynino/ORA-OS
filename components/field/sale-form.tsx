@@ -24,6 +24,15 @@ import { ProofUpload } from "@/components/ui/proof-upload";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { CUSTOMER_TYPES } from "@/lib/customer-types";
 
+/**
+ * Quantity/price fields must never change value on their own. A native number
+ * input silently bumps its value when the wheel scrolls over it while focused
+ * (and when the tiny steppers are mis-clicked) — that's how reps were ending up
+ * with a quantity they never typed. We blur on wheel and hide the steppers.
+ */
+const NUM_FIELD =
+  "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+
 type ProductRow = {
   id: string;
   name: string;
@@ -283,7 +292,9 @@ export function FieldSaleForm({
         // Full reset so the rep can immediately start a fresh sale — clear the
         // cart, the selected/typed customer, and EVERY payment detail (method,
         // account, reference, cheque bank/number/date and the attached photo).
-        setType("CASH");
+        // The cash/credit choice deliberately PERSISTS: a rep working through a
+        // run of credit sales shouldn't have to re-pick "Credit" every time —
+        // it stays until they switch it themselves.
         setQty({});
         setPrice(Object.fromEntries(products.map((p) => [p.id, String(p.price)])));
         setCustomerId("");
@@ -389,7 +400,8 @@ export function FieldSaleForm({
                     placeholder="Qty"
                     value={qty[p.id] ?? ""}
                     onChange={(e) => setQty((s) => ({ ...s, [p.id]: e.target.value }))}
-                    className="h-9 w-20"
+                    onWheel={(e) => e.currentTarget.blur()}
+                    className={cn("h-9 w-20", NUM_FIELD)}
                   />
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground">@</span>
@@ -400,7 +412,8 @@ export function FieldSaleForm({
                       disabled={out}
                       value={price[p.id] ?? ""}
                       onChange={(e) => setPrice((s) => ({ ...s, [p.id]: e.target.value }))}
-                      className="h-9 w-24"
+                      onWheel={(e) => e.currentTarget.blur()}
+                      className={cn("h-9 w-24", NUM_FIELD)}
                     />
                   </div>
                 </div>
