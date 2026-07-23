@@ -165,6 +165,11 @@ export function CreditSaleDetail({
                     <span className="mt-0.5 block text-xs text-muted-foreground">
                       {formatDateTime(p.createdAt)} · recorded by {p.recordedBy}
                     </span>
+                    {p.note && (
+                      <span className="mt-1 block text-xs italic text-muted-foreground">
+                        &ldquo;{p.note}&rdquo;
+                      </span>
+                    )}
                   </span>
                   {p.proofUrl && <ProofViewer url={p.proofUrl} label="Proof" compact />}
                 </li>

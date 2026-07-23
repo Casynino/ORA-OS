@@ -7,6 +7,7 @@ import { recordFieldCollection } from "@/lib/actions/field";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   ReceivingAccountPicker,
@@ -47,6 +48,7 @@ export function FieldCollectionButton({
     accounts.find((a) => a.type === firstMethod)?.id ?? accounts[0]?.id ?? "",
   );
   const [reference, setReference] = useState("");
+  const [note, setNote] = useState("");
   const [proofUrl, setProofUrl] = useState("");
   const [chequeBank, setChequeBank] = useState("");
   const [chequeNumber, setChequeNumber] = useState("");
@@ -83,6 +85,7 @@ export function FieldCollectionButton({
         method: METHOD_LABELS[method] ?? method,
         paymentAccountId: isCheque ? undefined : accountId || undefined,
         reference: reference || undefined,
+        note: note.trim() || undefined,
         paymentProofUrl: proofUrl || undefined,
         chequeBank: isCheque ? chequeBank : undefined,
         chequeNumber: isCheque ? chequeNumber : undefined,
@@ -162,6 +165,16 @@ export function FieldCollectionButton({
                 {isCheque ? "Cheque photo *" : "Payment proof (optional)"}
               </Label>
               <ProofUpload value={proofUrl} onChange={setProofUrl} label={isCheque ? "Attach cheque photo" : "Attach receipt / screenshot"} />
+            </div>
+            <div>
+              <Label className="mb-1.5 block">Note (optional)</Label>
+              <Textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                maxLength={300}
+                placeholder="Anything worth saying about this payment — e.g. part payment, promised the rest on Friday, paid by the shop owner's brother."
+              />
             </div>
             <Button className="w-full" onClick={submit} disabled={pending}>
               {pending ? "Recording…" : "Record payment"}
