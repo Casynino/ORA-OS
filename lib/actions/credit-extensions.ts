@@ -66,16 +66,12 @@ export async function createCreditExtension(
       include: { customer: { select: { id: true, name: true, businessName: true, repId: true } } },
     });
     if (!sale || sale.type !== "CREDIT") return fail("Credit sale not found.");
-    // A rep can raise extensions on any credit sale of a customer they currently
-    // manage — whether they recorded that sale themselves (sale.repId) or it was
-    // recorded by Finance / a prior rep before the customer was assigned to them
-    // (customer.repId). Both are scoped to the rep's own book and only create an
-    // Admin-approved request, so there's no privilege escalation.
-    if (
-      actor.role === "SALES_REP" &&
-      sale.repId !== actor.id &&
-      sale.customer?.repId !== actor.id
-    )
+    // A rep can raise extensions on any credit sale of a customer they CURRENTLY
+    // manage — including sales recorded by Finance or by a prior rep before the
+    // customer was assigned to them. Ownership is judged on the customer's
+    // current repId ALONE: having recorded the sale is not enough, or a rep whose
+    // customer was reassigned away could keep filing against another rep's book.
+    if (actor.role === "SALES_REP" && sale.customer?.repId !== actor.id)
       return fail("You can only request extensions for your own customers.");
     if (sale.voided) return fail("This sale was voided.");
     if (sale.financeStatus === "REJECTED")

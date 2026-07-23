@@ -26,10 +26,8 @@ export default async function FinanceCustomersPage() {
         </Link>
       </PageHeader>
       <MasterCustomersTables
-        partners={partners}
-        fieldCustomers={fieldCustomers}
-        partnerHref={() => "/finance/partners"}
-        fieldHref={(id) => `/finance/customers/${id}`}
+        partners={partners.map((p) => ({ ...p, href: "/finance/partners" }))}
+        fieldCustomers={fieldCustomers.map((c) => ({ ...c, href: `/finance/customers/${c.id}` }))}
       />
     </div>
   );

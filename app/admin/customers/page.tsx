@@ -32,11 +32,9 @@ export default async function AdminCustomersPage() {
       </PageHeader>
       <CustomerIntelligencePanel cust={intelligence} />
       <MasterCustomersTables
-        partners={partners}
-        fieldCustomers={fieldCustomers}
-        partnerHref={(id) => `/admin/customers/${id}`}
-        fieldHref={(id) => `/admin/reps/customers/${id}`}
-        repHref={(id) => `/admin/reps/${id}`}
+        partners={partners.map((p) => ({ ...p, href: `/admin/customers/${p.id}` }))}
+        fieldCustomers={fieldCustomers.map((c) => ({ ...c, href: `/admin/reps/customers/${c.id}` }))}
+        repHrefBase="/admin/reps"
       />
     </div>
   );

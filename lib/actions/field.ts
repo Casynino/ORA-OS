@@ -468,11 +468,19 @@ export async function recordFieldCollection(
 
     const sale = await prisma.fieldSale.findUnique({
       where: { id: d.saleId },
-      include: { customer: { select: { name: true } } },
+      include: { customer: { select: { name: true, repId: true } } },
     });
     if (!sale || sale.type !== "CREDIT") return fail("Credit sale not found.");
-    if (actor.role === "SALES_REP" && sale.repId !== actor.id)
-      return fail("That sale belongs to another rep.");
+    // A rep may only collect while the customer is still in THEIR book. Owning
+    // the historical sale isn't enough: once Admin/Finance reassigns a customer
+    // the whole ledger moves with them, so the previous rep must not be able to
+    // keep posting claims onto another rep's customer.
+    if (actor.role === "SALES_REP") {
+      const ownsSale = sale.repId === actor.id;
+      const ownsCustomer = !sale.customerId || sale.customer?.repId === actor.id;
+      if (!ownsSale || !ownsCustomer)
+        return fail("That customer is managed by another rep.");
+    }
     if (sale.voided) return fail("This sale was voided.");
     if (sale.financeStatus === "REJECTED")
       return fail("This sale was rejected by finance — record a corrected sale instead of collecting on it.");
@@ -1528,24 +1536,40 @@ export async function setFieldCustomerRep(
 ): Promise<ActionResult> {
   try {
     const actor = await requireActor(["ADMIN", "FINANCE"]);
-    const cust = await prisma.fieldCustomer.findUnique({ where: { id: customerId } });
+    const cust = await prisma.fieldCustomer.findUnique({
+      where: { id: customerId },
+      // The OUTGOING rep — so the audit trail can say who the customer moved from.
+      include: { rep: { select: { name: true } } },
+    });
     if (!cust) return fail("Customer not found.");
     const clean = repId?.trim() || null;
+    const who = cust.businessName ?? cust.name;
+    // A no-op save shouldn't write a misleading "reassigned" row into the history.
+    if (clean === (cust.repId ?? null))
+      return ok(undefined, clean ? `${who} is already managed by that rep.` : `${who} is already unassigned.`);
+
+    let newRepName: string | null = null;
     if (clean) {
       const rep = await prisma.user.findUnique({ where: { id: clean }, select: { role: true, name: true } });
       if (!rep || rep.role !== "SALES_REP") return fail("Assigned rep must be a sales representative.");
+      newRepName = rep.name;
     }
     await prisma.fieldCustomer.update({ where: { id: customerId }, data: { repId: clean } });
-    const who = cust.businessName ?? cust.name;
+    const oldRepName = cust.rep?.name ?? null;
+    // Name both sides of the move — a transfer audit is useless without them.
+    const summary =
+      clean && oldRepName
+        ? `${actor.name} moved ${who} from ${oldRepName} to ${newRepName}.`
+        : clean
+          ? `${actor.name} assigned ${who} to ${newRepName}.`
+          : `${actor.name} unassigned ${who}${oldRepName ? ` from ${oldRepName}` : ""}.`;
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
       action: "FIELD_CUSTOMER_REP_SET",
       entity: "FieldCustomer",
       entityId: customerId,
-      summary: clean
-        ? `${actor.name} assigned a managing rep to ${who}.`
-        : `${actor.name} left ${who} unassigned.`,
+      summary,
     });
     revalidateField();
     return ok(undefined, clean ? `Managing rep assigned for ${who}.` : `${who} set to unassigned.`);
