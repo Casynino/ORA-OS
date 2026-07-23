@@ -5,6 +5,8 @@ export type CreditPaymentDTO = {
   method: string | null;
   account: string | null;
   reference: string | null;
+  /** Free-text context the collector added about this payment. */
+  note: string | null;
   proofUrl: string | null;
   recordedBy: string;
   createdAt: string; // ISO
@@ -113,6 +115,7 @@ export async function getCreditSaleDetail(
         method: p.method,
         account: p.paymentAccount?.name ?? null,
         reference: p.reference,
+        note: p.note,
         proofUrl: p.paymentProofUrl,
         recordedBy: p.recordedBy.name,
         createdAt: p.createdAt.toISOString(),

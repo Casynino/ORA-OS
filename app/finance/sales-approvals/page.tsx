@@ -414,6 +414,11 @@ export default async function FinanceSalesApprovalsPage({
                         {p.chequeDate ? ` · ${new Date(p.chequeDate).toLocaleDateString("en-GB")}` : ""}
                       </p>
                     )}
+                    {p.note && (
+                      <p className="mt-2 rounded-lg border border-border bg-muted/30 px-2.5 py-1.5 text-xs italic text-muted-foreground">
+                        &ldquo;{p.note}&rdquo;
+                      </p>
+                    )}
                     {p.paymentProofUrl && (
                       <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2">
                         <ProofViewer url={p.paymentProofUrl} label="View payment proof" compact />
