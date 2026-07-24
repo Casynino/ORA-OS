@@ -21,6 +21,25 @@ export async function notifyFundRequest(requesterName: string | null | undefined
   }
 }
 
+/** Notify the CEO that Finance recorded COMPLETED expenses awaiting allocation.
+ *  Deliberately says "recorded", not "requested" — the money is already spent. */
+export async function notifyExpensesRecorded(
+  recorderName: string | null | undefined,
+  count: number,
+  total: number,
+) {
+  try {
+    const s = await reportSettings();
+    // Reuses the fund-request alert toggle — same class of finance→CEO alert.
+    if (s && !s.fundRequestAlerts) return;
+    await sendWhatsApp(
+      `🧾 ORA Expenses Recorded\n\n${recorderName || "Finance"} has recorded ${count} company ${count === 1 ? "expense" : "expenses"} totaling ${formatCurrency(total)}.\n\nPlease review and allocate the expenses to a company account in ORA OS.`,
+    );
+  } catch (e) {
+    console.error("[notifyExpensesRecorded]", e);
+  }
+}
+
 /** Notify the CEO that a sales rep submitted their daily field report. */
 export async function notifyRepReport(repName: string | null | undefined, location?: string | null) {
   try {

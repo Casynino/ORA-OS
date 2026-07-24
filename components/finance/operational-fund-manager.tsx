@@ -24,6 +24,12 @@ import {
   confirmOperationalFundReceipt,
   cancelIssuedFund,
 } from "@/lib/actions/operational-fund";
+import {
+  submitExpenseClaim,
+  approveExpenseClaim,
+  rejectExpenseClaim,
+} from "@/lib/actions/expense-claims";
+import type { ExpenseClaimRow } from "@/lib/services/expense-claims";
 import type { FundRequestRow, FundExpenseRow, FundItemRow } from "@/lib/services/operational-fund";
 import { EXPENSE_LABELS, OFFICE_FUND_CATEGORIES } from "@/lib/expense-categories";
 import { Modal } from "@/components/ui/dialog";
@@ -94,14 +100,17 @@ export function OperationalFundManager({
   fund,
   accounts = [],
   categories = [],
+  claims = { pending: [], recent: [], pendingTotal: 0 },
   canManage = false,
   canApprove = false,
 }: {
   fund: Fund;
-  /** Company accounts the CEO can issue funds FROM (approval only). */
+  /** Company accounts the CEO can issue funds FROM / allocate expenses TO. */
   accounts?: SelectableAccount[];
   /** Pickable expense categories (presets + custom) for the request builder. */
   categories?: CategoryOption[];
+  /** Recorded-expense submissions: pending (CEO reviews) + recent (status). */
+  claims?: { pending: ExpenseClaimRow[]; recent: ExpenseClaimRow[]; pendingTotal: number };
   /** Finance can request funds + record spending. */
   canManage?: boolean;
   /** CEO/admin can approve/reject funding requests. */
@@ -110,6 +119,7 @@ export function OperationalFundManager({
   const [requestOpen, setRequestOpen] = useState(false);
   const [spendOpen, setSpendOpen] = useState(false);
   const [issueOpen, setIssueOpen] = useState(false);
+  const [claimOpen, setClaimOpen] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -128,17 +138,21 @@ export function OperationalFundManager({
       {/* Actions (finance) */}
       {canManage && (
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => setRequestOpen(true)}>
+          <Button size="sm" onClick={() => setClaimOpen(true)}>
+            <Receipt className="size-4" /> Record company expenses
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setRequestOpen(true)}>
             <Plus className="size-4" /> Request funds
           </Button>
           <Button size="sm" variant="outline" onClick={() => setSpendOpen(true)} disabled={fund.balance <= 0}>
-            <Receipt className="size-4" /> Record expense
+            <Wallet className="size-4" /> Spend the fund
           </Button>
-          {fund.balance <= 0 && (
-            <span className="self-center text-xs text-muted-foreground">
-              Fund is empty — request more to record spending.
-            </span>
-          )}
+          <span className="w-full text-xs text-muted-foreground">
+            <strong className="text-foreground">Record company expenses</strong> = money already
+            spent — the CEO reviews the receipts and allocates a company account.{" "}
+            <strong className="text-foreground">Spend the fund</strong> draws down the operational
+            float you were already allocated.
+          </span>
         </div>
       )}
 
@@ -152,6 +166,88 @@ export function OperationalFundManager({
             Finance confirms receipt before it&apos;s booked as an expense.
           </span>
         </div>
+      )}
+
+      {/* Recorded expenses awaiting the CEO's review + account allocation */}
+      {claims.pending.length > 0 && (
+        <section className="space-y-3">
+          <div>
+            <h2 className="font-display text-lg font-semibold">
+              {canApprove
+                ? "Recorded expenses — review & allocate"
+                : "Recorded expenses — awaiting CEO approval"}
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              {canApprove
+                ? "Already-spent expenses recorded by Finance. Review every receipt, then approve and allocate one company account — that books them and reduces that account's balance."
+                : "You've recorded these completed expenses. Nothing is booked until the CEO reviews the receipts and allocates a company account."}
+            </p>
+          </div>
+          <div className="space-y-2">
+            {claims.pending.map((c) => (
+              <div key={c.id} className="rounded-2xl border border-warning/30 bg-warning/[0.04] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2 font-display font-semibold">
+                      {formatCurrency(c.total)}
+                      <span className="text-sm font-normal text-muted-foreground">
+                        · {c.items.length} {c.items.length === 1 ? "expense" : "expenses"}
+                      </span>
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {c.code} · recorded by {c.recordedBy} · {timeAgo(c.createdAt)}
+                    </p>
+                    <ClaimItemLines items={c.items} />
+                    {c.note && <p className="mt-1 text-xs text-muted-foreground">Note: {c.note}</p>}
+                  </div>
+                  {canApprove ? (
+                    <ClaimApproveControls id={c.id} accounts={accounts} />
+                  ) : (
+                    <Badge variant="warning">Awaiting approval</Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Recently recorded expenses (status glance — mainly for Finance) */}
+      {canManage && claims.recent.some((c) => c.status !== "PENDING") && (
+        <section className="space-y-3">
+          <h2 className="font-display text-lg font-semibold">Recently recorded expenses</h2>
+          <div className="rounded-2xl border border-border bg-card">
+            <ul className="divide-y divide-border/60">
+              {claims.recent
+                .filter((c) => c.status !== "PENDING")
+                .slice(0, 8)
+                .map((c) => (
+                  <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
+                    <span className="min-w-0">
+                      <span className="font-medium">{c.code}</span>{" "}
+                      <span className="text-muted-foreground">
+                        · {c.items.length} {c.items.length === 1 ? "item" : "items"} · {formatCurrency(c.total)}
+                      </span>
+                      {c.reviewNote && (
+                        <span className="block text-xs text-muted-foreground">&ldquo;{c.reviewNote}&rdquo;</span>
+                      )}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      {c.status === "APPROVED" && c.account && (
+                        <span className="text-xs text-muted-foreground">→ {c.account}</span>
+                      )}
+                      <Badge variant={c.status === "APPROVED" ? "success" : "destructive"}>
+                        {c.status.toLowerCase()}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {c.reviewedBy ?? ""} {c.reviewedAt ? timeAgo(c.reviewedAt) : ""}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        </section>
       )}
 
       {/* Pending funding requests */}
@@ -352,6 +448,7 @@ export function OperationalFundManager({
       {requestOpen && <RequestModal categories={categories} onClose={() => setRequestOpen(false)} />}
       {spendOpen && <SpendModal balance={fund.balance} onClose={() => setSpendOpen(false)} />}
       {issueOpen && <IssueModal accounts={accounts} categories={categories} onClose={() => setIssueOpen(false)} />}
+      {claimOpen && <SubmitExpensesModal categories={categories} onClose={() => setClaimOpen(false)} />}
     </div>
   );
 }
@@ -741,6 +838,190 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
         </div>
         <Button className="w-full" onClick={submit} disabled={pending || total <= 0 || over}>
           {pending ? "Recording…" : items.length > 1 ? `Record ${items.length} expenses · ${formatCurrency(total)}` : "Record expense"}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Expense claims (completed expenses → CEO reviews + allocates) ─────────────
+
+/** One line per recorded expense, with a link to open its receipt. */
+function ClaimItemLines({ items }: { items: ExpenseClaimRow["items"] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-1 rounded-lg border border-border/60 bg-background/50 px-3 py-2">
+      {items.map((it) => (
+        <div key={it.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+          <span className="min-w-0 flex-1 truncate">
+            <span className="text-muted-foreground">{it.label}</span> · {it.description}
+            {it.note ? <span className="text-muted-foreground"> — {it.note}</span> : null}
+          </span>
+          <span className="flex shrink-0 items-center gap-3">
+            <ProofViewer url={it.receiptUrl} label="Receipt" compact />
+            <span className="font-medium">{formatCurrency(it.amount)}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** CEO reviews a recorded-expense submission: allocate one account + approve, or reject. */
+function ClaimApproveControls({ id, accounts }: { id: string; accounts: SelectableAccount[] }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [rejecting, setRejecting] = useState(false);
+  const [note, setNote] = useState("");
+  const [accountId, setAccountId] = useState("");
+
+  function approve() {
+    if (!accountId) {
+      toast({ variant: "error", title: "Choose the account to allocate these expenses to." });
+      return;
+    }
+    start(async () => {
+      const res = await approveExpenseClaim({ id, paymentAccountId: accountId });
+      if (res.ok) { toast({ variant: "success", title: res.message }); router.refresh(); }
+      else toast({ variant: "error", title: res.error });
+    });
+  }
+  function reject() {
+    start(async () => {
+      const res = await rejectExpenseClaim(id, note.trim() || undefined);
+      if (res.ok) { toast({ variant: "success", title: res.message }); router.refresh(); }
+      else toast({ variant: "error", title: res.error });
+    });
+  }
+  return (
+    <div className="flex shrink-0 flex-col items-end gap-2">
+      <div className="w-56 text-left">
+        <CompanyAccountSelect accounts={accounts} value={accountId} onChange={setAccountId} label="Allocate to account" />
+      </div>
+      <div className="flex gap-1.5">
+        <Button size="sm" variant="success" disabled={pending} onClick={approve}>
+          <Check className="size-3.5" /> Approve &amp; allocate
+        </Button>
+        <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10" disabled={pending} onClick={() => setRejecting((v) => !v)}>
+          <X className="size-3.5" />
+        </Button>
+      </div>
+      {rejecting && (
+        <div className="flex items-center gap-1.5">
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reason…" className="h-8 w-40" />
+          <Button size="sm" variant="destructive" disabled={pending} onClick={reject}>Reject</Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type ClaimDraft = {
+  key: number;
+  category: string;
+  customCategory: string | null;
+  description: string;
+  amount: string;
+  receiptUrl: string;
+  receiptRef: string;
+  note: string;
+};
+
+/** Finance records already-incurred expenses — each item needs a receipt. */
+function SubmitExpensesModal({ categories, onClose }: { categories: CategoryOption[]; onClose: () => void }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const nextKey = useRef(2);
+  const [items, setItems] = useState<ClaimDraft[]>([
+    { key: 1, category: "OFFICE", customCategory: null, description: "", amount: "", receiptUrl: "", receiptRef: "", note: "" },
+  ]);
+  const [note, setNote] = useState("");
+
+  const total = items.reduce((s, it) => s + Math.round(Number(it.amount) || 0), 0);
+  const addItem = () =>
+    setItems((p) => [...p, { key: nextKey.current++, category: "OFFICE", customCategory: null, description: "", amount: "", receiptUrl: "", receiptRef: "", note: "" }]);
+  const removeItem = (key: number) => setItems((p) => (p.length > 1 ? p.filter((i) => i.key !== key) : p));
+  const patch = (key: number, ch: Partial<ClaimDraft>) => setItems((p) => p.map((i) => (i.key === key ? { ...i, ...ch } : i)));
+
+  function submit() {
+    const missingAmount = items.some((it) => Math.round(Number(it.amount) || 0) <= 0);
+    if (missingAmount) return toast({ variant: "error", title: "Give every expense an amount." });
+    const missingReceipt = items.some((it) => !it.receiptUrl);
+    if (missingReceipt) return toast({ variant: "error", title: "Attach a receipt for every expense." });
+    start(async () => {
+      const res = await submitExpenseClaim({
+        items: items.map((it) => ({
+          category: it.category,
+          customCategory: it.customCategory ?? undefined,
+          description: it.description.trim() || undefined,
+          amount: Math.round(Number(it.amount) || 0),
+          receiptUrl: it.receiptUrl,
+          receiptRef: it.receiptRef.trim() || undefined,
+          note: it.note.trim() || undefined,
+        })) as never,
+        note: note.trim() || undefined,
+      });
+      if (res.ok) { toast({ variant: "success", title: res.message }); onClose(); router.refresh(); }
+      else toast({ variant: "error", title: res.error });
+    });
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Record company expenses"
+      description="Expenses already paid. Add each with its receipt — the CEO reviews them, allocates a company account, and only then are they booked. Nothing leaves any account until approved."
+    >
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label>Expenses *</Label>
+          {items.map((it, idx) => (
+            <div key={it.key} className="space-y-2 rounded-xl border border-border p-2.5">
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <CategorySelect
+                    categories={categories}
+                    category={it.category}
+                    customCategory={it.customCategory}
+                    onChange={(v) => patch(it.key, v)}
+                    label=""
+                  />
+                </div>
+                <Input type="number" min={1} value={it.amount} onChange={(e) => patch(it.key, { amount: e.target.value })} onWheel={(e) => e.currentTarget.blur()} placeholder="Amount" className="w-28 shrink-0" />
+                {items.length > 1 && (
+                  <button type="button" onClick={() => removeItem(it.key)} className="mt-1 shrink-0 rounded-md p-1 text-muted-foreground hover:text-destructive" aria-label="Remove expense">
+                    <Trash2 className="size-4" />
+                  </button>
+                )}
+              </div>
+              <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="Description (optional)" className="h-9" />
+              <div>
+                <ProofUpload
+                  value={it.receiptUrl}
+                  onChange={(url) => patch(it.key, { receiptUrl: url })}
+                  label={`Attach receipt for expense ${idx + 1} (required)`}
+                />
+                {!it.receiptUrl && (
+                  <p className="mt-1 text-[11px] text-warning">A receipt is required for this expense.</p>
+                )}
+              </div>
+            </div>
+          ))}
+          <Button size="sm" variant="outline" onClick={addItem}>
+            <Plus className="size-4" /> Add expense
+          </Button>
+        </div>
+        <div className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2">
+          <span className="text-sm font-medium">Total recorded</span>
+          <span className="font-display text-lg font-bold">{formatCurrency(total)}</span>
+        </div>
+        <div>
+          <Label>Notes (optional)</Label>
+          <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5" placeholder="Anything the CEO should know" />
+        </div>
+        <Button className="w-full" onClick={submit} disabled={pending || total <= 0}>
+          {pending ? "Submitting…" : `Submit ${items.length} ${items.length === 1 ? "expense" : "expenses"} · ${formatCurrency(total)}`}
         </Button>
       </div>
     </Modal>
