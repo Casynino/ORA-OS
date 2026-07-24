@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   Wallet,
   Clock,
-  TrendingDown,
   Landmark,
   Plus,
   Receipt,
@@ -98,48 +97,6 @@ function Tile({ icon: Icon, label, value, hint, accent }: {
   );
 }
 
-/** One origin of spend inside the total panel. */
-function SpendBreak({ label, value, hint }: { label: string; value: number; hint: string }) {
-  return (
-    <div className="rounded-xl border border-border/70 bg-background/60 px-3 py-2">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-0.5 font-display text-base font-bold tabular-nums">{formatCurrency(value)}</p>
-      <p className="text-[10px] text-muted-foreground">{hint}</p>
-    </div>
-  );
-}
-
-/** The honest "money out" total — every approved expense, however it was spent,
- *  counted once. Answers "how much have we actually spent so far?" at a glance. */
-function SpendSummaryPanel({ spend }: { spend: SpendSummary }) {
-  return (
-    <section className="overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.07] via-card to-card p-5 shadow-soft">
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <Coins className="size-4 text-primary" /> Total money spent
-          </div>
-          <p className="mt-1.5 font-display text-3xl font-bold tracking-tight sm:text-4xl">
-            {formatCurrency(spend.total)}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {formatNumber(spend.count)} {spend.count === 1 ? "expense" : "expenses"} booked
-            {spend.thisMonth > 0 && <> · {formatCurrency(spend.thisMonth)} this month</>}
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <SpendBreak label="Direct & recorded" value={spend.direct} hint="approved expenses" />
-          <SpendBreak label="Operational fund" value={spend.fund} hint="allocations" />
-          {spend.payroll > 0 && <SpendBreak label="Payroll" value={spend.payroll} hint="salaries paid" />}
-        </div>
-      </div>
-      <p className="mt-3 border-t border-border/50 pt-3 text-[11px] text-muted-foreground">
-        Everything that&apos;s been approved and spent — direct spends, recorded expenses, and fund
-        allocations — each counted once. This is the same figure as the Profit &amp; Loss total.
-      </p>
-    </section>
-  );
-}
 
 export function OperationalFundManager({
   fund,
@@ -169,6 +126,16 @@ export function OperationalFundManager({
   const [issueOpen, setIssueOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
 
+  // Split of the total-spent tile: direct/recorded vs fund allocations (+ payroll
+  // only when there's been a run). Kept to one compact line under the value.
+  const spentHint = spend
+    ? [
+        `${formatNumber(spend.direct)} direct`,
+        `${formatNumber(spend.fund)} fund`,
+        ...(spend.payroll > 0 ? [`${formatNumber(spend.payroll)} payroll`] : []),
+      ].join(" · ")
+    : "all approved expenses";
+
   return (
     <div className="space-y-6">
       {/* Tiles */}
@@ -180,11 +147,8 @@ export function OperationalFundManager({
           <Tile icon={Clock} label="Pending requests" value={formatNumber(fund.pending.length)} hint={fund.pendingTotal > 0 ? formatCurrency(fund.pendingTotal) : "none"} accent="text-warning" />
         )}
         <Tile icon={Landmark} label="Total allocated" value={formatCurrency(fund.funded)} hint="company expense, confirmed" accent="text-info" />
-        <Tile icon={TrendingDown} label="Fund spent this month" value={formatCurrency(fund.spentThisMonth)} hint="from the operational float" accent="text-primary" />
+        <Tile icon={Coins} label="Total money spent" value={formatCurrency(spend?.total ?? 0)} hint={spentHint} accent="text-primary" />
       </div>
-
-      {/* Total money out — every approved expense, whichever way it was spent. */}
-      {spend && <SpendSummaryPanel spend={spend} />}
 
       {/* Actions (finance) */}
       {canManage && (
