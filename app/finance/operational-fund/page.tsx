@@ -1,5 +1,5 @@
 import { requireRole } from "@/lib/rbac";
-import { getOperationalFund } from "@/lib/services/operational-fund";
+import { getOperationalFund, getSpendSummary } from "@/lib/services/operational-fund";
 import { getSelectableCategories } from "@/lib/services/categories";
 import { getExpenseClaims } from "@/lib/services/expense-claims";
 import { PageHeader } from "@/components/ui/page-header";
@@ -12,8 +12,9 @@ export const dynamic = "force-dynamic";
  *  approve & allocate, and see every use — one place. */
 export default async function FinanceOperationalFundPage() {
   await requireRole("FINANCE");
-  const [fund, categories, claims] = await Promise.all([
+  const [fund, spend, categories, claims] = await Promise.all([
     getOperationalFund(),
+    getSpendSummary(),
     getSelectableCategories("operational"),
     getExpenseClaims(),
   ]);
@@ -24,7 +25,7 @@ export default async function FinanceOperationalFundPage() {
         title="Operational Fund"
         description="Funds allocated to Finance for day-to-day operations. Request funds, spend from the balance, and record every expense with receipts — all in one place."
       />
-      <OperationalFundManager fund={fund} categories={categories} claims={claims} canManage />
+      <OperationalFundManager fund={fund} spend={spend} categories={categories} claims={claims} canManage />
     </div>
   );
 }
