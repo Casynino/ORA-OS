@@ -33,6 +33,50 @@ export async function getOperationalFundBalance(): Promise<{
   return { funded: f, spent: s, balance: f - s, pendingCount };
 }
 
+export type SpendSummary = {
+  total: number; // every booked expense, all sources
+  thisMonth: number;
+  count: number;
+  direct: number; // plain company expenses + approved expense claims
+  fund: number; // Operational-Fund allocations
+  payroll: number; // salary runs
+};
+
+/**
+ * Company money actually spent so far — Σ(Expense.amount) across every source,
+ * the same figure the Profit & Loss uses. This is the honest "money out" total,
+ * whether it came from a fund request or a direct spend, once approved & booked.
+ *
+ * Broken down by origin:
+ *   • direct  — plain company expenses + approved expense claims (source=DIRECT)
+ *   • fund    — Operational-Fund allocations                     (source=OPERATIONAL_FUND)
+ *   • payroll — paid salary runs                                 (source=PAYROLL)
+ *
+ * OperationalSpend rows are deliberately NOT added — they draw down a fund that
+ * was already booked as an allocation expense, so counting them would double-count
+ * the same shillings.
+ */
+export async function getSpendSummary(): Promise<SpendSummary> {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const [bySource, totalAgg, monthAgg, count] = await Promise.all([
+    prisma.expense.groupBy({ by: ["source"], _sum: { amount: true } }),
+    prisma.expense.aggregate({ _sum: { amount: true } }),
+    prisma.expense.aggregate({ _sum: { amount: true }, where: { expenseDate: { gte: monthStart } } }),
+    prisma.expense.count(),
+  ]);
+  const bucket: Record<string, number> = {};
+  for (const r of bySource) bucket[r.source] = r._sum.amount ?? 0;
+  return {
+    total: totalAgg._sum.amount ?? 0,
+    thisMonth: monthAgg._sum.amount ?? 0,
+    count,
+    direct: bucket.DIRECT ?? 0,
+    fund: bucket.OPERATIONAL_FUND ?? 0,
+    payroll: bucket.PAYROLL ?? 0,
+  };
+}
+
 export type FundItemRow = {
   id: string;
   label: string; // custom name or the preset category label
