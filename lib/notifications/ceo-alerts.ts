@@ -33,7 +33,7 @@ export async function notifyExpensesRecorded(
     // Reuses the fund-request alert toggle — same class of finance→CEO alert.
     if (s && !s.fundRequestAlerts) return;
     await sendWhatsApp(
-      `🧾 ORA Expenses Recorded\n\n${recorderName || "Finance"} has recorded ${count} company ${count === 1 ? "expense" : "expenses"} totaling ${formatCurrency(total)}.\n\nPlease review and allocate the expenses to a company account in ORA OS.`,
+      `🧾 ORA Expenses Recorded\n\n${recorderName || "Finance"} has recorded ${count} ORA ${count === 1 ? "expense" : "expenses"} totaling ${formatCurrency(total)}.\n\nPlease review and allocate the expenses to a company account in ORA OS.`,
     );
   } catch (e) {
     console.error("[notifyExpensesRecorded]", e);

@@ -191,7 +191,7 @@ export async function approveExpenseClaim(
       action: "EXPENSE_CLAIM_APPROVED",
       entity: "ExpenseClaim",
       entityId: claim.code,
-      summary: `${actor.name} approved ${claim.items.length} ${claim.items.length === 1 ? "expense" : "expenses"} (${formatCurrency(total)}) recorded by ${claim.recordedBy.name} (${claim.code}) — booked as company expenses.`,
+      summary: `${actor.name} approved ${claim.items.length} ${claim.items.length === 1 ? "expense" : "expenses"} (${formatCurrency(total)}) recorded by ${claim.recordedBy.name} (${claim.code}) — booked as ORA expenses.`,
     });
 
     revalidateClaims();

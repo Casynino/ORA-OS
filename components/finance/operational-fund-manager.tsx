@@ -146,7 +146,7 @@ export function OperationalFundManager({
         ) : (
           <Tile icon={Clock} label="Pending requests" value={formatNumber(fund.pending.length)} hint={fund.pendingTotal > 0 ? formatCurrency(fund.pendingTotal) : "none"} accent="text-warning" />
         )}
-        <Tile icon={Landmark} label="Total allocated" value={formatCurrency(fund.funded)} hint="company expense, confirmed" accent="text-info" />
+        <Tile icon={Landmark} label="Total allocated" value={formatCurrency(fund.funded)} hint="ORA expense, confirmed" accent="text-info" />
         <Tile icon={Coins} label="Total money spent" value={formatCurrency(spend?.total ?? 0)} hint={spentHint} accent="text-primary" />
       </div>
 
@@ -154,7 +154,7 @@ export function OperationalFundManager({
       {canManage && (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={() => setClaimOpen(true)}>
-            <Receipt className="size-4" /> Record company expenses
+            <Receipt className="size-4" /> Record ORA expenses
           </Button>
           <Button size="sm" variant="outline" onClick={() => setRequestOpen(true)}>
             <Plus className="size-4" /> Request funds
@@ -163,7 +163,7 @@ export function OperationalFundManager({
             <Wallet className="size-4" /> Spend the fund
           </Button>
           <span className="w-full text-xs text-muted-foreground">
-            <strong className="text-foreground">Record company expenses</strong> = money already
+            <strong className="text-foreground">Record ORA expenses</strong> = money already
             spent — the CEO reviews the receipts and allocates a company account.{" "}
             <strong className="text-foreground">Spend the fund</strong> draws down the operational
             float you were already allocated.
@@ -179,7 +179,7 @@ export function OperationalFundManager({
           <AddExpenseButton
             accounts={accounts}
             categories={categories}
-            label="Record company expense"
+            label="Record ORA expense"
             variant="default"
             className="rounded-full"
           />
@@ -187,7 +187,7 @@ export function OperationalFundManager({
             <Send className="size-4" /> Issue funds to Finance
           </Button>
           <span className="w-full text-xs text-muted-foreground">
-            <strong className="text-foreground">Record company expense</strong> books an already-paid
+            <strong className="text-foreground">Record ORA expense</strong> books an already-paid
             expense straight to a company account (it appears in the General Ledger & Profit &amp;
             Loss). <strong className="text-foreground">Issue funds</strong> sends a spending float to
             Finance — they confirm receipt before it&apos;s booked.
@@ -286,7 +286,7 @@ export function OperationalFundManager({
             </h2>
             {canApprove && (
               <p className="text-xs text-muted-foreground">
-                Approving funds the request from a company account now — the money leaves that account and is booked as company expenses. Finance then confirms receipt to unlock the spendable balance.
+                Approving funds the request from a company account now — the money leaves that account and is booked as ORA expenses. Finance then confirms receipt to unlock the spendable balance.
               </p>
             )}
           </div>
@@ -326,7 +326,7 @@ export function OperationalFundManager({
             </h2>
             <p className="text-xs text-muted-foreground">
               {canManage
-                ? "The money has been sent to you (already booked as a company expense). Confirm once you've received the cash — that unlocks your spendable balance."
+                ? "The money has been sent to you (already booked as an ORA expense). Confirm once you've received the cash — that unlocks your spendable balance."
                 : "The money has already left the account and is booked as an expense. Recall it to reverse the money-out if Finance didn't receive it."}
             </p>
           </div>
@@ -526,7 +526,7 @@ function IssueModal({
     });
   }
   return (
-    <Modal open onClose={onClose} title="Issue funds to Finance" description="Push money to the Operational Fund without waiting for a request — add one or more line items. Finance confirms receipt before it's booked as a company expense.">
+    <Modal open onClose={onClose} title="Issue funds to Finance" description="Push money to the Operational Fund without waiting for a request — add one or more line items. Finance confirms receipt before it's booked as an ORA expense.">
       <div className="space-y-4">
         <div>
           <Label>Purpose *</Label>
@@ -1003,7 +1003,7 @@ function SubmitExpensesModal({ categories, onClose }: { categories: CategoryOpti
     <Modal
       open
       onClose={onClose}
-      title="Record company expenses"
+      title="Record ORA expenses"
       description="Expenses already paid. Add each with its receipt — the CEO reviews them, allocates a company account, and only then are they booked. Nothing leaves any account until approved."
     >
       <div className="space-y-4">
