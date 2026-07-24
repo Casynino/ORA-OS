@@ -24,6 +24,7 @@ import { RevenueTrends, HumanActivityFeed, CustomerIntelligencePanel } from "@/c
 import { AddExpenseButton, IssueFundsButton, AddCapitalButton } from "@/components/admin/finance-forms";
 import { getSelectableAccounts } from "@/lib/services/accounts";
 import { getSelectableCategories } from "@/lib/services/categories";
+import { getPendingExpenseClaimStats } from "@/lib/services/expense-claims";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { formatCurrency, timeAgo } from "@/lib/utils";
 
@@ -32,7 +33,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminCommandCenter() {
   const me = await requireRole("ADMIN");
 
-  const [d, fin, collections, customers, trends, opFund, accounts, categories, fundCategories, pettyPendingAgg, pendingSaleGroups, pendingCollAgg, lastPaidPayroll, meUser] =
+  const [d, fin, collections, customers, trends, opFund, accounts, categories, fundCategories, expenseClaimStats, pettyPendingAgg, pendingSaleGroups, pendingCollAgg, lastPaidPayroll, meUser] =
     await Promise.all([
       getCommandCenter(),
       getFinanceOverview("month"),
@@ -44,6 +45,8 @@ export default async function AdminCommandCenter() {
       getSelectableCategories(),
       // Issuing funds uses the Operational-Fund list, not the full expense list.
       getSelectableCategories("operational"),
+      // Finance-recorded completed expenses awaiting CEO review + allocation.
+      getPendingExpenseClaimStats(),
       prisma.pettyCashRequest.aggregate({ _count: true, _sum: { amount: true }, where: { status: "PENDING" } }),
       // Rep-recorded money awaiting finance/CEO sign-off (not yet company money).
       prisma.fieldSale.groupBy({ by: ["type"], where: { financeStatus: "PENDING", voided: false }, _count: { _all: true }, _sum: { total: true } }),
@@ -94,6 +97,8 @@ export default async function AdminCommandCenter() {
     attnItems.push({ key: "collect", category: "signoff", iconKey: "collect", tone: "info", label: `${approvalCounts.collections.count} ${approvalCounts.collections.count === 1 ? "collection" : "collections"} to verify`, hint: "rep-collected repayments awaiting sign-off", amount: approvalCounts.collections.amount, href: "/admin/sales-approvals" });
   if (approvalCounts.fundRequests.count > 0)
     attnItems.push({ key: "fund", category: "funds", iconKey: "fund", tone: "warning", label: `${approvalCounts.fundRequests.count} operational fund ${approvalCounts.fundRequests.count === 1 ? "request" : "requests"}`, hint: "Finance is waiting on your approval", amount: approvalCounts.fundRequests.amount, href: "/admin/finance/operational-fund" });
+  if (expenseClaimStats.count > 0)
+    attnItems.push({ key: "expenses", category: "signoff", iconKey: "collect", tone: "warning", label: `${expenseClaimStats.count} recorded ${expenseClaimStats.count === 1 ? "expense" : "expenses"} to review`, hint: "Finance recorded completed expenses — review receipts & allocate an account", amount: expenseClaimStats.total, href: "/admin/finance/operational-fund" });
   if (collections.dueSoon.length > 0)
     attnItems.push({ key: "dueSoon", category: "dueSoon", iconKey: "dueSoon", tone: "warning", label: `${collections.dueSoon.length} ${collections.dueSoon.length === 1 ? "customer" : "customers"} approaching payment`, hint: "payment dates coming up — plan the follow-ups", amount: null, href: "/admin/credit" });
   if (d.network.lowStock > 0)

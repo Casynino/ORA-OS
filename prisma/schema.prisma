@@ -205,6 +205,8 @@ model User {
   pettyCashApproved     PettyCashRequest[]       @relation("PettyCashApprover")
   pettyCashSpent        PettyCashExpense[]       @relation("PettyCashSpender")
   operationalSpends     OperationalSpend[]       @relation("OperationalSpender")
+  expenseClaimsRecorded ExpenseClaim[]           @relation("ExpenseClaimRecorder")
+  expenseClaimsReviewed ExpenseClaim[]           @relation("ExpenseClaimReviewer")
   expenseCategories     ExpenseCategoryOption[]  @relation("ExpenseCategoryCreator")
   payrollCreated        PayrollRun[]             @relation("PayrollCreator")
   payrollApproved       PayrollRun[]             @relation("PayrollApprover")
@@ -467,6 +469,7 @@ model PaymentAccount {
   cashDeposits       CashDeposit[]
   capitalEntries     CapitalEntry[]
   expenses           Expense[]
+  expenseClaims      ExpenseClaim[]
 
   @@index([type])
   @@index([isActive])
@@ -1536,6 +1539,11 @@ model Expense {
   // approval is cancelled, and lets the ledger link back to the request.
   pettyCashRequest   PettyCashRequest? @relation("PettyCashRequestExpenses", fields: [pettyCashRequestId], references: [id])
   pettyCashRequestId String?
+  // The Finance-recorded expense claim this expense was created from, once Admin
+  // approved it and allocated an account (source=DIRECT). Lets the claim link to
+  // the real booked rows.
+  expenseClaim   ExpenseClaim? @relation("ExpenseClaimExpenses", fields: [expenseClaimId], references: [id])
+  expenseClaimId String?
   // Groups the N rows of one multi-line direct expense (source=DIRECT) so they
   // read as a single transaction in the ledger.
   batchCode     String?
@@ -1628,4 +1636,57 @@ model ReportSettings {
   repReportAlerts       Boolean  @default(true)
   paymentConfirmAlerts  Boolean  @default(true)
   updatedAt             DateTime @updatedAt
+}
+
+enum ExpenseClaimStatus {
+  PENDING // Finance recorded completed expenses; awaiting CEO review + allocation
+  APPROVED // CEO verified receipts, allocated an account — booked as real expenses
+  REJECTED // CEO declined; nothing is booked, nothing leaves any account
+}
+
+/// Finance records COMPLETED (already-incurred) expenses as one submission of
+/// one-or-more line items, each with a required receipt. It sits PENDING and
+/// touches NO account/ledger/P&L until the CEO reviews the receipts, allocates a
+/// company account, and approves — at which point one DIRECT Expense per item is
+/// booked against that account. Distinct from the Operational Fund (which is a
+/// request for a spending float, not a record of money already spent).
+model ExpenseClaim {
+  id               String             @id @default(cuid())
+  code             String             @unique // EC-XXXXXX
+  status           ExpenseClaimStatus @default(PENDING)
+  note             String? // submission-level note (optional)
+  recordedBy       User               @relation("ExpenseClaimRecorder", fields: [recordedById], references: [id])
+  recordedById     String
+  // Set only on approval — the account the CEO allocated the whole batch to.
+  reviewedBy       User?              @relation("ExpenseClaimReviewer", fields: [reviewedById], references: [id])
+  reviewedById     String?
+  reviewedAt       DateTime?
+  reviewNote       String? // CEO's note on approval/rejection
+  paymentAccount   PaymentAccount?    @relation(fields: [paymentAccountId], references: [id])
+  paymentAccountId String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  items            ExpenseClaimItem[]
+  // The real DIRECT Expense rows created when this claim was approved.
+  expenses         Expense[]          @relation("ExpenseClaimExpenses")
+
+  @@index([status])
+  @@index([recordedById])
+  @@index([createdAt])
+}
+
+model ExpenseClaimItem {
+  id             String          @id @default(cuid())
+  claim          ExpenseClaim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  claimId        String
+  category       ExpenseCategory @default(OFFICE)
+  customCategory String? // free-text label for a custom category (rolls up under `category`)
+  description    String
+  amount         Int // whole TSh
+  receiptUrl     String // REQUIRED proof of the completed expense
+  receiptRef     String? // receipt / invoice / voucher number (optional)
+  note           String? // per-item note (optional)
+  createdAt      DateTime        @default(now())
+
+  @@index([claimId])
 }
