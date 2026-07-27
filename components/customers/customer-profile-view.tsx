@@ -202,14 +202,15 @@ export function CustomerProfileView({
                 </p>
                 {s.type === "CREDIT" && s.balance > 0 && (
                   <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-3">
-                    {/* Reps, Finance and Admin can all raise an extension request;
-                        only Admin can approve it. */}
+                    {/* Reps & Finance FILE a request for Admin to approve; the
+                        Admin (the approver) moves the due date directly. */}
                     <RequestExtensionButton
                       saleId={s.id}
                       saleCode={s.code}
                       owing={s.balance}
                       currentDueDate={s.dueDate ? s.dueDate.toISOString().slice(0, 10) : null}
                       hasPendingExtension={s.hasPendingExtension}
+                      isAdmin={role === "ADMIN"}
                     />
                     <FieldCollectionButton
                       saleId={s.id}

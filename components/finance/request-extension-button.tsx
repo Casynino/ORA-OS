@@ -3,7 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock } from "lucide-react";
-import { createCreditExtension } from "@/lib/actions/credit-extensions";
+import {
+  createCreditExtension,
+  applyCreditExtensionDirect,
+} from "@/lib/actions/credit-extensions";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,10 +15,12 @@ import { toast } from "@/components/ui/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 /**
- * Finance files a credit-extension request against a credit sale — the customer
- * asked for more time. It captures the reason, the requested new payment date
- * and finance's notes, then goes to Admin for approval. Finance never changes
- * the due date directly; only an approved request moves it.
+ * Extend the payment deadline on a credit sale.
+ *
+ * • Reps / Finance FILE a request — they never move the due date themselves; it
+ *   goes to Admin for approval.
+ * • Admin (the approver) moves the due date DIRECTLY — no request/approval round
+ *   trip. `isAdmin` switches the button, copy and action accordingly.
  */
 export function RequestExtensionButton({
   saleId,
@@ -23,12 +28,15 @@ export function RequestExtensionButton({
   owing,
   currentDueDate,
   hasPendingExtension,
+  isAdmin = false,
 }: {
   saleId: string;
   saleCode: string;
   owing: number;
   currentDueDate: string | null; // ISO (yyyy-mm-dd) or null
   hasPendingExtension: boolean;
+  /** Admin extends directly instead of filing a request for approval. */
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -40,7 +48,8 @@ export function RequestExtensionButton({
   if (hasPendingExtension) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-xs font-medium text-warning">
-        <CalendarClock className="size-3.5" /> Extension pending admin approval
+        <CalendarClock className="size-3.5" />
+        {isAdmin ? "Extension awaiting your approval" : "Extension pending admin approval"}
       </span>
     );
   }
@@ -51,7 +60,7 @@ export function RequestExtensionButton({
       return;
     }
     if (!newDate) {
-      toast({ variant: "error", title: "Pick the requested new payment date." });
+      toast({ variant: "error", title: "Pick the new payment date." });
       return;
     }
     if (currentDueDate && newDate <= currentDueDate) {
@@ -59,14 +68,21 @@ export function RequestExtensionButton({
       return;
     }
     start(async () => {
-      const res = await createCreditExtension({
-        saleId,
-        reason: reason.trim(),
-        requestedDueDate: newDate,
-        financeNotes: notes.trim() || undefined,
-      });
+      const res = isAdmin
+        ? await applyCreditExtensionDirect({
+            saleId,
+            reason: reason.trim(),
+            newDueDate: newDate,
+            adminNote: notes.trim() || undefined,
+          })
+        : await createCreditExtension({
+            saleId,
+            reason: reason.trim(),
+            requestedDueDate: newDate,
+            financeNotes: notes.trim() || undefined,
+          });
       if (res.ok) {
-        toast({ variant: "success", title: res.message ?? "Extension requested." });
+        toast({ variant: "success", title: res.message ?? "Done." });
         setOpen(false);
         setReason("");
         setNewDate("");
@@ -81,18 +97,24 @@ export function RequestExtensionButton({
   return (
     <>
       <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}>
-        <CalendarClock className="size-3.5" /> Request extension
+        <CalendarClock className="size-3.5" /> {isAdmin ? "Extend due date" : "Request extension"}
       </Button>
       {open && (
         <Modal
           open
           onClose={() => setOpen(false)}
-          title={`Request credit extension · ${saleCode}`}
-          description={`Outstanding ${formatCurrency(owing)}${currentDueDate ? ` · currently due ${formatDate(new Date(currentDueDate))}` : ""}. Admin approves before the due date moves.`}
+          title={`${isAdmin ? "Extend credit due date" : "Request credit extension"} · ${saleCode}`}
+          description={`Outstanding ${formatCurrency(owing)}${currentDueDate ? ` · currently due ${formatDate(new Date(currentDueDate))}` : ""}. ${
+            isAdmin
+              ? "The due date moves as soon as you confirm."
+              : "Admin approves before the due date moves."
+          }`}
         >
           <div className="space-y-4">
             <div>
-              <Label className="text-xs text-muted-foreground">Requested new payment date *</Label>
+              <Label className="text-xs text-muted-foreground">
+                {isAdmin ? "New payment date *" : "Requested new payment date *"}
+              </Label>
               <Input
                 type="date"
                 value={newDate}
@@ -111,16 +133,24 @@ export function RequestExtensionButton({
               />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Finance notes / recommendation (optional)</Label>
+              <Label className="text-xs text-muted-foreground">
+                {isAdmin ? "Note (optional)" : "Finance notes / recommendation (optional)"}
+              </Label>
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Your recommendation to admin"
+                placeholder={isAdmin ? "Add a note for the record" : "Your recommendation to admin"}
                 className="mt-1.5"
               />
             </div>
             <Button className="w-full" onClick={submit} disabled={pending}>
-              {pending ? "Sending…" : "Send to admin for approval"}
+              {pending
+                ? isAdmin
+                  ? "Extending…"
+                  : "Sending…"
+                : isAdmin
+                  ? "Move due date"
+                  : "Send to admin for approval"}
             </Button>
           </div>
         </Modal>

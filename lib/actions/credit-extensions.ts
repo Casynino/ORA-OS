@@ -124,6 +124,103 @@ export async function createCreditExtension(
   }
 }
 
+const directSchema = z.object({
+  saleId: z.string().min(1),
+  reason: z.string().trim().min(3, "Add the reason for the extension.").max(500),
+  newDueDate: z.string().min(1, "Pick the new payment date."),
+  adminNote: z.string().max(500).optional().or(z.literal("")),
+});
+
+/** ADMIN extends a credit sale's due date DIRECTLY — no request/approval round
+ *  trip, because the admin IS the approver. Moves the due date immediately and
+ *  records the extension as a self-approved entry so the history stays complete. */
+export async function applyCreditExtensionDirect(
+  input: z.infer<typeof directSchema>,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["ADMIN"]);
+    const parsed = directSchema.safeParse(input);
+    if (!parsed.success)
+      return fail(parsed.error.issues[0]?.message ?? "Invalid request.");
+    const d = parsed.data;
+
+    const sale = await prisma.fieldSale.findUnique({
+      where: { id: d.saleId },
+      include: { customer: { select: { id: true, name: true, businessName: true } } },
+    });
+    if (!sale || sale.type !== "CREDIT") return fail("Credit sale not found.");
+    if (sale.voided) return fail("This sale was voided.");
+    if (sale.financeStatus === "REJECTED")
+      return fail("This sale was rejected by finance — it can't be extended.");
+    const outstanding = Math.max(0, sale.total - sale.amountPaid);
+    if (outstanding <= 0)
+      return fail("This sale is already fully paid — nothing to extend.");
+
+    const newDueDate = new Date(d.newDueDate);
+    if (Number.isNaN(newDueDate.getTime()))
+      return fail("The new payment date is invalid.");
+    if (sale.dueDate && newDueDate <= sale.dueDate)
+      return fail("The new payment date must be after the current due date.");
+
+    // If someone (a rep/finance) already filed a pending request, the admin
+    // should decide THAT one rather than silently opening a second track.
+    const openReq = await prisma.creditExtensionRequest.findFirst({
+      where: { saleId: sale.id, status: "PENDING" },
+      select: { id: true },
+    });
+    if (openReq)
+      return fail("There's a pending extension request on this sale — approve or reject it in Credit Extensions.");
+
+    await prisma.$transaction(async (tx) => {
+      // Lock the sale so the deadline move + status recompute use current values.
+      await tx.$executeRaw`SELECT id FROM "FieldSale" WHERE id = ${sale.id} FOR UPDATE`;
+      const fresh = await tx.fieldSale.findUnique({
+        where: { id: sale.id },
+        select: { total: true, amountPaid: true, voided: true, financeStatus: true, dueDate: true },
+      });
+      if (!fresh || fresh.voided || fresh.financeStatus === "REJECTED")
+        throw new Error("This sale can no longer be extended — refresh and try again.");
+
+      await tx.creditExtensionRequest.create({
+        data: {
+          saleId: sale.id,
+          customerId: sale.customerId,
+          originalDueDate: fresh.dueDate,
+          outstanding: Math.max(0, fresh.total - fresh.amountPaid),
+          reason: d.reason.trim(),
+          requestedDueDate: newDueDate,
+          status: "APPROVED",
+          requestedById: actor.id,
+          reviewedById: actor.id,
+          reviewedAt: new Date(),
+          adminNote: d.adminNote?.trim() || null,
+        },
+      });
+      await tx.fieldSale.update({
+        where: { id: sale.id },
+        data: {
+          dueDate: newDueDate,
+          creditStatus: creditStatusFor(fresh.total, fresh.amountPaid, newDueDate),
+        },
+      });
+    });
+
+    const who = sale.customer?.businessName ?? sale.customer?.name ?? "customer";
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "CREDIT_EXTENSION_APPROVED",
+      entity: "FieldCustomer",
+      entityId: sale.customerId,
+      summary: `${actor.name} extended the credit due date on ${sale.code} (${who}) to ${newDueDate.toLocaleDateString()}.`,
+    });
+    revalidateExtensions();
+    return ok(undefined, "Due date extended — the sale is updated.");
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
 const decideSchema = z.object({
   id: z.string().min(1),
   adminNote: z.string().max(500).optional().or(z.literal("")),
