@@ -75,13 +75,12 @@ npm run dev             # http://localhost:3000
 
 ## 👤 Demo accounts
 
-| Role | Email | Password |
-| --- | --- | --- |
-| Admin | `admin@orapads.org` | `Admin@123` |
-| Agent / Partner | `agent@orapads.org` | `Agent@123` |
-| General User | `user@orapads.org` | `User@123` |
+Local demo accounts (Admin, Agent/Partner, General User, plus a second agent and a
+pending partner for the approval flow) are created by `npm run db:seed`. Their
+credentials are **not published here** — see `prisma/seed.ts` when running locally.
 
-> A second agent (`grace@orapads.org`) and a **pending** partner (`partner@orapads.org`, `Partner@123`) exist to demo the approval flow. Pending partners cannot log in until an admin activates them.
+> These seed logins are for a **local** database only. Never seed a production
+> database with them, and never reuse the seed passwords on a live deployment.
 
 ---
 
