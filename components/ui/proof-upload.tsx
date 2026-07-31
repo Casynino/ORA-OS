@@ -33,8 +33,11 @@ async function compressImage(file: File): Promise<Blob> {
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, "image/jpeg", 0.72),
     );
-    // Only use the compressed version if it actually came out smaller.
-    return blob && blob.size < file.size ? blob : file;
+    // Prefer the converted JPEG when it's smaller — OR whenever the original is
+    // HEIC/HEIF, since keeping HEIC would store a proof browsers can't preview
+    // (viewability wins over a few extra KB).
+    const heic = /heic|heif/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
+    return blob && (blob.size < file.size || heic) ? blob : file;
   } catch {
     return file;
   } finally {
@@ -66,6 +69,19 @@ export function ProofUpload({
     setUploading(true);
     try {
       const compressed = await compressImage(file);
+      // If the OUTPUT is still HEIC/HEIF, this browser couldn't decode it
+      // (desktop browsers can't), so it would store as a proof nothing can
+      // preview. Stop now with a clear message instead of uploading a broken
+      // image. A phone that DID convert produces a JPEG here, so it passes even
+      // when the original file name still ends in .HEIC.
+      if (/heic|heif/i.test(compressed.type)) {
+        toast({
+          variant: "error",
+          title: "Can't use this iPhone photo (HEIC)",
+          description: "Please upload a JPEG or PNG, or retake it in the app.",
+        });
+        return;
+      }
       const fd = new FormData();
       fd.append("file", compressed, file.name.replace(/\.[^.]+$/, "") + ".jpg");
       const res = await fetch("/api/upload", { method: "POST", body: fd });

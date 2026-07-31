@@ -3,7 +3,10 @@ import { put } from "@vercel/blob";
 import { requireActor } from "@/lib/rbac";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB (images are compressed client-side)
-const ALLOWED = ["jpg", "jpeg", "png", "webp", "gif", "heic", "heif"];
+// Web-renderable formats only. HEIC/HEIF are deliberately excluded: browsers
+// can't display them inline (they'd show as a broken image), so we reject any
+// that reached the server un-converted and ask for a JPEG/PNG instead.
+const ALLOWED = ["jpg", "jpeg", "png", "webp", "gif"];
 
 export async function POST(req: Request) {
   try {
@@ -28,6 +31,15 @@ export async function POST(req: Request) {
       .replace(/[^a-z0-9]/g, "");
     if (ext && !ALLOWED.includes(ext)) {
       return NextResponse.json({ error: "Unsupported image type." }, { status: 400 });
+    }
+    // The client renames everything to .jpg, so a HEIC that failed client-side
+    // conversion slips past the extension check — catch it by its real type and
+    // reject, rather than storing a proof that won't preview in any browser.
+    if (/heic|heif/i.test(file.type)) {
+      return NextResponse.json(
+        { error: "HEIC photos can't be shown in a browser. Please upload a JPEG or PNG (or retake it in the app)." },
+        { status: 400 },
+      );
     }
 
     const bytes = Buffer.from(await file.arrayBuffer());
