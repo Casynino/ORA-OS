@@ -82,6 +82,7 @@ export type CustomerProfile = {
     createdAt: Date;
     settledDate: Date | null;
     hasPendingExtension: boolean;
+    extendedBefore: boolean; // ≥1 approved extension already — a further one needs boss approval
     isOpeningBalance: boolean;
     items: { name: string; quantity: number }[];
   }[];
@@ -409,6 +410,10 @@ export async function getFieldCustomerProfile(
   const pendingExtSaleIds = new Set(
     customer.creditExtensions.filter((x) => x.status === "PENDING").map((x) => x.saleId),
   );
+  // Sales that already have an APPROVED extension — a further one needs boss approval.
+  const approvedExtSaleIds = new Set(
+    customer.creditExtensions.filter((x) => x.status === "APPROVED").map((x) => x.saleId),
+  );
   for (const x of customer.creditExtensions) {
     const verb =
       x.status === "APPROVED" ? "approved" : x.status === "REJECTED" ? "rejected" : "requested";
@@ -482,6 +487,7 @@ export async function getFieldCustomerProfile(
       createdAt: s.createdAt,
       settledDate: settledDateFor(s),
       hasPendingExtension: pendingExtSaleIds.has(s.id),
+      extendedBefore: approvedExtSaleIds.has(s.id),
       isOpeningBalance: s.isOpeningBalance,
       items: s.items.map((i) => ({ name: i.product.name, quantity: i.quantity })),
     })),

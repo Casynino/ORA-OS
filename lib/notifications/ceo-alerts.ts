@@ -40,6 +40,29 @@ export async function notifyExpensesRecorded(
   }
 }
 
+/** Notify the CEO when a rep/finance SELF-extends a credit due date — the first,
+ *  no-approval extension. Carries the full credit detail + the new date, so the
+ *  boss sees exactly what changed. Sent unconditionally (an important money
+ *  event); a second extension goes through approval instead of this alert. */
+export async function notifyCreditSelfExtended(p: {
+  actorName: string | null | undefined;
+  customer: string;
+  saleCode: string;
+  outstanding: number;
+  oldDueDate: Date | null;
+  newDueDate: Date;
+}) {
+  try {
+    const oldDue = p.oldDueDate ? p.oldDueDate.toLocaleDateString("en-GB") : "—";
+    const newDue = p.newDueDate.toLocaleDateString("en-GB");
+    await sendWhatsApp(
+      `🕒 Credit Extended\n\n${p.actorName || "A team member"} extended a customer's payment due date (first extension — no approval needed).\n\nCustomer: ${p.customer}\nSale: ${p.saleCode}\nOutstanding: ${formatCurrency(p.outstanding)}\nWas due: ${oldDue}\nNew due date: ${newDue}\n\nA second extension on this sale will need your approval.`,
+    );
+  } catch (e) {
+    console.error("[notifyCreditSelfExtended]", e);
+  }
+}
+
 /** Notify the CEO that a sales rep submitted their daily field report. */
 export async function notifyRepReport(repName: string | null | undefined, location?: string | null) {
   try {

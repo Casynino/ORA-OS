@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
+import { notifyCreditSelfExtended } from "@/lib/notifications/ceo-alerts";
 import type { FieldCreditStatus } from "@prisma/client";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,6 +42,57 @@ function revalidateExtensions() {
     revalidatePath(p);
 }
 
+/** Move a credit sale's due date NOW: row-lock it, record a self-approved
+ *  extension row (so history stays complete) and recompute its credit status.
+ *  Shared by the admin's direct extend and a rep/finance's first (no-approval)
+ *  self-extension. Returns the outstanding + the date it moved FROM. */
+async function applyDueDateMove(p: {
+  saleId: string;
+  customerId: string | null;
+  actorId: string;
+  newDueDate: Date;
+  reason: string;
+  note: string | null;
+}): Promise<{ outstanding: number; originalDueDate: Date | null }> {
+  let outstanding = 0;
+  let originalDueDate: Date | null = null;
+  await prisma.$transaction(async (tx) => {
+    // Lock the sale so the deadline move + status recompute use current values.
+    await tx.$executeRaw`SELECT id FROM "FieldSale" WHERE id = ${p.saleId} FOR UPDATE`;
+    const fresh = await tx.fieldSale.findUnique({
+      where: { id: p.saleId },
+      select: { total: true, amountPaid: true, voided: true, financeStatus: true, dueDate: true },
+    });
+    if (!fresh || fresh.voided || fresh.financeStatus === "REJECTED")
+      throw new Error("This sale can no longer be extended — refresh and try again.");
+    outstanding = Math.max(0, fresh.total - fresh.amountPaid);
+    originalDueDate = fresh.dueDate;
+    await tx.creditExtensionRequest.create({
+      data: {
+        saleId: p.saleId,
+        customerId: p.customerId,
+        originalDueDate: fresh.dueDate,
+        outstanding,
+        reason: p.reason,
+        requestedDueDate: p.newDueDate,
+        status: "APPROVED",
+        requestedById: p.actorId,
+        reviewedById: p.actorId,
+        reviewedAt: new Date(),
+        adminNote: p.note,
+      },
+    });
+    await tx.fieldSale.update({
+      where: { id: p.saleId },
+      data: {
+        dueDate: p.newDueDate,
+        creditStatus: creditStatusFor(fresh.total, fresh.amountPaid, p.newDueDate),
+      },
+    });
+  });
+  return { outstanding, originalDueDate };
+}
+
 const createSchema = z.object({
   saleId: z.string().min(1),
   reason: z.string().trim().min(3, "Add the reason for the extension.").max(500),
@@ -48,9 +100,13 @@ const createSchema = z.object({
   financeNotes: z.string().max(500).optional().or(z.literal("")),
 });
 
-/** A SALES_REP, FINANCE or ADMIN files an extension request against a credit
- *  sale. A rep may only request one for their OWN customers' sales; the request
- *  always goes to Admin — only Admin can approve or reject it. */
+/** A SALES_REP, FINANCE or ADMIN extends a credit sale's due date.
+ *
+ *  The FIRST extension on a sale is self-service — it applies immediately (no
+ *  approval) and the boss gets a WhatsApp with the full credit detail + new
+ *  date. A SECOND (or later) extension on the same sale needs the boss's
+ *  approval and goes to the pending queue. A rep may only act on their OWN
+ *  customers' sales. */
 export async function createCreditExtension(
   input: z.infer<typeof createSchema>,
 ): Promise<ActionResult> {
@@ -95,6 +151,46 @@ export async function createCreditExtension(
     if (openReq)
       return fail("There's already a pending extension request on this sale.");
 
+    // Has THIS sale been extended before? The first extension is self-service
+    // (applies now, boss is notified); a second needs the boss's approval.
+    const priorApproved = await prisma.creditExtensionRequest.count({
+      where: { saleId: sale.id, status: "APPROVED" },
+    });
+    const who = sale.customer?.businessName ?? sale.customer?.name ?? "customer";
+
+    if (actor.role === "ADMIN" || priorApproved === 0) {
+      // Self-service: apply immediately (self-approved), then notify the boss.
+      const { outstanding: owe, originalDueDate } = await applyDueDateMove({
+        saleId: sale.id,
+        customerId: sale.customerId,
+        actorId: actor.id,
+        newDueDate: requestedDueDate,
+        reason: d.reason.trim(),
+        note: d.financeNotes?.trim() || null,
+      });
+      await logActivity({
+        actorId: actor.id,
+        actorName: actor.name,
+        action: "CREDIT_EXTENSION_APPROVED",
+        entity: "FieldCustomer",
+        entityId: sale.customerId,
+        summary: `${actor.name} extended the credit due date on ${sale.code} (${who}) to ${requestedDueDate.toLocaleDateString()} — first extension, no approval needed.`,
+      });
+      if (actor.role !== "ADMIN") {
+        await notifyCreditSelfExtended({
+          actorName: actor.name,
+          customer: who,
+          saleCode: sale.code,
+          outstanding: owe,
+          oldDueDate: originalDueDate,
+          newDueDate: requestedDueDate,
+        });
+      }
+      revalidateExtensions();
+      return ok(undefined, "Due date extended — the boss has been notified.");
+    }
+
+    // Second (or later) extension on this sale → needs the boss's approval.
     await prisma.creditExtensionRequest.create({
       data: {
         saleId: sale.id,
@@ -107,18 +203,16 @@ export async function createCreditExtension(
         requestedById: actor.id,
       },
     });
-
-    const who = sale.customer?.businessName ?? sale.customer?.name ?? "customer";
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
       action: "CREDIT_EXTENSION_REQUESTED",
       entity: "FieldCustomer",
       entityId: sale.customerId,
-      summary: `${actor.name} requested a credit extension on ${sale.code} (${who}) — new date ${requestedDueDate.toLocaleDateString()}, TSh ${outstanding.toLocaleString()} outstanding.`,
+      summary: `${actor.name} requested a 2nd credit extension on ${sale.code} (${who}) — new date ${requestedDueDate.toLocaleDateString()}, TSh ${outstanding.toLocaleString()} outstanding.`,
     });
     revalidateExtensions();
-    return ok(undefined, "Extension request sent to Admin for approval.");
+    return ok(undefined, "This sale was already extended once — your request was sent to the boss for approval.");
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -171,38 +265,13 @@ export async function applyCreditExtensionDirect(
     if (openReq)
       return fail("There's a pending extension request on this sale — approve or reject it in Credit Extensions.");
 
-    await prisma.$transaction(async (tx) => {
-      // Lock the sale so the deadline move + status recompute use current values.
-      await tx.$executeRaw`SELECT id FROM "FieldSale" WHERE id = ${sale.id} FOR UPDATE`;
-      const fresh = await tx.fieldSale.findUnique({
-        where: { id: sale.id },
-        select: { total: true, amountPaid: true, voided: true, financeStatus: true, dueDate: true },
-      });
-      if (!fresh || fresh.voided || fresh.financeStatus === "REJECTED")
-        throw new Error("This sale can no longer be extended — refresh and try again.");
-
-      await tx.creditExtensionRequest.create({
-        data: {
-          saleId: sale.id,
-          customerId: sale.customerId,
-          originalDueDate: fresh.dueDate,
-          outstanding: Math.max(0, fresh.total - fresh.amountPaid),
-          reason: d.reason.trim(),
-          requestedDueDate: newDueDate,
-          status: "APPROVED",
-          requestedById: actor.id,
-          reviewedById: actor.id,
-          reviewedAt: new Date(),
-          adminNote: d.adminNote?.trim() || null,
-        },
-      });
-      await tx.fieldSale.update({
-        where: { id: sale.id },
-        data: {
-          dueDate: newDueDate,
-          creditStatus: creditStatusFor(fresh.total, fresh.amountPaid, newDueDate),
-        },
-      });
+    await applyDueDateMove({
+      saleId: sale.id,
+      customerId: sale.customerId,
+      actorId: actor.id,
+      newDueDate,
+      reason: d.reason.trim(),
+      note: d.adminNote?.trim() || null,
     });
 
     const who = sale.customer?.businessName ?? sale.customer?.name ?? "customer";

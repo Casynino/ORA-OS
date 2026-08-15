@@ -211,6 +211,7 @@ export function CustomerProfileView({
                       currentDueDate={s.dueDate ? s.dueDate.toISOString().slice(0, 10) : null}
                       hasPendingExtension={s.hasPendingExtension}
                       isAdmin={role === "ADMIN"}
+                      extendedBefore={s.extendedBefore}
                     />
                     <FieldCollectionButton
                       saleId={s.id}

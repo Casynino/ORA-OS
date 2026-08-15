@@ -15,12 +15,16 @@ import { toast } from "@/components/ui/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 /**
- * Extend the payment deadline on a credit sale.
+ * Extend the payment deadline on a credit sale. Three modes:
  *
- * • Reps / Finance FILE a request — they never move the due date themselves; it
- *   goes to Admin for approval.
- * • Admin (the approver) moves the due date DIRECTLY — no request/approval round
- *   trip. `isAdmin` switches the button, copy and action accordingly.
+ * • Admin — moves the due date directly, always (they're the approver).
+ * • Rep / Finance, FIRST extension on this sale — self-service: applies
+ *   immediately (no approval) and the boss gets a WhatsApp with the details.
+ * • Rep / Finance, SECOND+ extension on this sale — files a request that goes to
+ *   the boss for approval.
+ *
+ * `isAdmin` and `extendedBefore` pick the mode; the server enforces the same
+ * rule regardless of what the client shows.
  */
 export function RequestExtensionButton({
   saleId,
@@ -29,14 +33,17 @@ export function RequestExtensionButton({
   currentDueDate,
   hasPendingExtension,
   isAdmin = false,
+  extendedBefore = false,
 }: {
   saleId: string;
   saleCode: string;
   owing: number;
   currentDueDate: string | null; // ISO (yyyy-mm-dd) or null
   hasPendingExtension: boolean;
-  /** Admin extends directly instead of filing a request for approval. */
+  /** Admin extends directly instead of filing a request. */
   isAdmin?: boolean;
+  /** This sale already has an approved extension — a further one needs approval. */
+  extendedBefore?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -53,6 +60,11 @@ export function RequestExtensionButton({
       </span>
     );
   }
+
+  // Direct = applies immediately: admin always, or a rep/finance's FIRST extension.
+  // needsApproval = a rep/finance's second+ extension → goes to the boss.
+  const direct = isAdmin || !extendedBefore;
+  const needsApproval = !isAdmin && extendedBefore;
 
   function submit() {
     if (reason.trim().length < 3) {
@@ -97,23 +109,25 @@ export function RequestExtensionButton({
   return (
     <>
       <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}>
-        <CalendarClock className="size-3.5" /> {isAdmin ? "Extend due date" : "Request extension"}
+        <CalendarClock className="size-3.5" /> {needsApproval ? "Request extension" : "Extend due date"}
       </Button>
       {open && (
         <Modal
           open
           onClose={() => setOpen(false)}
-          title={`${isAdmin ? "Extend credit due date" : "Request credit extension"} · ${saleCode}`}
+          title={`${needsApproval ? "Request credit extension" : "Extend credit due date"} · ${saleCode}`}
           description={`Outstanding ${formatCurrency(owing)}${currentDueDate ? ` · currently due ${formatDate(new Date(currentDueDate))}` : ""}. ${
             isAdmin
               ? "The due date moves as soon as you confirm."
-              : "Admin approves before the due date moves."
+              : needsApproval
+                ? "This sale was already extended once, so this goes to the boss for approval."
+                : "First extension — it applies immediately and the boss is notified."
           }`}
         >
           <div className="space-y-4">
             <div>
               <Label className="text-xs text-muted-foreground">
-                {isAdmin ? "New payment date *" : "Requested new payment date *"}
+                {needsApproval ? "Requested new payment date *" : "New payment date *"}
               </Label>
               <Input
                 type="date"
@@ -134,23 +148,25 @@ export function RequestExtensionButton({
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">
-                {isAdmin ? "Note (optional)" : "Finance notes / recommendation (optional)"}
+                {isAdmin ? "Note (optional)" : needsApproval ? "Note to the boss (optional)" : "Note (optional)"}
               </Label>
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder={isAdmin ? "Add a note for the record" : "Your recommendation to admin"}
+                placeholder={needsApproval ? "Anything for the boss to consider" : "Add a note for the record"}
                 className="mt-1.5"
               />
             </div>
             <Button className="w-full" onClick={submit} disabled={pending}>
               {pending
-                ? isAdmin
-                  ? "Extending…"
-                  : "Sending…"
-                : isAdmin
-                  ? "Move due date"
-                  : "Send to admin for approval"}
+                ? needsApproval
+                  ? "Sending…"
+                  : "Extending…"
+                : needsApproval
+                  ? "Send to boss for approval"
+                  : direct && isAdmin
+                    ? "Move due date"
+                    : "Extend due date"}
             </Button>
           </div>
         </Modal>
