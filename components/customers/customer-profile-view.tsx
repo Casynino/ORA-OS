@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Phone, MapPin, BadgeCheck, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Phone, MapPin, BadgeCheck, ShoppingCart, Wallet } from "lucide-react";
 import type { CustomerProfile } from "@/lib/services/customer-profile";
 import type { ReceivingAccount } from "@/components/ui/receiving-account-picker";
 import { Badge } from "@/components/ui/badge";
@@ -118,6 +118,56 @@ export function CustomerProfileView({
         </Link>
       </div>
 
+      {/* Quick actions — pay off or extend an OPEN credit order right at the top,
+          as easy as Record sale (these used to be buried in the order history). */}
+      {(() => {
+        const openCredit = profile.sales.filter((s) => s.type === "CREDIT" && s.balance > 0);
+        if (openCredit.length === 0) return null;
+        return (
+          <section className="rounded-2xl border border-primary/25 bg-primary/[0.05] p-4 shadow-soft">
+            <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Wallet className="size-4 text-primary" /> Outstanding credit · quick actions
+            </h2>
+            <div className="space-y-2">
+              {openCredit.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3"
+                >
+                  <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-medium">
+                    <span>{s.code}</span>
+                    <span className="text-sm font-normal text-muted-foreground">
+                      owes {formatCurrency(s.balance)}
+                      {s.dueDate ? ` · due ${formatDate(s.dueDate)}` : ""}
+                    </span>
+                    {s.creditStatus && <StatusBadge status={s.creditStatus} />}
+                    {s.financeStatus === "PENDING" && <Badge variant="warning">awaiting finance</Badge>}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <RequestExtensionButton
+                      saleId={s.id}
+                      saleCode={s.code}
+                      owing={s.balance}
+                      currentDueDate={s.dueDate ? s.dueDate.toISOString().slice(0, 10) : null}
+                      hasPendingExtension={s.hasPendingExtension}
+                      isAdmin={role === "ADMIN"}
+                      extendedBefore={s.extendedBefore}
+                    />
+                    <FieldCollectionButton
+                      saleId={s.id}
+                      saleCode={s.code}
+                      owing={s.balance}
+                      accounts={accounts}
+                      claim={role === "SALES_REP"}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
+
       <CustomerFinancialSummary f={profile.finance} />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -201,26 +251,9 @@ export function CustomerProfileView({
                   {s.dueDate ? ` · due ${formatDate(s.dueDate)}` : ""}
                 </p>
                 {s.type === "CREDIT" && s.balance > 0 && (
-                  <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-3">
-                    {/* Reps & Finance FILE a request for Admin to approve; the
-                        Admin (the approver) moves the due date directly. */}
-                    <RequestExtensionButton
-                      saleId={s.id}
-                      saleCode={s.code}
-                      owing={s.balance}
-                      currentDueDate={s.dueDate ? s.dueDate.toISOString().slice(0, 10) : null}
-                      hasPendingExtension={s.hasPendingExtension}
-                      isAdmin={role === "ADMIN"}
-                      extendedBefore={s.extendedBefore}
-                    />
-                    <FieldCollectionButton
-                      saleId={s.id}
-                      saleCode={s.code}
-                      owing={s.balance}
-                      accounts={accounts}
-                      claim={role === "SALES_REP"}
-                    />
-                  </div>
+                  <p className="mt-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
+                    Pay or extend this order from <span className="font-medium text-foreground">Outstanding credit · quick actions</span> at the top.
+                  </p>
                 )}
               </div>
             ))}
