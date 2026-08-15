@@ -143,31 +143,83 @@ export async function createCreditExtension(
     if (sale.dueDate && requestedDueDate <= sale.dueDate)
       return fail("The new payment date must be after the current due date.");
 
-    // Only one open request per sale — Admin clears it before another is filed.
-    const openReq = await prisma.creditExtensionRequest.findFirst({
-      where: { saleId: sale.id, status: "PENDING" },
-      select: { id: true },
-    });
-    if (openReq)
-      return fail("There's already a pending extension request on this sale.");
-
-    // Has THIS sale been extended before? The first extension is self-service
-    // (applies now, boss is notified); a second needs the boss's approval.
-    const priorApproved = await prisma.creditExtensionRequest.count({
-      where: { saleId: sale.id, status: "APPROVED" },
-    });
     const who = sale.customer?.businessName ?? sale.customer?.name ?? "customer";
 
-    if (actor.role === "ADMIN" || priorApproved === 0) {
-      // Self-service: apply immediately (self-approved), then notify the boss.
-      const { outstanding: owe, originalDueDate } = await applyDueDateMove({
-        saleId: sale.id,
-        customerId: sale.customerId,
-        actorId: actor.id,
-        newDueDate: requestedDueDate,
-        reason: d.reason.trim(),
-        note: d.financeNotes?.trim() || null,
+    // The self-service-vs-approval DECISION and the write must both happen under
+    // the sale's row lock. Otherwise two concurrent "first" extensions (double
+    // click, two tabs, double POST) both read zero prior approvals outside the
+    // lock and both self-apply — bypassing the boss-approval control on the
+    // second one. Locking the sale, then re-counting inside the transaction,
+    // serializes them: the loser sees the winner's committed APPROVED row and
+    // correctly routes to a PENDING request. (A unique index is NOT usable here —
+    // a sale legitimately accrues several approved extensions over its life.)
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "FieldSale" WHERE id = ${sale.id} FOR UPDATE`;
+      const fresh = await tx.fieldSale.findUnique({
+        where: { id: sale.id },
+        select: { total: true, amountPaid: true, voided: true, financeStatus: true, dueDate: true },
       });
+      if (!fresh || fresh.voided || fresh.financeStatus === "REJECTED")
+        throw new Error("This sale can no longer be extended — refresh and try again.");
+      const owe = Math.max(0, fresh.total - fresh.amountPaid);
+      if (owe <= 0) throw new Error("This sale is already fully paid — nothing to extend.");
+      if (fresh.dueDate && requestedDueDate <= fresh.dueDate)
+        throw new Error("The new payment date must be after the current due date.");
+
+      // Serialized by the lock above, so these counts are authoritative.
+      const openPending = await tx.creditExtensionRequest.count({
+        where: { saleId: sale.id, status: "PENDING" },
+      });
+      if (openPending > 0)
+        throw new Error("There's already a pending extension request on this sale.");
+      const priorApproved = await tx.creditExtensionRequest.count({
+        where: { saleId: sale.id, status: "APPROVED" },
+      });
+
+      // First extension is self-service (admins always are); a second needs the boss.
+      const selfService = actor.role === "ADMIN" || priorApproved === 0;
+      if (selfService) {
+        await tx.creditExtensionRequest.create({
+          data: {
+            saleId: sale.id,
+            customerId: sale.customerId,
+            originalDueDate: fresh.dueDate,
+            outstanding: owe,
+            reason: d.reason.trim(),
+            requestedDueDate,
+            status: "APPROVED",
+            requestedById: actor.id,
+            reviewedById: actor.id,
+            reviewedAt: new Date(),
+            adminNote: d.financeNotes?.trim() || null,
+          },
+        });
+        await tx.fieldSale.update({
+          where: { id: sale.id },
+          data: {
+            dueDate: requestedDueDate,
+            creditStatus: creditStatusFor(fresh.total, fresh.amountPaid, requestedDueDate),
+          },
+        });
+      } else {
+        await tx.creditExtensionRequest.create({
+          data: {
+            saleId: sale.id,
+            customerId: sale.customerId,
+            originalDueDate: fresh.dueDate,
+            outstanding: owe,
+            reason: d.reason.trim(),
+            requestedDueDate,
+            financeNotes: d.financeNotes?.trim() || null,
+            requestedById: actor.id,
+          },
+        });
+      }
+      return { selfService, outstanding: owe, originalDueDate: fresh.dueDate };
+    });
+
+    // Post-commit side effects (logging + boss WhatsApp run after the DB commit).
+    if (result.selfService) {
       await logActivity({
         actorId: actor.id,
         actorName: actor.name,
@@ -181,8 +233,8 @@ export async function createCreditExtension(
           actorName: actor.name,
           customer: who,
           saleCode: sale.code,
-          outstanding: owe,
-          oldDueDate: originalDueDate,
+          outstanding: result.outstanding,
+          oldDueDate: result.originalDueDate,
           newDueDate: requestedDueDate,
         });
       }
@@ -190,26 +242,13 @@ export async function createCreditExtension(
       return ok(undefined, "Due date extended — the boss has been notified.");
     }
 
-    // Second (or later) extension on this sale → needs the boss's approval.
-    await prisma.creditExtensionRequest.create({
-      data: {
-        saleId: sale.id,
-        customerId: sale.customerId,
-        originalDueDate: sale.dueDate,
-        outstanding,
-        reason: d.reason.trim(),
-        requestedDueDate,
-        financeNotes: d.financeNotes?.trim() || null,
-        requestedById: actor.id,
-      },
-    });
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
       action: "CREDIT_EXTENSION_REQUESTED",
       entity: "FieldCustomer",
       entityId: sale.customerId,
-      summary: `${actor.name} requested a 2nd credit extension on ${sale.code} (${who}) — new date ${requestedDueDate.toLocaleDateString()}, TSh ${outstanding.toLocaleString()} outstanding.`,
+      summary: `${actor.name} requested a 2nd credit extension on ${sale.code} (${who}) — new date ${requestedDueDate.toLocaleDateString()}, TSh ${result.outstanding.toLocaleString()} outstanding.`,
     });
     revalidateExtensions();
     return ok(undefined, "This sale was already extended once — your request was sent to the boss for approval.");
