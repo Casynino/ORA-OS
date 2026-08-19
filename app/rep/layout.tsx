@@ -26,6 +26,7 @@ const nav: NavGroup[] = [
     items: [
       { href: "/rep/stock", label: "My stock", icon: "inventory" },
       { href: "/rep/stock/request", label: "Request stock", icon: "newRequest" },
+      { href: "/rep/stock/requests", label: "Request history", icon: "requests" },
     ],
   },
   {
