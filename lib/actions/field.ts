@@ -1675,8 +1675,9 @@ const editCustomerSchema = z.object({
   taxId: z.string().trim().max(60).optional().or(z.literal("")),
 });
 
-/** ADMIN/FINANCE edit a field customer's details — including the address, which
- * is the customer's single delivery address. Reps can never edit customers. */
+/** Admin, Finance, or the managing rep edit a field customer's details —
+ * including the address, which is the customer's single delivery address. A rep
+ * may edit only customers currently in their own book. */
 export async function updateFieldCustomer(
   id: string,
   input: z.infer<typeof editCustomerSchema>,
@@ -1742,10 +1743,13 @@ export async function deleteFieldCustomer(id: string): Promise<ActionResult> {
     // A rep may delete only customers currently in their own book.
     if (actor.role === "SALES_REP" && cust.repId !== actor.id)
       return fail("You can only delete your own customers.");
+    // Any sale row at all blocks deletion — deleting a customer with sales would
+    // break their financial records (and orphan those sale rows). To clear a
+    // duplicate, delete the EMPTY copy (the one no sale was ever recorded on).
     const sales = await prisma.fieldSale.count({ where: { customerId: id } });
     if (sales > 0)
       return fail(
-        "This customer has sales history and can't be deleted — void or move the sales first, or suspend their credit instead.",
+        "This customer has sales recorded against them and can't be deleted — that would break the records. To clear a duplicate, delete the empty copy instead.",
       );
     const who = cust.businessName ?? cust.name;
     // Keep the customer's activity trail (no FK to remove) so the deletion — and

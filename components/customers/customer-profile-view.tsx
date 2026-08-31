@@ -205,7 +205,7 @@ export function CustomerProfileView({
             taxId: profile.taxId,
           }}
           listHref={backHref}
-          hasSales={profile.sales.length > 0}
+          hasSales={profile.hasAnySales}
           canDelete={role === "SALES_REP" || role === "FINANCE" || role === "ADMIN"}
         />
         {canManageCredit && (

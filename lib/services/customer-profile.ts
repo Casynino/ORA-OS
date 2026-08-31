@@ -47,6 +47,7 @@ export type CustomerProfile = {
   creditSuspended: boolean;
   creditLimit: number | null;
   active: boolean;
+  hasAnySales: boolean; // ANY sale row (incl. voided/rejected) — gates deletion
   rep: { id: string; name: string; region: string | null } | null;
   registeredBy: string | null;
   finance: {
@@ -232,6 +233,9 @@ export async function getFieldCustomerProfile(
   if (!customer) return null;
 
   const live = customer.sales.filter(isLive);
+  // ANY sale row at all (incl. voided/finance-rejected) — deletion is blocked
+  // while any exist, so the delete button must reflect the same, not just live.
+  const hasAnySales = customer.sales.length > 0;
   // Opening balances are migrated debt: they count toward outstanding/overdue and
   // credit score (collections-facing), but NEVER toward revenue figures like
   // "lifetime purchases" or credit billed (revenue-facing). Split the two here.
@@ -457,6 +461,7 @@ export async function getFieldCustomerProfile(
     creditSuspended: customer.creditSuspended,
     creditLimit: customer.creditLimit,
     active,
+    hasAnySales,
     rep: customer.rep,
     registeredBy: customer.registeredBy?.name ?? null,
     finance: {

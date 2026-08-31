@@ -26,10 +26,10 @@ type EditableCustomer = {
   taxId: string | null;
 };
 
-/** ADMIN/FINANCE edit controls for a field customer. Never rendered for a sales
- * rep. The registered address here is the customer's one delivery address.
- * Deletion is Admin-only (customers belong to ORA) — Finance sees Edit but not
- * Delete, gated by `canDelete`. */
+/** Edit + Delete controls for a field customer, shown to Admin, Finance and the
+ * managing rep (a rep only for their own customers — enforced server-side). The
+ * registered address here is the customer's one delivery address. Delete is
+ * gated by `canDelete` and disabled by `hasSales` (any sale row blocks it). */
 export function CustomerEditControls({
   customer,
   listHref,
