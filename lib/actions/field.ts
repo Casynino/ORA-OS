@@ -16,7 +16,88 @@ import { resolveReceivingAccount, isCashMethod } from "@/lib/payment-methods";
 import { notifyRepReport, notifyPaymentConfirmed } from "@/lib/notifications/ceo-alerts";
 import { refCode } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
-import type { FieldCreditStatus, FinanceApproval, CashStatus } from "@prisma/client";
+import type { FieldCreditStatus, FinanceApproval, CashStatus, Prisma } from "@prisma/client";
+
+type Tx = Prisma.TransactionClient;
+
+/** Reverse ONE field sale inside a transaction: mark it voided, restore its
+ *  stock (to the warehouse for a head-office/direct sale, else back to the rep's
+ *  hands) and reject any still-pending collection claims. Shared by
+ *  {@link voidFieldSale} and the delete-customer cascade so the money/stock math
+ *  stays identical. Callers must run the pre-checks first (not already voided,
+ *  no banked cash/deposited collection). */
+async function reverseSaleInTx(
+  tx: Tx,
+  sale: {
+    id: string;
+    code: string;
+    directSale: boolean;
+    repId: string;
+    rep: { name: string };
+    items: { productId: string; quantity: number }[];
+  },
+  reason: string,
+  actorId: string,
+): Promise<void> {
+  // Atomic claim: a sale can only be voided once, never after a finance
+  // rejection already returned its stock (a second restore would corrupt stock).
+  const claimed = await tx.fieldSale.updateMany({
+    where: { id: sale.id, voided: false, financeStatus: { not: "REJECTED" } },
+    data: { voided: true, voidReason: reason || null },
+  });
+  if (claimed.count === 0)
+    throw new Error("This sale was already voided or rejected.");
+
+  for (const item of sale.items) {
+    if (sale.directSale) {
+      // Head-office sale drew from the WAREHOUSE — a void puts it back there.
+      await applyMovement(tx, {
+        productId: item.productId,
+        type: "RESTOCKED",
+        quantity: item.quantity,
+        createdById: actorId,
+        reference: `VOID ${sale.code}`,
+        note: `Customer → warehouse (head-office sale voided: ${reason})`,
+      });
+      await addWarehouseStock(tx, { productId: item.productId, quantity: item.quantity });
+      continue;
+    }
+    // Put the units back in the rep's hands, reconciling the org ledger.
+    await applyMovement(tx, {
+      productId: item.productId,
+      type: "RESTOCKED",
+      quantity: item.quantity,
+      createdById: actorId,
+      reference: `VOID ${sale.code}`,
+      note: `Customer → ${sale.rep.name} (sale voided: ${reason})`,
+    });
+    await applyMovement(tx, {
+      productId: item.productId,
+      type: "ASSIGNED",
+      quantity: item.quantity,
+      createdById: actorId,
+      reference: `VOID ${sale.code}`,
+      note: `Stock back in ${sale.rep.name}'s hands`,
+    });
+    await tx.repStock.update({
+      where: { repId_productId: { repId: sale.repId, productId: item.productId } },
+      data: { sellableQty: { increment: item.quantity }, soldQty: { decrement: item.quantity } },
+    });
+  }
+
+  // Still-pending collection claims are now moot — reject them so they don't
+  // linger in the finance queue. (Approved payments are excluded from money math
+  // by the sale.voided filter, so PENDING is enough.)
+  await tx.fieldPayment.updateMany({
+    where: { saleId: sale.id, financeStatus: "PENDING" },
+    data: {
+      financeStatus: "REJECTED",
+      financeReviewedById: actorId,
+      financeReviewedAt: new Date(),
+      financeNote: `Sale voided: ${reason || "no reason given"}`,
+    },
+  });
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Field sales actions — Warehouse → Sales Rep → Customer.
@@ -1729,40 +1810,83 @@ export async function updateFieldCustomer(
   }
 }
 
-/** Delete a field customer — Admin, Finance, or the rep who manages them (mainly
- * to clear duplicates). BLOCKED when the customer has ANY sales, so financial
- * history is never destroyed: dedupe the empty duplicate, or void/move the sales
- * first. Every delete is recorded in the activity log (who + role + when) and the
- * customer's prior trail is KEPT, so the boss sees the full delete history at
- * /admin/activity. */
-export async function deleteFieldCustomer(id: string): Promise<ActionResult> {
+/** Delete a field customer — Admin, Finance, or the rep who manages them (a rep
+ * only for their OWN book), mainly to remove mistaken/duplicate entries. A REASON
+ * is required. If the customer has sales, deleting UNDOES them first: every
+ * non-voided sale is reversed (stock returns to the rep/warehouse, the debt
+ * clears, pending collections are rejected), then the customer is removed and
+ * those sales are detached (kept as voided history, now customer-less). Blocked
+ * only if a payment on any sale was already banked in a deposit — reverse that
+ * deposit first. The whole thing is one transaction (all-or-nothing), and the
+ * deletion + reason + a snapshot are logged for the boss at /admin/activity. */
+export async function deleteFieldCustomer(
+  id: string,
+  reason: string,
+): Promise<ActionResult> {
   try {
     const actor = await requireActor(["ADMIN", "FINANCE", "SALES_REP"]);
+    const why = (reason ?? "").trim();
+    if (why.length < 3) return fail("Give a reason for deleting this customer.");
+    if (why.length > 300) return fail("Reason is too long.");
     const cust = await prisma.fieldCustomer.findUnique({ where: { id } });
     if (!cust) return fail("Customer not found.");
     // A rep may delete only customers currently in their own book.
     if (actor.role === "SALES_REP" && cust.repId !== actor.id)
       return fail("You can only delete your own customers.");
-    // Any sale row at all blocks deletion — deleting a customer with sales would
-    // break their financial records (and orphan those sale rows). To clear a
-    // duplicate, delete the EMPTY copy (the one no sale was ever recorded on).
-    const sales = await prisma.fieldSale.count({ where: { customerId: id } });
-    if (sales > 0)
-      return fail(
-        "This customer has sales recorded against them and can't be deleted — that would break the records. To clear a duplicate, delete the empty copy instead.",
-      );
+
     const who = cust.businessName ?? cust.name;
-    // Keep the customer's activity trail (no FK to remove) so the deletion — and
-    // everything that led to it — stays reviewable by the boss.
-    await prisma.fieldCustomer.delete({ where: { id } });
+
+    // Everything happens in ONE transaction, and the sales to reverse are read
+    // INSIDE it (with the customer row locked) so the set we reverse is exactly
+    // the set we detach — a sale recorded mid-delete can't be silently orphaned.
+    const summary = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "FieldCustomer" WHERE id = ${id} FOR UPDATE`;
+      const live = await tx.fieldSale.findMany({
+        where: { customerId: id, voided: false, financeStatus: { not: "REJECTED" } },
+        include: { items: true, rep: { select: { name: true } } },
+      });
+      // Never destroy money that's already been banked — reverse the deposit first.
+      const bankedSale = live.find((s) => s.cashStatus === "DEPOSITED");
+      if (bankedSale)
+        throw new Error(`Sale ${bankedSale.code} was already banked in a deposit — reverse that deposit first, then delete.`);
+      const banked = await tx.fieldPayment.findFirst({
+        where: { sale: { customerId: id }, cashStatus: "DEPOSITED" },
+        select: { sale: { select: { code: true } } },
+      });
+      if (banked)
+        throw new Error(`A payment on sale ${banked.sale?.code ?? ""} was already banked in a deposit — reverse that deposit first, then delete.`);
+
+      // 1. Reverse each live sale (stock back, debt cleared, pending rejected).
+      for (const sale of live) {
+        await reverseSaleInTx(tx, sale, `Customer deleted: ${why}`, actor.id);
+      }
+      // 2. Refuse if a sale was recorded after the read above — it would be
+      //    detached-but-not-reversed. Bail out (retry then picks it up) rather
+      //    than strand its stock/debt.
+      const stray = await tx.fieldSale.count({
+        where: { customerId: id, voided: false, financeStatus: { not: "REJECTED" } },
+      });
+      if (stray > 0)
+        throw new Error("A new sale was just recorded for this customer — please try deleting again.");
+      // 3. Detach every sale + credit-extension (voided sales are kept as
+      //    customer-less history), then remove the customer.
+      await tx.fieldSale.updateMany({ where: { customerId: id }, data: { customerId: null } });
+      await tx.creditExtensionRequest.updateMany({ where: { customerId: id }, data: { customerId: null } });
+      await tx.fieldCustomer.delete({ where: { id } });
+      return { count: live.length, value: live.reduce((s, x) => s + x.total, 0) };
+    });
+
     const roleLabel = actor.role === "SALES_REP" ? "rep" : actor.role === "FINANCE" ? "finance" : "admin";
+    const salesNote = summary.count
+      ? ` — ${summary.count} sale${summary.count === 1 ? "" : "s"} (TSh ${summary.value.toLocaleString()}) reversed`
+      : "";
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
       action: "FIELD_CUSTOMER_DELETED",
       entity: "FieldCustomer",
       entityId: id,
-      summary: `${actor.name} (${roleLabel}) deleted customer ${who}${cust.region ? ` · ${cust.region}` : ""}.`,
+      summary: `${actor.name} (${roleLabel}) deleted customer ${who}${cust.region ? ` · ${cust.region}` : ""}${salesNote}. Reason: ${why}`,
     });
     revalidateField();
     revalidatePath("/admin/reps/customers");
@@ -1802,80 +1926,7 @@ export async function voidFieldSale(
     if (bankedCollection)
       return fail("A collection on this sale has already been banked in a deposit — reverse the deposit first, then void.");
 
-    await prisma.$transaction(async (tx) => {
-      // Atomic claim: a sale can only be voided once, and never after finance
-      // rejected it (rejection already returned its stock — a second restore
-      // would corrupt inventory). This guards against concurrent void/reject.
-      const claimed = await tx.fieldSale.updateMany({
-        where: { id: sale.id, voided: false, financeStatus: { not: "REJECTED" } },
-        data: { voided: true, voidReason: reason || null },
-      });
-      if (claimed.count === 0)
-        throw new Error("This sale was already voided or rejected.");
-
-      for (const item of sale.items) {
-        if (sale.directSale) {
-          // A head-office sale drew its stock from the WAREHOUSE, so a void puts
-          // it back there — not into a rep's hands (there is no RepStock row).
-          // RESTOCKED nets warehouse +qty / distributed −qty; addWarehouseStock
-          // restores the per-location ledger so Σ onHand stays reconciled.
-          await applyMovement(tx, {
-            productId: item.productId,
-            type: "RESTOCKED",
-            quantity: item.quantity,
-            createdById: actor.id,
-            reference: `VOID ${sale.code}`,
-            note: `Customer → warehouse (head-office sale voided: ${reason})`,
-          });
-          await addWarehouseStock(tx, {
-            productId: item.productId,
-            quantity: item.quantity,
-          });
-          continue;
-        }
-        // Put the units back in the rep's hands and reconcile the org ledger:
-        // RESTOCKED (+warehouse, -distributed) then ASSIGNED (-warehouse, +assigned)
-        // nets to assigned +qty / distributed -qty with a clean audit trail.
-        await applyMovement(tx, {
-          productId: item.productId,
-          type: "RESTOCKED",
-          quantity: item.quantity,
-          createdById: actor.id,
-          reference: `VOID ${sale.code}`,
-          note: `Customer → ${sale.rep.name} (sale voided: ${reason})`,
-        });
-        await applyMovement(tx, {
-          productId: item.productId,
-          type: "ASSIGNED",
-          quantity: item.quantity,
-          createdById: actor.id,
-          reference: `VOID ${sale.code}`,
-          note: `Stock back in ${sale.rep.name}'s hands`,
-        });
-        await tx.repStock.update({
-          where: {
-            repId_productId: { repId: sale.repId, productId: item.productId },
-          },
-          data: {
-            sellableQty: { increment: item.quantity },
-            soldQty: { decrement: item.quantity },
-          },
-        });
-      }
-      // Any collections a rep claimed against this sale are now moot — reject
-      // the still-pending ones so they don't linger in the finance queue.
-      // (Approved payments are already excluded from money math by the
-      // sale.voided filter, so PENDING is enough here.)
-      await tx.fieldPayment.updateMany({
-        where: { saleId: sale.id, financeStatus: "PENDING" },
-        data: {
-          financeStatus: "REJECTED",
-          financeReviewedById: actor.id,
-          financeReviewedAt: new Date(),
-          financeNote: `Sale voided: ${reason || "no reason given"}`,
-        },
-      });
-    });
+    await prisma.$transaction((tx) => reverseSaleInTx(tx, sale, reason, actor.id));
 
     await logActivity({
       actorId: actor.id,

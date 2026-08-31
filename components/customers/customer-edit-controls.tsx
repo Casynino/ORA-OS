@@ -11,6 +11,14 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import { CUSTOMER_TYPES } from "@/lib/customer-types";
 
+const DELETE_REASONS = [
+  "Duplicate customer",
+  "Recorded by mistake",
+  "Wrong details / test entry",
+  "No longer trading",
+  "Other",
+] as const;
+
 type EditableCustomer = {
   id: string;
   businessName: string;
@@ -29,7 +37,9 @@ type EditableCustomer = {
 /** Edit + Delete controls for a field customer, shown to Admin, Finance and the
  * managing rep (a rep only for their own customers — enforced server-side). The
  * registered address here is the customer's one delivery address. Delete is
- * gated by `canDelete` and disabled by `hasSales` (any sale row blocks it). */
+ * gated by `canDelete` and needs a reason; if the customer has sales (`hasSales`)
+ * the modal warns that deleting first UNDOES them (the server reverses the
+ * stock/debt), so nothing is silently destroyed. */
 export function CustomerEditControls({
   customer,
   listHref,
@@ -44,8 +54,18 @@ export function CustomerEditControls({
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [reason, setReason] = useState("");
+  const [reasonNote, setReasonNote] = useState("");
   const [pending, start] = useTransition();
   const [del, startDelete] = useTransition();
+
+  function closeConfirm() {
+    setConfirming(false);
+    setReason("");
+    setReasonNote("");
+  }
+  // "Other" needs the note; any other reason can stand on its own.
+  const reasonReady = reason === "Other" ? reasonNote.trim().length >= 3 : reason.length > 0;
 
   const [f, setF] = useState({
     businessName: customer.businessName ?? "",
@@ -79,8 +99,18 @@ export function CustomerEditControls({
   }
 
   function remove() {
+    const finalReason =
+      reason === "Other"
+        ? reasonNote.trim()
+        : reasonNote.trim()
+          ? `${reason} — ${reasonNote.trim()}`
+          : reason;
+    if (finalReason.trim().length < 3) {
+      toast({ variant: "error", title: "Choose or write a reason for deleting." });
+      return;
+    }
     startDelete(async () => {
-      const res = await deleteFieldCustomer(customer.id);
+      const res = await deleteFieldCustomer(customer.id, finalReason);
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         router.push(listHref);
@@ -189,23 +219,48 @@ export function CustomerEditControls({
       {confirming && (
         <Modal
           open
-          onClose={() => setConfirming(false)}
+          onClose={closeConfirm}
           title={`Delete ${customer.businessName}?`}
           description={
             hasSales
-              ? "This customer has sales history, so they can't be deleted — suspend their credit instead."
+              ? "This customer has sales. Deleting will UNDO them — the stock goes back to the rep/warehouse, the debt is cleared, and any pending payments are rejected. This can't be undone."
               : "This permanently removes the customer. This can't be undone."
           }
         >
-          <div className="mt-2 flex justify-end gap-2">
-            <Button variant="ghost" className="rounded-full" onClick={() => setConfirming(false)}>Cancel</Button>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">Reason for deleting *</Label>
+              <select value={reason} onChange={(e) => setReason(e.target.value)} className={selectCls}>
+                <option value="">Choose a reason…</option>
+                {DELETE_REASONS.map((r) => (
+                  <option key={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+            {reason && (
+              <div>
+                <Label className="text-xs text-muted-foreground">
+                  {reason === "Other" ? "Describe the reason *" : "Add a note (optional)"}
+                </Label>
+                <Input
+                  value={reasonNote}
+                  onChange={(e) => setReasonNote(e.target.value)}
+                  maxLength={200}
+                  placeholder={reason === "Other" ? "Why is this customer being removed?" : "Any extra detail"}
+                  className="mt-1 h-9"
+                />
+              </div>
+            )}
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button variant="ghost" className="rounded-full" onClick={closeConfirm}>Cancel</Button>
             <Button
               variant="destructive"
               className="rounded-full"
-              disabled={del || hasSales}
+              disabled={del || !reasonReady}
               onClick={remove}
             >
-              {del ? "Deleting…" : "Delete customer"}
+              {del ? "Deleting…" : hasSales ? "Undo sales & delete" : "Delete customer"}
             </Button>
           </div>
         </Modal>
