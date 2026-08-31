@@ -1682,13 +1682,16 @@ export async function updateFieldCustomer(
   input: z.infer<typeof editCustomerSchema>,
 ): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["ADMIN", "FINANCE"]);
+    const actor = await requireActor(["ADMIN", "FINANCE", "SALES_REP"]);
     const parsed = editCustomerSchema.safeParse(input);
     if (!parsed.success)
       return fail(parsed.error.issues[0]?.message ?? "Invalid details.");
     const d = parsed.data;
     const cust = await prisma.fieldCustomer.findUnique({ where: { id } });
     if (!cust) return fail("Customer not found.");
+    // A rep may edit only customers currently in their own book.
+    if (actor.role === "SALES_REP" && cust.repId !== actor.id)
+      return fail("You can only edit your own customers.");
     const biz = d.businessName.trim();
     await prisma.fieldCustomer.update({
       where: { id },
@@ -1725,35 +1728,42 @@ export async function updateFieldCustomer(
   }
 }
 
-/** ADMIN deletes a field customer — only when they have no sales, so we never
- * destroy financial history. Customers belong to ORA, so only the CEO/Admin may
- * permanently remove one; Finance and reps never can. */
+/** Delete a field customer — Admin, Finance, or the rep who manages them (mainly
+ * to clear duplicates). BLOCKED when the customer has ANY sales, so financial
+ * history is never destroyed: dedupe the empty duplicate, or void/move the sales
+ * first. Every delete is recorded in the activity log (who + role + when) and the
+ * customer's prior trail is KEPT, so the boss sees the full delete history at
+ * /admin/activity. */
 export async function deleteFieldCustomer(id: string): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["ADMIN"]);
+    const actor = await requireActor(["ADMIN", "FINANCE", "SALES_REP"]);
     const cust = await prisma.fieldCustomer.findUnique({ where: { id } });
     if (!cust) return fail("Customer not found.");
+    // A rep may delete only customers currently in their own book.
+    if (actor.role === "SALES_REP" && cust.repId !== actor.id)
+      return fail("You can only delete your own customers.");
     const sales = await prisma.fieldSale.count({ where: { customerId: id } });
     if (sales > 0)
       return fail(
-        "This customer has sales history and can't be deleted — suspend their credit instead.",
+        "This customer has sales history and can't be deleted — void or move the sales first, or suspend their credit instead.",
       );
     const who = cust.businessName ?? cust.name;
-    await prisma.$transaction([
-      prisma.activityLog.deleteMany({ where: { entity: "FieldCustomer", entityId: id } }),
-      prisma.fieldCustomer.delete({ where: { id } }),
-    ]);
+    // Keep the customer's activity trail (no FK to remove) so the deletion — and
+    // everything that led to it — stays reviewable by the boss.
+    await prisma.fieldCustomer.delete({ where: { id } });
+    const roleLabel = actor.role === "SALES_REP" ? "rep" : actor.role === "FINANCE" ? "finance" : "admin";
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
       action: "FIELD_CUSTOMER_DELETED",
       entity: "FieldCustomer",
       entityId: id,
-      summary: `${actor.name} deleted customer ${who}.`,
+      summary: `${actor.name} (${roleLabel}) deleted customer ${who}${cust.region ? ` · ${cust.region}` : ""}.`,
     });
     revalidateField();
     revalidatePath("/admin/reps/customers");
     revalidatePath("/finance/customers");
+    revalidatePath("/rep/customers");
     return ok(undefined, `${who} deleted.`);
   } catch (e) {
     return fail(errorMessage(e));

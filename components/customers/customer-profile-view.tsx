@@ -175,40 +175,47 @@ export function CustomerProfileView({
         <CustomerInventorySummary inv={profile.inventory} />
       </div>
 
-      {canManageCredit && (
-        <div className="grid gap-4 lg:grid-cols-2">
+      {/* Reps, Finance and Admin can all edit + delete a customer they can see
+          (a rep only their own — enforced server-side, mainly to clear
+          duplicates). Credit-limit and rep-assignment stay Admin/Finance only.
+          Deletes are blocked once a customer has sales and are recorded in the
+          activity log for the boss. */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {canManageCredit && (
           <CreditLimitControl
             customerId={profile.id}
             currentLimit={profile.creditLimit}
             outstanding={profile.finance.outstanding}
             suspended={profile.creditSuspended}
           />
-          <CustomerEditControls
-            customer={{
-              id: profile.id,
-              businessName: profile.businessName,
-              email: profile.email,
-              phone: profile.phone,
-              location: profile.location,
-              region: profile.region,
-              district: profile.district,
-              customerType: profile.customerType,
-              expectedVolume: profile.expectedVolume,
-              preferredPayment: profile.preferredPayment,
-              businessLicense: profile.businessLicense,
-              taxId: profile.taxId,
-            }}
-            listHref={backHref}
-            hasSales={profile.sales.length > 0}
-            canDelete={role === "ADMIN"}
-          />
+        )}
+        <CustomerEditControls
+          customer={{
+            id: profile.id,
+            businessName: profile.businessName,
+            email: profile.email,
+            phone: profile.phone,
+            location: profile.location,
+            region: profile.region,
+            district: profile.district,
+            customerType: profile.customerType,
+            expectedVolume: profile.expectedVolume,
+            preferredPayment: profile.preferredPayment,
+            businessLicense: profile.businessLicense,
+            taxId: profile.taxId,
+          }}
+          listHref={backHref}
+          hasSales={profile.sales.length > 0}
+          canDelete={role === "SALES_REP" || role === "FINANCE" || role === "ADMIN"}
+        />
+        {canManageCredit && (
           <AssignRepControl
             customerId={profile.id}
             currentRepId={profile.rep?.id ?? null}
             reps={reps}
           />
-        </div>
-      )}
+        )}
+      </div>
 
       <CustomerNoteForm customerId={profile.id} />
 
