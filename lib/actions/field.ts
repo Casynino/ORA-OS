@@ -471,16 +471,14 @@ export async function recordFieldCollection(
       include: { customer: { select: { name: true, repId: true } } },
     });
     if (!sale || sale.type !== "CREDIT") return fail("Credit sale not found.");
-    // A rep may only collect while the customer is still in THEIR book. Owning
-    // the historical sale isn't enough: once Admin/Finance reassigns a customer
-    // the whole ledger moves with them, so the previous rep must not be able to
-    // keep posting claims onto another rep's customer.
-    if (actor.role === "SALES_REP") {
-      const ownsSale = sale.repId === actor.id;
-      const ownsCustomer = !sale.customerId || sale.customer?.repId === actor.id;
-      if (!ownsSale || !ownsCustomer)
-        return fail("That customer is managed by another rep.");
-    }
+    // A rep may collect on ANY credit sale of a customer they CURRENTLY manage —
+    // including sales recorded by Finance or a previous rep BEFORE the customer
+    // was assigned to them (that's the whole point of assigning the customer:
+    // full management, payments included). Ownership follows the customer's
+    // current repId ALONE — the ledger moves with the customer on reassignment,
+    // so having recorded the historical sale is neither necessary nor sufficient.
+    if (actor.role === "SALES_REP" && sale.customer?.repId !== actor.id)
+      return fail("You can only record payments for your own customers.");
     if (sale.voided) return fail("This sale was voided.");
     if (sale.financeStatus === "REJECTED")
       return fail("This sale was rejected by finance — record a corrected sale instead of collecting on it.");
