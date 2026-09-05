@@ -146,9 +146,17 @@ export function DashboardShell({
     setOpen(false);
   }, [pathname]);
 
-  const isActive = (href: string) =>
-    pathname === href ||
-    (href !== homeHref && pathname.startsWith(href + "/"));
+  // Most-specific match wins: a link is active only if it's the LONGEST href the
+  // current path matches. Without this a parent (e.g. /admin/finance) lights up
+  // on every child page (e.g. /admin/finance/operational-fund) at the same time
+  // as the child itself. homeHref only ever matches exactly, so the dashboard
+  // link doesn't light on every page.
+  const activeHref = nav
+    .flatMap((g) => g.items.map((i) => i.href))
+    .filter((href) => pathname === href || (href !== homeHref && pathname.startsWith(href + "/")))
+    .reduce((best, href) => (href.length > best.length ? href : best), "");
+
+  const isActive = (href: string) => href === activeHref && activeHref !== "";
 
   const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
     <nav className="flex flex-1 flex-col gap-4">
