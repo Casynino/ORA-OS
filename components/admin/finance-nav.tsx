@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 const LINKS = [
   { path: "", label: "Overview" },
   { path: "/profit", label: "Profit & Loss" },
-  { path: "/operational-fund", label: "Operational Fund" },
+  { path: "/operational-fund", label: "Expenses" },
   { path: "/capital", label: "Capital" },
   { path: "/accounts", label: "Accounts" },
   { path: "/cash", label: "Cash & deposits" },

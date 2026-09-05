@@ -187,10 +187,9 @@ export function OperationalFundManager({
             <Send className="size-4" /> Issue funds to Finance
           </Button>
           <span className="w-full text-xs text-muted-foreground">
-            <strong className="text-foreground">Record ORA expense</strong> books an already-paid
-            expense straight to a company account (it appears in the General Ledger & Profit &amp;
-            Loss). <strong className="text-foreground">Issue funds</strong> sends a spending float to
-            Finance — they confirm receipt before it&apos;s booked.
+            <strong className="text-foreground">Record ORA expense</strong> logs money ORA already
+            spent. <strong className="text-foreground">Issue funds</strong> gives Finance cash to
+            spend — they confirm they received it.
           </span>
         </div>
       )}
@@ -206,7 +205,7 @@ export function OperationalFundManager({
             </h2>
             <p className="text-xs text-muted-foreground">
               {canApprove
-                ? "Already-spent expenses recorded by Finance. Review every receipt, then approve and allocate one company account — that books them and reduces that account's balance."
+                ? "Expenses Finance already paid. Check the receipts, pick which account the money came from, then approve."
                 : "You've recorded these completed expenses. Nothing is booked until the CEO reviews the receipts and allocates a company account."}
             </p>
           </div>

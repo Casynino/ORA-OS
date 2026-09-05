@@ -24,8 +24,8 @@ export default async function AdminOperationalFundPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Operational Fund"
-        description="The single fund you allocate to Finance for daily operations. Approve funding requests, then monitor the balance and every recorded expense — full transparency, no per-expense sign-off."
+        title="Expenses"
+        description="Everything ORA spends. Record an expense, review the ones Finance recorded, and see where the money goes."
       />
       <FinanceNav />
       <OperationalFundManager fund={fund} spend={spend} accounts={accounts} categories={categories} claims={claims} canApprove />
