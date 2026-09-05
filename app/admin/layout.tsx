@@ -35,6 +35,7 @@ const nav: NavGroup[] = [
     label: "Finance",
     items: [
       { href: "/admin/finance", label: "Finance", icon: "finance" },
+      { href: "/admin/finance/operational-fund", label: "Expenses", icon: "payments" },
       { href: "/admin/credit", label: "Settlements", icon: "settlements" },
       { href: "/admin/credit/extensions", label: "Credit Extensions", icon: "extensions" },
     ],
