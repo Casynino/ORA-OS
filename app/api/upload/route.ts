@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { requireActor } from "@/lib/rbac";
 
-const MAX_BYTES = 12 * 1024 * 1024; // 12 MB (images are compressed client-side; PDFs pass through)
+// 10 MB. Deliberately below the point where the base64 DATA-URL fallback (used
+// when Blob isn't configured or a put() fails) would exceed the 15,000,000-char
+// attachmentInputSchema.url cap that every money action validates: 10 MB → ~14.0M
+// base64 chars, comfortably under 15M. Raising this without raising that cap
+// would let a large PDF upload "succeed" then get rejected at save on the
+// fallback path. Images are compressed client-side; PDFs pass through.
+const MAX_BYTES = 10 * 1024 * 1024;
 // Web-renderable image formats + PDF documents. HEIC/HEIF are deliberately
 // excluded: browsers can't display them inline (they'd show as a broken image),
 // so we reject any that reached the server un-converted and ask for a JPEG/PNG.
@@ -26,7 +32,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No file provided." }, { status: 400 });
     }
     if (file.size > MAX_BYTES) {
-      return NextResponse.json({ error: "File is too large (max 12MB)." }, { status: 400 });
+      return NextResponse.json({ error: "File is too large (max 10MB)." }, { status: 400 });
     }
     const ext = (file.name.split(".").pop() ?? "jpg")
       .toLowerCase()

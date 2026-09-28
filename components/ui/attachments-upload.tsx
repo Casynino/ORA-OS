@@ -101,6 +101,11 @@ export function AttachmentsUpload({
 }) {
   const [uploading, setUploading] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Always holds the LATEST value prop. Uploads are async: if the user removes a
+  // file while an upload is in flight, we must merge onto the current list — not
+  // the snapshot captured when the picker fired — or the removal gets clobbered.
+  const valueRef = useRef(value);
+  valueRef.current = value;
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
@@ -133,9 +138,11 @@ export function AttachmentsUpload({
     );
     const added = results.filter((r): r is AttachmentInput => !!r);
     if (added.length > 0) {
-      // De-dupe by URL against what's already there.
-      const seen = new Set(value.map((v) => v.url));
-      const merged = [...value, ...added.filter((a) => !seen.has(a.url))];
+      // Merge onto the CURRENT list (valueRef), not the snapshot from when the
+      // picker fired — so files removed mid-upload stay removed. De-dupe by URL.
+      const current = valueRef.current;
+      const seen = new Set(current.map((v) => v.url));
+      const merged = [...current, ...added.filter((a) => !seen.has(a.url))];
       onChange(merged);
       toast({
         variant: "success",
