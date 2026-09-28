@@ -16,6 +16,7 @@ import { resolveReceivingAccount, isCashMethod } from "@/lib/payment-methods";
 import { notifyRepReport, notifyPaymentConfirmed } from "@/lib/notifications/ceo-alerts";
 import { refCode } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
+import { createAttachments, filesFromInput, attachmentsInputSchema } from "@/lib/services/attachments";
 import type { FieldCreditStatus, FinanceApproval, CashStatus, Prisma } from "@prisma/client";
 
 type Tx = Prisma.TransactionClient;
@@ -206,8 +207,10 @@ const saleSchema = z.object({
   paymentAccountId: z.string().optional().or(z.literal("")),
   reference: z.string().max(80).optional().or(z.literal("")),
   // Direct bank/mobile payments: uploaded customer receipt image URL. Allows a
-  // long inline data URL (used when object storage isn't configured).
+  // long inline data URL (used when object storage isn't configured). Legacy
+  // single field — the first of `attachments`.
   paymentProofUrl: z.string().max(15000000).optional().or(z.literal("")),
+  attachments: attachmentsInputSchema, // one or more receipts / proofs
   // Cheque payments: the instrument details finance verifies before receipt.
   chequeBank: z.string().max(80).optional().or(z.literal("")),
   chequeNumber: z.string().max(40).optional().or(z.literal("")),
@@ -247,7 +250,8 @@ export async function recordFieldSale(
     if (isCheque && Number.isNaN(new Date(d.chequeDate!).getTime()))
       return fail("The cheque date is invalid.");
     // A cheque can't be verified without a picture of it — the photo is required.
-    if (isCheque && !d.paymentProofUrl?.trim())
+    const proofFiles = filesFromInput(d.attachments, d.paymentProofUrl);
+    if (isCheque && proofFiles.length === 0)
       return fail("Attach a photo of the cheque.");
     if (d.dueDate && Number.isNaN(new Date(d.dueDate).getTime()))
       return fail("The payment due date is invalid.");
@@ -452,7 +456,7 @@ export async function recordFieldSale(
           }
         : {};
 
-      await tx.fieldSale.create({
+      const sale = await tx.fieldSale.create({
         data: {
           code,
           type: d.type,
@@ -467,7 +471,7 @@ export async function recordFieldSale(
           paymentMethod: receiving.method,
           paymentAccountId: receiving.paymentAccountId,
           reference: d.reference?.trim() || null,
-          paymentProofUrl: d.paymentProofUrl?.trim() || null,
+          paymentProofUrl: proofFiles[0]?.url ?? null,
           chequeBank: isCheque ? d.chequeBank!.trim() : null,
           chequeNumber: isCheque ? d.chequeNumber!.trim() : null,
           chequeDate: isCheque ? new Date(d.chequeDate!) : null,
@@ -485,7 +489,9 @@ export async function recordFieldSale(
             })),
           },
         },
+        select: { id: true },
       });
+      await createAttachments(tx, "FieldSale", sale.id, proofFiles, actor.id);
     });
 
     await logActivity({
@@ -531,7 +537,9 @@ const collectSchema = z.object({
   reference: z.string().max(80).optional().or(z.literal("")),
   note: z.string().max(300).optional().or(z.literal("")),
   // Uploaded proof of the payment (receipt / screenshot) — long data URLs ok.
+  // Legacy single field — the first of `attachments`.
   paymentProofUrl: z.string().max(15000000).optional().or(z.literal("")),
+  attachments: attachmentsInputSchema, // one or more receipts / proofs
   // Cheque collections carry the instrument details finance verifies.
   chequeBank: z.string().max(80).optional().or(z.literal("")),
   chequeNumber: z.string().max(40).optional().or(z.literal("")),
@@ -596,7 +604,8 @@ export async function recordFieldCollection(
     if (isCheque && Number.isNaN(new Date(d.chequeDate!).getTime()))
       return fail("The cheque date is invalid.");
     // A cheque can't be verified without a picture of it — the photo is required.
-    if (isCheque && !d.paymentProofUrl?.trim())
+    const proofFiles = filesFromInput(d.attachments, d.paymentProofUrl);
+    if (isCheque && proofFiles.length === 0)
       return fail("Attach a photo of the cheque.");
 
     const newPaid = sale.amountPaid + d.amount;
@@ -624,14 +633,14 @@ export async function recordFieldCollection(
       // A finance/admin-recorded CASH collection is physical cash in hand the
       // moment it's auto-approved → Cash on Hand (RECEIVED) until it's banked.
       const autoApprovedCash = !isRepClaim && isCashMethod(receiving.method);
-      await tx.fieldPayment.create({
+      const payment = await tx.fieldPayment.create({
         data: {
           saleId: sale.id,
           amount: d.amount,
           method: receiving.method,
           paymentAccountId: receiving.paymentAccountId,
           reference: d.reference?.trim() || null,
-          paymentProofUrl: d.paymentProofUrl?.trim() || null,
+          paymentProofUrl: proofFiles[0]?.url ?? null,
           chequeBank: isCheque ? d.chequeBank!.trim() : null,
           chequeNumber: isCheque ? d.chequeNumber!.trim() : null,
           chequeDate: isCheque ? new Date(d.chequeDate!) : null,
@@ -643,7 +652,9 @@ export async function recordFieldCollection(
             : { financeReviewedById: actor.id, financeReviewedAt: new Date() }),
           ...(autoApprovedCash ? { cashStatus: "RECEIVED", cashReceivedAt: new Date() } : {}),
         },
+        select: { id: true },
       });
+      await createAttachments(tx, "FieldPayment", payment.id, proofFiles, actor.id);
     });
 
     await logActivity({

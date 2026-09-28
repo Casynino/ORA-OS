@@ -20,7 +20,8 @@ import {
   METHOD_LABELS,
   type ReceivingAccount,
 } from "@/components/ui/receiving-account-picker";
-import { ProofUpload } from "@/components/ui/proof-upload";
+import { AttachmentsUpload } from "@/components/ui/attachments-upload";
+import type { AttachmentInput } from "@/lib/attachments";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { CUSTOMER_TYPES } from "@/lib/customer-types";
 
@@ -74,7 +75,7 @@ export function FieldSaleForm({
   const [payReference, setPayReference] = useState("");
   // Direct bank/mobile payments: the rep attaches the customer's receipt so
   // finance can verify the money actually reached ORA's account.
-  const [payProofUrl, setPayProofUrl] = useState("");
+  const [payProofs, setPayProofs] = useState<AttachmentInput[]>([]);
   // Cheque payments capture the instrument details for finance to verify.
   const [chequeBank, setChequeBank] = useState("");
   const [chequeNumber, setChequeNumber] = useState("");
@@ -253,7 +254,7 @@ export function FieldSaleForm({
         variant: "error",
         title: "Enter the cheque bank, number and date.",
       });
-    if (isCheque && !payProofUrl)
+    if (isCheque && payProofs.length === 0)
       return toast({
         variant: "error",
         title: "Attach a photo of the cheque.",
@@ -267,7 +268,7 @@ export function FieldSaleForm({
           type === "CASH" ? METHOD_LABELS[payMethod] ?? payMethod : "",
         paymentAccountId: type === "CASH" && !isCheque ? payAccountId : "",
         reference: type === "CASH" ? payReference : "",
-        paymentProofUrl: isDirectPay ? payProofUrl : "",
+        attachments: isDirectPay ? payProofs : [],
         chequeBank: isCheque ? chequeBank : "",
         chequeNumber: isCheque ? chequeNumber : "",
         chequeDate: isCheque ? chequeDate : "",
@@ -297,7 +298,7 @@ export function FieldSaleForm({
         setPayMethod(firstMethod);
         setPayAccountId(accounts.find((a) => a.type === firstMethod)?.id ?? "");
         setPayReference("");
-        setPayProofUrl("");
+        setPayProofs([]);
         setChequeBank("");
         setChequeNumber("");
         setChequeDate("");
@@ -674,10 +675,10 @@ export function FieldSaleForm({
                   ? "Cheque photo * — attach a picture of the cheque"
                   : "Proof of payment — attach the customer's receipt / screenshot"}
               </Label>
-              <ProofUpload
-                value={payProofUrl}
-                onChange={setPayProofUrl}
-                label={isCheque ? "Attach cheque photo" : "Attach payment proof"}
+              <AttachmentsUpload
+                value={payProofs}
+                onChange={setPayProofs}
+                label={isCheque ? "Attach cheque photo(s)" : "Attach payment proof(s)"}
               />
               <p className="text-[11px] text-muted-foreground">
                 Finance verifies this against ORA&apos;s account before the sale becomes official.

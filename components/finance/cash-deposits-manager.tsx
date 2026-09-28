@@ -18,8 +18,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ProofUpload } from "@/components/ui/proof-upload";
-import { ProofViewer } from "@/components/ui/proof-viewer";
+import { AttachmentsUpload } from "@/components/ui/attachments-upload";
+import { AttachmentsViewer } from "@/components/ui/attachments-viewer";
+import type { AttachmentInput } from "@/lib/attachments";
+import { mergeLegacyAttachments } from "@/lib/attachments";
 import { toast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, timeAgo } from "@/lib/utils";
 
@@ -178,11 +180,14 @@ export function CashDepositsManager({
                 </button>
                 {expanded === d.id && (
                   <div className="border-t border-border/60 px-4 py-3">
-                    {d.slipUrl && (
-                      <div className="mb-3 rounded-lg border border-border bg-muted/30 p-2">
-                        <ProofViewer url={d.slipUrl} label="View deposit slip" />
-                      </div>
-                    )}
+                    {(() => {
+                      const slips = mergeLegacyAttachments(d.slipUrl, d.attachments ?? []);
+                      return slips.length > 0 ? (
+                        <div className="mb-3 rounded-lg border border-border bg-muted/30 p-2">
+                          <AttachmentsViewer items={slips} label="Deposit slip" />
+                        </div>
+                      ) : null;
+                    })()}
                     <ul className="space-y-1">
                       {d.lines.map((l, idx) => (
                         <li key={idx} className="flex items-center justify-between gap-2 text-sm">
@@ -238,20 +243,20 @@ function CreateDepositModal({
   const today = new Date().toISOString().slice(0, 10);
   const [depositDate, setDepositDate] = useState(today);
   const [slipRef, setSlipRef] = useState("");
-  const [slipUrl, setSlipUrl] = useState("");
+  const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
   const [note, setNote] = useState("");
 
   function submit() {
     if (!accountId) return toast({ variant: "error", title: "Choose the bank account you deposited into." });
     if (!depositDate) return toast({ variant: "error", title: "Pick the deposit date." });
-    if (!slipUrl) return toast({ variant: "error", title: "Attach the deposit slip." });
+    if (attachments.length === 0) return toast({ variant: "error", title: "Attach the deposit slip." });
     start(async () => {
       const res = await createCashDeposit({
         saleIds: items.filter((i) => i.kind === "sale").map((i) => i.id),
         paymentIds: items.filter((i) => i.kind === "collection").map((i) => i.id),
         depositAccountId: accountId,
         depositDate,
-        slipUrl,
+        attachments,
         slipRef: slipRef || undefined,
         note: note || undefined,
       });
@@ -296,8 +301,8 @@ function CreateDepositModal({
           <Input value={slipRef} onChange={(e) => setSlipRef(e.target.value)} placeholder="Slip no. / bank reference" className="mt-1.5" />
         </div>
         <div>
-          <Label className="mb-1.5 block">Deposit slip * — attach the bank slip</Label>
-          <ProofUpload value={slipUrl} onChange={setSlipUrl} label="Attach deposit slip image" />
+          <Label className="mb-1.5 block">Deposit slip(s) * — attach the bank slip</Label>
+          <AttachmentsUpload value={attachments} onChange={setAttachments} label="Attach deposit slip(s)" />
         </div>
         <div>
           <Label>Note (optional)</Label>

@@ -10,6 +10,7 @@ import { EXPENSE_CATEGORY_VALUES, EXPENSE_LABELS, OFFICE_FUND_CATEGORIES } from 
 import { resolveReceivingAccount, METHOD_LABEL } from "@/lib/payment-methods";
 import { notifyFundRequest } from "@/lib/notifications/ceo-alerts";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
+import { createAttachments, filesFromInput, attachmentsInputSchema } from "@/lib/services/attachments";
 import type { ExpenseCategory } from "@prisma/client";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -429,7 +430,8 @@ const spendSchema = z
     vendor: z.string().max(160).optional().or(z.literal("")),
     expenseDate: z.string().optional().or(z.literal("")), // ISO date (shared)
     receiptRef: z.string().max(120).optional().or(z.literal("")),
-    receiptUrl: z.string().max(15000000).optional().or(z.literal("")),
+    receiptUrl: z.string().max(15000000).optional().or(z.literal("")), // legacy single-file (first attachment)
+    attachments: attachmentsInputSchema, // one or more supporting documents
     note: z.string().max(500).optional().or(z.literal("")),
   })
   .refine((d) => totalWithinRange(d.items), { message: TOTAL_TOO_LARGE, path: ["items"] });
@@ -456,6 +458,8 @@ export async function recordOperationalExpense(
     const batchCode = multi ? refCode("OSB") : null;
     const expenseDate = d.expenseDate ? new Date(d.expenseDate) : new Date();
     const sharedNote = d.note?.trim() ?? "";
+    const files = filesFromInput(d.attachments, d.receiptUrl);
+    const legacyUrl = files[0]?.url ?? null;
     let remaining = 0;
     await prisma.$transaction(async (tx) => {
       // Serialize every fund spend so two concurrent transactions can't each slip
@@ -475,7 +479,7 @@ export async function recordOperationalExpense(
       // One accountability record per line, tied by batchCode; individually
       // traceable, but they draw the balance down together.
       for (const it of d.items) {
-        await tx.operationalSpend.create({
+        const row = await tx.operationalSpend.create({
           data: {
             code: refCode("OS"),
             category: it.category,
@@ -484,12 +488,14 @@ export async function recordOperationalExpense(
             // Per-line vendor lives in the note (kept with any shared note).
             note: [it.vendor?.trim() ? `Vendor: ${it.vendor.trim()}` : "", sharedNote].filter(Boolean).join(" · ") || null,
             receiptRef: d.receiptRef?.trim() || null,
-            receiptUrl: d.receiptUrl?.trim() || null,
+            receiptUrl: legacyUrl,
             expenseDate,
             batchCode,
             recordedById: actor.id,
           },
+          select: { id: true },
         });
+        await createAttachments(tx, "OperationalSpend", row.id, files, actor.id);
       }
     });
     await logActivity({
@@ -521,7 +527,10 @@ export async function removeOperationalExpense(id: string): Promise<ActionResult
     const actor = await requireActor(["FINANCE", "ADMIN"]);
     const spend = await prisma.operationalSpend.findUnique({ where: { id } });
     if (!spend) return fail("Spending record not found.");
-    await prisma.operationalSpend.delete({ where: { id } });
+    await prisma.$transaction([
+      prisma.attachment.deleteMany({ where: { entityType: "OperationalSpend", entityId: id } }),
+      prisma.operationalSpend.delete({ where: { id } }),
+    ]);
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,

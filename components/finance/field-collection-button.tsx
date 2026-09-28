@@ -14,7 +14,8 @@ import {
   METHOD_LABELS,
   type ReceivingAccount,
 } from "@/components/ui/receiving-account-picker";
-import { ProofUpload } from "@/components/ui/proof-upload";
+import { AttachmentsUpload } from "@/components/ui/attachments-upload";
+import type { AttachmentInput } from "@/lib/attachments";
 import { toast } from "@/components/ui/use-toast";
 import { formatCurrency } from "@/lib/utils";
 
@@ -49,7 +50,7 @@ export function FieldCollectionButton({
   );
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
-  const [proofUrl, setProofUrl] = useState("");
+  const [proofs, setProofs] = useState<AttachmentInput[]>([]);
   const [chequeBank, setChequeBank] = useState("");
   const [chequeNumber, setChequeNumber] = useState("");
   const [chequeDate, setChequeDate] = useState("");
@@ -74,7 +75,7 @@ export function FieldCollectionButton({
       toast({ variant: "error", title: "Enter the cheque bank, number and date." });
       return;
     }
-    if (isCheque && !proofUrl) {
+    if (isCheque && proofs.length === 0) {
       toast({ variant: "error", title: "Attach a photo of the cheque." });
       return;
     }
@@ -86,7 +87,7 @@ export function FieldCollectionButton({
         paymentAccountId: isCheque ? undefined : accountId || undefined,
         reference: reference || undefined,
         note: note.trim() || undefined,
-        paymentProofUrl: proofUrl || undefined,
+        attachments: proofs,
         chequeBank: isCheque ? chequeBank : undefined,
         chequeNumber: isCheque ? chequeNumber : undefined,
         chequeDate: isCheque ? chequeDate : undefined,
@@ -162,9 +163,9 @@ export function FieldCollectionButton({
             )}
             <div>
               <Label className="mb-1.5 block">
-                {isCheque ? "Cheque photo *" : "Payment proof (optional)"}
+                {isCheque ? "Cheque photo(s) *" : "Payment proof (optional)"}
               </Label>
-              <ProofUpload value={proofUrl} onChange={setProofUrl} label={isCheque ? "Attach cheque photo" : "Attach receipt / screenshot"} />
+              <AttachmentsUpload value={proofs} onChange={setProofs} label={isCheque ? "Attach cheque photo(s)" : "Attach receipts / screenshots"} />
             </div>
             <div>
               <Label className="mb-1.5 block">Note (optional)</Label>

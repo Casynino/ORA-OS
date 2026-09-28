@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { requireActor } from "@/lib/rbac";
 
-const MAX_BYTES = 8 * 1024 * 1024; // 8 MB (images are compressed client-side)
-// Web-renderable formats only. HEIC/HEIF are deliberately excluded: browsers
-// can't display them inline (they'd show as a broken image), so we reject any
-// that reached the server un-converted and ask for a JPEG/PNG instead.
-const ALLOWED = ["jpg", "jpeg", "png", "webp", "gif"];
+const MAX_BYTES = 12 * 1024 * 1024; // 12 MB (images are compressed client-side; PDFs pass through)
+// Web-renderable image formats + PDF documents. HEIC/HEIF are deliberately
+// excluded: browsers can't display them inline (they'd show as a broken image),
+// so we reject any that reached the server un-converted and ask for a JPEG/PNG.
+// PDFs aren't previewed inline but open/download fine, so they're supported for
+// invoices, statements and other supporting documents.
+const ALLOWED = ["jpg", "jpeg", "png", "webp", "gif", "pdf"];
 
 export async function POST(req: Request) {
   try {
@@ -24,13 +26,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No file provided." }, { status: 400 });
     }
     if (file.size > MAX_BYTES) {
-      return NextResponse.json({ error: "Image is too large (max 8MB)." }, { status: 400 });
+      return NextResponse.json({ error: "File is too large (max 12MB)." }, { status: 400 });
     }
     const ext = (file.name.split(".").pop() ?? "jpg")
       .toLowerCase()
       .replace(/[^a-z0-9]/g, "");
     if (ext && !ALLOWED.includes(ext)) {
-      return NextResponse.json({ error: "Unsupported image type." }, { status: 400 });
+      return NextResponse.json({ error: "Unsupported file type. Upload an image (JPG/PNG) or a PDF." }, { status: 400 });
     }
     // The client renames everything to .jpg, so a HEIC that failed client-side
     // conversion slips past the extension check — catch it by its real type and
@@ -43,19 +45,22 @@ export async function POST(req: Request) {
     }
 
     const bytes = Buffer.from(await file.arrayBuffer());
-    const contentType = file.type || `image/${ext || "jpeg"}`;
-    const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext || "jpg"}`;
+    const isPdf = ext === "pdf" || /pdf/i.test(file.type);
+    const contentType = file.type || (isPdf ? "application/pdf" : `image/${ext || "jpeg"}`);
+    const storedName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext || (isPdf ? "pdf" : "jpg")}`;
+    // The caller's own filename, shown to users in the attachment list.
+    const displayName = typeof file.name === "string" && file.name.trim() ? file.name.trim() : storedName;
 
     // Preferred: Vercel Blob (scales, keeps DB rows lean). Falls back to an
     // inline data URL if Blob isn't configured OR the upload fails — so proof
     // capture never hard-blocks a sale, even on Vercel's read-only filesystem.
     if (process.env.BLOB_READ_WRITE_TOKEN) {
       try {
-        const blob = await put(`uploads/${name}`, bytes, {
+        const blob = await put(`uploads/${storedName}`, bytes, {
           access: "public",
           contentType,
         });
-        return NextResponse.json({ url: blob.url });
+        return NextResponse.json({ url: blob.url, name: displayName, contentType, size: file.size });
       } catch (e) {
         console.error("Vercel Blob upload failed, using inline data URL:", e);
       }
@@ -64,6 +69,9 @@ export async function POST(req: Request) {
     // Inline data URL — self-contained, no external storage required.
     return NextResponse.json({
       url: `data:${contentType};base64,${bytes.toString("base64")}`,
+      name: displayName,
+      contentType,
+      size: file.size,
     });
   } catch (e) {
     console.error("Upload failed:", e);

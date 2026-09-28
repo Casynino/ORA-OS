@@ -47,8 +47,10 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import { ProofUpload } from "@/components/ui/proof-upload";
-import { ProofViewer } from "@/components/ui/proof-viewer";
+import { AttachmentsUpload } from "@/components/ui/attachments-upload";
+import { AttachmentsViewer } from "@/components/ui/attachments-viewer";
+import type { AttachmentInput } from "@/lib/attachments";
+import { mergeLegacyAttachments } from "@/lib/attachments";
 import { CompanyAccountSelect, type SelectableAccount } from "@/components/ui/account-select";
 import { CategorySelect } from "@/components/ui/category-select";
 import { toast } from "@/components/ui/use-toast";
@@ -412,13 +414,16 @@ export function OperationalFundManager({
                       {e.recordedBy}
                     </TableCell>
                     <TableCell data-label="Receipt" className="align-top">
-                      {e.receiptUrl ? (
-                        <ProofViewer url={e.receiptUrl} label="Receipt" compact />
-                      ) : e.receiptRef ? (
-                        <span className="text-xs text-muted-foreground">ref {e.receiptRef}</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                      {(() => {
+                        const files = mergeLegacyAttachments(e.receiptUrl, e.attachments ?? []);
+                        return files.length > 0 ? (
+                          <AttachmentsViewer items={files} label="Receipt" />
+                        ) : e.receiptRef ? (
+                          <span className="text-xs text-muted-foreground">ref {e.receiptRef}</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell data-label="Amount" className="align-top whitespace-nowrap text-right font-semibold text-destructive">
                       −{formatCurrency(e.amount)}
@@ -797,7 +802,7 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
   const nextKey = useRef(2);
   const [items, setItems] = useState<SimpleLine[]>([{ key: 1, category: "OFFICE", description: "", amount: "", vendor: "" }]);
   const [receiptRef, setReceiptRef] = useState("");
-  const [receiptUrl, setReceiptUrl] = useState("");
+  const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
   const [note, setNote] = useState("");
 
   const total = items.reduce((s, it) => s + Math.round(Number(it.amount) || 0), 0);
@@ -814,7 +819,7 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
       const res = await recordOperationalExpense({
         items: parsed as never,
         receiptRef: receiptRef.trim() || undefined,
-        receiptUrl: receiptUrl || undefined, note: note.trim() || undefined,
+        attachments, note: note.trim() || undefined,
       });
       if (res.ok) { toast({ variant: "success", title: res.message }); onClose(); router.refresh(); }
       else toast({ variant: "error", title: res.error });
@@ -861,8 +866,8 @@ function SpendModal({ balance, onClose }: { balance: number; onClose: () => void
           <Input value={receiptRef} onChange={(e) => setReceiptRef(e.target.value)} className="mt-1.5" placeholder="Optional — shared across items" />
         </div>
         <div>
-          <Label className="mb-1.5 block">Supporting document (receipt / invoice / voucher)</Label>
-          <ProofUpload value={receiptUrl} onChange={setReceiptUrl} label="Attach supporting document" />
+          <Label className="mb-1.5 block">Supporting documents (receipt / invoice / voucher)</Label>
+          <AttachmentsUpload value={attachments} onChange={setAttachments} label="Attach supporting documents" />
         </div>
         <div>
           <Label>Notes (optional)</Label>
@@ -890,7 +895,7 @@ function ClaimItemLines({ items }: { items: ExpenseClaimRow["items"] }) {
             {it.note ? <span className="text-muted-foreground"> — {it.note}</span> : null}
           </span>
           <span className="flex shrink-0 items-center gap-3">
-            <ProofViewer url={it.receiptUrl} label="Receipt" compact />
+            <AttachmentsViewer items={mergeLegacyAttachments(it.receiptUrl, it.attachments ?? [])} label="Receipt" />
             <span className="font-medium">{formatCurrency(it.amount)}</span>
           </span>
         </div>
@@ -954,7 +959,7 @@ type ClaimDraft = {
   customCategory: string | null;
   description: string;
   amount: string;
-  receiptUrl: string;
+  attachments: AttachmentInput[];
   receiptRef: string;
   note: string;
 };
@@ -965,20 +970,20 @@ function SubmitExpensesModal({ categories, onClose }: { categories: CategoryOpti
   const [pending, start] = useTransition();
   const nextKey = useRef(2);
   const [items, setItems] = useState<ClaimDraft[]>([
-    { key: 1, category: "OFFICE", customCategory: null, description: "", amount: "", receiptUrl: "", receiptRef: "", note: "" },
+    { key: 1, category: "OFFICE", customCategory: null, description: "", amount: "", attachments: [], receiptRef: "", note: "" },
   ]);
   const [note, setNote] = useState("");
 
   const total = items.reduce((s, it) => s + Math.round(Number(it.amount) || 0), 0);
   const addItem = () =>
-    setItems((p) => [...p, { key: nextKey.current++, category: "OFFICE", customCategory: null, description: "", amount: "", receiptUrl: "", receiptRef: "", note: "" }]);
+    setItems((p) => [...p, { key: nextKey.current++, category: "OFFICE", customCategory: null, description: "", amount: "", attachments: [], receiptRef: "", note: "" }]);
   const removeItem = (key: number) => setItems((p) => (p.length > 1 ? p.filter((i) => i.key !== key) : p));
   const patch = (key: number, ch: Partial<ClaimDraft>) => setItems((p) => p.map((i) => (i.key === key ? { ...i, ...ch } : i)));
 
   function submit() {
     const missingAmount = items.some((it) => Math.round(Number(it.amount) || 0) <= 0);
     if (missingAmount) return toast({ variant: "error", title: "Give every expense an amount." });
-    const missingReceipt = items.some((it) => !it.receiptUrl);
+    const missingReceipt = items.some((it) => it.attachments.length === 0);
     if (missingReceipt) return toast({ variant: "error", title: "Attach a receipt for every expense." });
     start(async () => {
       const res = await submitExpenseClaim({
@@ -987,7 +992,7 @@ function SubmitExpensesModal({ categories, onClose }: { categories: CategoryOpti
           customCategory: it.customCategory ?? undefined,
           description: it.description.trim() || undefined,
           amount: Math.round(Number(it.amount) || 0),
-          receiptUrl: it.receiptUrl,
+          attachments: it.attachments,
           receiptRef: it.receiptRef.trim() || undefined,
           note: it.note.trim() || undefined,
         })) as never,
@@ -1029,12 +1034,12 @@ function SubmitExpensesModal({ categories, onClose }: { categories: CategoryOpti
               </div>
               <Input value={it.description} onChange={(e) => patch(it.key, { description: e.target.value })} placeholder="Description (optional)" className="h-9" />
               <div>
-                <ProofUpload
-                  value={it.receiptUrl}
-                  onChange={(url) => patch(it.key, { receiptUrl: url })}
-                  label={`Attach receipt for expense ${idx + 1} (required)`}
+                <AttachmentsUpload
+                  value={it.attachments}
+                  onChange={(files) => patch(it.key, { attachments: files })}
+                  label={`Attach receipt(s) for expense ${idx + 1} (required)`}
                 />
-                {!it.receiptUrl && (
+                {it.attachments.length === 0 && (
                   <p className="mt-1 text-[11px] text-warning">A receipt is required for this expense.</p>
                 )}
               </div>

@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { getAttachmentsMap } from "@/lib/services/attachments";
+import type { AttachmentDTO } from "@/lib/attachments";
 
 /**
  * Cash-on-Hand & Deposits — the money finance has physically received from reps
@@ -37,6 +39,7 @@ export type CashDepositRow = {
   depositDate: Date;
   slipRef: string | null;
   slipUrl: string | null;
+  attachments: AttachmentDTO[];
   note: string | null;
   depositedBy: string;
   itemCount: number;
@@ -149,6 +152,7 @@ export async function getCashSummary() {
   const today = items.filter((i) => i.receivedAt >= startToday).reduce((a, i) => a + i.amount, 0);
   const week = items.filter((i) => i.receivedAt >= startWeek).reduce((a, i) => a + i.amount, 0);
 
+  const depositAttachments = await getAttachmentsMap("CashDeposit", deposits.map((d) => d.id));
   const depositRows: CashDepositRow[] = deposits.map((d) => ({
     id: d.id,
     code: d.code,
@@ -157,6 +161,7 @@ export async function getCashSummary() {
     depositDate: d.depositDate,
     slipRef: d.slipRef,
     slipUrl: d.slipUrl,
+    attachments: depositAttachments[d.id] ?? [],
     note: d.note,
     depositedBy: d.depositedBy.name,
     itemCount: d._count.fieldSales + d._count.fieldPayments,

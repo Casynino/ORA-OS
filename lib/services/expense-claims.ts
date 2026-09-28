@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { EXPENSE_LABELS } from "@/lib/expense-categories";
+import { getAttachmentsMap } from "@/lib/services/attachments";
+import type { AttachmentDTO } from "@/lib/attachments";
 import type { ExpenseCategory } from "@prisma/client";
 
 export type ExpenseClaimItemRow = {
@@ -9,6 +11,7 @@ export type ExpenseClaimItemRow = {
   amount: number;
   category: ExpenseCategory;
   receiptUrl: string;
+  attachments: AttachmentDTO[];
   receiptRef: string | null;
   note: string | null;
 };
@@ -49,7 +52,7 @@ function toRow(r: {
     receiptRef: string | null;
     note: string | null;
   }[];
-}): ExpenseClaimRow {
+}, attachments: Record<string, AttachmentDTO[]> = {}): ExpenseClaimRow {
   return {
     id: r.id,
     code: r.code,
@@ -69,6 +72,7 @@ function toRow(r: {
       amount: it.amount,
       category: it.category,
       receiptUrl: it.receiptUrl,
+      attachments: attachments[it.id] ?? [],
       receiptRef: it.receiptRef,
       note: it.note,
     })),
@@ -97,7 +101,9 @@ export async function getExpenseClaims(): Promise<{
         items: { orderBy: { createdAt: "asc" } },
       },
     });
-    const rows = claims.map(toRow);
+    const itemIds = claims.flatMap((c) => c.items.map((it) => it.id));
+    const itemAttachments = await getAttachmentsMap("ExpenseClaimItem", itemIds);
+    const rows = claims.map((c) => toRow(c, itemAttachments));
     const pending = rows.filter((r) => r.status === "PENDING");
     return {
       pending,

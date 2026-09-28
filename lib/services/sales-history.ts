@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { WALKIN_EMAIL } from "@/lib/constants";
+import { getAttachmentsMap } from "@/lib/services/attachments";
+import type { AttachmentDTO } from "@/lib/attachments";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Unified Sales History — the single source of truth for EVERY sale, across all
@@ -38,6 +40,8 @@ export type SalesHistoryRow = {
   confirmedBy: string | null;
   /** Uploaded payment/deposit proof image (finance or rep attached it). */
   paymentProofUrl: string | null;
+  /** All uploaded payment/deposit proofs for this sale. */
+  attachments: AttachmentDTO[];
   /** Deposit-slip / receipt reference captured with the payment. */
   paymentProofRef: string | null;
   items: SalesHistoryItem[];
@@ -101,6 +105,7 @@ export async function getSalesHistory(opts?: {
         }),
   ]);
 
+  const fieldSaleAttachments = await getAttachmentsMap("FieldSale", fieldSales.map((s) => s.id));
   const fieldRows: SalesHistoryRow[] = fieldSales.map((s) => {
     const items = s.items.map((i) => {
       const { cartons, pieces } = splitUnits(i.quantity, i.product.unitsPerCarton);
@@ -147,6 +152,7 @@ export async function getSalesHistory(opts?: {
       confirmed: s.financeStatus === "APPROVED",
       confirmedBy: s.financeReviewedBy?.name ?? null,
       paymentProofUrl: s.paymentProofUrl,
+      attachments: fieldSaleAttachments[s.id] ?? [],
       paymentProofRef: s.depositProofRef,
       items,
     };
@@ -182,6 +188,7 @@ export async function getSalesHistory(opts?: {
       confirmed: fulfilled,
       confirmedBy: null,
       paymentProofUrl: null,
+      attachments: [],
       paymentProofRef: null,
       items,
     };

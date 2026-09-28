@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { EXPENSE_LABELS } from "@/lib/expense-categories";
+import { getAttachmentsMap } from "@/lib/services/attachments";
+import type { AttachmentDTO } from "@/lib/attachments";
 import type { ExpenseCategory } from "@prisma/client";
 
 /**
@@ -109,6 +111,7 @@ export type FundExpenseRow = {
   description: string;
   receiptRef: string | null;
   receiptUrl: string | null;
+  attachments: AttachmentDTO[];
   expenseDate: Date;
   note: string | null;
   recordedBy: string;
@@ -151,6 +154,7 @@ export async function getOperationalFund() {
     .filter((r) => r.status === "ISSUED")
     .map(toRequestRow);
   const requestRows: FundRequestRow[] = requests.map(toRequestRow);
+  const spendAttachments = await getAttachmentsMap("OperationalSpend", spends.map((e) => e.id));
   const expenseRows: FundExpenseRow[] = spends.map((e) => ({
     id: e.id,
     code: e.code,
@@ -159,6 +163,7 @@ export async function getOperationalFund() {
     description: e.description,
     receiptRef: e.receiptRef,
     receiptUrl: e.receiptUrl,
+    attachments: spendAttachments[e.id] ?? [],
     expenseDate: e.expenseDate,
     note: e.note,
     recordedBy: e.recordedBy.name,

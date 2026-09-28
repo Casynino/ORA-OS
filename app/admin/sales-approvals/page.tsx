@@ -5,7 +5,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ProofViewer } from "@/components/ui/proof-viewer";
+import { AttachmentsViewer } from "@/components/ui/attachments-viewer";
+import { getAttachmentsMap } from "@/lib/services/attachments";
+import { mergeLegacyAttachments } from "@/lib/attachments";
 import {
   SaleApprovalActions,
   CollectionApprovalActions,
@@ -51,6 +53,11 @@ export default async function AdminSalesApprovalsPage() {
     }),
   ]);
 
+  const [saleAtt, collAtt] = await Promise.all([
+    getAttachmentsMap("FieldSale", sales.map((s) => s.id)),
+    getAttachmentsMap("FieldPayment", collections.map((p) => p.id)),
+  ]);
+
   const cashSales = sales.filter((s) => s.type === "CASH");
   const creditSales = sales.filter((s) => s.type === "CREDIT");
   const cashTotal = cashSales.reduce((a, s) => a + s.total, 0);
@@ -88,13 +95,16 @@ export default async function AdminSalesApprovalsPage() {
                   Direct {s.paymentMethod} payment — verify the proof reached ORA&apos;s account before confirming.
                 </p>
               )}
-              {s.paymentProofUrl ? (
-                <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2">
-                  <ProofViewer url={s.paymentProofUrl} label="View payment proof" compact />
-                </div>
-              ) : (
-                isDirectPayment(s.paymentMethod) && <p className="mt-1 text-xs text-destructive">No proof image attached by the rep.</p>
-              )}
+              {(() => {
+                const files = mergeLegacyAttachments(s.paymentProofUrl, saleAtt[s.id] ?? []);
+                return files.length > 0 ? (
+                  <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2">
+                    <AttachmentsViewer items={files} label="Payment proof" />
+                  </div>
+                ) : (
+                  isDirectPayment(s.paymentMethod) && <p className="mt-1 text-xs text-destructive">No proof image attached by the rep.</p>
+                );
+              })()}
             </>
           ) : (
             <p className="mt-1 text-xs text-muted-foreground">
@@ -188,11 +198,14 @@ export default async function AdminSalesApprovalsPage() {
                         &ldquo;{p.note}&rdquo;
                       </p>
                     )}
-                    {p.paymentProofUrl && (
-                      <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2">
-                        <ProofViewer url={p.paymentProofUrl} label="View payment proof" compact />
-                      </div>
-                    )}
+                    {(() => {
+                      const files = mergeLegacyAttachments(p.paymentProofUrl, collAtt[p.id] ?? []);
+                      return files.length > 0 ? (
+                        <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2">
+                          <AttachmentsViewer items={files} label="Payment proof" />
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                   {p.sale.financeStatus !== "APPROVED" ? (
                     // Same guard as the finance queue: posting a collection onto an

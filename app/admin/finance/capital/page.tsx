@@ -9,7 +9,9 @@ import {
   RecordWithdrawalButton,
   DeleteCapitalButton,
 } from "@/components/admin/finance-forms";
-import { ProofViewer } from "@/components/ui/proof-viewer";
+import { AttachmentsViewer } from "@/components/ui/attachments-viewer";
+import { getAttachmentsMap } from "@/lib/services/attachments";
+import { mergeLegacyAttachments } from "@/lib/attachments";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { PiggyBank, TrendingUp, TrendingDown, Wallet } from "lucide-react";
@@ -31,6 +33,8 @@ export default async function AdminCapitalPage() {
     getFinanceOverview("all"),
     getSelectableAccounts(),
   ]);
+
+  const capAttachments = await getAttachmentsMap("CapitalEntry", entries.map((e) => e.id));
 
   const injected = entries.reduce((s, e) => s + Math.max(0, e.amount), 0);
   const withdrawn = entries.reduce((s, e) => s + Math.max(0, -e.amount), 0);
@@ -86,11 +90,14 @@ export default async function AdminCapitalPage() {
                     {e.paymentAccount ? ` · ${isWithdrawal ? "from" : "into"} ${e.paymentAccount.name}` : ""}
                     {e.note ? ` · ${e.note}` : ""}
                   </p>
-                  {e.receiptUrl && (
-                    <div className="mt-1.5">
-                      <ProofViewer url={e.receiptUrl} label="Document" compact />
-                    </div>
-                  )}
+                  {(() => {
+                    const files = mergeLegacyAttachments(e.receiptUrl, capAttachments[e.id] ?? []);
+                    return files.length > 0 ? (
+                      <div className="mt-1.5">
+                        <AttachmentsViewer items={files} label="Document" />
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <span className={cn("text-sm font-bold", isWithdrawal ? "text-destructive" : "text-success")}>

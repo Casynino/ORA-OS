@@ -12,7 +12,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { ProofViewer } from "@/components/ui/proof-viewer";
+import { AttachmentsViewer } from "@/components/ui/attachments-viewer";
+import { mergeLegacyAttachments } from "@/lib/attachments";
 import { FieldCollectionButton } from "@/components/finance/field-collection-button";
 import type {
   CreditSaleDetailDTO,
@@ -184,7 +185,7 @@ export function CreditSaleDetail({
                       </span>
                     )}
                   </span>
-                  {p.proofUrl && <ProofViewer url={p.proofUrl} label="Proof" compact />}
+                  <AttachmentsViewer items={mergeLegacyAttachments(p.proofUrl, p.attachments ?? [])} label="Proof" />
                 </li>
               ))}
             </ul>

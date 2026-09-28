@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { getAttachmentsMap } from "@/lib/services/attachments";
+import type { AttachmentDTO } from "@/lib/attachments";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Finance read models.
@@ -447,7 +449,8 @@ export type LedgerEntry = {
   accountId: string | null; // company account the money moved through
   accountName: string | null;
   linkedHref: string | null; // where to open the source document
-  proofUrl: string | null; // uploaded proof / receipt image for this movement
+  proofUrl: string | null; // legacy single proof / receipt (first attachment)
+  attachments: AttachmentDTO[]; // all uploaded proofs / receipts for this movement
 };
 
 export async function getLedger(period: Period, take = 120): Promise<LedgerEntry[]> {
@@ -522,10 +525,18 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
       }),
     ]);
 
+  const [fsAtt, fpAtt, expAtt, capAtt] = await Promise.all([
+    getAttachmentsMap("FieldSale", fieldSales.map((s) => s.id)),
+    getAttachmentsMap("FieldPayment", fieldPayments.map((p) => p.id)),
+    getAttachmentsMap("Expense", expenses.map((e) => e.id)),
+    getAttachmentsMap("CapitalEntry", capital.map((c) => c.id)),
+  ]);
+
   const rows: LedgerEntry[] = [
     ...orders.map((o) => ({
       id: `req-${o.id}`,
       proofUrl: null,
+      attachments: [],
       date: o.fulfilledAt ?? o.createdAt,
       kind: "SALE" as const,
       label: `Sale to ${o.requester.organization ?? o.requester.name}`,
@@ -541,6 +552,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
     ...payments.map((p) => ({
       id: `pay-${p.id}`,
       proofUrl: null,
+      attachments: [],
       date: p.createdAt,
       kind: "CREDIT_COLLECTED" as const,
       label: `Credit payment — ${p.creditAccount.agent.name}`,
@@ -556,6 +568,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
     ...fieldSales.map((s) => ({
       id: `fs-${s.id}`,
       proofUrl: s.paymentProofUrl,
+      attachments: fsAtt[s.id] ?? [],
       date: s.createdAt,
       kind: "FIELD_SALE" as const,
       label: `Field cash sale — ${s.customer?.name ?? s.customerName ?? "walk-in"} (${s.rep.name})`,
@@ -571,6 +584,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
     ...fieldPayments.map((p) => ({
       id: `fp-${p.id}`,
       proofUrl: p.paymentProofUrl,
+      attachments: fpAtt[p.id] ?? [],
       date: p.createdAt,
       kind: "FIELD_COLLECTION" as const,
       label: `Field credit collection${p.sale.customer ? ` — ${p.sale.customer.name}` : ""}`,
@@ -586,6 +600,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
     ...expenses.map((e) => ({
       id: `exp-${e.id}`,
       proofUrl: e.receiptUrl,
+      attachments: expAtt[e.id] ?? [],
       date: e.expenseDate,
       kind: "EXPENSE" as const,
       label: e.purpose,
@@ -607,6 +622,7 @@ export async function getLedger(period: Period, take = 120): Promise<LedgerEntry
     ...capital.map((c) => ({
       id: `cap-${c.id}`,
       proofUrl: c.receiptUrl,
+      attachments: capAtt[c.id] ?? [],
       date: c.entryDate,
       kind: "CAPITAL" as const,
       label: `Capital — ${c.source}`,

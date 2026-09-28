@@ -12,6 +12,7 @@ import { getBusinessCapital } from "@/lib/services/finance";
 import { resolveReceivingAccount } from "@/lib/payment-methods";
 import { formatCurrency } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
+import { createAttachments, filesFromInput, attachmentsInputSchema } from "@/lib/services/attachments";
 
 // Every shilling leaving ORA is recorded, categorised and tied to the admin
 // who approved it. No expense without a record; no income without a source.
@@ -53,7 +54,8 @@ const expensesSchema = z.object({
   paymentMethod: z.string().max(40).optional().or(z.literal("")),
   paymentAccountId: z.string().optional().or(z.literal("")), // company account paid from
   expenseDate: z.string().optional().or(z.literal("")), // ISO date
-  receiptUrl: z.string().max(15000000).optional().or(z.literal("")), // data-URL image ok
+  receiptUrl: z.string().max(15000000).optional().or(z.literal("")), // legacy single-file (first attachment)
+  attachments: attachmentsInputSchema, // one or more supporting documents
   note: z.string().max(500).optional().or(z.literal("")),
 });
 
@@ -99,10 +101,17 @@ export async function recordExpenses(
     const multi = d.items.length > 1;
     const batchCode = multi ? refCode("EXB") : null;
 
+    // The shared supporting documents for this batch — the first is mirrored into
+    // the legacy receiptUrl column so existing screens keep working; all of them
+    // are attached to every line so each booked Expense carries the same proof.
+    const files = filesFromInput(d.attachments, d.receiptUrl);
+    const legacyUrl = files[0]?.url ?? null;
+
     // One Expense per line, all in a single atomic transaction.
-    const created = await prisma.$transaction(
-      d.items.map((it) =>
-        prisma.expense.create({
+    const created = await prisma.$transaction(async (tx) => {
+      const rows: { code: string }[] = [];
+      for (const it of d.items) {
+        const row = await tx.expense.create({
           data: {
             code: refCode("EXP"),
             category: it.category,
@@ -113,15 +122,18 @@ export async function recordExpenses(
             paymentMethod: method,
             paymentAccountId: account.paymentAccountId,
             expenseDate,
-            receiptUrl: d.receiptUrl || null,
+            receiptUrl: legacyUrl,
             note: d.note || null,
             batchCode,
             recordedById: actor.id,
           },
-          select: { code: true },
-        }),
-      ),
-    );
+          select: { id: true, code: true },
+        });
+        await createAttachments(tx, "Expense", row.id, files, actor.id);
+        rows.push({ code: row.code });
+      }
+      return rows;
+    });
 
     await logActivity({
       actorId: actor.id,
@@ -183,7 +195,10 @@ export async function removeExpense(id: string): Promise<ActionResult> {
         "This expense was created by an approval workflow (payroll / operational fund) and can't be deleted here.",
       );
     }
-    await prisma.expense.delete({ where: { id } });
+    await prisma.$transaction([
+      prisma.attachment.deleteMany({ where: { entityType: "Expense", entityId: id } }),
+      prisma.expense.delete({ where: { id } }),
+    ]);
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
@@ -205,7 +220,8 @@ const capitalSchema = z.object({
   source: z.string().min(2, "Where did this come from / go to?").max(160),
   paymentAccountId: z.string().optional().or(z.literal("")), // account it lands in / leaves
   entryDate: z.string().optional().or(z.literal("")),
-  receiptUrl: z.string().max(15000000).optional().or(z.literal("")),
+  receiptUrl: z.string().max(15000000).optional().or(z.literal("")), // legacy single-file (first attachment)
+  attachments: attachmentsInputSchema, // one or more supporting documents
   note: z.string().max(500).optional().or(z.literal("")),
 });
 
@@ -236,18 +252,23 @@ export async function recordCapital(
     const account = await resolveReceivingAccount(prisma, d.paymentAccountId || null, null);
     const signedAmount = isWithdrawal ? -d.amount : d.amount;
     const code = refCode("CAP");
-    await prisma.capitalEntry.create({
-      data: {
-        code,
-        type: d.type,
-        amount: signedAmount,
-        source: d.source,
-        paymentAccountId: account.paymentAccountId,
-        entryDate: d.entryDate ? new Date(d.entryDate) : new Date(),
-        receiptUrl: d.receiptUrl || null,
-        note: d.note || null,
-        recordedById: actor.id,
-      },
+    const files = filesFromInput(d.attachments, d.receiptUrl);
+    await prisma.$transaction(async (tx) => {
+      const entry = await tx.capitalEntry.create({
+        data: {
+          code,
+          type: d.type,
+          amount: signedAmount,
+          source: d.source,
+          paymentAccountId: account.paymentAccountId,
+          entryDate: d.entryDate ? new Date(d.entryDate) : new Date(),
+          receiptUrl: files[0]?.url ?? null,
+          note: d.note || null,
+          recordedById: actor.id,
+        },
+        select: { id: true },
+      });
+      await createAttachments(tx, "CapitalEntry", entry.id, files, actor.id);
     });
     await logActivity({
       actorId: actor.id,
@@ -276,7 +297,10 @@ export async function removeCapital(id: string): Promise<ActionResult> {
     const actor = await requireActor(["ADMIN", "FINANCE"]);
     const cap = await prisma.capitalEntry.findUnique({ where: { id } });
     if (!cap) return fail("Capital entry not found.");
-    await prisma.capitalEntry.delete({ where: { id } });
+    await prisma.$transaction([
+      prisma.attachment.deleteMany({ where: { entityType: "CapitalEntry", entityId: id } }),
+      prisma.capitalEntry.delete({ where: { id } }),
+    ]);
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,

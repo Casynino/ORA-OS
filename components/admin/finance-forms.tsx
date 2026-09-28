@@ -18,7 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { CategorySelect } from "@/components/ui/category-select";
-import { ProofUpload } from "@/components/ui/proof-upload";
+import { AttachmentsUpload } from "@/components/ui/attachments-upload";
+import type { AttachmentInput } from "@/lib/attachments";
 import { CompanyAccountSelect, type SelectableAccount } from "@/components/ui/account-select";
 import { toast } from "@/components/ui/use-toast";
 
@@ -58,7 +59,7 @@ export function AddExpenseButton({
   // Default to the first company account; the CEO can switch to "Other / cheque".
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [method, setMethod] = useState("Cheque"); // only used when no account
-  const [receiptUrl, setReceiptUrl] = useState("");
+  const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
   const [note, setNote] = useState("");
 
   const total = items.reduce((s, it) => s + Math.max(0, Math.round(Number(it.amount) || 0)), 0);
@@ -80,7 +81,7 @@ export function AddExpenseButton({
   }
   function reset() {
     setItems([{ key: keyRef.current++, category: "RENT", customCategory: null, vendor: "", amount: "" }]);
-    setNote(""); setReceiptUrl("");
+    setNote(""); setAttachments([]);
   }
 
   function submit() {
@@ -95,7 +96,7 @@ export function AddExpenseButton({
         })),
         paymentAccountId: accountId || undefined,
         paymentMethod: accountId ? undefined : method,
-        receiptUrl: receiptUrl || undefined,
+        attachments,
         note: note.trim() || undefined,
       });
       if (res.ok) {
@@ -195,8 +196,8 @@ export function AddExpenseButton({
               </div>
             )}
             <div>
-              <Label className="mb-1.5 block">Supporting document (receipt / invoice)</Label>
-              <ProofUpload value={receiptUrl} onChange={setReceiptUrl} label="Attach supporting document" />
+              <Label className="mb-1.5 block">Supporting documents (receipts / invoices)</Label>
+              <AttachmentsUpload value={attachments} onChange={setAttachments} label="Attach supporting documents" />
             </div>
             <div>
               <Label>Note (optional)</Label>
@@ -268,7 +269,7 @@ export function AddCapitalButton({
   const [source, setSource] = useState("");
   const [accountId, setAccountId] = useState("");
   const [date, setDate] = useState("");
-  const [receiptUrl, setReceiptUrl] = useState("");
+  const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
   const [note, setNote] = useState("");
 
   function submit() {
@@ -279,13 +280,13 @@ export function AddCapitalButton({
         source,
         paymentAccountId: accountId || undefined,
         entryDate: date,
-        receiptUrl: receiptUrl || undefined,
+        attachments,
         note,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         setOpen(false);
-        setAmount(""); setSource(""); setNote(""); setDate(""); setReceiptUrl("");
+        setAmount(""); setSource(""); setNote(""); setDate(""); setAttachments([]);
         router.refresh();
       } else toast({ variant: "error", title: res.error });
     });
@@ -340,8 +341,8 @@ export function AddCapitalButton({
               </div>
             </div>
             <div>
-              <Label className="mb-1.5 block">Supporting document (optional)</Label>
-              <ProofUpload value={receiptUrl} onChange={setReceiptUrl} label="Attach document" />
+              <Label className="mb-1.5 block">Supporting documents (optional)</Label>
+              <AttachmentsUpload value={attachments} onChange={setAttachments} label="Attach documents" />
             </div>
             <Button className="w-full rounded-full" disabled={pending || !amount || source.trim().length < 2} onClick={submit}>
               {pending ? "Recording…" : "Record investment"}
@@ -373,7 +374,7 @@ export function RecordWithdrawalButton({
   const [source, setSource] = useState("");
   const [accountId, setAccountId] = useState("");
   const [date, setDate] = useState("");
-  const [receiptUrl, setReceiptUrl] = useState("");
+  const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
   const [note, setNote] = useState("");
 
   function submit() {
@@ -384,13 +385,13 @@ export function RecordWithdrawalButton({
         source,
         paymentAccountId: accountId || undefined,
         entryDate: date,
-        receiptUrl: receiptUrl || undefined,
+        attachments,
         note,
       });
       if (res.ok) {
         toast({ variant: "success", title: res.message });
         setOpen(false);
-        setAmount(""); setSource(""); setNote(""); setDate(""); setReceiptUrl("");
+        setAmount(""); setSource(""); setNote(""); setDate(""); setAttachments([]);
         router.refresh();
       } else toast({ variant: "error", title: res.error });
     });
@@ -431,8 +432,8 @@ export function RecordWithdrawalButton({
               label="From account"
             />
             <div>
-              <Label className="mb-1.5 block">Supporting document (optional)</Label>
-              <ProofUpload value={receiptUrl} onChange={setReceiptUrl} label="Attach document" />
+              <Label className="mb-1.5 block">Supporting documents (optional)</Label>
+              <AttachmentsUpload value={attachments} onChange={setAttachments} label="Attach documents" />
             </div>
             <div>
               <Label>Note (optional)</Label>

@@ -5,7 +5,8 @@ import { Search, ChevronDown, Package } from "lucide-react";
 import type { SalesHistoryRow } from "@/lib/services/sales-history";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ProofViewer } from "@/components/ui/proof-viewer";
+import { AttachmentsViewer } from "@/components/ui/attachments-viewer";
+import { mergeLegacyAttachments } from "@/lib/attachments";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 
 type ChannelFilter = "all" | "FIELD" | "PARTNER";
@@ -140,11 +141,14 @@ export function SalesHistoryTable({ rows }: { rows: SalesHistoryRow[] }) {
                         )}
                       </td>
                       <td className="px-3 py-2.5 align-top" onClick={(e) => e.stopPropagation()}>
-                        {r.paymentProofUrl ? (
-                          <ProofViewer url={r.paymentProofUrl} label="View" compact />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
+                        {(() => {
+                          const files = mergeLegacyAttachments(r.paymentProofUrl, r.attachments ?? []);
+                          return files.length > 0 ? (
+                            <AttachmentsViewer items={files} label="View" />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          );
+                        })()}
                       </td>
                       <td className="px-3 py-2.5 text-right align-top">
                         <p className="whitespace-nowrap font-semibold tabular-nums">{formatCurrency(r.total)}</p>

@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Search, Download, ArrowUpDown, ExternalLink, ScrollText } from "lucide-react";
 import type { LedgerEntry } from "@/lib/services/finance";
-import { ProofViewer } from "@/components/ui/proof-viewer";
+import { AttachmentsViewer } from "@/components/ui/attachments-viewer";
+import { mergeLegacyAttachments } from "@/lib/attachments";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -301,11 +302,14 @@ export function GeneralLedgerTable({ rows }: { rows: LedgerEntry[] }) {
                       {formatCurrency(bal)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      {r.proofUrl ? (
-                        <ProofViewer url={r.proofUrl} label="View" compact />
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                      {(() => {
+                        const files = mergeLegacyAttachments(r.proofUrl, r.attachments ?? []);
+                        return files.length > 0 ? (
+                          <AttachmentsViewer items={files} label="View" />
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        );
+                      })()}
                     </td>
                   </tr>
                 );

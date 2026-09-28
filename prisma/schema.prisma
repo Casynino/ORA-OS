@@ -214,6 +214,7 @@ model User {
   impactActivities      ImpactActivity[]         @relation("ImpactActivityCreator")
   loginEvents           LoginEvent[]
   creditEvents          PartnerCreditEvent[]     @relation("PartnerCreditEvents")
+  attachmentsUploaded   Attachment[]             @relation("AttachmentUploader")
 
   @@index([role])
   @@index([status])
@@ -1683,10 +1684,37 @@ model ExpenseClaimItem {
   customCategory String? // free-text label for a custom category (rolls up under `category`)
   description    String
   amount         Int // whole TSh
-  receiptUrl     String // REQUIRED proof of the completed expense
+  receiptUrl     String // REQUIRED proof of the completed expense (the FIRST attachment; more live in Attachment)
   receiptRef     String? // receipt / invoice / voucher number (optional)
   note           String? // per-item note (optional)
   createdAt      DateTime        @default(now())
 
   @@index([claimId])
+}
+
+// ── Attachments ──────────────────────────────────────────────────────────────
+//  One generic table for EVERY uploaded document/proof across the system, so any
+//  transaction can carry MULTIPLE files (payment receipts, deposit slips,
+//  expense invoices, supporting docs) without a column per entity. Polymorphic:
+//  (entityType, entityId) points at the owning row — e.g. ("Expense", <id>),
+//  ("FieldSale", <id>), ("FieldPayment", <id>), ("CashDeposit", <id>),
+//  ("CapitalEntry", <id>), ("ExpenseClaimItem", <id>), ("OperationalSpend",
+//  <id>), ("PettyCashExpense", <id>). The legacy single-file columns
+//  (receiptUrl / slipUrl / paymentProofUrl) are kept as the FIRST attachment so
+//  existing rows and screens keep working; new documents are added here.
+
+model Attachment {
+  id           String   @id @default(cuid())
+  url          String // Vercel Blob URL or inline data: URL
+  name         String? // original filename shown to users
+  contentType  String? // MIME type — decides image preview vs document chip
+  size         Int? // bytes
+  entityType   String // which model owns this file (see note above)
+  entityId     String // the owning row's id
+  uploadedBy   User?    @relation("AttachmentUploader", fields: [uploadedById], references: [id])
+  uploadedById String? // who attached it (accountability); snapshot survives via ActivityLog
+  createdAt    DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
 }

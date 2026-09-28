@@ -1,32 +1,42 @@
 "use client";
 
 import { useState } from "react";
-import { Paperclip, Download, ExternalLink, ImageOff } from "lucide-react";
+import { Paperclip, Download, ExternalLink, ImageOff, FileText } from "lucide-react";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
+import { isImageAttachment } from "@/lib/attachments";
 
 /**
- * View an uploaded proof image in an in-app lightbox with a Download button.
- * Works whether the URL is a data: URL (browsers block opening those as a top
- * -level tab — hence the modal) or a hosted blob/http URL.
+ * View a single uploaded attachment.
  *
- * If the browser can't render the file inline (e.g. an iPhone HEIC photo, which
- * desktop browsers can't decode) we fall back to an "Open in new tab" + Download
- * path so the proof is never a dead end.
+ * Images open in an in-app lightbox with a Download button (works whether the
+ * URL is a data: URL — which browsers block opening as a top-level tab — or a
+ * hosted blob/http URL). If the browser can't render it inline (e.g. an iPhone
+ * HEIC photo) it falls back to "Open in new tab" + Download so the proof is
+ * never a dead end.
+ *
+ * PDFs (and any non-image file) render as a document chip that opens in a new
+ * tab (hosted) or downloads (data: URL) — no broken inline <img>.
  */
 export function ProofViewer({
   url,
   label = "View proof",
   compact = false,
+  name,
+  contentType,
 }: {
   url: string;
   label?: string;
   compact?: boolean;
+  name?: string | null;
+  contentType?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [failed, setFailed] = useState(false);
   const isData = url.startsWith("data:");
+  const image = isImageAttachment({ url, contentType });
+  const downloadName = name?.trim() || (image ? "payment-proof.jpg" : "document.pdf");
 
   async function download() {
     try {
@@ -35,7 +45,7 @@ export function ProofViewer({
       const obj = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = obj;
-      a.download = "payment-proof.jpg";
+      a.download = downloadName;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -43,8 +53,30 @@ export function ProofViewer({
     } catch {
       // Hosted URLs can still be opened directly if the download fetch fails.
       if (!isData) window.open(url, "_blank", "noopener");
-      else toast({ variant: "error", title: "Couldn't download the image." });
+      else toast({ variant: "error", title: "Couldn't download the file." });
     }
+  }
+
+  // ── Document (PDF / non-image): a chip, no lightbox ──
+  if (!image) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          if (isData) download();
+          else window.open(url, "_blank", "noopener");
+        }}
+        className="flex min-w-0 items-center gap-2 text-sm font-medium text-primary hover:underline"
+      >
+        {!compact && (
+          <span className="flex size-10 shrink-0 items-center justify-center rounded bg-muted">
+            <FileText className="size-5 text-muted-foreground" />
+          </span>
+        )}
+        <FileText className="size-3.5 shrink-0" />
+        <span className="truncate">{name?.trim() || label}</span>
+      </button>
+    );
   }
 
   return (
@@ -73,7 +105,7 @@ export function ProofViewer({
         <span className="truncate">{label}</span>
       </button>
       {open && (
-        <Modal open onClose={() => setOpen(false)} title="Payment proof">
+        <Modal open onClose={() => setOpen(false)} title={name?.trim() || "Payment proof"}>
           <div className="space-y-3">
             {!failed ? (
               // eslint-disable-next-line @next/next/no-img-element

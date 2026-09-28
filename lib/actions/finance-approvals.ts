@@ -10,6 +10,8 @@ import { refCode } from "@/lib/utils";
 import { isCashMethod } from "@/lib/payment-methods";
 import { notifyPaymentConfirmed } from "@/lib/notifications/ceo-alerts";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
+import { createAttachments, filesFromInput } from "@/lib/services/attachments";
+import type { AttachmentInput } from "@/lib/attachments";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Finance verification of rep-recorded money. Nothing a rep records becomes
@@ -411,7 +413,8 @@ export type CreateCashDepositInput = {
   paymentIds: string[];
   depositAccountId: string; // the company bank/mobile account it was banked into
   depositDate: string; // ISO date the cash was physically banked
-  slipUrl?: string; // uploaded deposit-slip image (required)
+  slipUrl?: string; // legacy single deposit-slip image (first attachment)
+  attachments?: AttachmentInput[]; // one or more deposit slips / proofs (at least one required)
   slipRef?: string; // slip number / bank reference
   note?: string;
 };
@@ -441,7 +444,8 @@ export async function createCashDeposit(
     const depositDate = new Date(input.depositDate);
     if (!input.depositDate || Number.isNaN(depositDate.getTime()))
       return fail("Pick a valid deposit date.");
-    if (!input.slipUrl?.trim())
+    const files = filesFromInput(input.attachments, input.slipUrl);
+    if (files.length === 0)
       return fail("Attach the deposit slip.");
 
     const code = refCode("DEP");
@@ -473,12 +477,14 @@ export async function createCashDeposit(
           depositAccountId: account.id,
           total,
           depositDate,
-          slipUrl: input.slipUrl!.trim(),
+          slipUrl: files[0].url,
           slipRef: input.slipRef?.trim() || null,
           note: input.note?.trim() || null,
           depositedById: actor.id,
         },
+        select: { id: true },
       });
+      await createAttachments(tx, "CashDeposit", deposit.id, files, actor.id);
 
       // Bank the cash: move it out of hand and attribute it to this account.
       // The updateMany guards MIRROR the findMany guards exactly, so a sale

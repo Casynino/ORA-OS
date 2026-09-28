@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { getAttachmentsMap } from "@/lib/services/attachments";
+import type { AttachmentDTO } from "@/lib/attachments";
 
 export type CreditPaymentDTO = {
   amount: number;
@@ -8,6 +10,7 @@ export type CreditPaymentDTO = {
   /** Free-text context the collector added about this payment. */
   note: string | null;
   proofUrl: string | null;
+  attachments: AttachmentDTO[];
   recordedBy: string;
   /** APPROVED = verified money that reduced the balance; PENDING = awaiting finance. */
   status: "APPROVED" | "PENDING";
@@ -89,6 +92,11 @@ export async function getCreditSaleDetail(
 
   if (!sale || sale.voided) return { sale: null, accounts };
 
+  const paymentAttachments = await getAttachmentsMap(
+    "FieldPayment",
+    sale.payments.map((p) => p.id),
+  );
+
   return {
     accounts,
     sale: {
@@ -123,6 +131,7 @@ export async function getCreditSaleDetail(
         reference: p.reference,
         note: p.note,
         proofUrl: p.paymentProofUrl,
+        attachments: paymentAttachments[p.id] ?? [],
         recordedBy: p.recordedBy.name,
         status: p.financeStatus === "APPROVED" ? "APPROVED" : "PENDING",
         createdAt: p.createdAt.toISOString(),

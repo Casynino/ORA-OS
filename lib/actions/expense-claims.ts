@@ -10,6 +10,13 @@ import { EXPENSE_CATEGORY_VALUES, EXPENSE_LABELS } from "@/lib/expense-categorie
 import { resolveReceivingAccount, METHOD_LABEL } from "@/lib/payment-methods";
 import { notifyExpensesRecorded } from "@/lib/notifications/ceo-alerts";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
+import {
+  createAttachments,
+  filesFromInput,
+  attachmentsInputSchema,
+  getAttachmentsMap,
+} from "@/lib/services/attachments";
+import type { AttachmentInput } from "@/lib/attachments";
 import type { ExpenseCategory } from "@prisma/client";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,8 +51,11 @@ const itemSchema = z.object({
   customCategory: z.string().max(60).optional().or(z.literal("")),
   description: z.string().max(200).optional().or(z.literal("")),
   amount: z.number().int().positive("Enter an amount.").max(MAX_INT4),
-  // Proof is REQUIRED for every completed expense — that's the whole point.
-  receiptUrl: z.string().min(1, "Attach a receipt for every expense.").max(15000000),
+  // Proof is REQUIRED for every completed expense — that's the whole point. The
+  // legacy single field OR the new attachments array must carry at least one
+  // file (enforced per line in the action after parsing).
+  receiptUrl: z.string().max(15000000).optional().or(z.literal("")),
+  attachments: attachmentsInputSchema,
   receiptRef: z.string().max(80).optional().or(z.literal("")),
   note: z.string().max(300).optional().or(z.literal("")),
 });
@@ -79,24 +89,44 @@ export async function submitExpenseClaim(
     const d = parsed.data;
     const total = d.items.reduce((s, it) => s + it.amount, 0);
 
-    const claim = await prisma.expenseClaim.create({
-      data: {
-        code: refCode("EC"),
-        status: "PENDING",
-        note: d.note?.trim() || null,
-        recordedById: actor.id,
-        items: {
-          create: d.items.map((it) => ({
+    // Resolve each line's files (legacy single URL or the new array) and require
+    // at least one per line — a completed expense must have its proof.
+    const perItemFiles = d.items.map((it) => filesFromInput(it.attachments, it.receiptUrl));
+    if (perItemFiles.some((files) => files.length === 0))
+      return fail("Attach a receipt for every expense.");
+
+    // Create the claim, then each item individually so we can attach its files to
+    // the right ExpenseClaimItem id (deterministic — not relying on nested-create
+    // ordering).
+    const claim = await prisma.$transaction(async (tx) => {
+      const c = await tx.expenseClaim.create({
+        data: {
+          code: refCode("EC"),
+          status: "PENDING",
+          note: d.note?.trim() || null,
+          recordedById: actor.id,
+        },
+        select: { id: true, code: true },
+      });
+      for (let i = 0; i < d.items.length; i++) {
+        const it = d.items[i];
+        const files = perItemFiles[i];
+        const item = await tx.expenseClaimItem.create({
+          data: {
+            claimId: c.id,
             category: it.category,
             customCategory: it.customCategory?.trim() || null,
             description: itemDescription(it),
             amount: it.amount,
-            receiptUrl: it.receiptUrl,
+            receiptUrl: files[0].url,
             receiptRef: it.receiptRef?.trim() || null,
             note: it.note?.trim() || null,
-          })),
-        },
-      },
+          },
+          select: { id: true },
+        });
+        await createAttachments(tx, "ExpenseClaimItem", item.id, files, actor.id);
+      }
+      return c;
     });
 
     await logActivity({
@@ -142,6 +172,13 @@ export async function approveExpenseClaim(
     });
     if (!claim) return fail("Submission not found.");
 
+    // The documents attached to each recorded item — copied onto the booked
+    // Expense so the proof travels with the money into the ledger.
+    const itemAttachments = await getAttachmentsMap(
+      "ExpenseClaimItem",
+      claim.items.map((it) => it.id),
+    );
+
     await prisma.$transaction(async (tx) => {
       // Resolve + validate the allocation account (rejects unknown/inactive).
       const account = await resolveReceivingAccount(tx, paymentAccountId, null);
@@ -162,7 +199,7 @@ export async function approveExpenseClaim(
       // recordedBy = the Finance user who incurred it (attribution), not the CEO
       // who merely approved — matches the operational-fund attribution rule.
       for (const it of claim.items) {
-        await tx.expense.create({
+        const exp = await tx.expense.create({
           data: {
             code: refCode("EXP"),
             source: "DIRECT",
@@ -180,7 +217,23 @@ export async function approveExpenseClaim(
             expenseClaimId: claim.id,
             recordedById: claim.recordedById,
           },
+          select: { id: true },
         });
+        // Carry every attached document over to the booked expense (fall back to
+        // the legacy single receipt for pre-existing items with no rows yet).
+        const files: AttachmentInput[] = (itemAttachments[it.id] ?? []).map((a) => ({
+          url: a.url,
+          name: a.name,
+          contentType: a.contentType,
+          size: a.size,
+        }));
+        await createAttachments(
+          tx,
+          "Expense",
+          exp.id,
+          files.length > 0 ? files : it.receiptUrl ? [{ url: it.receiptUrl }] : [],
+          claim.recordedById,
+        );
       }
     });
 
