@@ -25,7 +25,6 @@ import { playSound, unlockAudio, useAudioReady } from "@/components/app/notifica
 import type { NotifDTO, NotifPulse } from "@/lib/notifications/types";
 
 const POLL_MS = 12_000; // how often we ask "anything new?"
-const REPEAT_MS = 20_000; // how often an unresolved ACTION re-rings
 const LS_KEY = "ora.notif.v1";
 
 type Settings = { enabled: boolean; volume: number };
@@ -59,11 +58,12 @@ function kindOf(type: string): { icon: LucideIcon; tone: string } {
 
 /**
  * THE BELL — mounted once in the shared top bar, so it shows on every role's
- * dashboard. It polls the role-scoped /api/notifications, rings once when
- * something new arrives (twice, and pops a toast), and RE-RINGS every ~25s while
- * any ACTION item is still unresolved — the sound stops on its own when the
- * workflow action completes (the item leaves the waiting set). Tap the bell to
- * open the center; the speaker button switches sound on/off (persisted per user).
+ * dashboard. It polls the role-scoped /api/notifications. Each notification rings
+ * exactly TWICE (once now, once 5s later) and pops a toast — no endless repeat.
+ * A page that loads with pending ACTION work rings twice the moment sound is
+ * live. The item still stays unread/waiting in the bell until the workflow
+ * action resolves it — just silently. The speaker button switches sound on/off
+ * (persisted per user); switching off cancels any pending ring immediately.
  */
 export function NotificationBell() {
   const router = useRouter();
@@ -76,10 +76,30 @@ export function NotificationBell() {
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
   const seen = useRef<Set<string> | null>(null);
   const chimedOnLoad = useRef(false);
+  const ringTimers = useRef<number[]>([]);
   const settingsRef = useRef(settings);
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  // Cancel any scheduled second-ring — so muting stops the sound at once.
+  const clearRingTimers = useCallback(() => {
+    ringTimers.current.forEach((id) => clearTimeout(id));
+    ringTimers.current = [];
+  }, []);
+
+  // A notification rings EXACTLY TWICE: once now, once 5s later — then silence.
+  // No endless repeat. Muting (enabled=false) cancels the pending second ring.
+  const ringTwice = useCallback(() => {
+    if (!settingsRef.current.enabled) return;
+    playSound("bell", settingsRef.current.volume, 1);
+    const id = window.setTimeout(() => {
+      if (settingsRef.current.enabled && document.visibilityState === "visible") {
+        playSound("bell", settingsRef.current.volume, 1);
+      }
+    }, 5000);
+    ringTimers.current.push(id);
+  }, []);
 
   useEffect(() => setSettings(loadSettings()), []);
   const saveSettings = useCallback((s: Settings) => {
@@ -128,9 +148,8 @@ export function NotificationBell() {
         const arrived = data.items.filter((i) => !seen.current!.has(i.id));
         ids.forEach((id) => seen.current!.add(id));
         if (!arrived.length) return;
-        const s = settingsRef.current;
-        const hasAction = arrived.some((a) => a.category === "ACTION");
-        if (s.enabled) playSound(hasAction ? "bell" : "chime", s.volume, 2);
+        // A new notification arrived → ring twice (now + 5s later), then done.
+        ringTwice();
         for (const a of arrived.slice(0, 3)) toast({ title: a.title, description: a.body });
         if (document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
           try {
@@ -153,31 +172,27 @@ export function NotificationBell() {
     return () => {
       stop = true;
       clearInterval(t);
+      clearRingTimers();
       document.removeEventListener("visibilitychange", onShow);
       window.removeEventListener("focus", onShow);
     };
-  }, []);
+  }, [ringTwice, clearRingTimers]);
 
-  // Still waiting on an action: re-ring until it's resolved (or muted).
-  const waitKey = waiting.join(",");
+  // Arriving to pending work: ring twice ONCE, as soon as sound is live (page
+  // loaded with a backlog, or the user just switched sound on while there's
+  // pending ACTION work). Muting (or losing audio) cancels any pending ring and
+  // re-arms this, so switching sound back on chimes again if work is still there.
   useEffect(() => {
-    if (!waitKey || !settings.enabled) return;
-    const t = setInterval(() => {
-      if (document.visibilityState === "visible") playSound("bell", settingsRef.current.volume, 1);
-    }, REPEAT_MS);
-    return () => clearInterval(t);
-  }, [waitKey, settings.enabled]);
-
-  // Arrive to pending work: chime ONCE as soon as sound is live (so a page that
-  // loads with a backlog alerts immediately after the first tap, instead of
-  // waiting a full repeat cycle). Fires once per mount; a new arrival while
-  // mounted is handled by the poll's own ring above.
-  useEffect(() => {
-    if (chimedOnLoad.current) return;
-    if (!audio || !settings.enabled || waiting.length === 0) return;
+    const live = audio && settings.enabled;
+    if (!live) {
+      chimedOnLoad.current = false;
+      clearRingTimers();
+      return;
+    }
+    if (chimedOnLoad.current || waiting.length === 0) return;
     chimedOnLoad.current = true;
-    playSound("bell", settingsRef.current.volume, 1);
-  }, [audio, settings.enabled, waiting.length]);
+    ringTwice();
+  }, [audio, settings.enabled, waiting.length, ringTwice, clearRingTimers]);
 
   const markAllRead = useCallback(async (flipLocal: boolean) => {
     setUnread(0);
@@ -226,7 +241,14 @@ export function NotificationBell() {
   const toggleSound = () => {
     const s = { ...settings, enabled: !settings.enabled };
     saveSettings(s);
-    if (s.enabled) void unlockAudio().then((ok) => ok && playSound("chime", s.volume, 1));
+    if (s.enabled) {
+      // Turning sound ON just enables audio — no confirmation beep. It only rings
+      // if there's an actual notification (handled by the pending-work effect).
+      void unlockAudio();
+    } else {
+      // Turning it OFF stops any scheduled ring at once.
+      clearRingTimers();
+    }
   };
 
   const soundOn = settings.enabled;
