@@ -17,7 +17,7 @@ import { notifyRepReport, notifyPaymentConfirmed } from "@/lib/notifications/ceo
 import { refCode } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 import { attachAfterCommit, filesFromInput, attachmentsInputSchema } from "@/lib/services/attachments";
-import { notifyInApp, resolveInApp } from "@/lib/notifications/in-app";
+import { notifyInApp, resolveInApp, resolveManyInApp } from "@/lib/notifications/in-app";
 import type { FieldCreditStatus, FinanceApproval, CashStatus, Prisma } from "@prisma/client";
 
 type Tx = Prisma.TransactionClient;
@@ -40,7 +40,7 @@ async function reverseSaleInTx(
   },
   reason: string,
   actorId: string,
-): Promise<void> {
+): Promise<{ paymentIds: string[] }> {
   // Atomic claim: a sale can only be voided once, never after a finance
   // rejection already returned its stock (a second restore would corrupt stock).
   const claimed = await tx.fieldSale.updateMany({
@@ -49,6 +49,12 @@ async function reverseSaleInTx(
   });
   if (claimed.count === 0)
     throw new Error("This sale was already voided or rejected.");
+  // Capture the still-pending collections BEFORE we reject them, so the caller
+  // can clear their "verify" notification rings post-commit.
+  const pendingPays = await tx.fieldPayment.findMany({
+    where: { saleId: sale.id, financeStatus: "PENDING" },
+    select: { id: true },
+  });
 
   for (const item of sale.items) {
     if (sale.directSale) {
@@ -99,6 +105,7 @@ async function reverseSaleInTx(
       financeNote: `Sale voided: ${reason || "no reason given"}`,
     },
   });
+  return { paymentIds: pendingPays.map((p) => p.id) };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1984,8 +1991,10 @@ export async function deleteFieldCustomer(
         throw new Error(`A payment on sale ${banked.sale?.code ?? ""} was already banked in a deposit — reverse that deposit first, then delete.`);
 
       // 1. Reverse each live sale (stock back, debt cleared, pending rejected).
+      const reversedPaymentIds: string[] = [];
       for (const sale of live) {
-        await reverseSaleInTx(tx, sale, `Customer deleted: ${why}`, actor.id);
+        const { paymentIds } = await reverseSaleInTx(tx, sale, `Customer deleted: ${why}`, actor.id);
+        reversedPaymentIds.push(...paymentIds);
       }
       // 2. Refuse if a sale was recorded after the read above — it would be
       //    detached-but-not-reversed. Bail out (retry then picks it up) rather
@@ -2000,7 +2009,12 @@ export async function deleteFieldCustomer(
       await tx.fieldSale.updateMany({ where: { customerId: id }, data: { customerId: null } });
       await tx.creditExtensionRequest.updateMany({ where: { customerId: id }, data: { customerId: null } });
       await tx.fieldCustomer.delete({ where: { id } });
-      return { count: live.length, value: live.reduce((s, x) => s + x.total, 0) };
+      return {
+        count: live.length,
+        value: live.reduce((s, x) => s + x.total, 0),
+        saleIds: live.map((s) => s.id),
+        paymentIds: reversedPaymentIds,
+      };
     });
 
     const roleLabel = actor.role === "SALES_REP" ? "rep" : actor.role === "FINANCE" ? "finance" : "admin";
@@ -2019,6 +2033,9 @@ export async function deleteFieldCustomer(
     revalidatePath("/admin/reps/customers");
     revalidatePath("/finance/customers");
     revalidatePath("/rep/customers");
+    // Clear any pending verify rings for the reversed sales + their collections.
+    await resolveManyInApp("FieldSale", summary.saleIds);
+    await resolveManyInApp("FieldPayment", summary.paymentIds);
     return ok(undefined, `${who} deleted.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -2053,7 +2070,7 @@ export async function voidFieldSale(
     if (bankedCollection)
       return fail("A collection on this sale has already been banked in a deposit — reverse the deposit first, then void.");
 
-    await prisma.$transaction((tx) => reverseSaleInTx(tx, sale, reason, actor.id));
+    const { paymentIds } = await prisma.$transaction((tx) => reverseSaleInTx(tx, sale, reason, actor.id));
 
     await logActivity({
       actorId: actor.id,
@@ -2064,6 +2081,10 @@ export async function voidFieldSale(
       summary: `${actor.name} voided sale ${sale.code} (${reason || "no reason given"}). Stock restored to ${sale.directSale ? "the warehouse" : sale.rep.name}.`,
     });
     revalidateField();
+    // Voiding is a terminal path — clear any pending verify rings for this sale
+    // and its now-rejected collections so they don't ring forever.
+    await resolveInApp("FieldSale", sale.id);
+    await resolveManyInApp("FieldPayment", paymentIds);
     return ok(undefined, `Sale ${sale.code} voided and stock restored.`);
   } catch (e) {
     return fail(errorMessage(e));

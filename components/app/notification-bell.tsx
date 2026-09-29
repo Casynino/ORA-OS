@@ -106,7 +106,9 @@ export function NotificationBell() {
   useEffect(() => {
     let stop = false;
     const tick = async () => {
-      if (document.visibilityState !== "visible") return;
+      // Poll even when the tab is hidden — that's exactly when a background OS
+      // notification matters. Sound is naturally suppressed while hidden (the
+      // audio context is suspended), so a hidden tab alerts via the OS popup only.
       try {
         const res = await fetch("/api/notifications", { cache: "no-store" });
         if (res.status === 401) return; // signed out / no session — stay quiet
@@ -181,7 +183,18 @@ export function NotificationBell() {
 
   const openPanel = () => {
     setOpen((v) => !v);
-    if (!open && unread > 0) void markAllRead(false); // clear badge; keep "new" highlight until next poll
+    if (!open) {
+      if (unread > 0) void markAllRead(false); // clear badge; keep "new" highlight until next poll
+      // Ask for OS-notification permission on explicit intent (opening the bell),
+      // so alerts can reach the user when the tab is in the background.
+      if (typeof Notification !== "undefined" && Notification.permission === "default") {
+        try {
+          void Notification.requestPermission();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
   };
 
   const onItem = async (n: NotifDTO) => {

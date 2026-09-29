@@ -81,3 +81,22 @@ export async function resolveInApp(entityType: string, entityId: string): Promis
     console.error("[resolveInApp]", entityType, entityId, e instanceof Error ? e.message : e);
   }
 }
+
+/**
+ * Resolve ACTION notifications for MANY entities of one type at once — used when
+ * a single action closes several rows' tasks (e.g. voiding a sale that also
+ * rejects its pending collections, or deleting a customer with several sales).
+ * Never throws.
+ */
+export async function resolveManyInApp(entityType: string, entityIds: string[]): Promise<void> {
+  const ids = entityIds.filter(Boolean);
+  if (ids.length === 0) return;
+  try {
+    await prisma.notification.updateMany({
+      where: { entityType, entityId: { in: ids }, resolvedAt: null },
+      data: { resolvedAt: new Date() },
+    });
+  } catch (e) {
+    console.error("[resolveManyInApp]", entityType, e instanceof Error ? e.message : e);
+  }
+}
