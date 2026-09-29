@@ -24,8 +24,8 @@ import { cn, timeAgo } from "@/lib/utils";
 import { playSound, unlockAudio, useAudioReady } from "@/components/app/notification-sound";
 import type { NotifDTO, NotifPulse } from "@/lib/notifications/types";
 
-const POLL_MS = 20_000; // how often we ask "anything new?"
-const REPEAT_MS = 25_000; // how often an unresolved ACTION re-rings
+const POLL_MS = 12_000; // how often we ask "anything new?"
+const REPEAT_MS = 20_000; // how often an unresolved ACTION re-rings
 const LS_KEY = "ora.notif.v1";
 
 type Settings = { enabled: boolean; volume: number };
@@ -75,6 +75,7 @@ export function NotificationBell() {
   const [online, setOnline] = useState(true);
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
   const seen = useRef<Set<string> | null>(null);
+  const chimedOnLoad = useRef(false);
   const settingsRef = useRef(settings);
   useEffect(() => {
     settingsRef.current = settings;
@@ -166,6 +167,17 @@ export function NotificationBell() {
     }, REPEAT_MS);
     return () => clearInterval(t);
   }, [waitKey, settings.enabled]);
+
+  // Arrive to pending work: chime ONCE as soon as sound is live (so a page that
+  // loads with a backlog alerts immediately after the first tap, instead of
+  // waiting a full repeat cycle). Fires once per mount; a new arrival while
+  // mounted is handled by the poll's own ring above.
+  useEffect(() => {
+    if (chimedOnLoad.current) return;
+    if (!audio || !settings.enabled || waiting.length === 0) return;
+    chimedOnLoad.current = true;
+    playSound("bell", settingsRef.current.volume, 1);
+  }, [audio, settings.enabled, waiting.length]);
 
   const markAllRead = useCallback(async (flipLocal: boolean) => {
     setUnread(0);
