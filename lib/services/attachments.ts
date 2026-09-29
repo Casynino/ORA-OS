@@ -77,6 +77,26 @@ export async function createAttachments(
   return clean.length;
 }
 
+/**
+ * Attach files AFTER the money transaction has committed — best-effort, never
+ * throws. Use this instead of calling createAttachments inside the money tx:
+ * a failure here (missing table, DB hiccup) then can't roll back the sale/
+ * expense/deposit. The first file is already saved in the legacy single column
+ * inside the tx, so the primary proof is never lost even if this fails.
+ */
+export async function attachAfterCommit(
+  entityType: AttachmentEntity | string,
+  entityId: string,
+  files: AttachmentInput[] | undefined | null,
+  uploadedById?: string | null,
+): Promise<void> {
+  try {
+    await createAttachments(prisma, entityType, entityId, files, uploadedById);
+  } catch (e) {
+    console.error("[attachAfterCommit]", entityType, entityId, e instanceof Error ? e.message : e);
+  }
+}
+
 /** Normalise an uploader payload: trim, drop empties, de-dupe by URL. */
 export function dedupeFiles(files: AttachmentInput[] | undefined | null): AttachmentInput[] {
   if (!Array.isArray(files)) return [];

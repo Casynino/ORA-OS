@@ -10,7 +10,7 @@ import { refCode } from "@/lib/utils";
 import { isCashMethod } from "@/lib/payment-methods";
 import { notifyPaymentConfirmed } from "@/lib/notifications/ceo-alerts";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
-import { createAttachments, filesFromInput } from "@/lib/services/attachments";
+import { attachAfterCommit, filesFromInput } from "@/lib/services/attachments";
 import type { AttachmentInput } from "@/lib/attachments";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -450,6 +450,7 @@ export async function createCashDeposit(
 
     const code = refCode("DEP");
     let total = 0;
+    let depositId = "";
     await prisma.$transaction(async (tx) => {
       // Re-read the selected rows, guarded to on-hand cash only, and total them
       // server-side (never trust a client-supplied sum).
@@ -484,7 +485,7 @@ export async function createCashDeposit(
         },
         select: { id: true },
       });
-      await createAttachments(tx, "CashDeposit", deposit.id, files, actor.id);
+      depositId = deposit.id;
 
       // Bank the cash: move it out of hand and attribute it to this account.
       // The updateMany guards MIRROR the findMany guards exactly, so a sale
@@ -508,6 +509,10 @@ export async function createCashDeposit(
           throw new Error("A selected collection changed while depositing — refresh and try again.");
       }
     });
+
+    // Attach the deposit slip(s) after the deposit + banking committed
+    // (best-effort; first slip already saved in the legacy slipUrl column).
+    await attachAfterCommit("CashDeposit", depositId, files, actor.id);
 
     await logActivity({
       actorId: actor.id,

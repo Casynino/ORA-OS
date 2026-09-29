@@ -10,7 +10,7 @@ import { EXPENSE_CATEGORY_VALUES, EXPENSE_LABELS, OFFICE_FUND_CATEGORIES } from 
 import { resolveReceivingAccount, METHOD_LABEL } from "@/lib/payment-methods";
 import { notifyFundRequest } from "@/lib/notifications/ceo-alerts";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
-import { createAttachments, filesFromInput, attachmentsInputSchema } from "@/lib/services/attachments";
+import { attachAfterCommit, filesFromInput, attachmentsInputSchema } from "@/lib/services/attachments";
 import type { ExpenseCategory } from "@prisma/client";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -461,6 +461,7 @@ export async function recordOperationalExpense(
     const files = filesFromInput(d.attachments, d.receiptUrl);
     const legacyUrl = files[0]?.url ?? null;
     let remaining = 0;
+    const createdSpendIds: string[] = [];
     await prisma.$transaction(async (tx) => {
       // Serialize every fund spend so two concurrent transactions can't each slip
       // under the balance and overspend the CEO's allocation.
@@ -495,9 +496,13 @@ export async function recordOperationalExpense(
           },
           select: { id: true },
         });
-        await createAttachments(tx, "OperationalSpend", row.id, files, actor.id);
+        createdSpendIds.push(row.id);
       }
     });
+    // Attach supporting docs after the fund transaction commits (best-effort;
+    // first file already saved in the legacy receiptUrl column).
+    if (files.length > 0)
+      await Promise.all(createdSpendIds.map((id) => attachAfterCommit("OperationalSpend", id, files, actor.id)));
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,

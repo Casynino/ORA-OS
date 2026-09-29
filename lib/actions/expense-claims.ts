@@ -11,7 +11,7 @@ import { resolveReceivingAccount, METHOD_LABEL } from "@/lib/payment-methods";
 import { notifyExpensesRecorded } from "@/lib/notifications/ceo-alerts";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 import {
-  createAttachments,
+  attachAfterCommit,
   filesFromInput,
   attachmentsInputSchema,
   getAttachmentsMap,
@@ -98,6 +98,7 @@ export async function submitExpenseClaim(
     // Create the claim, then each item individually so we can attach its files to
     // the right ExpenseClaimItem id (deterministic — not relying on nested-create
     // ordering).
+    const attachJobs: { id: string; files: AttachmentInput[] }[] = [];
     const claim = await prisma.$transaction(async (tx) => {
       const c = await tx.expenseClaim.create({
         data: {
@@ -124,10 +125,13 @@ export async function submitExpenseClaim(
           },
           select: { id: true },
         });
-        await createAttachments(tx, "ExpenseClaimItem", item.id, files, actor.id);
+        attachJobs.push({ id: item.id, files });
       }
       return c;
     });
+    // Attach each item's files after commit (best-effort; first file already in
+    // each item's receiptUrl column).
+    await Promise.all(attachJobs.map((j) => attachAfterCommit("ExpenseClaimItem", j.id, j.files, actor.id)));
 
     await logActivity({
       actorId: actor.id,
@@ -179,6 +183,7 @@ export async function approveExpenseClaim(
       claim.items.map((it) => it.id),
     );
 
+    const expenseAttachJobs: { id: string; files: AttachmentInput[] }[] = [];
     await prisma.$transaction(async (tx) => {
       // Resolve + validate the allocation account (rejects unknown/inactive).
       const account = await resolveReceivingAccount(tx, paymentAccountId, null);
@@ -227,15 +232,17 @@ export async function approveExpenseClaim(
           contentType: a.contentType,
           size: a.size,
         }));
-        await createAttachments(
-          tx,
-          "Expense",
-          exp.id,
-          files.length > 0 ? files : it.receiptUrl ? [{ url: it.receiptUrl }] : [],
-          claim.recordedById,
-        );
+        expenseAttachJobs.push({
+          id: exp.id,
+          files: files.length > 0 ? files : it.receiptUrl ? [{ url: it.receiptUrl }] : [],
+        });
       }
     });
+    // Copy the documents onto the booked expenses after commit (best-effort; each
+    // expense already carries the first receipt in its receiptUrl column).
+    await Promise.all(
+      expenseAttachJobs.map((j) => attachAfterCommit("Expense", j.id, j.files, claim.recordedById)),
+    );
 
     const total = claim.items.reduce((s, it) => s + it.amount, 0);
     await logActivity({

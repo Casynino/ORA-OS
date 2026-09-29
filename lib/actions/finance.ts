@@ -12,7 +12,7 @@ import { getBusinessCapital } from "@/lib/services/finance";
 import { resolveReceivingAccount } from "@/lib/payment-methods";
 import { formatCurrency } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
-import { createAttachments, filesFromInput, attachmentsInputSchema } from "@/lib/services/attachments";
+import { attachAfterCommit, filesFromInput, attachmentsInputSchema } from "@/lib/services/attachments";
 
 // Every shilling leaving ORA is recorded, categorised and tied to the admin
 // who approved it. No expense without a record; no income without a source.
@@ -109,7 +109,7 @@ export async function recordExpenses(
 
     // One Expense per line, all in a single atomic transaction.
     const created = await prisma.$transaction(async (tx) => {
-      const rows: { code: string }[] = [];
+      const rows: { id: string; code: string }[] = [];
       for (const it of d.items) {
         const row = await tx.expense.create({
           data: {
@@ -129,11 +129,15 @@ export async function recordExpenses(
           },
           select: { id: true, code: true },
         });
-        await createAttachments(tx, "Expense", row.id, files, actor.id);
-        rows.push({ code: row.code });
+        rows.push(row);
       }
       return rows;
     });
+    // Attach the supporting docs AFTER the money is committed (best-effort) so a
+    // failure here can never roll back the expense — the first file is already in
+    // the legacy receiptUrl column.
+    if (files.length > 0)
+      await Promise.all(created.map((r) => attachAfterCommit("Expense", r.id, files, actor.id)));
 
     await logActivity({
       actorId: actor.id,
@@ -253,23 +257,23 @@ export async function recordCapital(
     const signedAmount = isWithdrawal ? -d.amount : d.amount;
     const code = refCode("CAP");
     const files = filesFromInput(d.attachments, d.receiptUrl);
-    await prisma.$transaction(async (tx) => {
-      const entry = await tx.capitalEntry.create({
-        data: {
-          code,
-          type: d.type,
-          amount: signedAmount,
-          source: d.source,
-          paymentAccountId: account.paymentAccountId,
-          entryDate: d.entryDate ? new Date(d.entryDate) : new Date(),
-          receiptUrl: files[0]?.url ?? null,
-          note: d.note || null,
-          recordedById: actor.id,
-        },
-        select: { id: true },
-      });
-      await createAttachments(tx, "CapitalEntry", entry.id, files, actor.id);
+    const entry = await prisma.capitalEntry.create({
+      data: {
+        code,
+        type: d.type,
+        amount: signedAmount,
+        source: d.source,
+        paymentAccountId: account.paymentAccountId,
+        entryDate: d.entryDate ? new Date(d.entryDate) : new Date(),
+        receiptUrl: files[0]?.url ?? null,
+        note: d.note || null,
+        recordedById: actor.id,
+      },
+      select: { id: true },
     });
+    // Attach supporting docs after commit (best-effort; first file already saved
+    // in the legacy receiptUrl column).
+    await attachAfterCommit("CapitalEntry", entry.id, files, actor.id);
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,

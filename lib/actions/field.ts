@@ -16,7 +16,7 @@ import { resolveReceivingAccount, isCashMethod } from "@/lib/payment-methods";
 import { notifyRepReport, notifyPaymentConfirmed } from "@/lib/notifications/ceo-alerts";
 import { refCode } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
-import { createAttachments, filesFromInput, attachmentsInputSchema } from "@/lib/services/attachments";
+import { attachAfterCommit, filesFromInput, attachmentsInputSchema } from "@/lib/services/attachments";
 import type { FieldCreditStatus, FinanceApproval, CashStatus, Prisma } from "@prisma/client";
 
 type Tx = Prisma.TransactionClient;
@@ -262,6 +262,7 @@ export async function recordFieldSale(
     // alert can still name the buyer and the resolved payment method.
     let soldTo = d.customerName?.trim() || "walk-in customer";
     let resolvedMethod: string | null = null;
+    let createdSaleId = "";
 
     await prisma.$transaction(async (tx) => {
       if (!customerId && d.newCustomer) {
@@ -491,8 +492,12 @@ export async function recordFieldSale(
         },
         select: { id: true },
       });
-      await createAttachments(tx, "FieldSale", sale.id, proofFiles, actor.id);
+      createdSaleId = sale.id;
     });
+    // Attach proof(s) after the sale + stock movements commit (best-effort; first
+    // file already saved in the legacy paymentProofUrl column).
+    if (proofFiles.length > 0)
+      await attachAfterCommit("FieldSale", createdSaleId, proofFiles, actor.id);
 
     await logActivity({
       actorId: actor.id,
@@ -609,6 +614,7 @@ export async function recordFieldCollection(
       return fail("Attach a photo of the cheque.");
 
     const newPaid = sale.amountPaid + d.amount;
+    let createdPaymentId = "";
     await prisma.$transaction(async (tx) => {
       const receiving = await resolveReceivingAccount(
         tx,
@@ -654,8 +660,12 @@ export async function recordFieldCollection(
         },
         select: { id: true },
       });
-      await createAttachments(tx, "FieldPayment", payment.id, proofFiles, actor.id);
+      createdPaymentId = payment.id;
     });
+    // Attach proof(s) after the collection commits (best-effort; first file
+    // already saved in the legacy paymentProofUrl column).
+    if (proofFiles.length > 0)
+      await attachAfterCommit("FieldPayment", createdPaymentId, proofFiles, actor.id);
 
     await logActivity({
       actorId: actor.id,
