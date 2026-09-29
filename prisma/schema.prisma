@@ -215,6 +215,7 @@ model User {
   loginEvents           LoginEvent[]
   creditEvents          PartnerCreditEvent[]     @relation("PartnerCreditEvents")
   attachmentsUploaded   Attachment[]             @relation("AttachmentUploader")
+  notifications         Notification[]           @relation("UserNotifications")
 
   @@index([role])
   @@index([status])
@@ -1715,6 +1716,46 @@ model Attachment {
   uploadedById String? // who attached it (accountability); snapshot survives via ActivityLog
   createdAt    DateTime @default(now())
 
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ── In-app notifications ─────────────────────────────────────────────────────
+//  Role-scoped alerts that drive the notification bell + sound. Each row targets
+//  EITHER one user (userId, e.g. "your sale was approved") OR a whole role (role,
+//  userId null, e.g. all FINANCE — "a sale needs verifying"). ACTION rows ring &
+//  repeat until resolvedAt is set by the workflow action that completes them; INFO
+//  rows ring once and stay in history. readAt tracks the unread badge. Purely
+//  additive — no existing table is touched, and every write is best-effort so the
+//  underlying workflow never breaks if notifying fails.
+
+enum NotificationCategory {
+  ACTION // requires the recipient to do something — rings until resolved
+  INFO // informational — rings once, kept in history
+}
+
+model Notification {
+  id          String               @id @default(cuid())
+  // Audience: a specific user, OR a role broadcast (userId null + role set).
+  user        User?                @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  userId      String?
+  role        Role? // set when broadcasting to everyone in a role
+  category    NotificationCategory @default(INFO)
+  type        String // machine code, e.g. STOCK_REQUEST, SALE_VERIFY, REPORT
+  title       String
+  body        String
+  actorName   String? // who triggered it (snapshot)
+  // What it's about — lets the resolving action find & clear it.
+  entityType  String?
+  entityId    String?
+  actionUrl   String? // where the recipient goes to act
+  actionLabel String? // e.g. "Review request"
+  readAt      DateTime? // when the recipient opened/acknowledged it
+  resolvedAt  DateTime? // ACTION: when the underlying action was completed (stops the ring)
+  createdAt   DateTime             @default(now())
+
+  @@index([userId, resolvedAt, createdAt])
+  @@index([role, resolvedAt, createdAt])
   @@index([entityType, entityId])
   @@index([createdAt])
 }

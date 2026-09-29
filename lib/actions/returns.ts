@@ -9,6 +9,7 @@ import { applyMovement } from "@/lib/services/inventory";
 import { addWarehouseStock } from "@/lib/services/warehouse-stock";
 import { getReturnableStock } from "@/lib/returns-stock";
 import { refCode } from "@/lib/utils";
+import { notifyInApp, resolveInApp } from "@/lib/notifications/in-app";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 const REASON_TYPES = [
@@ -115,6 +116,18 @@ export async function createReturn(
     });
 
     revalidateReturns();
+    await notifyInApp({
+      toRoles: ["WAREHOUSE", "ADMIN"],
+      category: "ACTION",
+      type: "RETURN_HANDLE",
+      title: "Return to handle",
+      body: `${actor.name} requested to return ${quantity} × ${product.name} (${ret.code}).`,
+      actorName: actor.name,
+      entityType: "ReturnRequest",
+      entityId: ret.id,
+      actionUrl: "/warehouse/returns",
+      actionLabel: "Review return",
+    });
     return ok({ code: ret.code }, "Return submitted to the ORA team for review.");
   } catch (e) {
     return fail(errorMessage(e));
@@ -197,6 +210,18 @@ export async function createFinanceReturn(
     revalidateReturns();
     revalidatePath("/finance/returns");
     revalidatePath("/finance/credit");
+    await notifyInApp({
+      toRoles: ["WAREHOUSE", "ADMIN"],
+      category: "ACTION",
+      type: "RETURN_HANDLE",
+      title: "Return to receive",
+      body: `${actor.name} initiated a debt-recovery return (${ret.code}) — ${d.quantity} × ${line.product.name}.`,
+      actorName: actor.name,
+      entityType: "ReturnRequest",
+      entityId: ret.id,
+      actionUrl: "/warehouse/returns",
+      actionLabel: "Review return",
+    });
     return ok({ code: ret.code }, `${ret.code} created — awaiting receipt at the warehouse.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -346,6 +371,7 @@ export async function completeReturn(returnId: string): Promise<ActionResult> {
     revalidatePath("/admin/inventory");
     revalidatePath("/finance/returns");
     revalidatePath("/finance/credit");
+    await resolveInApp("ReturnRequest", returnId); // stop the warehouse ring
     return ok(
       undefined,
       recovered > 0
@@ -390,6 +416,7 @@ export async function rejectReturn(
       summary: `Return ${ret.code} rejected.`,
     });
     revalidateReturns();
+    await resolveInApp("ReturnRequest", returnId); // stop the warehouse ring
     return ok(undefined, `Return ${ret.code} rejected.`);
   } catch (e) {
     return fail(errorMessage(e));

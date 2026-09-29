@@ -12,6 +12,7 @@ import { notifyPaymentConfirmed } from "@/lib/notifications/ceo-alerts";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 import { attachAfterCommit, filesFromInput } from "@/lib/services/attachments";
 import type { AttachmentInput } from "@/lib/attachments";
+import { notifyInApp, resolveInApp } from "@/lib/notifications/in-app";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Finance verification of rep-recorded money. Nothing a rep records becomes
@@ -111,6 +112,20 @@ export async function approveFieldSale(
     if (sale.type === "CASH") {
       await notifyPaymentConfirmed({ customer: who, amount: sale.total, method: sale.paymentMethod, verifiedBy: actor.name });
     }
+    // Finance handled it → stop their ring; tell the rep it was confirmed.
+    await resolveInApp("FieldSale", id);
+    await notifyInApp({
+      toUserId: sale.repId,
+      category: "INFO",
+      type: "SALE_APPROVED",
+      title: "Sale confirmed",
+      body: `Your ${sale.type.toLowerCase()} sale ${sale.code} for ${who} was confirmed.`,
+      actorName: actor.name,
+      entityType: "FieldSale",
+      entityId: id,
+      actionUrl: "/rep/sales",
+      actionLabel: "View",
+    });
     return ok(
       undefined,
       sale.type === "CREDIT"
@@ -191,6 +206,19 @@ export async function revertFieldSaleApproval(id: string): Promise<ActionResult>
       summary: `${actor.name} sent ${saleCode} (${who}) back to pending — the earlier confirmation was undone${cashLine ? "; the cash left Cash on Hand" : ""}.`,
     });
     revalidateApprovals();
+    // Re-open the verification queue for finance.
+    await notifyInApp({
+      toRoles: ["FINANCE", "ADMIN"],
+      category: "ACTION",
+      type: "SALE_VERIFY",
+      title: "Sale back for review",
+      body: `${saleCode} was sent back to the verification queue.`,
+      actorName: actor.name,
+      entityType: "FieldSale",
+      entityId: id,
+      actionUrl: "/finance/sales-approvals",
+      actionLabel: "Verify sale",
+    });
     return ok(undefined, `${saleCode} sent back to pending for review.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -284,6 +312,20 @@ export async function rejectFieldSale(
       summary: `Finance rejected ${sale.type.toLowerCase()} sale ${sale.code} (rep ${sale.rep.name})${note?.trim() ? ` — ${note.trim()}` : ""}. Stock returned to ${sale.rep.name}.`,
     });
     revalidateApprovals();
+    // Finance handled it → stop their ring; tell the rep to re-record.
+    await resolveInApp("FieldSale", id);
+    await notifyInApp({
+      toUserId: sale.repId,
+      category: "INFO",
+      type: "SALE_REJECTED",
+      title: "Sale rejected",
+      body: `Your sale ${sale.code} was rejected${note?.trim() ? `: ${note.trim()}` : ""}. Stock returned — re-record it.`,
+      actorName: actor.name,
+      entityType: "FieldSale",
+      entityId: id,
+      actionUrl: "/rep/sell",
+      actionLabel: "Re-record",
+    });
     return ok(undefined, `${sale.code} rejected — stock returned to ${sale.rep.name}; the rep can see your comment and re-record it.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -362,6 +404,20 @@ export async function approveFieldCollection(
     revalidateApprovals();
     // Instant CEO alert — a customer credit payment was verified.
     await notifyPaymentConfirmed({ customer: sale.customer?.name ?? "Customer", amount: payment.amount, method: payment.method, verifiedBy: actor.name });
+    // Finance handled it → stop their ring; tell the rep who submitted it.
+    await resolveInApp("FieldPayment", paymentId);
+    await notifyInApp({
+      toUserId: payment.recordedById,
+      category: "INFO",
+      type: "COLLECTION_APPROVED",
+      title: "Collection confirmed",
+      body: `Your TSh ${payment.amount.toLocaleString()} collection on ${sale.code} was confirmed.`,
+      actorName: actor.name,
+      entityType: "FieldPayment",
+      entityId: paymentId,
+      actionUrl: "/rep/customers",
+      actionLabel: "View",
+    });
     return ok(undefined, "Collection confirmed and posted to the customer's balance.");
   } catch (e) {
     return fail(errorMessage(e));
@@ -400,6 +456,20 @@ export async function rejectFieldCollection(
       summary: `Finance rejected a TSh ${payment.amount.toLocaleString()} collection on ${payment.sale.code} (submitted by ${payment.recordedBy.name})${note?.trim() ? ` — ${note.trim()}` : ""}.`,
     });
     revalidateApprovals();
+    // Finance handled it → stop their ring; tell the rep who submitted it.
+    await resolveInApp("FieldPayment", paymentId);
+    await notifyInApp({
+      toUserId: payment.recordedById,
+      category: "INFO",
+      type: "COLLECTION_REJECTED",
+      title: "Collection rejected",
+      body: `Your collection on ${payment.sale.code} was rejected${note?.trim() ? `: ${note.trim()}` : ""}.`,
+      actorName: actor.name,
+      entityType: "FieldPayment",
+      entityId: paymentId,
+      actionUrl: "/rep/customers",
+      actionLabel: "View",
+    });
     return ok(undefined, "Collection rejected — nothing was posted.");
   } catch (e) {
     return fail(errorMessage(e));

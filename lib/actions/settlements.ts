@@ -9,6 +9,7 @@ import { logActivity } from "@/lib/activity";
 import { refCode, formatCurrency } from "@/lib/utils";
 import { completeCycleIfCleared } from "@/lib/services/credit";
 import { resolveReceivingAccount } from "@/lib/payment-methods";
+import { notifyInApp, resolveInApp } from "@/lib/notifications/in-app";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 function revalidateSettlements() {
@@ -85,6 +86,31 @@ export async function submitSettlement(
     });
 
     revalidateSettlements();
+    // Ring finance (primary confirmer) + admin — repeats until confirmed/rejected.
+    await notifyInApp({
+      toRoles: ["FINANCE"],
+      category: "ACTION",
+      type: "SETTLEMENT_CONFIRM",
+      title: "Payment to confirm",
+      body: `${actor.name} submitted a ${formatCurrency(parsed.data.amount)} payment (${sr.code}).`,
+      actorName: actor.name,
+      entityType: "SettlementRequest",
+      entityId: sr.id,
+      actionUrl: "/finance/credit",
+      actionLabel: "Confirm payment",
+    });
+    await notifyInApp({
+      toRoles: ["ADMIN"],
+      category: "ACTION",
+      type: "SETTLEMENT_CONFIRM",
+      title: "Payment to confirm",
+      body: `${actor.name} submitted a ${formatCurrency(parsed.data.amount)} payment (${sr.code}).`,
+      actorName: actor.name,
+      entityType: "SettlementRequest",
+      entityId: sr.id,
+      actionUrl: "/admin/credit",
+      actionLabel: "Confirm payment",
+    });
     return ok({ code: sr.code }, "Payment submitted to the ORA team for confirmation.");
   } catch (e) {
     return fail(errorMessage(e));
@@ -205,6 +231,7 @@ export async function confirmSettlement(
     });
 
     revalidateSettlements();
+    await resolveInApp("SettlementRequest", id); // stop the confirm ring
     return ok(
       undefined,
       cycleMsg ??
@@ -244,6 +271,7 @@ export async function rejectSettlement(
       summary: `Settlement ${sr.code} rejected.`,
     });
     revalidateSettlements();
+    await resolveInApp("SettlementRequest", id); // stop the confirm ring
     return ok(undefined, "Settlement rejected.");
   } catch (e) {
     return fail(errorMessage(e));

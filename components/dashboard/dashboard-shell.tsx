@@ -54,6 +54,7 @@ import {
 import { Logo } from "@/components/brand/logo";
 import { Avatar } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { NotificationBell } from "@/components/app/notification-bell";
 import { logoutAction } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
 
@@ -284,6 +285,7 @@ export function DashboardShell({
               <Home className="size-4" />
               <span className="hidden sm:inline">Main site</span>
             </Link>
+            <NotificationBell />
             <ThemeToggle />
 
             {/* User menu */}

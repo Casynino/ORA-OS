@@ -17,6 +17,7 @@ import { notifyRepReport, notifyPaymentConfirmed } from "@/lib/notifications/ceo
 import { refCode } from "@/lib/utils";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 import { attachAfterCommit, filesFromInput, attachmentsInputSchema } from "@/lib/services/attachments";
+import { notifyInApp, resolveInApp } from "@/lib/notifications/in-app";
 import type { FieldCreditStatus, FinanceApproval, CashStatus, Prisma } from "@prisma/client";
 
 type Tx = Prisma.TransactionClient;
@@ -511,6 +512,22 @@ export async function recordFieldSale(
     });
     revalidateField();
     revalidatePath("/finance/sales-approvals");
+    // A rep-recorded sale sits PENDING until finance verifies it → ring finance.
+    // Office sales (admin/finance) are auto-confirmed, so they never queue.
+    if (!isOffice) {
+      await notifyInApp({
+        toRoles: ["FINANCE", "ADMIN"],
+        category: "ACTION",
+        type: "SALE_VERIFY",
+        title: d.type === "CASH" ? "Payment to verify" : "New credit sale to review",
+        body: `${actor.name} recorded a ${d.type.toLowerCase()} sale ${code} of TSh ${total.toLocaleString()} for ${soldTo}.`,
+        actorName: actor.name,
+        entityType: "FieldSale",
+        entityId: createdSaleId,
+        actionUrl: "/finance/sales-approvals",
+        actionLabel: "Verify sale",
+      });
+    }
     // A head-office cash sale is money-in the instant it's recorded — alert the
     // CEO, exactly as when finance confirms a rep's cash sale.
     if (isOffice && d.type === "CASH") {
@@ -679,6 +696,21 @@ export async function recordFieldCollection(
     });
     revalidateField();
     revalidatePath(`/rep/customers`);
+    // A rep-claimed collection sits PENDING until finance verifies it → ring finance.
+    if (isRepClaim) {
+      await notifyInApp({
+        toRoles: ["FINANCE", "ADMIN"],
+        category: "ACTION",
+        type: "COLLECTION_VERIFY",
+        title: "Payment to verify",
+        body: `${actor.name} submitted a TSh ${d.amount.toLocaleString()} collection on ${sale.code}${sale.customer ? ` (${sale.customer.name})` : ""}.`,
+        actorName: actor.name,
+        entityType: "FieldPayment",
+        entityId: createdPaymentId,
+        actionUrl: "/finance/sales-approvals",
+        actionLabel: "Verify payment",
+      });
+    }
     return ok(
       undefined,
       isRepClaim
@@ -800,6 +832,18 @@ export async function submitFieldReport(
     });
     revalidateField();
     await notifyRepReport(actor.name, d.location); // WhatsApp the CEO
+    // In-app ping to admin — informational (no action to complete), rings once.
+    await notifyInApp({
+      toRoles: ["ADMIN"],
+      category: "INFO",
+      type: "REPORT",
+      title: "Daily report submitted",
+      body: `${actor.name} filed a field report from ${d.location}.`,
+      actorName: actor.name,
+      entityType: "FieldReport",
+      actionUrl: "/admin/activity",
+      actionLabel: "View",
+    });
     return ok(undefined, "Report submitted — the ORA team can see it now.");
   } catch (e) {
     return fail(errorMessage(e));
@@ -1018,13 +1062,14 @@ export async function requestRepStock(
     if (lines.length === 0) return fail("None of those products are available.");
 
     const code = refCode("RSR");
-    await prisma.repStockRequest.create({
+    const req = await prisma.repStockRequest.create({
       data: {
         code,
         repId: actor.id,
         note: d.note || null,
         items: { create: lines },
       },
+      select: { id: true },
     });
 
     const totalUnits = lines.reduce((s, l) => s + l.quantity, 0);
@@ -1037,6 +1082,19 @@ export async function requestRepStock(
       summary: `${actor.name} requested ${lines.length} product${lines.length === 1 ? "" : "s"} (${totalUnits} pcs) — ${code}.`,
     });
     revalidateField();
+    // Ring the warehouse — repeats until they approve/reject (leaves PENDING).
+    await notifyInApp({
+      toRoles: ["WAREHOUSE", "ADMIN"],
+      category: "ACTION",
+      type: "STOCK_REQUEST",
+      title: "New stock request",
+      body: `${actor.name} requested ${lines.length} product${lines.length === 1 ? "" : "s"} (${totalUnits} pcs) — ${code}.`,
+      actorName: actor.name,
+      entityType: "RepStockRequest",
+      entityId: req.id,
+      actionUrl: "/warehouse/rep-requests",
+      actionLabel: "Review request",
+    });
     return ok(undefined, `Stock request ${code} sent to the ORA team.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -1155,6 +1213,20 @@ export async function approveRepStockRequest(
     });
     revalidateField();
     revalidatePath(`/admin/reps/${rep.id}`);
+    // Warehouse handled it → stop their ring; tell the rep it's ready.
+    await resolveInApp("RepStockRequest", req.id);
+    await notifyInApp({
+      toUserId: rep.id,
+      category: "INFO",
+      type: "STOCK_READY",
+      title: "Stock ready to collect",
+      body: `Your request ${req.code} is ready to collect at ${wh.name}.`,
+      actorName: actor.name,
+      entityType: "RepStockRequest",
+      entityId: req.id,
+      actionUrl: "/rep/stock",
+      actionLabel: "Collect",
+    });
     return ok(
       undefined,
       `Approved — ${rep.name} can now collect at ${wh.name}.`,
@@ -1384,6 +1456,22 @@ export async function issueRepStock(
     });
     revalidateField();
     revalidatePath(`/admin/reps/${d.repId}`);
+    // If this closed a rep's request, stop the warehouse ring + tell the rep.
+    if (d.requestId) {
+      await resolveInApp("RepStockRequest", d.requestId);
+      await notifyInApp({
+        toUserId: d.repId,
+        category: "INFO",
+        type: "STOCK_ISSUED",
+        title: "Stock issued to you",
+        body: `${actor.name} issued ${d.quantity} ${d.kind.toLowerCase()} units to you.`,
+        actorName: actor.name,
+        entityType: "RepStockRequest",
+        entityId: d.requestId,
+        actionUrl: "/rep/stock",
+        actionLabel: "View",
+      });
+    }
     return ok(undefined, `Stock issued to ${rep.name}.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -1407,6 +1495,7 @@ export async function rejectRepStockRequest(
         : null;
 
     let wasReady = false;
+    let rejectedRepId = "";
     const repName = await prisma.$transaction(async (tx) => {
       // Read the CURRENT state inside the tx so a concurrent approve can't
       // slip a now-READY request past a stale pre-tx snapshot (TOCTOU).
@@ -1415,6 +1504,7 @@ export async function rejectRepStockRequest(
         include: { rep: { select: { name: true } }, items: true },
       });
       if (!req) throw new Error("Request not found.");
+      rejectedRepId = req.repId;
       wasReady = req.status === "READY";
       // A READY request is pinned to a warehouse — a warehouse actor may only
       // cancel their own. PENDING is the shared intake queue (any warehouse).
@@ -1456,6 +1546,22 @@ export async function rejectRepStockRequest(
       summary: `${actor.name} ${wasReady ? "cancelled the prepared" : "rejected"} stock request from ${repName}.`,
     });
     revalidateField();
+    // Stop the warehouse ring + tell the rep it was declined.
+    await resolveInApp("RepStockRequest", id);
+    if (rejectedRepId) {
+      await notifyInApp({
+        toUserId: rejectedRepId,
+        category: "INFO",
+        type: "STOCK_REJECTED",
+        title: wasReady ? "Collection cancelled" : "Stock request declined",
+        body: `${actor.name} ${wasReady ? "cancelled your prepared request" : "declined your stock request"}.`,
+        actorName: actor.name,
+        entityType: "RepStockRequest",
+        entityId: id,
+        actionUrl: "/rep/stock",
+        actionLabel: "View",
+      });
+    }
     return ok(undefined, wasReady ? "Collection cancelled — reserved stock released." : "Request rejected.");
   } catch (e) {
     return fail(errorMessage(e));

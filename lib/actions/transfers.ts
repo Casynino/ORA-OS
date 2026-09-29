@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { refCode } from "@/lib/utils";
+import { notifyInApp, resolveInApp } from "@/lib/notifications/in-app";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 const createSchema = z.object({
@@ -106,6 +107,19 @@ export async function createTransfer(
     });
 
     revalidateTransfers();
+    // Ring the warehouse — repeats until the transfer is received/rejected.
+    await notifyInApp({
+      toRoles: ["WAREHOUSE", "ADMIN"],
+      category: "ACTION",
+      type: "TRANSFER_RECEIVE",
+      title: "Stock transfer to handle",
+      body: `Transfer ${transfer.code} was created (${merged.size} product${merged.size > 1 ? "s" : ""}).`,
+      actorName: actor.name,
+      entityType: "WarehouseTransfer",
+      entityId: transfer.id,
+      actionUrl: "/warehouse/transfers",
+      actionLabel: "Review transfer",
+    });
     return ok({ code: transfer.code }, "Transfer created — awaiting approval.");
   } catch (e) {
     return fail(errorMessage(e));
@@ -282,6 +296,7 @@ export async function receiveTransfer(id: string): Promise<ActionResult> {
       summary: `Transfer ${t.code} received & reconciled at destination.`,
     });
     revalidateTransfers();
+    await resolveInApp("WarehouseTransfer", id); // stop the warehouse ring
     return ok(undefined, "Received. Destination stock updated.");
   } catch (e) {
     return fail(errorMessage(e));
@@ -311,6 +326,7 @@ export async function rejectTransfer(id: string, note?: string): Promise<ActionR
       summary: `Transfer ${t.code} rejected.`,
     });
     revalidateTransfers();
+    await resolveInApp("WarehouseTransfer", id); // stop the warehouse ring
     return ok(undefined, "Transfer rejected.");
   } catch (e) {
     return fail(errorMessage(e));

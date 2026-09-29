@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { notifyInApp, resolveInApp } from "@/lib/notifications/in-app";
 import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
@@ -194,6 +195,34 @@ export async function createRequest(
 
     revalidateAll();
     revalidatePath("/admin/payments");
+    // Credit orders need admin credit approval; cash orders need payment confirmed.
+    if (isCredit) {
+      await notifyInApp({
+        toRoles: ["ADMIN"],
+        category: "ACTION",
+        type: "ORDER_APPROVE",
+        title: "New credit order",
+        body: `${actor.name} submitted credit order ${request.code} (${merged.size} item${merged.size > 1 ? "s" : ""}).`,
+        actorName: actor.name,
+        entityType: "Request",
+        entityId: request.id,
+        actionUrl: "/admin/requests",
+        actionLabel: "Review order",
+      });
+    } else {
+      await notifyInApp({
+        toRoles: ["ADMIN", "FINANCE"],
+        category: "ACTION",
+        type: "ORDER_PAYMENT_VERIFY",
+        title: "Order payment to confirm",
+        body: `${actor.name} placed cash order ${request.code} — awaiting payment confirmation.`,
+        actorName: actor.name,
+        entityType: "Request",
+        entityId: request.id,
+        actionUrl: "/admin/payments",
+        actionLabel: "Confirm payment",
+      });
+    }
     return ok(
       { code: request.code, id: request.id },
       isCredit
@@ -520,6 +549,23 @@ export async function approveRequest(
     });
 
     revalidateAll();
+    // Credit approval releases the order to the warehouse → clear the admin ring,
+    // ring the warehouse to dispatch.
+    await resolveInApp("Request", request.id);
+    if (isCredit) {
+      await notifyInApp({
+        toRoles: ["WAREHOUSE", "ADMIN"],
+        category: "ACTION",
+        type: "ORDER_DISPATCH",
+        title: "Order ready to dispatch",
+        body: `Order ${request.code} for ${request.requester.name} is approved — dispatch it${request.warehouseName ? ` from ${request.warehouseName}` : ""}.`,
+        actorName: admin.name,
+        entityType: "Request",
+        entityId: request.id,
+        actionUrl: "/warehouse/orders",
+        actionLabel: "Dispatch",
+      });
+    }
     return ok(
       undefined,
       isCredit
@@ -564,6 +610,7 @@ export async function rejectRequest(
       summary: `Request ${request.code} rejected.`,
     });
     revalidateAll();
+    await resolveInApp("Request", request.id);
     return ok(undefined, `Request ${request.code} rejected.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -617,6 +664,7 @@ export async function dispatchOrder(requestId: string): Promise<ActionResult> {
       summary: `Order ${request.code} accepted & dispatched — in transit.`,
     });
     revalidateAll();
+    await resolveInApp("Request", requestId); // warehouse dispatched → stop the ring
     return ok(undefined, "Accepted & dispatched — now in transit.");
   } catch (e) {
     return fail(errorMessage(e));
@@ -655,6 +703,7 @@ export async function declineOrder(
       summary: `Order ${request.code} declined${note ? ` — ${note}` : ""}.`,
     });
     revalidateAll();
+    await resolveInApp("Request", requestId);
     return ok(undefined, "Order declined.");
   } catch (e) {
     return fail(errorMessage(e));
@@ -851,6 +900,7 @@ export async function fulfillRequest(
     });
 
     revalidateAll();
+    await resolveInApp("Request", requestId); // fulfilled → stop the warehouse ring
     return ok(
       undefined,
       isCredit
@@ -892,6 +942,7 @@ export async function cancelRequest(
       summary: `Request ${request.code} cancelled.`,
     });
     revalidateAll();
+    await resolveInApp("Request", requestId);
     return ok(undefined, `Request ${request.code} cancelled.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -1087,6 +1138,20 @@ export async function confirmOrderPayment(
     });
     revalidateAll();
     revalidatePath("/admin/payments");
+    // Payment confirmed → clear the admin/finance ring, ring the warehouse to dispatch.
+    await resolveInApp("Request", requestId);
+    await notifyInApp({
+      toRoles: ["WAREHOUSE", "ADMIN"],
+      category: "ACTION",
+      type: "ORDER_DISPATCH",
+      title: "Order ready to dispatch",
+      body: `Order ${request.code} for ${request.requester.name} is paid — dispatch it${request.warehouseName ? ` from ${request.warehouseName}` : ""}.`,
+      actorName: admin.name,
+      entityType: "Request",
+      entityId: request.id,
+      actionUrl: "/warehouse/orders",
+      actionLabel: "Dispatch",
+    });
     return ok(undefined, `Payment confirmed — ${request.code} released to the warehouse.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -1131,6 +1196,7 @@ export async function rejectOrderPayment(
     });
     revalidateAll();
     revalidatePath("/admin/payments");
+    await resolveInApp("Request", requestId);
     return ok(undefined, `Payment rejected — ${request.code} returned for review.`);
   } catch (e) {
     return fail(errorMessage(e));

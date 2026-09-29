@@ -9,6 +9,7 @@ import { refCode, formatCurrency } from "@/lib/utils";
 import { EXPENSE_CATEGORY_VALUES, EXPENSE_LABELS } from "@/lib/expense-categories";
 import { resolveReceivingAccount, METHOD_LABEL } from "@/lib/payment-methods";
 import { notifyExpensesRecorded } from "@/lib/notifications/ceo-alerts";
+import { notifyInApp, resolveInApp } from "@/lib/notifications/in-app";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 import {
   attachAfterCommit,
@@ -145,6 +146,19 @@ export async function submitExpenseClaim(
     revalidateClaims();
     // Alert the CEO after the commit (worded as recorded, not requested).
     await notifyExpensesRecorded(actor.name, d.items.length, total);
+    // Ring the CEO in-app — repeats until they approve/reject the submission.
+    await notifyInApp({
+      toRoles: ["ADMIN"],
+      category: "ACTION",
+      type: "EXPENSE_APPROVE",
+      title: "Expenses to review",
+      body: `${actor.name} recorded ${d.items.length} ${d.items.length === 1 ? "expense" : "expenses"} totalling ${formatCurrency(total)}.`,
+      actorName: actor.name,
+      entityType: "ExpenseClaim",
+      entityId: claim.id,
+      actionUrl: "/admin/finance/operational-fund",
+      actionLabel: "Review expenses",
+    });
 
     return ok(
       undefined,
@@ -255,6 +269,19 @@ export async function approveExpenseClaim(
     });
 
     revalidateClaims();
+    await resolveInApp("ExpenseClaim", claim.id);
+    await notifyInApp({
+      toUserId: claim.recordedById,
+      category: "INFO",
+      type: "EXPENSE_APPROVED",
+      title: "Expenses approved",
+      body: `The CEO approved your ${claim.items.length} ${claim.items.length === 1 ? "expense" : "expenses"} (${formatCurrency(total)}).`,
+      actorName: actor.name,
+      entityType: "ExpenseClaim",
+      entityId: claim.id,
+      actionUrl: "/finance/operational-fund",
+      actionLabel: "View",
+    });
     return ok(
       undefined,
       `${claim.items.length} ${claim.items.length === 1 ? "expense" : "expenses"} approved — ${formatCurrency(total)} booked to the account.`,
@@ -295,6 +322,19 @@ export async function rejectExpenseClaim(id: string, note?: string): Promise<Act
     });
 
     revalidateClaims();
+    await resolveInApp("ExpenseClaim", claim.id);
+    await notifyInApp({
+      toUserId: claim.recordedById,
+      category: "INFO",
+      type: "EXPENSE_REJECTED",
+      title: "Expenses declined",
+      body: `The CEO declined your expense submission ${claim.code}${note?.trim() ? `: ${note.trim()}` : ""}.`,
+      actorName: actor.name,
+      entityType: "ExpenseClaim",
+      entityId: claim.id,
+      actionUrl: "/finance/operational-fund",
+      actionLabel: "View",
+    });
     return ok(undefined, `Submission ${claim.code} rejected — nothing was booked.`);
   } catch (e) {
     return fail(errorMessage(e));

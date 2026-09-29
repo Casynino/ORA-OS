@@ -7,6 +7,7 @@ import { requireActor } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 import { notifyCreditSelfExtended } from "@/lib/notifications/ceo-alerts";
+import { notifyInApp, resolveInApp } from "@/lib/notifications/in-app";
 import type { FieldCreditStatus } from "@prisma/client";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -153,6 +154,7 @@ export async function createCreditExtension(
     // serializes them: the loser sees the winner's committed APPROVED row and
     // correctly routes to a PENDING request. (A unique index is NOT usable here —
     // a sale legitimately accrues several approved extensions over its life.)
+    let extReqId = "";
     const result = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT id FROM "FieldSale" WHERE id = ${sale.id} FOR UPDATE`;
       const fresh = await tx.fieldSale.findUnique({
@@ -202,7 +204,7 @@ export async function createCreditExtension(
           },
         });
       } else {
-        await tx.creditExtensionRequest.create({
+        const created = await tx.creditExtensionRequest.create({
           data: {
             saleId: sale.id,
             customerId: sale.customerId,
@@ -213,7 +215,9 @@ export async function createCreditExtension(
             financeNotes: d.financeNotes?.trim() || null,
             requestedById: actor.id,
           },
+          select: { id: true },
         });
+        extReqId = created.id;
       }
       return { selfService, outstanding: owe, originalDueDate: fresh.dueDate };
     });
@@ -251,6 +255,19 @@ export async function createCreditExtension(
       summary: `${actor.name} requested a 2nd credit extension on ${sale.code} (${who}) — new date ${requestedDueDate.toLocaleDateString()}, TSh ${result.outstanding.toLocaleString()} outstanding.`,
     });
     revalidateExtensions();
+    // Ring the CEO — repeats until they approve/reject the extension.
+    await notifyInApp({
+      toRoles: ["ADMIN"],
+      category: "ACTION",
+      type: "CREDIT_EXTENSION",
+      title: "Credit extension to approve",
+      body: `${actor.name} requested a 2nd due-date extension on ${sale.code} (${who}).`,
+      actorName: actor.name,
+      entityType: "CreditExtensionRequest",
+      entityId: extReqId,
+      actionUrl: "/admin/credit/extensions",
+      actionLabel: "Review extension",
+    });
     return ok(undefined, "This sale was already extended once — your request was sent to the boss for approval.");
   } catch (e) {
     return fail(errorMessage(e));
@@ -400,6 +417,19 @@ export async function approveCreditExtension(
       summary: `${actor.name} approved a credit extension on ${req.sale.code} (${who}) — new due date ${req.requestedDueDate.toLocaleDateString()}.`,
     });
     revalidateExtensions();
+    await resolveInApp("CreditExtensionRequest", req.id);
+    await notifyInApp({
+      toUserId: req.requestedById,
+      category: "INFO",
+      type: "CREDIT_EXTENSION_RESULT",
+      title: "Extension approved",
+      body: `Your credit extension on ${req.sale.code} (${who}) was approved.`,
+      actorName: actor.name,
+      entityType: "CreditExtensionRequest",
+      entityId: req.id,
+      actionUrl: "/rep/customers",
+      actionLabel: "View",
+    });
     return ok(undefined, "Extension approved — the due date has been updated.");
   } catch (e) {
     return fail(errorMessage(e));
@@ -446,6 +476,19 @@ export async function rejectCreditExtension(
       summary: `${actor.name} rejected the credit extension on ${req.sale.code} (${who}).`,
     });
     revalidateExtensions();
+    await resolveInApp("CreditExtensionRequest", req.id);
+    await notifyInApp({
+      toUserId: req.requestedById,
+      category: "INFO",
+      type: "CREDIT_EXTENSION_RESULT",
+      title: "Extension declined",
+      body: `Your credit extension on ${req.sale.code} (${who}) was declined.`,
+      actorName: actor.name,
+      entityType: "CreditExtensionRequest",
+      entityId: req.id,
+      actionUrl: "/rep/customers",
+      actionLabel: "View",
+    });
     return ok(undefined, "Extension rejected — the due date stays as it was.");
   } catch (e) {
     return fail(errorMessage(e));

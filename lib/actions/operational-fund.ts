@@ -11,6 +11,7 @@ import { resolveReceivingAccount, METHOD_LABEL } from "@/lib/payment-methods";
 import { notifyFundRequest } from "@/lib/notifications/ceo-alerts";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 import { attachAfterCommit, filesFromInput, attachmentsInputSchema } from "@/lib/services/attachments";
+import { notifyInApp, resolveInApp } from "@/lib/notifications/in-app";
 import type { ExpenseCategory } from "@prisma/client";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,6 +121,19 @@ export async function requestOperationalFunds(
     revalidateFund();
     // Executive alert: WhatsApp the CEO so they can review/approve promptly.
     await notifyFundRequest(actor.name, total, d.items.map((it) => fundItemDescription(it)));
+    // Ring the CEO in-app — repeats until they approve/reject.
+    await notifyInApp({
+      toRoles: ["ADMIN"],
+      category: "ACTION",
+      type: "FUND_REQUEST",
+      title: "Operational fund request",
+      body: `${actor.name} requested ${formatCurrency(total)} for the Operational Fund (${req.code}).`,
+      actorName: actor.name,
+      entityType: "PettyCashRequest",
+      entityId: req.id,
+      actionUrl: "/admin/finance/operational-fund",
+      actionLabel: "Review request",
+    });
     return ok({ code: req.code }, `${req.code} sent to the CEO for approval.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -195,6 +209,20 @@ export async function approveOperationalFundRequest(
       summary: `CEO approved & funded ${formatCurrency(req.amount)} for ${req.requestedBy.name} (${req.code}) — money-out booked; awaiting Finance's receipt confirmation.`,
     });
     revalidateFund();
+    // CEO handled the request → stop that ring; now ring FINANCE to confirm receipt.
+    await resolveInApp("PettyCashRequest", req.id);
+    await notifyInApp({
+      toRoles: ["FINANCE"],
+      category: "ACTION",
+      type: "FUND_RECEIPT",
+      title: "Confirm funds received",
+      body: `${formatCurrency(req.amount)} was issued for ${req.code} — confirm you received it.`,
+      actorName: admin.name,
+      entityType: "PettyCashRequest",
+      entityId: req.id,
+      actionUrl: "/finance/operational-fund",
+      actionLabel: "Confirm receipt",
+    });
     return ok(undefined, `${req.code} approved — ${formatCurrency(req.amount)} sent; awaiting Finance confirmation.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -220,6 +248,19 @@ export async function rejectOperationalFundRequest(id: string, note?: string): P
       summary: `CEO rejected Operational Fund request ${req.code}${note?.trim() ? ` — ${note.trim()}` : ""}.`,
     });
     revalidateFund();
+    await resolveInApp("PettyCashRequest", req.id);
+    await notifyInApp({
+      toUserId: req.requestedById,
+      category: "INFO",
+      type: "FUND_REJECTED",
+      title: "Fund request declined",
+      body: `The CEO declined your Operational Fund request ${req.code}${note?.trim() ? `: ${note.trim()}` : ""}.`,
+      actorName: admin.name,
+      entityType: "PettyCashRequest",
+      entityId: req.id,
+      actionUrl: "/finance/operational-fund",
+      actionLabel: "View",
+    });
     return ok(undefined, "Request rejected.");
   } catch (e) {
     return fail(errorMessage(e));
@@ -258,6 +299,7 @@ export async function issueOperationalFunds(
     const d = parsed.data;
     const total = d.items.reduce((s, it) => s + it.amount, 0);
     let code = "";
+    let issuedId = "";
     await prisma.$transaction(async (tx) => {
       const account = await resolveReceivingAccount(tx, d.paymentAccountId || null, null);
       const req = await tx.pettyCashRequest.create({
@@ -283,6 +325,7 @@ export async function issueOperationalFunds(
         },
       });
       code = req.code;
+      issuedId = req.id;
       // Money-out now — one Expense per line, drawing down the chosen account.
       for (const it of d.items) {
         await tx.expense.create({
@@ -311,6 +354,19 @@ export async function issueOperationalFunds(
       summary: `CEO issued ${formatCurrency(total)} to the Operational Fund (${code}, ${d.items.length} item${d.items.length === 1 ? "" : "s"}) — money-out booked; awaiting Finance's receipt confirmation.`,
     });
     revalidateFund();
+    // Ring FINANCE to confirm they received it — repeats until confirmed/recalled.
+    await notifyInApp({
+      toRoles: ["FINANCE"],
+      category: "ACTION",
+      type: "FUND_RECEIPT",
+      title: "Confirm funds received",
+      body: `The CEO issued ${formatCurrency(total)} to the Operational Fund (${code}) — confirm you received it.`,
+      actorName: admin.name,
+      entityType: "PettyCashRequest",
+      entityId: issuedId,
+      actionUrl: "/finance/operational-fund",
+      actionLabel: "Confirm receipt",
+    });
     return ok({ code }, `${formatCurrency(total)} issued — Finance will confirm receipt.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -375,6 +431,7 @@ export async function confirmOperationalFundReceipt(id: string): Promise<ActionR
       summary: `${actor.name} confirmed receipt of ${formatCurrency(req.amount)} (${req.code}) — the fund is now spendable.`,
     });
     revalidateFund();
+    await resolveInApp("PettyCashRequest", req.id); // stop the finance confirm-receipt ring
     return ok(undefined, `Receipt confirmed — ${formatCurrency(req.amount)} added to the fund.`);
   } catch (e) {
     return fail(errorMessage(e));
@@ -409,6 +466,7 @@ export async function cancelIssuedFund(id: string): Promise<ActionResult> {
       summary: `CEO recalled ${formatCurrency(amount)} (${req.code}) before confirmation — money-out reversed, funds returned to the account.`,
     });
     revalidateFund();
+    await resolveInApp("PettyCashRequest", req.id); // stop the finance confirm-receipt ring
     return ok(undefined, "Allocation recalled — funds returned to the account.");
   } catch (e) {
     return fail(errorMessage(e));
