@@ -14,7 +14,7 @@ export async function approveAgent(userId: string): Promise<ActionResult> {
   try {
     const admin = await requireActor(["ADMIN"]);
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return fail("User not found.");
+    if (!user || user.role === "DEVELOPER") return fail("User not found.");
     if (user.status === "ACTIVE") return fail("This account is already active.");
 
     await prisma.user.update({
@@ -147,7 +147,7 @@ export async function rejectApplication(
   try {
     const admin = await requireActor(["ADMIN", "FINANCE"]);
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return fail("Application not found.");
+    if (!user || user.role === "DEVELOPER") return fail("Application not found.");
     if (user.status !== "PENDING") {
       return fail("Only pending applications can be rejected.");
     }
@@ -193,7 +193,8 @@ export async function setUserStatus(
     const user = await prisma.user.findUnique({
       where: { id: parsed.data.userId },
     });
-    if (!user) return fail("User not found.");
+    // The Developer account is managed only from the Developer console.
+    if (!user || user.role === "DEVELOPER") return fail("User not found.");
 
     await prisma.user.update({
       where: { id: user.id },
@@ -512,7 +513,7 @@ export async function updateCustomer(
     const user = await prisma.user.findUnique({
       where: { id: parsed.data.userId },
     });
-    if (!user) return fail("Customer not found.");
+    if (!user || user.role === "DEVELOPER") return fail("Customer not found.");
 
     // Guard against email collisions with another account.
     if (parsed.data.email.toLowerCase() !== user.email.toLowerCase()) {
@@ -581,9 +582,10 @@ export async function resetPartnerPassword(
     }
     const user = await prisma.user.findUnique({
       where: { id: parsed.data.userId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, role: true },
     });
-    if (!user) return fail("Customer not found.");
+    // An Admin must never be able to reset the Developer account's password.
+    if (!user || user.role === "DEVELOPER") return fail("Customer not found.");
 
     await prisma.user.update({
       where: { id: user.id },

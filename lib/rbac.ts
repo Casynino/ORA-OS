@@ -12,6 +12,8 @@ export function dashboardPath(role?: Role | string | null): string {
       return "/warehouse";
     case "SALES_REP":
       return "/rep";
+    case "DEVELOPER":
+      return "/developer";
     default:
       return "/partner";
   }

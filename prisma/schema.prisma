@@ -29,6 +29,7 @@ enum Role {
   WAREHOUSE
   PARTNER
   SALES_REP
+  DEVELOPER // technical maintenance account — NOT a business role: no money/stock powers, separate /developer area, fully audited
 }
 
 enum UserStatus {

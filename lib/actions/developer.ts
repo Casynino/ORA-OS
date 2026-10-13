@@ -1,0 +1,245 @@
+"use server";
+
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import type { Role, UserStatus } from "@prisma/client";
+import { prisma } from "@/lib/db";
+import { requireActor } from "@/lib/rbac";
+import { writeDevAudit, writeDevAuditSafe, requestMeta } from "@/lib/developer/audit";
+import { notifyInApp } from "@/lib/notifications/in-app";
+import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Developer console — user ACCESS management.
+//
+//  Every action here:
+//   • is server-authorised for the DEVELOPER role only (never ADMIN/staff),
+//   • needs a written reason (≥10 chars) AND the word CONFIRM typed,
+//   • refuses to touch the business owner's Admin account, other Developer
+//     accounts, or the Developer's own account,
+//   • writes its audit row INSIDE the same transaction as the change — if the
+//     audit row can't be written, the change does not happen,
+//   • records failures too, always under the Developer's OWN identity,
+//   • sends the business owner an in-app heads-up (her WhatsApp/CallMeBot setup
+//     is untouched).
+//  There is intentionally NO password-reset here: it would let the Developer
+//  sign in AS another person, and their later actions would carry that person's
+//  name — exactly what the audit rules forbid.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const baseSchema = z.object({
+  userId: z.string().min(1),
+  reason: z
+    .string()
+    .trim()
+    .min(10, "Give a reason (at least 10 characters).")
+    .max(300, "Keep the reason under 300 characters."),
+  confirm: z.string(),
+});
+
+const statusSchema = baseSchema.extend({
+  status: z.enum(["ACTIVE", "SUSPENDED"]),
+});
+
+type Target = {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  status: UserStatus;
+};
+
+/** Which accounts the Developer console may NOT change. null = allowed. */
+function refuseTarget(actorId: string, target: Target | null): string | null {
+  if (!target) return "User not found.";
+  if (target.id === actorId) return "You can't change your own account here.";
+  if (target.role === "ADMIN")
+    return "The business owner's Admin account can't be changed from the Developer console.";
+  if (target.role === "DEVELOPER") return "Developer accounts can't be changed here.";
+  return null;
+}
+
+async function loadTarget(userId: string): Promise<Target | null> {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, name: true, email: true, role: true, status: true },
+  });
+}
+
+function revalidateUsers() {
+  revalidatePath("/developer/users");
+  revalidatePath("/developer/audit");
+  revalidatePath("/admin/users");
+}
+
+/** Suspend or re-activate a (non-Admin) staff/partner account. */
+export async function devSetUserStatus(
+  input: z.infer<typeof statusSchema>,
+): Promise<ActionResult> {
+  let actor;
+  try {
+    actor = await requireActor(["DEVELOPER"]);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+  const meta = requestMeta(await headers());
+  const parsed = statusSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid request.");
+  const d = parsed.data;
+  if (d.confirm.trim() !== "CONFIRM") return fail("Type CONFIRM to proceed.");
+
+  const target = await loadTarget(d.userId);
+  const refusal = refuseTarget(actor.id, target);
+  if (refusal || !target) {
+    await writeDevAuditSafe({
+      actor: { id: actor.id, name: actor.name ?? "Developer" },
+      action: "DEV_USER_STATUS_CHANGED",
+      entity: "User",
+      entityId: d.userId,
+      summary: `Refused: change account status — ${refusal}`,
+      outcome: "FAILED",
+      reason: d.reason,
+      ...meta,
+    });
+    return fail(refusal ?? "User not found.");
+  }
+  if (target.status === d.status) return fail(`${target.name} is already ${d.status.toLowerCase()}.`);
+
+  const verb = d.status === "SUSPENDED" ? "suspended" : "re-activated";
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Compare-and-swap on the status we showed the Developer, so a concurrent
+      // change can't be silently overwritten.
+      const claimed = await tx.user.updateMany({
+        where: { id: target.id, status: target.status },
+        data: { status: d.status },
+      });
+      if (claimed.count === 0)
+        throw new Error("This account changed while you were reviewing it — refresh and try again.");
+      await writeDevAudit(tx, {
+        actor: { id: actor.id, name: actor.name ?? "Developer" },
+        action: "DEV_USER_STATUS_CHANGED",
+        entity: "User",
+        entityId: target.id,
+        summary: `Developer ${verb} ${target.name} (${target.email}, ${target.role}).`,
+        outcome: "SUCCESS",
+        reason: d.reason,
+        before: { status: target.status },
+        after: { status: d.status },
+        ...meta,
+      });
+    });
+  } catch (e) {
+    await writeDevAuditSafe({
+      actor: { id: actor.id, name: actor.name ?? "Developer" },
+      action: "DEV_USER_STATUS_CHANGED",
+      entity: "User",
+      entityId: target.id,
+      summary: `Failed to change ${target.name}'s status to ${d.status}: ${errorMessage(e)}`,
+      outcome: "FAILED",
+      reason: d.reason,
+      before: { status: target.status },
+      ...meta,
+    });
+    return fail(errorMessage(e));
+  }
+
+  // Heads-up to the business owner (in-app only; WhatsApp setup untouched).
+  await notifyInApp({
+    toRoles: ["ADMIN"],
+    category: "INFO",
+    type: "DEVELOPER_ACTION",
+    title: "Developer changed an account",
+    body: `${actor.name} (Developer) ${verb} ${target.name}. Reason: ${d.reason}`,
+    actorName: `${actor.name} (Developer)`,
+    entityType: "User",
+    entityId: target.id,
+    actionUrl: "/admin/activity",
+    actionLabel: "View activity",
+  });
+  revalidateUsers();
+  return ok(undefined, `${target.name} ${verb}.`);
+}
+
+const signOutSchema = baseSchema;
+
+/** Sign a (non-Admin) account out of every device. */
+export async function devForceSignOut(
+  input: z.infer<typeof signOutSchema>,
+): Promise<ActionResult> {
+  let actor;
+  try {
+    actor = await requireActor(["DEVELOPER"]);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+  const meta = requestMeta(await headers());
+  const parsed = signOutSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid request.");
+  const d = parsed.data;
+  if (d.confirm.trim() !== "CONFIRM") return fail("Type CONFIRM to proceed.");
+
+  const target = await loadTarget(d.userId);
+  const refusal = refuseTarget(actor.id, target);
+  if (refusal || !target) {
+    await writeDevAuditSafe({
+      actor: { id: actor.id, name: actor.name ?? "Developer" },
+      action: "DEV_USER_SIGNED_OUT",
+      entity: "User",
+      entityId: d.userId,
+      summary: `Refused: force sign-out — ${refusal}`,
+      outcome: "FAILED",
+      reason: d.reason,
+      ...meta,
+    });
+    return fail(refusal ?? "User not found.");
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: target.id },
+        data: { sessionVersion: { increment: 1 } },
+      });
+      await writeDevAudit(tx, {
+        actor: { id: actor.id, name: actor.name ?? "Developer" },
+        action: "DEV_USER_SIGNED_OUT",
+        entity: "User",
+        entityId: target.id,
+        summary: `Developer signed ${target.name} (${target.email}) out of all devices.`,
+        outcome: "SUCCESS",
+        reason: d.reason,
+        after: { sessionsRevoked: true },
+        ...meta,
+      });
+    });
+  } catch (e) {
+    await writeDevAuditSafe({
+      actor: { id: actor.id, name: actor.name ?? "Developer" },
+      action: "DEV_USER_SIGNED_OUT",
+      entity: "User",
+      entityId: target.id,
+      summary: `Failed to sign ${target.name} out: ${errorMessage(e)}`,
+      outcome: "FAILED",
+      reason: d.reason,
+      ...meta,
+    });
+    return fail(errorMessage(e));
+  }
+
+  await notifyInApp({
+    toRoles: ["ADMIN"],
+    category: "INFO",
+    type: "DEVELOPER_ACTION",
+    title: "Developer signed a user out",
+    body: `${actor.name} (Developer) signed ${target.name} out of all devices. Reason: ${d.reason}`,
+    actorName: `${actor.name} (Developer)`,
+    entityType: "User",
+    entityId: target.id,
+    actionUrl: "/admin/activity",
+    actionLabel: "View activity",
+  });
+  revalidateUsers();
+  return ok(undefined, `${target.name} was signed out everywhere.`);
+}

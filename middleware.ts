@@ -8,6 +8,7 @@ function dashboardFor(role?: string) {
   if (role === "FINANCE") return "/finance";
   if (role === "WAREHOUSE") return "/warehouse";
   if (role === "SALES_REP") return "/rep";
+  if (role === "DEVELOPER") return "/developer";
   return "/partner";
 }
 
@@ -22,7 +23,9 @@ export default auth((req) => {
   const inWarehouse = path.startsWith("/warehouse");
   const inPartner = path.startsWith("/partner");
   const inRep = path.startsWith("/rep");
-  const isProtected = inAdmin || inFinance || inWarehouse || inPartner || inRep;
+  const inDeveloper = path.startsWith("/developer");
+  const isProtected =
+    inAdmin || inFinance || inWarehouse || inPartner || inRep || inDeveloper;
 
   // Note: signed-in users are bounced away from /login by the login page
   // itself (Node runtime, DB-validated) — the edge token here can be stale
@@ -46,6 +49,10 @@ export default auth((req) => {
     if (inPartner && role !== "PARTNER")
       return Response.redirect(new URL(dashboardFor(role), nextUrl));
     if (inRep && role !== "SALES_REP")
+      return Response.redirect(new URL(dashboardFor(role), nextUrl));
+    // The Developer area is Developer-only (and a Developer can't wander into
+    // business areas — each guard above bounces them back to /developer).
+    if (inDeveloper && role !== "DEVELOPER")
       return Response.redirect(new URL(dashboardFor(role), nextUrl));
   }
 });

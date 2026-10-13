@@ -4,11 +4,20 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { authConfig } from "./auth.config";
 import { prisma } from "@/lib/db";
+import { authenticateDeveloper } from "@/lib/developer/login";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  // Which login the user chose. Defaults to "staff" so every existing caller
+  // (and the existing staff form) behaves exactly as before.
+  mode: z.enum(["staff", "developer"]).default("staff"),
+  code: z.string().optional(), // authenticator code — Developer login only
 });
+
+// A Developer session is deliberately short-lived (8h), independent of the
+// longer staff session lifetime.
+const DEV_SESSION_MS = 8 * 60 * 60 * 1000;
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -17,12 +26,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        mode: { label: "Mode", type: "text" },
+        code: { label: "Code", type: "text" },
       },
       async authorize(credentials, request) {
         const parsed = credentialsSchema.safeParse(credentials);
         if (!parsed.success) return null;
 
-        const { email, password } = parsed.data;
+        const { email, password, mode, code } = parsed.data;
         const user = await prisma.user.findUnique({
           where: { email: email.toLowerCase().trim() },
         });
@@ -33,14 +44,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // surfaces a friendly message for these states.
         if (user.status !== "ACTIVE") return null;
 
-        const valid = await bcrypt.compare(password, user.passwordHash);
-        if (!valid) return null;
-
-        // Record the sign-in — powers the profile's login history.
         const headers = request?.headers;
         const ip =
           headers?.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
         const userAgent = headers?.get("user-agent")?.slice(0, 300) || null;
+
+        // ── Two separate doors ─────────────────────────────────────────────
+        // The Developer account can ONLY come in through the Developer login
+        // (password + authenticator code + lockout), and staff accounts can
+        // ONLY come in through the staff login. Enforced here — not just in the
+        // form — so the raw /api/auth endpoint can't be used to cross over.
+        const isDeveloper = user.role === "DEVELOPER";
+        if (isDeveloper !== (mode === "developer")) return null;
+
+        if (isDeveloper) {
+          const ok = await authenticateDeveloper(user, password, code, { ip, userAgent });
+          if (!ok) return null;
+        } else {
+          const valid = await bcrypt.compare(password, user.passwordHash);
+          if (!valid) return null;
+        }
+
+        // Record the sign-in — powers the profile's login history.
         try {
           await prisma.$transaction([
             prisma.loginEvent.create({
@@ -82,6 +107,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.preferredName = user.preferredName ?? null;
         token.avatar = user.avatar ?? null;
         token.sv = user.sessionVersion ?? 0;
+        if (user.role === "DEVELOPER") token.devAt = Date.now();
         return token;
       }
       if (!token.id) return token;
@@ -101,6 +127,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Gone, suspended, or signed out everywhere → invalidate this session.
         if (!db || db.status !== "ACTIVE") return null;
         if (((token.sv as number | undefined) ?? 0) !== db.sessionVersion) return null;
+        // Developer sessions expire after 8h; a developer token with no timestamp
+        // is treated as expired (fail closed).
+        if (db.role === "DEVELOPER") {
+          const at = token.devAt as number | undefined;
+          if (!at || Date.now() - at > DEV_SESSION_MS) return null;
+        }
         token.name = db.name;
         token.email = db.email;
         token.role = db.role;

@@ -27,7 +27,9 @@ export default async function AdminUsersPage() {
     pricesByPartner.set(pp.partnerId, m);
   }
 
-  const dto = users.map((u) => ({
+  // The Developer account isn't a business user and isn't managed from here —
+  // its actions are visible to the Admin through the activity log instead.
+  const dto = users.filter((u) => u.role !== "DEVELOPER").map((u) => ({
     id: u.id,
     name: u.name,
     email: u.email,

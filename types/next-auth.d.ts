@@ -29,5 +29,6 @@ declare module "next-auth/jwt" {
     preferredName?: string | null;
     avatar?: string | null;
     sv?: number;
+    devAt?: number; // Developer sessions only: sign-in time, for the 8h expiry
   }
 }

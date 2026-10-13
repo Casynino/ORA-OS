@@ -8,11 +8,14 @@ import { signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { dashboardPath } from "@/lib/rbac";
+import { isDeveloperLocked, DEV_LOCK_WINDOW_MIN } from "@/lib/developer/login";
 import { fail, ok, type ActionResult } from "@/lib/types";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email address."),
   password: z.string().min(1, "Enter your password."),
+  mode: z.enum(["staff", "developer"]).default("staff"),
+  code: z.string().optional(),
 });
 
 export async function loginAction(
@@ -22,14 +25,55 @@ export async function loginAction(
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
+    mode: formData.get("mode") ?? "staff",
+    code: formData.get("code") ?? undefined,
   });
   if (!parsed.success) {
     return fail("Please enter a valid email and password.");
   }
   const email = parsed.data.email.toLowerCase().trim();
+  const mode = parsed.data.mode;
 
-  // Friendly messaging for non-active accounts (authorize() returns null for these).
   const existing = await prisma.user.findUnique({ where: { email } });
+
+  // ── Developer login: its own door, password + authenticator code ──────────
+  if (mode === "developer") {
+    const code = (parsed.data.code ?? "").replace(/\s/g, "");
+    if (!/^\d{6}$/.test(code)) {
+      return fail("Enter the 6-digit code from your authenticator app.");
+    }
+    // Only tell the (genuine) developer about a lockout; everyone else gets the
+    // same generic failure, so this can't be used to probe which emails exist.
+    if (existing?.role === "DEVELOPER" && (await isDeveloperLocked(existing.id))) {
+      return fail(
+        `Too many failed attempts. Try again in ${DEV_LOCK_WINDOW_MIN} minutes.`,
+      );
+    }
+    try {
+      await signIn("credentials", {
+        email,
+        password: parsed.data.password,
+        mode: "developer",
+        code,
+        redirect: false,
+      });
+    } catch (error) {
+      if (error instanceof AuthError) {
+        return fail("Invalid email, password or code.");
+      }
+      throw error;
+    }
+    // authorize() already wrote the DEV_LOGIN audit row.
+    redirect(dashboardPath("DEVELOPER"));
+  }
+
+  // ── Staff login (unchanged behaviour) ─────────────────────────────────────
+  // The Developer account cannot sign in here — same generic failure as a wrong
+  // password, so the staff form never confirms a Developer account exists.
+  if (existing?.role === "DEVELOPER") {
+    return fail("Invalid email or password.");
+  }
+  // Friendly messaging for non-active accounts (authorize() returns null for these).
   if (existing?.status === "PENDING") {
     return fail("Your partner account is awaiting admin approval.");
   }
@@ -41,6 +85,7 @@ export async function loginAction(
     await signIn("credentials", {
       email,
       password: parsed.data.password,
+      mode: "staff",
       redirect: false,
     });
   } catch (error) {

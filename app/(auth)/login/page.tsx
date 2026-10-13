@@ -5,7 +5,12 @@ import { getCurrentUser, dashboardPath } from "@/lib/rbac";
 
 export const metadata: Metadata = { title: "Sign in" };
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string }>;
+}) {
+  const { mode } = await searchParams;
   // Validated against the database (unlike the edge middleware), so a session
   // revoked via "sign out everywhere" correctly lands here instead of looping.
   const user = await getCurrentUser();
@@ -21,7 +26,7 @@ export default async function LoginPage() {
       </p>
 
       <div className="mt-8">
-        <LoginForm />
+        <LoginForm initialMode={mode === "developer" ? "developer" : "staff"} />
       </div>
     </div>
   );
