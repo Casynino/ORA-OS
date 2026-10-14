@@ -12,7 +12,7 @@
 // • Refuses to run if a Developer account already exists, or if the database
 //   hasn't had scripts/developer-account.sql applied yet.
 
-import readline from "node:readline";
+import { ask as askPlain, askHidden } from "./_prompt.mjs";
 import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -29,19 +29,9 @@ function base32(buf) {
   return out;
 }
 
-function ask(question, { hidden = false } = {}) {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-    if (hidden) {
-      rl._writeToOutput = (s) => { if (s.includes(question)) rl.output.write(s); else rl.output.write("*"); };
-    }
-    rl.question(question, (answer) => {
-      rl.close();
-      if (hidden) process.stdout.write("\n");
-      resolve(answer.trim());
-    });
-  });
-}
+// ask() shows what you type; askHidden() never does (see _prompt.mjs).
+// `ask(q, { hidden: true })` is kept as a thin alias so every secret goes through askHidden.
+const ask = (q, { hidden = false } = {}) => (hidden ? askHidden(q).then((s) => s.trim()) : askPlain(q));
 
 function strongEnough(pw) {
   if (pw.length < 14) return "Use at least 14 characters.";
@@ -82,10 +72,19 @@ try {
   if (!name || !/^\S+@\S+\.\S+$/.test(email)) { console.log("Need a name and a valid email."); process.exit(1); }
   if (await prisma.user.findUnique({ where: { email } })) { console.log("That email is already used by another account."); process.exit(1); }
 
-  const pw = await ask("Choose a password (hidden): ", { hidden: true });
-  const weak = strongEnough(pw);
-  if (weak) { console.log(weak); process.exit(1); }
-  if (pw !== (await ask("Repeat the password: ", { hidden: true }))) { console.log("Passwords didn't match."); process.exit(1); }
+  // Keep asking until the password is strong AND typed twice the same — a typo or
+  // a too-short password never drops you out of the script.
+  console.log("\nChoose a NEW password: at least 14 characters, e.g. a few words, dashes and numbers.");
+  console.log("Don't reuse a password you've shown anyone or typed anywhere else.");
+  let pw = "";
+  for (let attempt = 1; ; attempt++) {
+    if (attempt > 6) { console.log("Too many tries. Nothing was created."); process.exit(1); }
+    pw = await askHidden("Choose a password (hidden): ");
+    const weak = strongEnough(pw);
+    if (weak) { console.log(`  ✗ ${weak} Try again.`); continue; }
+    if (pw === (await askHidden("Repeat the password: "))) break;
+    console.log("  ✗ The two passwords didn't match. Try again.");
+  }
 
   const secret = base32(randomBytes(20));
   let user;
