@@ -53,8 +53,8 @@ export function LoginForm({ initialMode = "staff" }: { initialMode?: Mode }) {
 
       {isDev && (
         <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-          Technical maintenance account. Requires your password and a code from
-          your authenticator app. Every action is audited.
+          Technical maintenance account. Every action you take is recorded
+          under your own name.
         </p>
       )}
 
@@ -90,23 +90,6 @@ export function LoginForm({ initialMode = "staff" }: { initialMode?: Mode }) {
           className="mt-1.5"
         />
       </div>
-
-      {isDev && (
-        <div>
-          <Label htmlFor="code">Authenticator code</Label>
-          <Input
-            id="code"
-            name="code"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            pattern="[0-9 ]*"
-            maxLength={7}
-            placeholder="6-digit code"
-            required
-            className="mt-1.5 tracking-widest"
-          />
-        </div>
-      )}
 
       <SubmitButton className="w-full" pendingText="Signing in…">
         {isDev ? "Sign in as Developer" : "Sign in"}

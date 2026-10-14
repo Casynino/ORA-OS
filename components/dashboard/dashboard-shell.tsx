@@ -55,6 +55,7 @@ import { Logo } from "@/components/brand/logo";
 import { Avatar } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationBell } from "@/components/app/notification-bell";
+import { ActingBanner, useActing } from "@/components/developer/acting-banner";
 import { logoutAction } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
 
@@ -124,6 +125,7 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const acting = useActing();
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const homeHref = nav[0]?.items[0]?.href ?? "/";
@@ -262,7 +264,14 @@ export function DashboardShell({
 
       {/* Content */}
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur lg:px-8">
+        {/* A Developer working as a staff member always sees who they really are. */}
+        {acting && <ActingBanner state={acting} />}
+        <header
+          className={cn(
+            "sticky z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur lg:px-8",
+            acting ? "top-9" : "top-0",
+          )}
+        >
           <div className="flex items-center gap-3">
             <button
               onClick={() => setOpen(true)}

@@ -22,6 +22,10 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE });
   }
+  // A Developer working as someone must never see or alter THEIR inbox.
+  if (user.impersonatedBy) {
+    return NextResponse.json({ items: [], waitingIds: [], unread: 0, v: "acting" }, { headers: NO_STORE });
+  }
   const inbox = await getInboxFor({ id: user.id, role: user.role });
   return NextResponse.json(inbox, { headers: NO_STORE });
 }
@@ -31,6 +35,7 @@ export async function POST(req: Request) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE });
   }
+  if (user.impersonatedBy) return NextResponse.json({ ok: true }, { headers: NO_STORE }); // no-op
   let body: { action?: string; id?: string } = {};
   try {
     body = await req.json();

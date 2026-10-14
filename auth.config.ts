@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import type { ActAs } from "@/lib/developer/acting";
 
 /**
  * Edge-safe Auth.js configuration. Contains NO Node-only dependencies
@@ -23,8 +24,11 @@ export const authConfig = {
     },
     session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id as string;
-        session.user.role = token.role as typeof session.user.role;
+        // While a Developer is working as a staff member, the middleware must
+        // route by THAT person's role (so they land in the right dashboard).
+        const act = token.actAs as ActAs | undefined;
+        session.user.id = (act ? act.id : token.id) as string;
+        session.user.role = (act ? act.role : token.role) as typeof session.user.role;
         session.user.status = token.status as typeof session.user.status;
       }
       return session;

@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { writeDevAuditSafe } from "@/lib/developer/audit";
 import { devActivatableIds } from "@/lib/developer/eligibility";
+import { canWorkAs } from "@/lib/developer/acting";
 import { DevUserActions } from "@/components/developer/user-actions";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,7 +44,7 @@ export default async function DeveloperUsersPage() {
     <div className="space-y-5">
       <PageHeader
         title="User access"
-        description="Suspend, re-activate or sign out an account. Each change needs a reason and is recorded under your name. The business owner's Admin account is protected."
+        description="Work as a team member to see and use their dashboard without their password — everything you do is recorded under your name. You can also suspend or sign out an account (each needs a reason). The business owner's Admin account is protected."
       />
       <Card>
         <CardContent className="p-0">
@@ -84,6 +85,7 @@ export default async function DeveloperUsersPage() {
                         name={u.name}
                         status={u.status}
                         canActivate={activatable.has(u.id)}
+                        canWorkAs={canWorkAs(u, me.id)}
                       />
                     )}
                   </TableCell>

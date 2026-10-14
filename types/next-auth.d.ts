@@ -9,6 +9,8 @@ declare module "next-auth" {
       status: UserStatus;
       preferredName?: string | null;
       avatar?: string | null;
+      /** Set ONLY while a Developer is working as this person — the real Developer. */
+      impersonatedBy?: { id: string; name: string } | null;
     } & DefaultSession["user"];
   }
 
@@ -30,5 +32,7 @@ declare module "next-auth/jwt" {
     avatar?: string | null;
     sv?: number;
     devAt?: number; // Developer sessions only: sign-in time, for the 8h expiry
+    /** Developer sessions only: the staff member currently being worked as. */
+    actAs?: { id: string; role: Role; name: string; email: string };
   }
 }

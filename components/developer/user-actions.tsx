@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, UserCheck, UserX } from "lucide-react";
-import { devSetUserStatus, devForceSignOut } from "@/lib/actions/developer";
+import { LogIn, LogOut, UserCheck, UserX } from "lucide-react";
+import { devSetUserStatus, devForceSignOut, devStartActing } from "@/lib/actions/developer";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,16 +40,33 @@ export function DevUserActions({
   name,
   status,
   canActivate,
+  canWorkAs,
 }: {
   userId: string;
   name: string;
   status: string;
   /** True only for accounts the Developer console itself suspended. */
   canActivate: boolean;
+  /** An active Finance / Warehouse / Sales Rep account you may work as. */
+  canWorkAs: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [kind, setKind] = useState<Kind | null>(null);
+  const [confirmWork, setConfirmWork] = useState(false);
+
+  function workAs() {
+    start(async () => {
+      const res = await devStartActing({ userId });
+      if (res.ok && res.data) {
+        // Full navigation so the whole app picks up the new session.
+        window.location.assign(res.data.redirectTo);
+      } else {
+        toast({ variant: "error", title: res.ok ? "Couldn't start." : res.error });
+        setConfirmWork(false);
+      }
+    });
+  }
   const [reason, setReason] = useState("");
   const [confirm, setConfirm] = useState("");
 
@@ -98,6 +115,11 @@ export function DevUserActions({
   return (
     <>
       <div className="flex flex-wrap justify-end gap-1.5">
+        {canWorkAs && (
+          <Button size="sm" onClick={() => setConfirmWork(true)}>
+            <LogIn className="size-3.5" /> Work as
+          </Button>
+        )}
         {status === "ACTIVE" ? (
           <Button size="sm" variant="outline" onClick={() => setKind("suspend")}>
             <UserX className="size-3.5" /> Suspend
@@ -111,6 +133,31 @@ export function DevUserActions({
           <LogOut className="size-3.5" /> Sign out
         </Button>
       </div>
+
+      {confirmWork && (
+        <Modal
+          open
+          onClose={() => setConfirmWork(false)}
+          title={`Work as ${name}?`}
+          description="You'll see and use their dashboard with their permissions, without needing their password."
+        >
+          <div className="space-y-4">
+            <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              Everything you do is recorded under <strong className="text-foreground">your</strong> name as
+              &ldquo;Developer as {name}&rdquo;, and the business owner is told. A bar at the top stays on screen
+              until you press <strong className="text-foreground">Stop</strong>.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setConfirmWork(false)} disabled={pending}>
+                Cancel
+              </Button>
+              <Button onClick={workAs} disabled={pending}>
+                {pending ? "Opening…" : `Work as ${name}`}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {kind && (
         <Modal open onClose={close} title={`${COPY[kind].title} — ${name}`} description={COPY[kind].blurb}>

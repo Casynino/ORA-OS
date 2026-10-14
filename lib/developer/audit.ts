@@ -37,9 +37,11 @@ export function devActorLabel(name: string) {
   return `${name} (Developer)`;
 }
 
-export async function writeDevAudit(db: Db, input: DevAuditInput): Promise<void> {
+/** Writes the audit row and returns its id. Throws if it can't be written. */
+export async function writeDevAudit(db: Db, input: DevAuditInput): Promise<string> {
   if (!input.action.startsWith("DEV_")) throw new Error("Developer audit actions must start with DEV_.");
-  await db.activityLog.create({
+  const row = await db.activityLog.create({
+    select: { id: true },
     data: {
       actorId: input.actor.id,
       actorName: devActorLabel(input.actor.name),
@@ -59,6 +61,7 @@ export async function writeDevAudit(db: Db, input: DevAuditInput): Promise<void>
       },
     },
   });
+  return row.id;
 }
 
 /** Best-effort variant for reads / failed logins — never throws. */

@@ -8,6 +8,9 @@ import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { writeDevAudit, writeDevAuditSafe, requestMeta } from "@/lib/developer/audit";
 import { devActivatableIds } from "@/lib/developer/eligibility";
+import { canWorkAs } from "@/lib/developer/acting";
+import { auth, unstable_update } from "@/auth";
+import { dashboardPath } from "@/lib/rbac";
 import { notifyInApp } from "@/lib/notifications/in-app";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
@@ -251,4 +254,107 @@ export async function devForceSignOut(
   });
   revalidateUsers();
   return ok(undefined, `${target.name} was signed out everywhere.`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Work as a staff member
+//
+//  The Developer opens a Finance / Warehouse / Sales Rep dashboard with that
+//  person's real permissions and data — no password needed. The session becomes
+//  that person (so every screen just works) but is marked as the Developer
+//  behind it, and logActivity records everything as "<Developer> (Developer) as
+//  <person>". Never the Admin, never a partner, never another Developer.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function devStartActing(input: { userId: string }): Promise<ActionResult<{ redirectTo: string }>> {
+  const session = await auth();
+  if (session?.user?.impersonatedBy)
+    return fail("You're already working as someone — stop first, then pick another account.");
+  let actor;
+  try {
+    actor = await requireActor(["DEVELOPER"]);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+  const meta = requestMeta(await headers());
+  const me = { id: actor.id, name: actor.name ?? "Developer" };
+  const target = typeof input?.userId === "string" ? await loadTarget(input.userId) : null;
+
+  if (!target || !canWorkAs(target, actor.id)) {
+    await writeDevAuditSafe({
+      actor: me,
+      action: "DEV_ACT_START",
+      entity: "User",
+      entityId: target?.id ?? null,
+      summary: "Refused: work as an account that isn't an active Finance, Warehouse or Sales Rep user.",
+      outcome: "FAILED",
+      ...meta,
+    });
+    return fail("You can only work as an active Finance, Warehouse or Sales Rep account.");
+  }
+
+  try {
+    // Audit FIRST: if this row can't be written, working-as never starts.
+    const auditId = await writeDevAudit(prisma, {
+      actor: me,
+      action: "DEV_ACT_START",
+      entity: "User",
+      entityId: target.id,
+      summary: `Developer started working as ${target.name} (${target.email}, ${target.role}).`,
+      outcome: "SUCCESS",
+      after: { actingAs: target.id, role: target.role },
+      ...meta,
+    });
+    // The session only accepts the switch when it can find THIS audit row, so
+    // working-as can never begin without a record of it.
+    await unstable_update({ actAs: target.id, actAuditId: auditId } as never);
+  } catch (e) {
+    await writeDevAuditSafe({
+      actor: me,
+      action: "DEV_ACT_START",
+      entity: "User",
+      entityId: target.id,
+      summary: `Failed to start working as ${target.name}: ${errorMessage(e)}`,
+      outcome: "FAILED",
+      ...meta,
+    });
+    return fail(errorMessage(e));
+  }
+
+  // Heads-up to the business owner (in-app only; WhatsApp setup untouched).
+  await notifyInApp({
+    toRoles: ["ADMIN"],
+    category: "INFO",
+    type: "DEVELOPER_ACTION",
+    title: "Developer is working as a team member",
+    body: `${me.name} (Developer) opened ${target.name}'s dashboard. Everything done is recorded under the Developer.`,
+    actorName: `${me.name} (Developer)`,
+    entityType: "User",
+    entityId: target.id,
+    actionUrl: "/admin/activity",
+    actionLabel: "View activity",
+  });
+  return ok({ redirectTo: dashboardPath(target.role) }, `Now working as ${target.name}.`);
+}
+
+export async function devStopActing(): Promise<ActionResult> {
+  const session = await auth();
+  const real = session?.user?.impersonatedBy;
+  if (!real || !session?.user) return fail("You're not working as anyone.");
+  const meta = requestMeta(await headers());
+  try {
+    await writeDevAudit(prisma, {
+      actor: { id: real.id, name: real.name },
+      action: "DEV_ACT_STOP",
+      entity: "User",
+      entityId: session.user.id,
+      summary: `Developer stopped working as ${session.user.name ?? "a team member"}.`,
+      outcome: "SUCCESS",
+      ...meta,
+    });
+    await unstable_update({ actAs: null } as never);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+  return ok(undefined, "Back in your Developer console.");
 }

@@ -12,7 +12,6 @@ const ENV_CHECKS: { name: string; note: string; required: boolean }[] = [
   { name: "DATABASE_URL", note: "App database (should be the pooled connection)", required: true },
   { name: "DIRECT_URL", note: "Direct connection used for migrations", required: true },
   { name: "AUTH_SECRET", note: "Signs login sessions", required: true },
-  { name: "DEV_TOTP_SECRET", note: "Developer login second factor — login is refused without it", required: true },
   { name: "BLOB_READ_WRITE_TOKEN", note: "File storage for receipts/proofs", required: false },
   { name: "CALLMEBOT_APIKEY", note: "Admin WhatsApp alerts (key)", required: false },
   { name: "CALLMEBOT_PHONE", note: "Admin WhatsApp alerts (number)", required: false },

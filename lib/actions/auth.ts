@@ -15,7 +15,6 @@ const loginSchema = z.object({
   email: z.string().email("Enter a valid email address."),
   password: z.string().min(1, "Enter your password."),
   mode: z.enum(["staff", "developer"]).default("staff"),
-  code: z.string().optional(),
 });
 
 export async function loginAction(
@@ -26,7 +25,6 @@ export async function loginAction(
     email: formData.get("email"),
     password: formData.get("password"),
     mode: formData.get("mode") ?? "staff",
-    code: formData.get("code") ?? undefined,
   });
   if (!parsed.success) {
     return fail("Please enter a valid email and password.");
@@ -36,26 +34,21 @@ export async function loginAction(
 
   const existing = await prisma.user.findUnique({ where: { email } });
 
-  // ── Developer login: its own door, password + authenticator code ──────────
+  // ── Developer login: its own door ─────────────────────────────────────────
   if (mode === "developer") {
-    const code = (parsed.data.code ?? "").replace(/\s/g, "");
-    if (!/^\d{6}$/.test(code)) {
-      return fail("Enter the 6-digit code from your authenticator app.");
-    }
-    // Every failure — wrong email, password, code, or a lockout — returns the
+    // Every failure — wrong email, wrong password, or a lockout — returns the
     // same message, so this door can't be used to find out which emails exist.
     try {
       await signIn("credentials", {
         email,
         password: parsed.data.password,
         mode: "developer",
-        code,
         redirect: false,
       });
     } catch (error) {
       if (error instanceof AuthError) {
         return fail(
-          `Invalid email, password or code. After repeated failures, Developer sign-in locks for ${DEV_LOCK_WINDOW_MIN} minutes.`,
+          `Invalid email or password. After repeated failures, Developer sign-in locks for ${DEV_LOCK_WINDOW_MIN} minutes.`,
         );
       }
       throw error;
