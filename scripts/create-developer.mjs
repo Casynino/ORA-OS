@@ -51,11 +51,24 @@ function strongEnough(pw) {
   return null;
 }
 
-const prisma = new PrismaClient();
+let prisma;
 try {
-  const url = process.env.DATABASE_URL ?? "";
-  const host = (url.match(/@([^/:?]+)/) || [])[1] ?? "(from .env)";
-  console.log(`\nTarget database host: ${host}`);
+  // Which database? Use DATABASE_URL if it's a real one; otherwise ASK (hidden), so
+  // there's nothing to edit in the command. Empty answer = the local test database.
+  let url = (process.env.DATABASE_URL ?? "").trim();
+  if (!/^postgres(ql)?:\/\//.test(url)) {
+    url = await ask(
+      "\nPaste your database URL (it starts with postgresql://, hidden as you paste).\nPress Enter instead to use the LOCAL test database: ",
+      { hidden: true },
+    );
+  }
+  if (url && !/^postgres(ql)?:\/\//.test(url)) {
+    console.log("That doesn't look like a database URL — it must start with postgresql://   Nothing was changed.");
+    process.exit(1);
+  }
+  prisma = new PrismaClient(url ? { datasources: { db: { url } } } : undefined);
+  const host = url ? (url.match(/@([^/:?]+)/) || [])[1] ?? "(unknown host)" : "LOCAL database (.env)";
+  console.log(`\nTarget database: ${host}`);
   const go = await ask("Create the Developer account on THIS database? (yes/no): ");
   if (go.toLowerCase() !== "yes") { console.log("Cancelled."); process.exit(0); }
 
@@ -111,5 +124,5 @@ NEXT — authenticator (shown only once, store it safely):
   3. Sign in at /login → "Developer login".
 `);
 } finally {
-  await prisma.$disconnect();
+  await prisma?.$disconnect();
 }
