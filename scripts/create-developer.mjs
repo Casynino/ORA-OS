@@ -53,9 +53,11 @@ function strongEnough(pw) {
 
 let prisma;
 try {
-  // Which database? Use DATABASE_URL if it's a real one; otherwise ASK (hidden), so
-  // there's nothing to edit in the command. Empty answer = the local test database.
-  let url = (process.env.DATABASE_URL ?? "").trim();
+  // Which database? ALWAYS ask (hidden) — never trust whatever DATABASE_URL happens
+  // to be set in the terminal, which is how it once silently pointed at the local
+  // test database. (CREATE_DEV_DB_URL can pre-answer it for automation.) An empty
+  // answer = the local test database.
+  let url = (process.env.CREATE_DEV_DB_URL ?? "").trim();
   if (!/^postgres(ql)?:\/\//.test(url)) {
     url = await ask(
       "\nPaste your database URL (it starts with postgresql://, hidden as you paste).\nPress Enter instead to use the LOCAL test database: ",
