@@ -39,10 +39,13 @@ export function DevUserActions({
   userId,
   name,
   status,
+  canActivate,
 }: {
   userId: string;
   name: string;
   status: string;
+  /** True only for accounts the Developer console itself suspended. */
+  canActivate: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -79,6 +82,18 @@ export function DevUserActions({
   }
 
   const ready = reason.trim().length >= 10 && confirm.trim() === "CONFIRM";
+
+  // Approvals and the owner's suspensions/rejections are business decisions —
+  // the Developer console can't act on them, so say so instead of offering a button.
+  if (status !== "ACTIVE" && !canActivate) {
+    return (
+      <span className="text-xs text-muted-foreground">
+        {status === "PENDING"
+          ? "Awaiting owner approval"
+          : "Suspended by the business — owner decides"}
+      </span>
+    );
+  }
 
   return (
     <>

@@ -7,6 +7,7 @@ import type { Role, UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { writeDevAudit, writeDevAuditSafe, requestMeta } from "@/lib/developer/audit";
+import { devActivatableIds } from "@/lib/developer/eligibility";
 import { notifyInApp } from "@/lib/notifications/in-app";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
@@ -90,7 +91,15 @@ export async function devSetUserStatus(
   if (d.confirm.trim() !== "CONFIRM") return fail("Type CONFIRM to proceed.");
 
   const target = await loadTarget(d.userId);
-  const refusal = refuseTarget(actor.id, target);
+  let refusal = refuseTarget(actor.id, target);
+  // Approving applications and overruling the owner's suspensions/rejections are
+  // business decisions — never the Developer's. They may only suspend, and
+  // re-activate an account the Developer console itself suspended.
+  if (!refusal && target?.status === "PENDING")
+    refusal = "This account is awaiting approval — that decision belongs to the business owner.";
+  if (!refusal && target && d.status === "ACTIVE" && !(await devActivatableIds([target.id])).has(target.id))
+    refusal =
+      "Only accounts suspended from the Developer console can be re-activated here. Ask the business owner to re-activate this one.";
   if (refusal || !target) {
     await writeDevAuditSafe({
       actor: { id: actor.id, name: actor.name ?? "Developer" },

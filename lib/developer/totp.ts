@@ -66,18 +66,26 @@ export function totpNow(secretB32: string, now = Date.now()): string {
   return hotp(base32Decode(secretB32), Math.floor(now / 30_000));
 }
 
-/** Verify a 6-digit code, allowing ±1 step (30s) of clock drift. Constant-time compare. */
-export function verifyTotp(secretB32: string, code: string, now = Date.now()): boolean {
+/**
+ * Verify a 6-digit code, allowing ±1 step (30s) of clock drift. Constant-time
+ * compare. Returns the 30-second STEP the code belongs to (so the caller can
+ * refuse to accept the same step twice — one-time use), or null if invalid.
+ */
+export function verifyTotpStep(secretB32: string, code: string, now = Date.now()): number | null {
   const clean = (code ?? "").replace(/\s/g, "");
-  if (!/^\d{6}$/.test(clean)) return false;
+  if (!/^\d{6}$/.test(clean)) return null;
   const secret = base32Decode(secretB32);
-  if (secret.length < 10) return false; // refuse a missing/garbage secret
+  if (secret.length < 10) return null; // refuse a missing/garbage secret
   const step = Math.floor(now / 30_000);
-  let ok = false;
+  let matched: number | null = null;
   for (const delta of [-1, 0, 1]) {
     const expected = Buffer.from(hotp(secret, step + delta));
     const given = Buffer.from(clean);
-    if (expected.length === given.length && timingSafeEqual(expected, given)) ok = true;
+    if (expected.length === given.length && timingSafeEqual(expected, given)) matched = step + delta;
   }
-  return ok;
+  return matched;
+}
+
+export function verifyTotp(secretB32: string, code: string, now = Date.now()): boolean {
+  return verifyTotpStep(secretB32, code, now) !== null;
 }

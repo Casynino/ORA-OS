@@ -2,6 +2,7 @@ import { Lock } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { writeDevAuditSafe } from "@/lib/developer/audit";
+import { devActivatableIds } from "@/lib/developer/eligibility";
 import { DevUserActions } from "@/components/developer/user-actions";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,6 +26,10 @@ export default async function DeveloperUsersPage() {
     select: { id: true, name: true, email: true, role: true, status: true, lastLoginAt: true },
   });
   const visible = users.filter((u) => u.role !== "DEVELOPER");
+  // Only accounts the Developer console itself suspended can be re-activated here.
+  const activatable = await devActivatableIds(
+    visible.filter((u) => u.status === "SUSPENDED").map((u) => u.id),
+  );
 
   await writeDevAuditSafe({
     actor: { id: me.id, name: me.name ?? "Developer" },
@@ -74,7 +79,12 @@ export default async function DeveloperUsersPage() {
                         <Lock className="size-3.5" /> Protected
                       </span>
                     ) : (
-                      <DevUserActions userId={u.id} name={u.name} status={u.status} />
+                      <DevUserActions
+                        userId={u.id}
+                        name={u.name}
+                        status={u.status}
+                        canActivate={activatable.has(u.id)}
+                      />
                     )}
                   </TableCell>
                 </TableRow>

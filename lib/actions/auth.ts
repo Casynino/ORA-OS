@@ -8,7 +8,7 @@ import { signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { dashboardPath } from "@/lib/rbac";
-import { isDeveloperLocked, DEV_LOCK_WINDOW_MIN } from "@/lib/developer/login";
+import { DEV_LOCK_WINDOW_MIN } from "@/lib/developer/login";
 import { fail, ok, type ActionResult } from "@/lib/types";
 
 const loginSchema = z.object({
@@ -42,13 +42,8 @@ export async function loginAction(
     if (!/^\d{6}$/.test(code)) {
       return fail("Enter the 6-digit code from your authenticator app.");
     }
-    // Only tell the (genuine) developer about a lockout; everyone else gets the
-    // same generic failure, so this can't be used to probe which emails exist.
-    if (existing?.role === "DEVELOPER" && (await isDeveloperLocked(existing.id))) {
-      return fail(
-        `Too many failed attempts. Try again in ${DEV_LOCK_WINDOW_MIN} minutes.`,
-      );
-    }
+    // Every failure — wrong email, password, code, or a lockout — returns the
+    // same message, so this door can't be used to find out which emails exist.
     try {
       await signIn("credentials", {
         email,
@@ -59,7 +54,9 @@ export async function loginAction(
       });
     } catch (error) {
       if (error instanceof AuthError) {
-        return fail("Invalid email, password or code.");
+        return fail(
+          `Invalid email, password or code. After repeated failures, Developer sign-in locks for ${DEV_LOCK_WINDOW_MIN} minutes.`,
+        );
       }
       throw error;
     }

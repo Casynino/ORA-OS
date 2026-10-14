@@ -29,6 +29,8 @@ export type DevAuditInput = {
   after?: Prisma.InputJsonValue;
   ip?: string | null;
   userAgent?: string | null;
+  /** Extra machine-readable facts merged into meta (e.g. the TOTP step used). */
+  extra?: Record<string, Prisma.InputJsonValue>;
 };
 
 export function devActorLabel(name: string) {
@@ -53,6 +55,7 @@ export async function writeDevAudit(db: Db, input: DevAuditInput): Promise<void>
         after: input.after ?? null,
         ip: input.ip ?? null,
         userAgent: input.userAgent ?? null,
+        ...(input.extra ?? {}),
       },
     },
   });
