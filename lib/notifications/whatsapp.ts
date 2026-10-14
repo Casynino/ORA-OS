@@ -1,4 +1,5 @@
 import "server-only";
+import { workingAsContext } from "@/lib/developer/context";
 
 const BASE = "https://api.callmebot.com/whatsapp.php";
 
@@ -22,9 +23,15 @@ export type WhatsAppResult = {
  * CallMeBot is rate-limited; keep sends to genuinely important events only.
  */
 export async function sendWhatsApp(
-  text: string,
+  rawText: string,
   opts?: { phone?: string; apikey?: string },
 ): Promise<WhatsAppResult> {
+  // If a Developer is working as a team member, say so — the owner must never
+  // read "Daeda did X" when it was really the Developer. (Never throws.)
+  const ctx = await workingAsContext();
+  const text = ctx
+    ? `${rawText}\n\n(Done by Developer ${ctx.developer.name}, working as ${ctx.as.name})`
+    : rawText;
   const phone = opts?.phone ?? process.env.CALLMEBOT_PHONE;
   const apikey = opts?.apikey ?? process.env.CALLMEBOT_APIKEY;
 

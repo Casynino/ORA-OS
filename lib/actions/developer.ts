@@ -307,7 +307,9 @@ export async function devStartActing(input: { userId: string }): Promise<ActionR
     });
     // The session only accepts the switch when it can find THIS audit row, so
     // working-as can never begin without a record of it.
-    await unstable_update({ actAs: target.id, actAuditId: auditId } as never);
+    const updated = await unstable_update({ actAs: target.id, actAuditId: auditId } as never);
+    // Only report success if the session really switched.
+    if (!updated?.user?.impersonatedBy) throw new Error("Couldn't switch the session — nothing was changed.");
   } catch (e) {
     await writeDevAuditSafe({
       actor: me,

@@ -12,7 +12,10 @@ import type { Role, UserStatus } from "@prisma/client";
  *     can't be used to take over the person's account.
  */
 /** What the session token remembers while a Developer is working as someone. */
-export type ActAs = { id: string; role: Role; name: string; email: string };
+export type ActAs = { id: string; role: Role; name: string; email: string; at: number };
+
+/** Working-as ends by itself after this long (a forgotten session can't linger or resume days later). */
+export const WORK_AS_MAX_MS = 4 * 60 * 60 * 1000;
 
 export const ACTABLE_ROLES: readonly Role[] = ["FINANCE", "WAREHOUSE", "SALES_REP"];
 

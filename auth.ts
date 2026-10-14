@@ -5,14 +5,11 @@ import { z } from "zod";
 import { authConfig } from "./auth.config";
 import { prisma } from "@/lib/db";
 import { authenticateDeveloper } from "@/lib/developer/login";
-import { canWorkAs, type ActAs } from "@/lib/developer/acting";
+import { canWorkAs, WORK_AS_MAX_MS, type ActAs } from "@/lib/developer/acting";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
-  // Which login the user chose. Defaults to "staff" so every existing caller
-  // (and the existing staff form) behaves exactly as before.
-  mode: z.enum(["staff", "developer"]).default("staff"),
 });
 
 // A Developer session is deliberately short-lived (8h), independent of the
@@ -26,14 +23,12 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
-        mode: { label: "Mode", type: "text" },
-        code: { label: "Code", type: "text" },
       },
       async authorize(credentials, request) {
         const parsed = credentialsSchema.safeParse(credentials);
         if (!parsed.success) return null;
 
-        const { email, password, mode } = parsed.data;
+        const { email, password } = parsed.data;
         const user = await prisma.user.findUnique({
           where: { email: email.toLowerCase().trim() },
         });
@@ -49,15 +44,12 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           headers?.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
         const userAgent = headers?.get("user-agent")?.slice(0, 300) || null;
 
-        // ── Two separate doors ─────────────────────────────────────────────
-        // The Developer account can ONLY come in through the Developer login
-        // (password + authenticator code + lockout), and staff accounts can
-        // ONLY come in through the staff login. Enforced here — not just in the
-        // form — so the raw /api/auth endpoint can't be used to cross over.
-        const isDeveloper = user.role === "DEVELOPER";
-        if (isDeveloper !== (mode === "developer")) return null;
-
-        if (isDeveloper) {
+        // ── One login page, two sets of checks ─────────────────────────────
+        // The server — not anything the browser sends — decides from the ACCOUNT
+        // which checks apply: the Developer gets the hardened path (lockout +
+        // full audit trail), everyone else the normal password check. There is
+        // no switch to flip, so the raw /api/auth endpoint can't skip either.
+        if (user.role === "DEVELOPER") {
           const ok = await authenticateDeveloper(user, password, { ip, userAgent });
           if (!ok) return null;
         } else {
@@ -147,30 +139,36 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
               delete token.actAs;
             } else {
               const t = await prisma.user.findUnique({ where: { id: want }, select: pick });
-              // A switch is honoured only with a fresh DEV_ACT_START audit row for
-              // exactly this developer + target — no record, no working-as.
+              // A switch is honoured only with the developer's LATEST start/stop
+              // audit row being a fresh DEV_ACT_START for exactly this target — no
+              // record, no working-as; and once Stop is pressed (a newer STOP row)
+              // an old start row can't be replayed to resume.
               const auditId = (session as { actAuditId?: string }).actAuditId;
-              const proof = auditId
+              const latest = auditId
                 ? await prisma.activityLog.findFirst({
-                    where: {
-                      id: auditId,
-                      action: "DEV_ACT_START",
-                      actorId: token.id as string,
-                      entityId: want,
-                      createdAt: { gte: new Date(Date.now() - 60_000) },
-                    },
-                    select: { id: true },
+                    where: { actorId: token.id as string, action: { in: ["DEV_ACT_START", "DEV_ACT_STOP"] } },
+                    orderBy: { createdAt: "desc" },
+                    select: { id: true, action: true, entityId: true, createdAt: true },
                   })
                 : null;
-              if (t && proof && canWorkAs(t, token.id as string))
-                token.actAs = { id: t.id, role: t.role, name: t.name, email: t.email };
+              const proven =
+                !!latest &&
+                latest.id === auditId &&
+                latest.action === "DEV_ACT_START" &&
+                latest.entityId === want &&
+                Date.now() - latest.createdAt.getTime() < 60_000;
+              if (t && proven && canWorkAs(t, token.id as string))
+                token.actAs = { id: t.id, role: t.role, name: t.name, email: t.email, at: Date.now() };
               else delete token.actAs;
             }
           } else if (token.actAs) {
             const current = token.actAs as ActAs;
-            const t = await prisma.user.findUnique({ where: { id: current.id }, select: pick });
+            // Working-as ends by itself after WORK_AS_MAX_MS (old tokens with no
+            // start time count as expired).
+            const expired = !current.at || Date.now() - current.at > WORK_AS_MAX_MS;
+            const t = expired ? null : await prisma.user.findUnique({ where: { id: current.id }, select: pick });
             if (t && canWorkAs(t, token.id as string))
-              token.actAs = { id: t.id, role: t.role, name: t.name, email: t.email };
+              token.actAs = { id: t.id, role: t.role, name: t.name, email: t.email, at: current.at };
             else delete token.actAs;
           }
         } else {

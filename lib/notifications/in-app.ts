@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { workingAsContext } from "@/lib/developer/context";
 import type { Role, NotificationCategory } from "@prisma/client";
 
 /**
@@ -40,12 +41,17 @@ export type NotifyInput = {
 /** Write one notification row per target (user + each role). Never throws. */
 export async function notifyInApp(input: NotifyInput): Promise<void> {
   try {
+    // While a Developer works as a team member, say so on every alert so it never
+    // reads as the person's own doing.
+    const wa = await workingAsContext();
     const base = {
       category: input.category ?? "INFO",
       type: input.type,
       title: input.title,
-      body: input.body,
-      actorName: input.actorName ?? null,
+      body: wa ? `${input.body} (done by Developer ${wa.developer.name}, working as ${wa.as.name})` : input.body,
+      actorName: wa
+        ? `${wa.developer.name} (Developer) as ${input.actorName ?? wa.as.name}`
+        : (input.actorName ?? null),
       entityType: input.entityType ?? null,
       entityId: input.entityId ?? null,
       actionUrl: input.actionUrl ?? null,

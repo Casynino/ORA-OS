@@ -8,13 +8,11 @@ import { signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { dashboardPath } from "@/lib/rbac";
-import { DEV_LOCK_WINDOW_MIN } from "@/lib/developer/login";
 import { fail, ok, type ActionResult } from "@/lib/types";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email address."),
   password: z.string().min(1, "Enter your password."),
-  mode: z.enum(["staff", "developer"]).default("staff"),
 });
 
 export async function loginAction(
@@ -24,46 +22,14 @@ export async function loginAction(
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
-    mode: formData.get("mode") ?? "staff",
   });
   if (!parsed.success) {
     return fail("Please enter a valid email and password.");
   }
   const email = parsed.data.email.toLowerCase().trim();
-  const mode = parsed.data.mode;
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-
-  // ── Developer login: its own door ─────────────────────────────────────────
-  if (mode === "developer") {
-    // Every failure — wrong email, wrong password, or a lockout — returns the
-    // same message, so this door can't be used to find out which emails exist.
-    try {
-      await signIn("credentials", {
-        email,
-        password: parsed.data.password,
-        mode: "developer",
-        redirect: false,
-      });
-    } catch (error) {
-      if (error instanceof AuthError) {
-        return fail(
-          `Invalid email or password. After repeated failures, Developer sign-in locks for ${DEV_LOCK_WINDOW_MIN} minutes.`,
-        );
-      }
-      throw error;
-    }
-    // authorize() already wrote the DEV_LOGIN audit row.
-    redirect(dashboardPath("DEVELOPER"));
-  }
-
-  // ── Staff login (unchanged behaviour) ─────────────────────────────────────
-  // The Developer account cannot sign in here — same generic failure as a wrong
-  // password, so the staff form never confirms a Developer account exists.
-  if (existing?.role === "DEVELOPER") {
-    return fail("Invalid email or password.");
-  }
   // Friendly messaging for non-active accounts (authorize() returns null for these).
+  const existing = await prisma.user.findUnique({ where: { email } });
   if (existing?.status === "PENDING") {
     return fail("Your partner account is awaiting admin approval.");
   }
@@ -75,7 +41,6 @@ export async function loginAction(
     await signIn("credentials", {
       email,
       password: parsed.data.password,
-      mode: "staff",
       redirect: false,
     });
   } catch (error) {
@@ -86,7 +51,9 @@ export async function loginAction(
   }
 
   const user = await prisma.user.findUnique({ where: { email } });
-  if (user) {
+  // A Developer's sign-in is already audited (DEV_LOGIN) under their own identity
+  // by the Developer path in authorize(), so don't also write the generic line.
+  if (user && user.role !== "DEVELOPER") {
     await logActivity({
       actorId: user.id,
       actorName: user.name,

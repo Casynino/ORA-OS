@@ -40,6 +40,9 @@ export async function requireRole(role: Role | Role[]) {
   const user = await requireUser();
   const roles = Array.isArray(role) ? role : [role];
   if (!roles.includes(user.role)) {
+    // A Developer whose "work as" has ended is still bounced around by the old
+    // browser cookie — send them through the reset so it's cleared.
+    if (user.role === "DEVELOPER") redirect("/api/developer/reset");
     redirect(dashboardPath(user.role));
   }
   return user;

@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { auth } from "@/auth";
+import { workingAsContext } from "@/lib/developer/context";
 
 type ActivityInput = {
   actorId?: string | null;
@@ -12,16 +12,6 @@ type ActivityInput = {
   meta?: Prisma.InputJsonValue;
 };
 
-/** If a Developer is currently working as a staff member, who is really behind it. */
-async function workingAsContext() {
-  try {
-    const u = (await auth())?.user;
-    return u?.impersonatedBy ? { developer: u.impersonatedBy, as: { id: u.id, name: u.name ?? "" } } : null;
-  } catch {
-    return null; // no request context (cron / script) → not working-as
-  }
-}
-
 /**
  * Append a line to the immutable activity log. Used across every state change
  * so the admin "full activity logs" view tells the complete story.
@@ -32,7 +22,10 @@ async function workingAsContext() {
  */
 export async function logActivity(input: ActivityInput) {
   try {
-    const wa = await workingAsContext();
+    // Only entries about the person being worked as are re-attributed (not, say,
+    // a record logged for some other user).
+    const ctx = await workingAsContext();
+    const wa = ctx && (!input.actorId || input.actorId === ctx.as.id) ? ctx : null;
     const base = (input.meta ?? undefined) as Record<string, Prisma.InputJsonValue> | undefined;
     await prisma.activityLog.create({
       data: wa

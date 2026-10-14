@@ -44,7 +44,10 @@ export default async function DeveloperAuditPage({
   const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.to ?? "") ? sp.to! : "";
 
   const and: Prisma.ActivityLogWhereInput[] = [];
-  if (scope === "developer") and.push({ action: { startsWith: "DEV_" } });
+  // "Developer actions" = the console's own DEV_ rows PLUS everything done while
+  // working as a staff member (those carry meta.developer = true).
+  if (scope === "developer")
+    and.push({ OR: [{ action: { startsWith: "DEV_" } }, { meta: { path: ["developer"], equals: true } }] });
   if (scope === "failed")
     and.push({
       OR: [
@@ -140,7 +143,7 @@ export default async function DeveloperAuditPage({
             <ol className="divide-y divide-border">
               {rows.map((log) => {
                 const m = (log.meta ?? {}) as DevMeta;
-                const isDev = log.action.startsWith("DEV_");
+                const isDev = log.action.startsWith("DEV_") || m.developer === true;
                 const hasDetail = isDev && (m.reason || m.before || m.after || m.ip);
                 return (
                   <li key={log.id} className="px-5 py-3">

@@ -96,7 +96,7 @@ try {
 
   console.log(`
 ✔ Developer account created for ${email}
-  Sign in at /login → "Developer login" with that email and your password.
+  Sign in on the normal /login page with that email and your password.
 `);
 } finally {
   await prisma?.$disconnect();
