@@ -247,6 +247,11 @@ function NewPostModal({
             className="mt-1.5 min-h-[140px]"
             placeholder="Separate paragraphs with a blank line."
           />
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Optional formatting: <code>## Heading</code> · <code>- bullet</code> · <code>**bold**</code> ·{" "}
+            <code>[link text](https://…)</code> · a line with only a link becomes a button · a line of only{" "}
+            <code>#hashtags</code> shows as tags.
+          </p>
         </div>
         <div>
           <Label>Category</Label>

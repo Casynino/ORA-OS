@@ -6,6 +6,7 @@ import { ArrowLeft, Calendar } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { RichText } from "@/components/public/rich-text";
 import { humanize } from "@/lib/utils";
 
 export async function generateMetadata({
@@ -28,7 +29,6 @@ export default async function NewsArticlePage({
   const post = await prisma.newsPost.findUnique({ where: { slug } });
   if (!post || !post.published) notFound();
 
-  const paragraphs = post.body.split(/\n\n+/).filter(Boolean);
   const date = post.publishedAt.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
@@ -88,10 +88,8 @@ export default async function NewsArticlePage({
 
       <p className="mt-8 text-lg text-muted-foreground">{post.excerpt}</p>
 
-      <div className="mt-6 space-y-5 text-[15px] leading-relaxed text-foreground/90">
-        {paragraphs.map((p, i) => (
-          <p key={i}>{p}</p>
-        ))}
+      <div className="mt-6 text-[15px] leading-relaxed text-foreground/90 sm:text-base">
+        <RichText body={post.body} />
       </div>
 
       <div className="mt-12 overflow-hidden rounded-2xl border border-border bg-muted/30 p-6 text-center">

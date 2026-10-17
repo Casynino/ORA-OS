@@ -95,13 +95,7 @@ export default async function DeveloperOverviewPage() {
         eyebrow={dateLabel}
         pill="Developer"
         title={<>{greeting}, {firstName}.</>}
-        subtitle="Your technical control room for ORA — is the system healthy, who is using it, and what has been done. Nothing here changes business data unless you press a button that says so."
-        stats={[
-          { label: "Database", value: d.dbOk ? "Online" : "Down", sub: d.dbOk ? `${d.dbMs} ms` : "cannot connect" },
-          { label: "Activity today", value: formatNumber(d.activity24h), sub: "actions in 24h" },
-          { label: "Accounts", value: formatNumber(totalUsers), sub: "people with a login" },
-          { label: "Waiting on people", value: formatNumber(d.openActions), sub: "alerts to act on" },
-        ]}
+        subtitle="Your control room for ORA — health, people and everything done, in one place."
       />
 
       {/* Overall status */}
