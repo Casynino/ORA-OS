@@ -8,17 +8,14 @@ import {
 // The Developer console is its own area: it never shares routes, navigation or
 // permissions with the business dashboards, and only the DEVELOPER role gets in.
 const nav: NavGroup[] = [
-  { items: [{ href: "/developer", label: "Home", icon: "dashboard" }] },
   {
-    label: "View only",
+    // Ordered from the safest (just looking) to the most powerful (changing access).
     items: [
-      { href: "/developer/records", label: "Business records", icon: "reports" },
-      { href: "/developer/audit", label: "Audit trail", icon: "audit" },
+      { href: "/developer", label: "Home", icon: "dashboard" },
+      { href: "/developer/records", label: "Business", icon: "reports" },
+      { href: "/developer/audit", label: "Audit", icon: "audit" },
+      { href: "/developer/users", label: "Access", icon: "roles" },
     ],
-  },
-  {
-    label: "Can change things",
-    items: [{ href: "/developer/users", label: "People & access", icon: "users" }],
   },
 ];
 

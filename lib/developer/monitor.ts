@@ -382,7 +382,7 @@ export async function getMonitor() {
       level: "warning",
       title: `${events.failed24} failed sign-ins in 24 hours`,
       detail: "That is more than normal typing mistakes and may be someone guessing passwords.",
-      hint: "Check the failed sign-ins in the “Crashes & sign-ins” tab below. If it looks like an attack, suspend the targeted account from People & access.",
+      hint: "Check the failed sign-ins in the “Crashes & sign-ins” tab below. If it looks like an attack, suspend the targeted account from Access.",
     });
   if (diag.failedDevLogins24h > 0)
     problems.push({
@@ -406,14 +406,14 @@ export async function getMonitor() {
       level: "critical",
       title: "Stock numbers do not add up",
       detail: `${nw} warehouse and ${nr} sales-rep stock line${nw + nr > 1 ? "s" : ""} have negative or impossible quantities.`,
-      hint: "Open Business records → stock to find them. Do not edit by hand; tell me and we fix the cause.",
+      hint: "Open Business → stock to find them. Do not edit by hand; tell me and we fix the cause.",
     });
   if (op > 0)
     problems.push({
       level: "critical",
       title: "Some sales show more paid than the total",
       detail: `${op} sale${op > 1 ? "s have" : " has"} a paid amount larger than the sale total (or below zero).`,
-      hint: "Open Business records → sales to find them. Money records must not be edited by hand.",
+      hint: "Open Business → sales to find them. Money records must not be edited by hand.",
     });
   if (pendingOld > 0)
     problems.push({

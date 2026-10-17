@@ -4,6 +4,7 @@ import {
   Banknote,
   Boxes,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Database,
   Info,
@@ -80,70 +81,127 @@ const eat = (d: Date) =>
 const bytes = (n: number) =>
   n >= 1073741824 ? `${(n / 1073741824).toFixed(2)} GB` : n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
-/* ───────────────────── score + problems (top of Home) ───────────────────── */
+/* ───────────────────── status strip (top of Home) ───────────────────── */
 
-export function ScoreAndProblems({ m }: { m: Monitor }) {
+/** One compact panel: the verdict, the score, and the four live numbers — no wasted space. */
+export function StatusStrip({ m }: { m: Monitor }) {
+  const d = m.diag;
   const crit = m.problems.filter((p) => p.level === "critical").length;
   const warn = m.problems.filter((p) => p.level === "warning").length;
+  const info = m.problems.length - crit - warn;
   const headline = crit
     ? "Needs attention now"
     : warn
-      ? "Working, but a few things need a look"
-      : m.problems.length
-        ? "Healthy"
-        : "Everything is healthy";
+      ? "Working, with a few things to look at"
+      : "Everything is healthy";
+  const summary = crit
+    ? `${crit} thing${crit > 1 ? "s are" : " is"} broken and should be fixed now.`
+    : warn
+      ? `${warn} thing${warn > 1 ? "s" : ""} worth a look. Nothing is broken.`
+      : "The database is fast, every required setting is in place and nothing has crashed.";
+  const metrics = [
+    { label: "Database", value: d.dbOk ? "Online" : "Down", hint: d.dbOk ? `${d.dbMs} ms · ${d.pooled ? "pooled" : "not pooled"}` : "cannot connect", tone: d.dbOk ? "text-success" : "text-destructive" },
+    { label: "Signed in today", value: formatNumber(m.signedIn24), hint: "different people", tone: "" },
+    { label: "Actions today", value: formatNumber(d.activity24h), hint: "saved in 24 hours", tone: "" },
+    { label: "Alerts waiting", value: formatNumber(d.openActions), hint: d.stuckAlerts > 0 ? `${d.stuckAlerts} over a day` : "none too long", tone: d.stuckAlerts > 0 ? "text-warning" : "" },
+  ];
   return (
-    <section className="grid gap-4 lg:grid-cols-3">
-      <Card>
-        <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
-          <ScoreRing score={m.score} />
-          <div>
-            <p className="font-display text-lg font-semibold">{headline}</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Starts at 100 and drops for each problem found: a lot for something broken, a little for something to
-              keep an eye on.
-            </p>
+    <Card>
+      <CardContent className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[auto_minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-8">
+        <div className="flex items-center gap-5">
+          <ScoreRing score={m.score} size={112} />
+          <div className="lg:hidden">
+            <p className="font-display text-lg font-semibold leading-tight">{headline}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{summary}</p>
           </div>
-          <div className="flex flex-wrap justify-center gap-1.5">
+        </div>
+        <div className="hidden lg:block">
+          <p className="font-display text-xl font-semibold leading-tight">{headline}</p>
+          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{summary}</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
             <Badge variant={crit ? "destructive" : "secondary"}>{crit} to fix now</Badge>
             <Badge variant={warn ? "warning" : "secondary"}>{warn} to look at</Badge>
-            <Badge variant="secondary">{m.problems.length - crit - warn} for information</Badge>
+            <Badge variant="secondary">{info} for information</Badge>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4 lg:grid-cols-2 lg:border-l lg:border-border lg:pl-8">
+          {metrics.map((x) => (
+            <div key={x.label} className="min-w-0">
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{x.label}</dt>
+              <dd className={cn("mt-1 font-display text-2xl font-bold leading-none tabular-nums", x.tone)}>{x.value}</dd>
+              <p className="mt-1 truncate text-xs text-muted-foreground">{x.hint}</p>
+            </div>
+          ))}
+        </dl>
+      </CardContent>
+    </Card>
+  );
+}
 
-      <div className="space-y-3 lg:col-span-2">
-        <SectionTitle title="Problems found" className="mb-0" text="Checked just now. Each one says what it means and what to do." />
-        {m.problems.length === 0 ? (
-          <InfoCallout icon={CheckCircle2} tone="good" title="No problems found">
-            The database answers quickly, every required setting is in place, nothing has crashed, and no sign-in looks
-            suspicious.
+/** A problem as a compact card; tap to see what it means and what to do. */
+function ProblemCard({ p }: { p: Monitor["problems"][number] }) {
+  const l = LEVEL[p.level];
+  const Icon = l.icon;
+  return (
+    <details className={cn("group rounded-xl border open:shadow-soft", l.box)}>
+      <summary className="flex cursor-pointer list-none items-center gap-3 p-3.5 [&::-webkit-details-marker]:hidden">
+        <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg", l.chip)}>
+          <Icon className="size-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">{p.title}</span>
+          <span className="block truncate text-xs text-muted-foreground">{p.detail}</span>
+        </span>
+        <span className={cn("hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide sm:inline", l.chip)}>
+          {l.label}
+        </span>
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="space-y-1.5 border-t border-border/60 px-3.5 py-3 text-sm leading-relaxed">
+        <p className="text-muted-foreground">{p.detail}</p>
+        <p className="text-foreground/90">
+          <span className="font-semibold">What to do: </span>
+          {p.hint}
+        </p>
+      </div>
+    </details>
+  );
+}
+
+/** Problems, most urgent first. Things to act on are up front; "good to know" is quieter. */
+export function Attention({ m }: { m: Monitor }) {
+  const act = m.problems.filter((p) => p.level !== "info");
+  const know = m.problems.filter((p) => p.level === "info");
+  return (
+    <section className="space-y-4">
+      <div>
+        <SectionTitle
+          title={act.length ? `Needs your attention · ${act.length}` : "Needs your attention"}
+          text="Checked just now. Tap a card to see what it means and what to do."
+          className="mb-3"
+        />
+        {act.length === 0 ? (
+          <InfoCallout icon={CheckCircle2} tone="good" title="Nothing needs your attention">
+            Nothing is broken and nothing is waiting too long.
           </InfoCallout>
         ) : (
-          m.problems.map((p) => {
-            const l = LEVEL[p.level];
-            const Icon = l.icon;
-            return (
-              <div key={p.title} className={cn("flex items-start gap-3 rounded-xl border p-4", l.box)}>
-                <span className={cn("mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg", l.chip)}>
-                  <Icon className="size-4" />
-                </span>
-                <div className="min-w-0 text-sm leading-relaxed">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold">{p.title}</p>
-                    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", l.chip)}>{l.label}</span>
-                  </div>
-                  <p className="mt-0.5 text-muted-foreground">{p.detail}</p>
-                  <p className="mt-1 text-xs text-foreground/80">
-                    <span className="font-semibold">What to do: </span>
-                    {p.hint}
-                  </p>
-                </div>
-              </div>
-            );
-          })
+          <div className="grid items-start gap-3 md:grid-cols-2">
+            {act.map((p) => (
+              <ProblemCard key={p.title} p={p} />
+            ))}
+          </div>
         )}
       </div>
+      {know.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Good to know · {know.length}</p>
+          <div className="grid items-start gap-3 md:grid-cols-2">
+            {know.map((p) => (
+              <ProblemCard key={p.title} p={p} />
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -614,7 +672,7 @@ export function PeoplePanel({ m }: { m: Monitor }) {
       <section>
         <SectionTitle
           title={`${formatNumber(totalUsers)} accounts`}
-          text="Who has an account, grouped by what they do. Open People & access to work as any of them."
+          text="Who has an account, grouped by what they do. Open Access to work as any of them."
         />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {roles.map((role) => {

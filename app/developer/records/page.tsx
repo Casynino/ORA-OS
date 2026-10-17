@@ -249,7 +249,7 @@ export default async function DeveloperRecordsPage({
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Business records"
+        title="Business"
         description="A look at the business data — sales, payments, stock and customers — in plain tables."
       />
       <InfoCallout icon={Eye} tone="neutral" title="Look, don't touch">

@@ -56,7 +56,7 @@ export default async function DeveloperUsersPage() {
   return (
     <div className="flex flex-col gap-7">
       <PageHeader
-        title="People & access"
+        title="Access"
         description={`${formatNumber(visible.length)} accounts. Pick a person and press “Work as” to open their dashboard exactly as they see it — without their password. Everything you do is recorded under your name.`}
       />
 

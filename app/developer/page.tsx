@@ -1,19 +1,18 @@
-import { Activity, AlertTriangle, BarChart3, Database, LogIn, ScrollText, Users } from "lucide-react";
+import { BarChart3, LogIn, ScrollText } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import { getMonitor } from "@/lib/developer/monitor";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
-import { StatCard } from "@/components/ui/stat-card";
 import { QuickLink } from "@/components/developer/info";
 import { HomeTabs, type HomeTab } from "@/components/developer/home-tabs";
 import {
   ActivityPanel,
   ErrorsPanel,
+  Attention,
   PeoplePanel,
-  ScoreAndProblems,
   SettingsPanel,
   SpeedPanel,
+  StatusStrip,
 } from "@/components/developer/home-sections";
-import { formatNumber } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -52,47 +51,28 @@ export default async function DeveloperHomePage() {
         subtitle="Your control room for ORA — health, people and everything done, in one place."
       />
 
-      {/* The verdict first: is anything wrong? */}
-      <ScoreAndProblems m={m} />
-
-      {/* Live pulse */}
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label="Database"
-          value={d.dbOk ? "Online" : "Down"}
-          icon={Database}
-          accent={d.dbOk ? "success" : "warning"}
-          hint={d.dbOk ? `${d.dbMs} ms · ${d.pooled ? "pooled link" : "NOT pooled"}` : "Cannot reach the database"}
-        />
-        <StatCard label="Signed in today" value={formatNumber(m.signedIn24)} icon={Users} accent="info" hint="different people, 24 hours" />
-        <StatCard label="Actions today" value={formatNumber(d.activity24h)} icon={Activity} accent="primary" hint="saved in the last 24 hours" />
-        <StatCard
-          label="Alerts waiting"
-          value={formatNumber(d.openActions)}
-          icon={AlertTriangle}
-          accent={d.stuckAlerts > 0 ? "warning" : "success"}
-          hint={d.stuckAlerts > 0 ? `${d.stuckAlerts} waiting over a day` : "none waiting too long"}
-        />
-      </section>
+      {/* Verdict + live numbers in one compact panel, then what needs attention */}
+      <StatusStrip m={m} />
+      <Attention m={m} />
 
       {/* Where to go */}
       <section className="grid gap-3 md:grid-cols-3">
         <QuickLink
           href="/developer/users"
           icon={LogIn}
-          title="Work as a team member"
+          title="Open Access (work as someone)"
           text="Open the dashboard of the owner, a team member or a partner to help them or to see what they see. Every click is recorded under your name."
         />
         <QuickLink
           href="/developer/audit"
           icon={ScrollText}
-          title="Read the audit trail"
+          title="Open Audit"
           text="The permanent diary of everything done in the system — by staff and by you. It can never be edited or deleted."
         />
         <QuickLink
           href="/developer/records"
           icon={BarChart3}
-          title="Look at business records"
+          title="Open Business"
           text="See sales, payments, stock and customers in read-only tables. Good for checking a number without risking a change."
         />
       </section>
