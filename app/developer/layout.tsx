@@ -10,15 +10,14 @@ import {
 const nav: NavGroup[] = [
   { items: [{ href: "/developer", label: "Home", icon: "dashboard" }] },
   {
-    label: "Watch",
+    label: "View only",
     items: [
-      { href: "/developer/monitor", label: "System health", icon: "activity" },
       { href: "/developer/records", label: "Business records", icon: "reports" },
       { href: "/developer/audit", label: "Audit trail", icon: "audit" },
     ],
   },
   {
-    label: "Manage",
+    label: "Can change things",
     items: [{ href: "/developer/users", label: "People & access", icon: "users" }],
   },
 ];

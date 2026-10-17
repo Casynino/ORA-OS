@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { getDiagnostics } from "@/lib/developer/diagnostics";
 
 /**
- * Everything the "System health" page shows: usage, who signs in, speed, size,
+ * Everything the Developer Home shows: usage, who signs in, speed, size,
  * errors and a plain-language "problems found" list. READ-ONLY, and every probe is
  * isolated so one failing query can't blank the page.
  */
@@ -337,7 +337,7 @@ export async function getMonitor() {
       level: "warning",
       title: `${failedProbes.length} database check${failedProbes.length > 1 ? "s" : ""} failed`,
       detail: failedProbes.map((p) => p.label).join(", "),
-      hint: "Open Home and check the database; if it keeps happening, look at the Neon dashboard.",
+      hint: "Check the database in the Neon dashboard; if it keeps happening, tell me.",
     });
   if (diag.dbOk && avgMs > 400)
     problems.push({
@@ -366,7 +366,7 @@ export async function getMonitor() {
       level: "info",
       title: "Error tracking is switched off",
       detail: "Until it is on, crashes and failed sign-ins are not recorded here, so a problem could go unnoticed.",
-      hint: "Press “Turn on error tracking” on this page. It is one safe, additive step.",
+      hint: "Open the “Crashes & sign-ins” tab below and press “Turn on error tracking”. It is one safe, additive step.",
     });
   if (events.errors24 > 0)
     problems.push({
@@ -375,14 +375,14 @@ export async function getMonitor() {
       detail: events.groupedErrors[0]
         ? `Most recent: “${events.groupedErrors[0].message.slice(0, 120)}” on ${events.groupedErrors[0].path ?? "an unknown page"}.`
         : "See the error table below.",
-      hint: "Open the errors table below. A page that crashes for staff usually shows up here first.",
+      hint: "Open the “Crashes & sign-ins” tab below. A page that crashes for staff usually shows up here first.",
     });
   if (events.failed24 >= 10)
     problems.push({
       level: "warning",
       title: `${events.failed24} failed sign-ins in 24 hours`,
       detail: "That is more than normal typing mistakes and may be someone guessing passwords.",
-      hint: "Check the failed sign-ins table below. If it looks like an attack, suspend the targeted account from People & access.",
+      hint: "Check the failed sign-ins in the “Crashes & sign-ins” tab below. If it looks like an attack, suspend the targeted account from People & access.",
     });
   if (diag.failedDevLogins24h > 0)
     problems.push({
@@ -436,7 +436,7 @@ export async function getMonitor() {
       level: "info",
       title: "Some numbers could not be read just now",
       detail: `Could not load: ${incomplete.join(", ")}. This is usually a short database hiccup.`,
-      hint: "Refresh the page in a minute. If it keeps happening, check the database on the Home page.",
+      hint: "Refresh the page in a minute. If it keeps happening, check the database in the Neon dashboard.",
     });
 
   const score = Math.max(

@@ -425,7 +425,6 @@ export async function devEnableErrorTracking(): Promise<ActionResult> {
     return fail(errorMessage(e));
   }
   resumeTracking();
-  revalidatePath("/developer/monitor");
   revalidatePath("/developer");
   return ok(undefined, "Error tracking is on. Crashes and failed sign-ins are now recorded.");
 }
