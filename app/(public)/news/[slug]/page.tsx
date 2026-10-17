@@ -7,9 +7,8 @@ import { getPublicPost, listPublicPosts } from "@/lib/services/news";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { RichText } from "@/components/public/rich-text";
+import { siteOrigin } from "@/lib/site-origin";
 import { humanize } from "@/lib/utils";
-
-const SITE = (process.env.NEXT_PUBLIC_APP_URL ?? "https://www.ora.co.tz").replace(/\/$/, "");
 
 export async function generateMetadata({
   params,
@@ -19,8 +18,10 @@ export async function generateMetadata({
   const { slug } = await params;
   const post = await getPublicPost(slug);
   if (!post) return { title: "Post not found" };
-  // The picture + title that show when the link is shared on WhatsApp, Facebook, X, LinkedIn.
+  // The picture + title that show when the link is shared on WhatsApp, Facebook, X, LinkedIn —
+  // on the same domain the visitor is on (so ora.co.tz links preview with ora.co.tz images).
   return {
+    metadataBase: new URL(await siteOrigin()),
     title: post.title,
     description: post.excerpt,
     openGraph: {
@@ -58,7 +59,7 @@ export default async function NewsArticlePage({
   const words = post.body.replace(/!\[[^\]]*\]\([^)]*\)/g, " ").split(/\s+/).filter(Boolean).length;
   const minutes = Math.max(1, Math.round(words / 200));
 
-  const url = `${SITE}/news/${post.slug}`;
+  const url = `${await siteOrigin()}/news/${post.slug}`;
   const text = encodeURIComponent(`${post.title}`);
   const link = encodeURIComponent(url);
   const shares = [
