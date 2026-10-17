@@ -8,12 +8,11 @@ import {
 // permissions with the business dashboards, and only the DEVELOPER role gets in.
 const nav: NavGroup[] = [
   {
-    // Ordered from the safest (just looking) to the most powerful (changing access).
     items: [
       { href: "/developer", label: "Home", icon: "dashboard" },
       { href: "/developer/audit", label: "Audit", icon: "audit" },
-      { href: "/developer/records", label: "Business", icon: "reports" },
       { href: "/developer/users", label: "Access", icon: "roles" },
+      { href: "/developer/records", label: "Business", icon: "reports" },
     ],
   },
 ];
