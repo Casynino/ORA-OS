@@ -68,7 +68,7 @@ export default async function MonitorPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="System monitor"
+        title="System health"
         description="Is the system healthy, how fast is it, and who is using it? Everything here is read live from the system and explained in plain words."
       />
 

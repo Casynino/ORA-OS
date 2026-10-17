@@ -143,7 +143,7 @@ export default async function DeveloperOverviewPage() {
           <QuickLink
             href="/developer/monitor"
             icon={Activity}
-            title="Open the system monitor"
+            title="Open system health"
             text="Charts of who signs in and how busy it is, how fast the system is, and a plain list of any problems found."
           />
           <QuickLink
@@ -155,13 +155,13 @@ export default async function DeveloperOverviewPage() {
           <QuickLink
             href="/developer/audit"
             icon={ScrollText}
-            title="Read the audit log"
+            title="Read the audit trail"
             text="The permanent diary of everything done in the system — by staff and by you. Records here can never be edited or deleted."
           />
           <QuickLink
             href="/developer/records"
             icon={BarChart3}
-            title="Look at the records"
+            title="Look at business records"
             text="See sales, payments, stock and customers in read-only tables. Good for checking a number without risking a change."
           />
         </div>
@@ -287,7 +287,7 @@ export default async function DeveloperOverviewPage() {
       <section>
         <SectionTitle
           title={`People · ${formatNumber(totalUsers)} accounts`}
-          text="Who has an account, grouped by what they do. Open User access to work as any of them."
+          text="Who has an account, grouped by what they do. Open People & access to work as any of them."
         />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {roles.map((role) => {

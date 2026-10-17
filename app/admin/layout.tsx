@@ -6,7 +6,7 @@ import {
 } from "@/components/dashboard/dashboard-shell";
 
 const nav: NavGroup[] = [
-  { items: [{ href: "/admin", label: "Dashboard", icon: "dashboard" }] },
+  { items: [{ href: "/admin", label: "Home", icon: "dashboard" }] },
   {
     label: "Operations",
     items: [

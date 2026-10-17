@@ -9,7 +9,7 @@ import {
 // debt; the CEO owns all company accounts. No account management, no
 // payroll (handled by the CEO), no user/system/warehouse control.
 const nav: NavGroup[] = [
-  { items: [{ href: "/finance", label: "Dashboard", icon: "dashboard" }] },
+  { items: [{ href: "/finance", label: "Home", icon: "dashboard" }] },
   {
     label: "Customers",
     items: [

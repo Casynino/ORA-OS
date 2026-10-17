@@ -106,7 +106,7 @@ export default async function DeveloperAuditPage({
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Audit log"
+        title="Audit trail"
         description="The permanent diary of the system: who did what, and when. Developer actions can't be edited or deleted — not even from the database."
       />
 

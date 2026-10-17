@@ -7,7 +7,7 @@ import {
 // Inventory operations only — no sales, pricing, finance or customer
 // management. Warehouse staff receive, prepare, dispatch and count stock.
 const nav: NavGroup[] = [
-  { items: [{ href: "/warehouse", label: "Overview", icon: "dashboard" }] },
+  { items: [{ href: "/warehouse", label: "Home", icon: "dashboard" }] },
   {
     label: "Operations",
     items: [

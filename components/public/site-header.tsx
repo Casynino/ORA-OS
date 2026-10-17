@@ -57,7 +57,7 @@ export function SiteHeader({
               className={buttonVariants({ size: "sm" })}
             >
               <LayoutDashboard className="size-4" />
-              Dashboard
+              My Home
             </Link>
           ) : (
             <>
@@ -104,7 +104,7 @@ export function SiteHeader({
                   className={buttonVariants({ size: "sm" })}
                   onClick={() => setOpen(false)}
                 >
-                  Go to dashboard
+                  Go to my Home
                 </Link>
               ) : (
                 <>

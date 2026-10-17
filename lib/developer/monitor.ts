@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { getDiagnostics } from "@/lib/developer/diagnostics";
 
 /**
- * Everything the "System monitor" page shows: usage, who signs in, speed, size,
+ * Everything the "System health" page shows: usage, who signs in, speed, size,
  * errors and a plain-language "problems found" list. READ-ONLY, and every probe is
  * isolated so one failing query can't blank the page.
  */
@@ -337,7 +337,7 @@ export async function getMonitor() {
       level: "warning",
       title: `${failedProbes.length} database check${failedProbes.length > 1 ? "s" : ""} failed`,
       detail: failedProbes.map((p) => p.label).join(", "),
-      hint: "Open Overview and check the database; if it keeps happening, look at the Neon dashboard.",
+      hint: "Open Home and check the database; if it keeps happening, look at the Neon dashboard.",
     });
   if (diag.dbOk && avgMs > 400)
     problems.push({
@@ -382,7 +382,7 @@ export async function getMonitor() {
       level: "warning",
       title: `${events.failed24} failed sign-ins in 24 hours`,
       detail: "That is more than normal typing mistakes and may be someone guessing passwords.",
-      hint: "Check the failed sign-ins table below. If it looks like an attack, suspend the targeted account from User access.",
+      hint: "Check the failed sign-ins table below. If it looks like an attack, suspend the targeted account from People & access.",
     });
   if (diag.failedDevLogins24h > 0)
     problems.push({
@@ -406,14 +406,14 @@ export async function getMonitor() {
       level: "critical",
       title: "Stock numbers do not add up",
       detail: `${nw} warehouse and ${nr} sales-rep stock line${nw + nr > 1 ? "s" : ""} have negative or impossible quantities.`,
-      hint: "Open Records → stock to find them. Do not edit by hand; tell me and we fix the cause.",
+      hint: "Open Business records → stock to find them. Do not edit by hand; tell me and we fix the cause.",
     });
   if (op > 0)
     problems.push({
       level: "critical",
       title: "Some sales show more paid than the total",
       detail: `${op} sale${op > 1 ? "s have" : " has"} a paid amount larger than the sale total (or below zero).`,
-      hint: "Open Records → sales to find them. Money records must not be edited by hand.",
+      hint: "Open Business records → sales to find them. Money records must not be edited by hand.",
     });
   if (pendingOld > 0)
     problems.push({
@@ -436,7 +436,7 @@ export async function getMonitor() {
       level: "info",
       title: "Some numbers could not be read just now",
       detail: `Could not load: ${incomplete.join(", ")}. This is usually a short database hiccup.`,
-      hint: "Refresh the page in a minute. If it keeps happening, check the database on the Overview page.",
+      hint: "Refresh the page in a minute. If it keeps happening, check the database on the Home page.",
     });
 
   const score = Math.max(
