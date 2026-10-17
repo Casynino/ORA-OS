@@ -13,6 +13,7 @@ import { auth, unstable_update } from "@/auth";
 import { dashboardPath } from "@/lib/rbac";
 import { notifyInApp } from "@/lib/notifications/in-app";
 import { sendWhatsApp } from "@/lib/notifications/whatsapp";
+import { resumeTracking } from "@/lib/developer/errors";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -368,4 +369,63 @@ export async function devStopActing(): Promise<ActionResult> {
     return fail(errorMessage(e));
   }
   return ok(undefined, "Back in your Developer console.");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Turn on error tracking
+//
+//  Creates the SystemEvent table (additive + idempotent — the same SQL as
+//  scripts/system-events-table.sql) so the monitor can record server errors and
+//  failed sign-ins. It never touches business data. Audited like everything else.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function devEnableErrorTracking(): Promise<ActionResult> {
+  let actor;
+  try {
+    actor = await requireActor(["DEVELOPER"]);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+  const meta = requestMeta(await headers());
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`CREATE TABLE IF NOT EXISTS "SystemEvent" (
+        "id" TEXT NOT NULL,
+        "kind" TEXT NOT NULL,
+        "message" TEXT NOT NULL,
+        "path" TEXT,
+        "method" TEXT,
+        "digest" TEXT,
+        "detail" TEXT,
+        "ip" TEXT,
+        "count" INTEGER NOT NULL DEFAULT 1,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "SystemEvent_pkey" PRIMARY KEY ("id")
+      )`;
+      await tx.$executeRaw`ALTER TABLE "SystemEvent" ADD COLUMN IF NOT EXISTS "count" INTEGER NOT NULL DEFAULT 1`;
+      await tx.$executeRaw`CREATE INDEX IF NOT EXISTS "SystemEvent_createdAt_idx" ON "SystemEvent"("createdAt")`;
+      await tx.$executeRaw`CREATE INDEX IF NOT EXISTS "SystemEvent_kind_createdAt_idx" ON "SystemEvent"("kind", "createdAt")`;
+      await writeDevAudit(tx, {
+        actor: { id: actor.id, name: actor.name ?? "Developer" },
+        action: "DEV_ERROR_TRACKING_ENABLED",
+        entity: "System",
+        summary: "Developer turned on error tracking (created the SystemEvent table).",
+        outcome: "SUCCESS",
+        ...meta,
+      });
+    });
+  } catch (e) {
+    await writeDevAuditSafe({
+      actor: { id: actor.id, name: actor.name ?? "Developer" },
+      action: "DEV_ERROR_TRACKING_ENABLED",
+      entity: "System",
+      summary: `Failed to turn on error tracking: ${errorMessage(e)}`,
+      outcome: "FAILED",
+      ...meta,
+    });
+    return fail(errorMessage(e));
+  }
+  resumeTracking();
+  revalidatePath("/developer/monitor");
+  revalidatePath("/developer");
+  return ok(undefined, "Error tracking is on. Crashes and failed sign-ins are now recorded.");
 }

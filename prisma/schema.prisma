@@ -1760,3 +1760,23 @@ model Notification {
   @@index([entityType, entityId])
   @@index([createdAt])
 }
+
+/// Technical events for the Developer console: unhandled server errors and failed
+/// sign-ins. Deliberately separate from ActivityLog (the business audit trail) so
+/// technical noise never shows up in the owner's activity feed. Created on demand
+/// from the Developer console ("Turn on error tracking") — see scripts/system-events-table.sql.
+model SystemEvent {
+  id        String   @id @default(cuid())
+  kind      String // SERVER_ERROR | LOGIN_FAILED
+  message   String
+  path      String?
+  method    String?
+  digest    String?
+  detail    String? // trimmed stack / extra context (never request bodies, cookies or query strings)
+  ip        String?
+  count     Int      @default(1) // identical repeats within a minute are merged into the next row
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([kind, createdAt])
+}

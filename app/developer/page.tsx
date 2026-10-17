@@ -128,7 +128,10 @@ export default async function DeveloperOverviewPage() {
           <p className="mt-0.5 text-muted-foreground">
             {attention.length
               ? `Reason: ${attention.join("; ")}. Details are in the cards below.`
-              : "The database is reachable, every required setting is in place, and nothing is waiting too long."}
+              : "The database is reachable, every required setting is in place, and nothing is waiting too long."}{" "}
+            <Link href="/developer/monitor" className="font-medium text-primary hover:underline">
+              See the full report
+            </Link>
           </p>
         </div>
       </div>
@@ -136,7 +139,13 @@ export default async function DeveloperOverviewPage() {
       {/* Where to go */}
       <section>
         <SectionTitle title="What do you want to do?" />
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <QuickLink
+            href="/developer/monitor"
+            icon={Activity}
+            title="Open the system monitor"
+            text="Charts of who signs in and how busy it is, how fast the system is, and a plain list of any problems found."
+          />
           <QuickLink
             href="/developer/users"
             icon={LogIn}

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { authConfig } from "./auth.config";
 import { prisma } from "@/lib/db";
 import { authenticateDeveloper } from "@/lib/developer/login";
+import { recordSystemEvent } from "@/lib/developer/errors";
 import { canWorkAs, WORK_AS_MAX_MS, type ActAs } from "@/lib/developer/acting";
 
 const credentialsSchema = z.object({
@@ -29,20 +30,31 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         if (!parsed.success) return null;
 
         const { email, password } = parsed.data;
-        const user = await prisma.user.findUnique({
-          where: { email: email.toLowerCase().trim() },
-        });
-        if (!user) return null;
-
-        // Only ACTIVE accounts may authenticate. PENDING agents await admin
-        // approval; SUSPENDED accounts are blocked. The login server action
-        // surfaces a friendly message for these states.
-        if (user.status !== "ACTIVE") return null;
-
         const headers = request?.headers;
         const ip =
           headers?.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
         const userAgent = headers?.get("user-agent")?.slice(0, 300) || null;
+
+        const user = await prisma.user.findUnique({
+          where: { email: email.toLowerCase().trim() },
+        });
+        if (!user) {
+          // Never store what was typed in the email box (it can be a mistyped password).
+          await recordSystemEvent({ kind: "LOGIN_FAILED", message: "Sign-in with an email that has no account", ip });
+          return null;
+        }
+
+        // Only ACTIVE accounts may authenticate. PENDING agents await admin
+        // approval; SUSPENDED accounts are blocked. The login server action
+        // surfaces a friendly message for these states.
+        if (user.status !== "ACTIVE") {
+          await recordSystemEvent({
+            kind: "LOGIN_FAILED",
+            message: `${user.name} (${user.role}) tried to sign in but the account is ${user.status.toLowerCase()}`,
+            ip,
+          });
+          return null;
+        }
 
         // ── One login page, two sets of checks ─────────────────────────────
         // The server — not anything the browser sends — decides from the ACCOUNT
@@ -54,7 +66,14 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           if (!ok) return null;
         } else {
           const valid = await bcrypt.compare(password, user.passwordHash);
-          if (!valid) return null;
+          if (!valid) {
+            await recordSystemEvent({
+              kind: "LOGIN_FAILED",
+              message: `Wrong password for ${user.name} (${user.role})`,
+              ip,
+            });
+            return null;
+          }
         }
 
         // Record the sign-in — powers the profile's login history.

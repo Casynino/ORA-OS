@@ -12,6 +12,7 @@ const nav: NavGroup[] = [
   {
     label: "Investigate",
     items: [
+      { href: "/developer/monitor", label: "System monitor", icon: "activity" },
       { href: "/developer/records", label: "Records (read-only)", icon: "reports" },
       { href: "/developer/audit", label: "Audit log", icon: "audit" },
     ],
