@@ -32,7 +32,6 @@ export default async function DeveloperLayout({
         role: session.role,
         avatar: session.avatar ?? null,
       }}
-      areaLabel="Developer Console"
     >
       {children}
     </DashboardShell>

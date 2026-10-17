@@ -120,7 +120,8 @@ export function DashboardShell({
     avatar?: string | null;
     preferredName?: string | null;
   };
-  areaLabel: string;
+  /** Small heading above the menu (and in the phone top bar). Leave out for none. */
+  areaLabel?: string;
   profileHref?: string;
   children: React.ReactNode;
 }) {
@@ -228,9 +229,11 @@ export function DashboardShell({
           </Link>
         </div>
         <div className="flex flex-1 flex-col overflow-y-auto scrollbar-thin p-3">
-          <p className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-primary">
-            {areaLabel}
-          </p>
+          {areaLabel && (
+            <p className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-primary">
+              {areaLabel}
+            </p>
+          )}
           <NavLinks />
         </div>
         <UserCard />
@@ -280,9 +283,11 @@ export function DashboardShell({
             >
               <Menu className="size-5" />
             </button>
-            <span className="font-display font-semibold lg:hidden">
-              {areaLabel}
-            </span>
+            {areaLabel && (
+              <span className="font-display font-semibold lg:hidden">
+                {areaLabel}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
