@@ -25,7 +25,7 @@ import { CampaignMarquee } from "@/components/public/campaign-marquee";
 import { AuroraBackground } from "@/components/public/aurora-background";
 import { SocialLinks } from "@/components/public/social-links";
 import { ORA_CONTACT } from "@/lib/constants";
-import { prisma } from "@/lib/db";
+import { listPublicPosts } from "@/lib/services/news";
 import { getPublicImpactStats } from "@/lib/stats";
 import { getImpactFeed } from "@/lib/services/impact";
 import { ImpactPulse } from "@/components/public/impact-live";
@@ -52,11 +52,7 @@ export default async function HomePage() {
     { icon: Heart, title: "Dignity for All", body: "Every girl deserves to live her life with dignity and confidence." },
   ];
 
-  const newsPosts = await prisma.newsPost.findMany({
-    where: { published: true },
-    orderBy: { publishedAt: "desc" },
-    take: 3,
-  });
+  const newsPosts = await listPublicPosts(3);
   const news = newsPosts.map((n) => ({
     slug: n.slug,
     title: n.title,

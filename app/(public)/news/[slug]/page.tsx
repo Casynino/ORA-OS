@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Calendar } from "lucide-react";
-import { prisma } from "@/lib/db";
+import { getPublicPost } from "@/lib/services/news";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { RichText } from "@/components/public/rich-text";
@@ -15,7 +15,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const post = await prisma.newsPost.findUnique({ where: { slug } });
+  const post = await getPublicPost(slug);
   if (!post) return { title: "Post not found" };
   return { title: post.title, description: post.excerpt };
 }
@@ -26,9 +26,12 @@ export default async function NewsArticlePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const post = await prisma.newsPost.findUnique({ where: { slug } });
-  if (!post || !post.published) notFound();
+  const post = await getPublicPost(slug);
+  if (!post) notFound();
 
+  // A designed (SVG) cover already carries its own headline, so it is shown clean with the
+  // title underneath; photos keep the title overlaid on the picture.
+  const graphicCover = !!post.coverImage && post.coverImage.endsWith(".svg");
   const date = post.publishedAt.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
@@ -45,7 +48,7 @@ export default async function NewsArticlePage({
         Back to newsroom
       </Link>
 
-      {post.coverImage && (
+      {post.coverImage && !graphicCover && (
         <div className="relative mt-6 aspect-[21/10] overflow-hidden rounded-3xl">
           <Image
             src={post.coverImage}
@@ -71,7 +74,20 @@ export default async function NewsArticlePage({
         </div>
       )}
 
-      {!post.coverImage && (
+      {post.coverImage && graphicCover && (
+        <div className="relative mt-6 aspect-[21/10] overflow-hidden rounded-3xl shadow-soft">
+          <Image
+            src={post.coverImage}
+            alt={post.title}
+            fill
+            sizes="(min-width:768px) 768px, 100vw"
+            className="object-cover"
+            priority
+          />
+        </div>
+      )}
+
+      {(!post.coverImage || graphicCover) && (
         <div className="mt-6">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="accent">{humanize(post.category)}</Badge>

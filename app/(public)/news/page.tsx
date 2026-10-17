@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Newspaper } from "lucide-react";
-import { prisma } from "@/lib/db";
+import { listPublicPosts } from "@/lib/services/news";
 import { Badge } from "@/components/ui/badge";
 import { Reveal } from "@/components/ui/reveal";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -25,10 +25,7 @@ function fmt(d: Date) {
 }
 
 export default async function NewsPage() {
-  const posts = await prisma.newsPost.findMany({
-    where: { published: true },
-    orderBy: { publishedAt: "desc" },
-  });
+  const posts = await listPublicPosts();
   const [featured, ...rest] = posts;
 
   return (
