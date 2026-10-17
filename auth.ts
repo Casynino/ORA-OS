@@ -132,7 +132,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         // re-validated on EVERY read, so it ends the instant that person is
         // suspended or no longer an eligible staff role.
         if (db.role === "DEVELOPER") {
-          const pick = { id: true, name: true, email: true, role: true, status: true } as const;
+          const pick = { id: true, name: true, email: true, role: true, status: true, sessionVersion: true } as const;
           if (trigger === "update" && session && typeof session === "object" && "actAs" in session) {
             const want = (session as { actAs?: string | null }).actAs;
             if (!want) {
@@ -157,19 +157,50 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
                 latest.action === "DEV_ACT_START" &&
                 latest.entityId === want &&
                 Date.now() - latest.createdAt.getTime() < 60_000;
-              if (t && proven && canWorkAs(t, token.id as string))
-                token.actAs = { id: t.id, role: t.role, name: t.name, email: t.email, at: Date.now() };
+              if (t && proven && auditId && canWorkAs(t, token.id as string))
+                token.actAs = {
+                  id: t.id,
+                  role: t.role,
+                  name: t.name,
+                  email: t.email,
+                  at: Date.now(),
+                  aid: auditId,
+                  tsv: t.sessionVersion,
+                };
               else delete token.actAs;
             }
           } else if (token.actAs) {
             const current = token.actAs as ActAs;
-            // Working-as ends by itself after WORK_AS_MAX_MS (old tokens with no
-            // start time count as expired).
-            const expired = !current.at || Date.now() - current.at > WORK_AS_MAX_MS;
-            const t = expired ? null : await prisma.user.findUnique({ where: { id: current.id }, select: pick });
-            if (t && canWorkAs(t, token.id as string))
-              token.actAs = { id: t.id, role: t.role, name: t.name, email: t.email, at: current.at };
-            else delete token.actAs;
+            // Working-as stays valid only while ALL of these hold, re-checked on
+            // every read (so a copied cookie dies the moment any of them breaks):
+            //  • under WORK_AS_MAX_MS old (old tokens without start data = expired),
+            //  • the developer's latest start/stop row is still THIS start — pressing
+            //    Stop (or starting someone else) revokes every copy of the cookie,
+            //  • the target is still an ACTIVE, actable account,
+            //  • the target's sessionVersion is unchanged — so the person's own
+            //    "sign out of all devices" also ends the Developer's session as them.
+            let keep = false;
+            if (current.at && current.aid && Date.now() - current.at <= WORK_AS_MAX_MS) {
+              const [t, latest] = await Promise.all([
+                prisma.user.findUnique({ where: { id: current.id }, select: pick }),
+                prisma.activityLog.findFirst({
+                  where: { actorId: token.id as string, action: { in: ["DEV_ACT_START", "DEV_ACT_STOP"] } },
+                  orderBy: { createdAt: "desc" },
+                  select: { id: true, action: true },
+                }),
+              ]);
+              if (
+                t &&
+                canWorkAs(t, token.id as string) &&
+                t.sessionVersion === current.tsv &&
+                latest?.id === current.aid &&
+                latest.action === "DEV_ACT_START"
+              ) {
+                token.actAs = { ...current, role: t.role, name: t.name, email: t.email };
+                keep = true;
+              }
+            }
+            if (!keep) delete token.actAs;
           }
         } else {
           delete token.actAs;

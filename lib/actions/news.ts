@@ -88,10 +88,18 @@ export async function toggleNewsPublished(id: string): Promise<ActionResult> {
 
 export async function deleteNews(id: string): Promise<ActionResult> {
   try {
-    await requireActor(["ADMIN"]);
+    const actor = await requireActor(["ADMIN"]);
     const post = await prisma.newsPost.findUnique({ where: { id } });
     if (!post) return fail("Post not found.");
     await prisma.newsPost.delete({ where: { id } });
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "NEWS_DELETED",
+      entity: "NewsPost",
+      entityId: id,
+      summary: `${actor.name} deleted the news post “${post.title}”.`,
+    });
     revalidatePath("/news");
     revalidatePath("/admin/news");
     revalidatePath("/");

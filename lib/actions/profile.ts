@@ -4,7 +4,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireActor } from "@/lib/rbac";
+import { requireOwnIdentity } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
@@ -25,7 +25,7 @@ export async function updateMyProfile(
   input: z.infer<typeof profileSchema>,
 ): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["ADMIN"]);
+    const actor = await requireOwnIdentity(["ADMIN"]);
     const parsed = profileSchema.safeParse(input);
     if (!parsed.success)
       return fail(parsed.error.issues[0]?.message ?? "Invalid profile.");
@@ -74,7 +74,7 @@ export async function changeMyPassword(
   input: z.infer<typeof passwordSchema>,
 ): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["ADMIN"]);
+    const actor = await requireOwnIdentity(["ADMIN"]);
     const parsed = passwordSchema.safeParse(input);
     if (!parsed.success)
       return fail(parsed.error.issues[0]?.message ?? "Invalid password.");
@@ -105,7 +105,7 @@ export async function changeMyPassword(
 /** Invalidate every session of this account — including this one. */
 export async function signOutAllDevices(): Promise<ActionResult> {
   try {
-    const actor = await requireActor(["ADMIN"]);
+    const actor = await requireOwnIdentity(["ADMIN"]);
     await prisma.user.update({
       where: { id: actor.id },
       data: { sessionVersion: { increment: 1 } },

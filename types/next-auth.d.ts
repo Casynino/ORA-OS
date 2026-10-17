@@ -33,6 +33,6 @@ declare module "next-auth/jwt" {
     sv?: number;
     devAt?: number; // Developer sessions only: sign-in time, for the 8h expiry
     /** Developer sessions only: the staff member currently being worked as. */
-    actAs?: { id: string; role: Role; name: string; email: string; at: number };
+    actAs?: { id: string; role: Role; name: string; email: string; at: number; aid: string; tsv: number };
   }
 }

@@ -2,7 +2,9 @@ import Link from "next/link";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { writeDevAuditSafe } from "@/lib/developer/audit";
+import { Eye } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { InfoCallout } from "@/components/developer/info";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -248,8 +250,16 @@ export default async function DeveloperRecordsPage({
     <div className="space-y-5">
       <PageHeader
         title="Records"
-        description="Read-only view across departments for troubleshooting. Nothing here can be edited — business records can only be changed by the people who own them. Each visit is audited."
+        description="A look at the business data — sales, payments, stock and customers — in plain tables."
       />
+      <InfoCallout icon={Eye} tone="neutral" title="Look, don't touch">
+        This page is read-only: nothing here can be edited, so you can check a number safely. If a record is wrong, the
+        person who owns it fixes it — or you can use{" "}
+        <a href="/developer/users" className="font-medium text-primary hover:underline">
+          Work as
+        </a>{" "}
+        to see their screen. Each visit to this page is recorded in the audit log.
+      </InfoCallout>
       <div className="flex flex-wrap gap-1.5">
         {DEPTS.map((x) => (
           <Link

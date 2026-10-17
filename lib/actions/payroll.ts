@@ -73,7 +73,7 @@ export async function updateEmployee(
   input: z.infer<typeof employeeUpdateSchema>,
 ): Promise<ActionResult> {
   try {
-    await requireActor(["ADMIN"]);
+    const actor = await requireActor(["ADMIN"]);
     const parsed = employeeUpdateSchema.safeParse(input);
     if (!parsed.success) return fail("Invalid update.");
     const { employeeId, ...rest } = parsed.data;
@@ -89,6 +89,22 @@ export async function updateEmployee(
         note: rest.note !== undefined ? rest.note.trim() || null : emp.note,
         isActive: rest.isActive ?? emp.isActive,
       },
+    });
+    const salaryNote =
+      rest.baseSalary !== undefined && rest.baseSalary !== emp.baseSalary
+        ? ` (base salary ${emp.baseSalary} → ${rest.baseSalary})`
+        : "";
+    const activeNote =
+      rest.isActive !== undefined && rest.isActive !== emp.isActive
+        ? ` (${rest.isActive ? "re-activated" : "deactivated"})`
+        : "";
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "EMPLOYEE_UPDATED",
+      entity: "Employee",
+      entityId: emp.id,
+      summary: `${actor.name} updated payroll details for ${emp.name}${salaryNote}${activeNote}.`,
     });
     revalidatePayroll();
     return ok(undefined, "Employee updated.");

@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/rbac";
+import { logActivity } from "@/lib/activity";
 import { prisma } from "@/lib/db";
 import { generateDailyReport } from "@/lib/reports/generate-daily";
 import { generateMonthlyReport } from "@/lib/reports/generate-monthly";
@@ -45,12 +46,25 @@ const settingsSchema = z.object({
 /** ADMIN: update the executive-reporting settings (toggles + daily send hour). */
 export async function updateReportSettings(input: z.infer<typeof settingsSchema>): Promise<ActionResult> {
   try {
-    await requireRole("ADMIN");
+    const actor = await requireRole("ADMIN");
     const d = settingsSchema.parse(input);
+    const before = await prisma.reportSettings.findUnique({ where: { id: "singleton" } });
     await prisma.reportSettings.upsert({
       where: { id: "singleton" },
       create: { id: "singleton", ...d },
       update: d,
+    });
+    // Say exactly which switches changed (turning alerts off must leave a trace).
+    const changed = (Object.keys(d) as (keyof typeof d)[]).filter((k) => before?.[k] !== d[k]);
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "REPORT_SETTINGS_UPDATED",
+      entity: "ReportSettings",
+      entityId: "singleton",
+      summary: changed.length
+        ? `${actor.name} changed report & alert settings: ${changed.map((k) => `${k} → ${String(d[k])}`).join(", ")}.`
+        : `${actor.name} saved report & alert settings (no change).`,
     });
     revalidatePath("/admin/reports");
     return ok(undefined, "Report settings saved.");

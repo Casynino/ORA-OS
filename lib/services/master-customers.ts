@@ -10,6 +10,8 @@ export async function getMasterCustomers() {
     prisma.user.findMany({
       where: { role: "PARTNER" },
       orderBy: { createdAt: "desc" },
+      // These rows go to the browser — never include the password hash.
+      omit: { passwordHash: true },
       include: { creditAccounts: true },
     }),
     prisma.fieldCustomer.findMany({

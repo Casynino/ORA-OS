@@ -12,6 +12,7 @@ import { canWorkAs } from "@/lib/developer/acting";
 import { auth, unstable_update } from "@/auth";
 import { dashboardPath } from "@/lib/rbac";
 import { notifyInApp } from "@/lib/notifications/in-app";
+import { sendWhatsApp } from "@/lib/notifications/whatsapp";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -286,11 +287,11 @@ export async function devStartActing(input: { userId: string }): Promise<ActionR
       action: "DEV_ACT_START",
       entity: "User",
       entityId: target?.id ?? null,
-      summary: "Refused: work as an account that isn't an active Finance, Warehouse or Sales Rep user.",
+      summary: "Refused: work as an account that isn't active, is a Developer, or is your own.",
       outcome: "FAILED",
       ...meta,
     });
-    return fail("You can only work as an active Finance, Warehouse or Sales Rep account.");
+    return fail("You can only work as an active account (not another Developer, and not yourself).");
   }
 
   try {
@@ -328,7 +329,7 @@ export async function devStartActing(input: { userId: string }): Promise<ActionR
     toRoles: ["ADMIN"],
     category: "INFO",
     type: "DEVELOPER_ACTION",
-    title: "Developer is working as a team member",
+    title: target.role === "ADMIN" ? "Developer opened the Admin dashboard" : "Developer is working as a team member",
     body: `${me.name} (Developer) opened ${target.name}'s dashboard. Everything done is recorded under the Developer.`,
     actorName: `${me.name} (Developer)`,
     entityType: "User",
@@ -336,6 +337,14 @@ export async function devStartActing(input: { userId: string }): Promise<ActionR
     actionUrl: "/admin/activity",
     actionLabel: "View activity",
   });
+  // Working as the OWNER's own account is the most sensitive case — also tell her
+  // on WhatsApp (best-effort, capped so it can never hold up the switch).
+  if (target.role === "ADMIN") {
+    await Promise.race([
+      sendWhatsApp(`ORA security notice: Developer ${me.name} just opened the Admin dashboard (working as ${target.name}). Everything done is recorded under the Developer in Activity.`),
+      new Promise((r) => setTimeout(r, 5000)),
+    ]);
+  }
   return ok({ redirectTo: dashboardPath(target.role) }, `Now working as ${target.name}.`);
 }
 

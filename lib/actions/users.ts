@@ -4,7 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
-import { requireActor } from "@/lib/rbac";
+import { requireActor, requireOwnIdentity } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { recordLimitSet } from "@/lib/services/credit";
 import { formatCurrency } from "@/lib/utils";
@@ -283,6 +283,14 @@ export async function setPartnerFinanceNotes(
       where: { id: user.id },
       data: { financeNotes: parsed.data.notes.trim() || null },
     });
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "PARTNER_FINANCE_NOTES_SET",
+      entity: "User",
+      entityId: user.id,
+      summary: `${actor.name} updated the financial notes on ${user.name}.`,
+    });
     revalidatePath("/finance/partners");
     revalidatePath("/finance/customers");
     revalidatePath(`/finance/customers/${user.id}`);
@@ -311,7 +319,7 @@ export async function createUserByAdmin(
   input: z.infer<typeof createSchema>,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireOwnIdentity(["ADMIN"]);
     const parsed = createSchema.safeParse(input);
     if (!parsed.success) {
       return fail(parsed.error.issues[0]?.message ?? "Invalid details.");
@@ -515,6 +523,11 @@ export async function updateCustomer(
     });
     if (!user || user.role === "DEVELOPER") return fail("Customer not found.");
 
+    // The email is the login — it can't be changed while a Developer is working
+    // as the Admin (account-takeover guard).
+    if (admin.impersonatedBy && parsed.data.email.toLowerCase().trim() !== user.email.toLowerCase())
+      return fail("The login email can't be changed while a Developer is working as someone.");
+
     // Guard against email collisions with another account.
     if (parsed.data.email.toLowerCase() !== user.email.toLowerCase()) {
       const clash = await prisma.user.findUnique({
@@ -575,7 +588,7 @@ export async function resetPartnerPassword(
   input: z.infer<typeof resetPwSchema>,
 ): Promise<ActionResult> {
   try {
-    const admin = await requireActor(["ADMIN"]);
+    const admin = await requireOwnIdentity(["ADMIN"]);
     const parsed = resetPwSchema.safeParse(input);
     if (!parsed.success) {
       return fail(parsed.error.issues[0]?.message ?? "Invalid password.");

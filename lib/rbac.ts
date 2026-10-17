@@ -60,3 +60,18 @@ export async function requireActor(roles?: Role[]) {
   }
   return user;
 }
+
+/**
+ * For actions that change HOW SOMEONE SIGNS IN — passwords, login email, new
+ * accounts, "sign out everywhere". Same as requireActor, but refused while a
+ * Developer is working as that person: otherwise "Work as" could be used to take
+ * over an account (or plant a new Admin) and keep access after Stop.
+ */
+export async function requireOwnIdentity(roles?: Role[]) {
+  const user = await requireActor(roles);
+  if (user.impersonatedBy)
+    throw new Error(
+      "This changes sign-in details, so it can't be done while a Developer is working as this person. They must do it themselves.",
+    );
+  return user;
+}

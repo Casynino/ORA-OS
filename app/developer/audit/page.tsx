@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
-import { Activity } from "lucide-react";
+import { Activity, ScrollText } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { writeDevAuditSafe } from "@/lib/developer/audit";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
+import { InfoCallout } from "@/components/developer/info";
 import { formatDateTime, formatNumber, humanize } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -106,8 +107,18 @@ export default async function DeveloperAuditPage({
     <div className="space-y-5">
       <PageHeader
         title="Audit log"
-        description="Every recorded action across the platform. Developer actions are append-only and can't be edited or deleted — not even from the database."
+        description="The permanent diary of the system: who did what, and when. Developer actions can't be edited or deleted — not even from the database."
       />
+
+      <InfoCallout icon={ScrollText} title="How to read this page">
+        Each line is one thing that happened. An{" "}
+        <span className="inline-block size-2 rounded-full bg-warning align-middle" /> orange dot and a{" "}
+        <strong className="text-foreground">Developer</strong> tag mean it was done by you — including when you worked
+        as someone (shown as &ldquo;you (Developer) as them&rdquo;). A{" "}
+        <span className="inline-block size-2 rounded-full bg-primary align-middle" /> purple dot is normal staff work, and
+        a <span className="inline-block size-2 rounded-full bg-destructive align-middle" /> red dot is something that failed.
+        Use the filters to show only your actions, or only failures.
+      </InfoCallout>
 
       <div className="flex flex-wrap gap-1.5">
         {SCOPES.map((s) => (

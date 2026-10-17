@@ -8,17 +8,70 @@ import { BUILD_ID } from "@/lib/build-id";
  * check can't blank the page.
  */
 
-const ENV_CHECKS: { name: string; note: string; required: boolean }[] = [
-  { name: "DATABASE_URL", note: "App database (should be the pooled connection)", required: true },
-  { name: "DIRECT_URL", note: "Direct connection used for migrations", required: true },
-  { name: "AUTH_SECRET", note: "Signs login sessions", required: true },
-  { name: "BLOB_READ_WRITE_TOKEN", note: "File storage for receipts/proofs", required: false },
-  { name: "CALLMEBOT_APIKEY", note: "Admin WhatsApp alerts (key)", required: false },
-  { name: "CALLMEBOT_PHONE", note: "Admin WhatsApp alerts (number)", required: false },
-  { name: "NEXT_PUBLIC_APP_URL", note: "Public site URL", required: false },
+type EnvCheck = {
+  name: string;
+  /** Plain-language name shown as the card title. */
+  title: string;
+  /** What this setting is for. */
+  purpose: string;
+  /** What happens (in the app) when it is not set. */
+  ifMissing: string;
+  required: boolean;
+};
+
+const ENV_CHECKS: EnvCheck[] = [
+  {
+    name: "DATABASE_URL",
+    title: "Database connection",
+    purpose: "How the website talks to the database during normal use. It should be the “pooled” link, which lets many people use the system at the same time.",
+    ifMissing: "The whole system stops — nobody can sign in or load any page.",
+    required: true,
+  },
+  {
+    name: "DIRECT_URL",
+    title: "Direct database link",
+    purpose: "A second, direct link used only when the database structure is updated (migrations).",
+    ifMissing: "Everyday use still works, but database updates cannot be applied.",
+    required: true,
+  },
+  {
+    name: "AUTH_SECRET",
+    title: "Login security key",
+    purpose: "A private key that signs every login session so nobody can fake being signed in.",
+    ifMissing: "Nobody can sign in. Never share or change it casually — changing it signs everyone out.",
+    required: true,
+  },
+  {
+    name: "BLOB_READ_WRITE_TOKEN",
+    title: "File storage",
+    purpose: "Cloud storage for receipts, proofs and report PDFs (Vercel Blob).",
+    ifMissing: "Uploads still work — files are kept inside the database instead. That is fine for now, but the database grows faster. Add it in Vercel when you want faster pages and a lighter database.",
+    required: false,
+  },
+  {
+    name: "CALLMEBOT_APIKEY",
+    title: "WhatsApp alerts — key",
+    purpose: "Lets the system send WhatsApp messages and daily reports to the owner (through CallMeBot).",
+    ifMissing: "No WhatsApp alerts or reports are sent. In-app alerts still work.",
+    required: false,
+  },
+  {
+    name: "CALLMEBOT_PHONE",
+    title: "WhatsApp alerts — number",
+    purpose: "The owner's phone number that receives those WhatsApp messages.",
+    ifMissing: "No WhatsApp alerts or reports are sent. In-app alerts still work.",
+    required: false,
+  },
+  {
+    name: "NEXT_PUBLIC_APP_URL",
+    title: "Public site address",
+    purpose: "The web address placed inside WhatsApp messages and report links.",
+    ifMissing: "Links in messages fall back to the default address.",
+    required: false,
+  },
 ];
 
-export type EnvStatus = { name: string; note: string; required: boolean; set: boolean };
+export type EnvStatus = EnvCheck & { set: boolean };
 
 export async function getDiagnostics() {
   const env: EnvStatus[] = ENV_CHECKS.map((c) => ({
@@ -47,7 +100,7 @@ export async function getDiagnostics() {
     }
   };
 
-  const [usersByRole, activity24h, failedDevLogins24h, lastDevLogin, stuckAlerts] = await Promise.all([
+  const [usersByRole, activity24h, failedDevLogins24h, lastDevLogin, stuckAlerts, recentDev, openActions] = await Promise.all([
     safe(() => prisma.user.groupBy({ by: ["role", "status"], _count: { _all: true } }), []),
     safe(() => prisma.activityLog.count({ where: { createdAt: { gte: day } } }), 0),
     safe(
@@ -75,6 +128,19 @@ export async function getDiagnostics() {
         }),
       0,
     ),
+    // The Developer's own most recent actions (shown on the overview).
+    safe(
+      () =>
+        prisma.activityLog.findMany({
+          where: { OR: [{ action: { startsWith: "DEV_" } }, { meta: { path: ["developer"], equals: true } }] },
+          orderBy: { createdAt: "desc" },
+          take: 6,
+          select: { id: true, action: true, summary: true, createdAt: true, meta: true },
+        }),
+      [],
+    ),
+    // Every ACTION alert still waiting for someone (normal work in progress).
+    safe(() => prisma.notification.count({ where: { category: "ACTION", resolvedAt: null } }), 0),
   ]);
 
   return {
@@ -90,5 +156,7 @@ export async function getDiagnostics() {
     failedDevLogins24h,
     lastDevLogin: lastDevLogin?.createdAt ?? null,
     stuckAlerts,
+    recentDev,
+    openActions,
   };
 }

@@ -256,6 +256,14 @@ export async function saveDeliveryDetails(
         phone: parsed.data.contactPhone?.trim() || null,
       },
     });
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "DELIVERY_DETAILS_SAVED",
+      entity: "User",
+      entityId: actor.id,
+      summary: `${actor.name} saved their delivery address and phone.`,
+    });
     revalidatePath("/partner/request");
     revalidatePath("/partner/profile");
     revalidatePath("/partner");

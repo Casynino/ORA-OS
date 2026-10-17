@@ -48,5 +48,6 @@ export async function getPendingApplications() {
   return prisma.user.findMany({
     where: { role: "PARTNER", status: "PENDING" },
     orderBy: { createdAt: "desc" },
+    omit: { passwordHash: true },
   });
 }
