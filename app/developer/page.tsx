@@ -1,10 +1,12 @@
-import { BarChart3, LogIn, ScrollText } from "lucide-react";
+import { BarChart3, ScrollText } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { getMonitor } from "@/lib/developer/monitor";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { QuickLink } from "@/components/developer/info";
 import { CreateAccountButton } from "@/components/developer/create-account";
+import { WorkAsCard } from "@/components/developer/work-as-picker";
+import { canWorkAs } from "@/lib/developer/acting";
 import { HomeTabs, type HomeTab } from "@/components/developer/home-tabs";
 import {
   ActivityPanel,
@@ -20,10 +22,18 @@ export const dynamic = "force-dynamic";
 
 export default async function DeveloperHomePage() {
   const me = await requireRole("DEVELOPER");
-  const [m, warehouses] = await Promise.all([
+  const [m, warehouses, accounts] = await Promise.all([
     getMonitor(),
     prisma.warehouse.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.user.findMany({
+      where: { status: "ACTIVE", id: { not: me.id } },
+      select: { id: true, name: true, role: true, status: true, avatar: true },
+    }),
   ]);
+  // Only the people the Developer is allowed to work as (active, not another Developer).
+  const people = accounts
+    .filter((u) => canWorkAs(u, me.id))
+    .map((u) => ({ id: u.id, name: u.name, role: u.role as string, avatar: u.avatar }));
   const d = m.diag;
 
   const firstName = me.preferredName || (me.name ?? "Developer").split(" ")[0];
@@ -67,12 +77,7 @@ export default async function DeveloperHomePage() {
 
       {/* Where to go */}
       <section className="grid gap-3 md:grid-cols-3">
-        <QuickLink
-          href="/developer/users"
-          icon={LogIn}
-          title="Open Access (work as someone)"
-          text="Open the dashboard of the owner, a team member or a partner to help them or to see what they see. Every click is recorded under your name."
-        />
+        <WorkAsCard people={people} />
         <QuickLink
           href="/developer/audit"
           icon={ScrollText}
