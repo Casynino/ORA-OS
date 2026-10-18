@@ -82,6 +82,42 @@ const eat = (d: Date) =>
 const bytes = (n: number) =>
   n >= 1073741824 ? `${(n / 1073741824).toFixed(2)} GB` : n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
+/* ───────────────────────── one section of the Home page ───────────────────────── */
+
+/** A titled block on the single Home page. `id` lets a problem card jump straight to it ("#errors"). */
+export function HomeSection({
+  id,
+  title,
+  badge,
+  tone = "neutral",
+  children,
+}: {
+  id: string;
+  title: string;
+  badge?: string | null;
+  tone?: "neutral" | "warn" | "bad";
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={id} className="scroll-mt-20 border-t border-border pt-8">
+      <div className="mb-5 flex items-center gap-3">
+        <h2 className="font-display text-2xl font-bold tracking-tight">{title}</h2>
+        {badge && (
+          <span
+            className={cn(
+              "rounded-full px-2.5 py-1 text-xs font-semibold leading-none tabular-nums",
+              tone === "bad" ? "bg-destructive/15 text-destructive" : tone === "warn" ? "bg-warning/20 text-warning" : "bg-muted text-muted-foreground",
+            )}
+          >
+            {badge}
+          </span>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 /* ───────────────────── status strip (top of Home) ───────────────────── */
 
 /** One compact panel: the verdict, the score, and the four live numbers — no wasted space. */

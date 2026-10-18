@@ -8,11 +8,11 @@ import { QuickLink } from "@/components/developer/info";
 import { CreateAccountButton } from "@/components/developer/create-account";
 import { WorkAsCard } from "@/components/developer/work-as-picker";
 import { canWorkAs } from "@/lib/developer/acting";
-import { HomeTabs, type HomeTab } from "@/components/developer/home-tabs";
 import {
   ActivityPanel,
   ErrorsPanel,
   Attention,
+  HomeSection,
   PeoplePanel,
   SettingsPanel,
   SpeedPanel,
@@ -52,16 +52,10 @@ export default async function DeveloperHomePage() {
   const missing = d.env.filter((e) => !e.set && e.required).length;
   const errorsBadge = !m.tracking ? "Off" : m.events.errors24 + m.events.failed24 > 0 ? String(m.events.errors24 + m.events.failed24) : null;
 
-  const tabs: HomeTab[] = [
-    { id: "activity", label: "Activity" },
-    { id: "speed", label: "Speed & size", badge: `${m.avgMs} ms`, tone: m.avgMs >= 400 ? "bad" : m.avgMs >= 150 ? "warn" : "neutral" },
-    { id: "errors", label: "Crashes & sign-ins", badge: errorsBadge, tone: !m.tracking ? "warn" : m.events.errors24 > 0 ? "bad" : "warn" },
-    { id: "settings", label: "Settings", badge: missing > 0 ? String(missing) : null, tone: "bad" },
-    { id: "people", label: "People & my actions" },
-  ];
+
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <DashboardHero
         eyebrow={dateLabel}
         pill="Developer"
@@ -81,18 +75,27 @@ export default async function DeveloperHomePage() {
       <StatusStrip m={m} />
       <Attention m={m} />
 
-      {/* The detail, one tab at a time */}
-      <HomeTabs
-        tabs={tabs}
-        initial="activity"
-        panels={{
-          activity: <ActivityPanel m={m} />,
-          speed: <SpeedPanel m={m} />,
-          errors: <ErrorsPanel m={m} />,
-          settings: <SettingsPanel m={m} />,
-          people: <PeoplePanel m={m} />,
-        }}
-      />
+      {/* Everything else, on this one page: what is broken first, then speed, usage, settings, people */}
+      <HomeSection
+        id="errors"
+        title="Crashes & sign-ins"
+        badge={errorsBadge}
+        tone={!m.tracking ? "warn" : m.events.errors24 > 0 ? "bad" : "warn"}
+      >
+        <ErrorsPanel m={m} />
+      </HomeSection>
+      <HomeSection id="speed" title="Speed & size" badge={`${m.avgMs} ms`} tone={m.avgMs >= 400 ? "bad" : m.avgMs >= 150 ? "warn" : "neutral"}>
+        <SpeedPanel m={m} />
+      </HomeSection>
+      <HomeSection id="activity" title="Activity">
+        <ActivityPanel m={m} />
+      </HomeSection>
+      <HomeSection id="settings" title="Settings" badge={missing > 0 ? `${missing} missing` : null} tone="bad">
+        <SettingsPanel m={m} />
+      </HomeSection>
+      <HomeSection id="people" title="People & my actions">
+        <PeoplePanel m={m} />
+      </HomeSection>
     </div>
   );
 }
