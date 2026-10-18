@@ -1,5 +1,4 @@
 import { BarChart3, ScrollText } from "lucide-react";
-import { Suspense } from "react";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { getMonitor } from "@/lib/developer/monitor";
@@ -8,7 +7,6 @@ import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { QuickLink } from "@/components/developer/info";
 import { CreateAccountButton } from "@/components/developer/create-account";
 import { WorkAsCard } from "@/components/developer/work-as-picker";
-import { PulsePanel, PulseSkeleton } from "@/components/developer/pulse-panel";
 import { canWorkAs } from "@/lib/developer/acting";
 import { HomeTabs, type HomeTab } from "@/components/developer/home-tabs";
 import {
@@ -56,7 +54,6 @@ export default async function DeveloperHomePage() {
 
   const tabs: HomeTab[] = [
     { id: "activity", label: "Activity" },
-    { id: "business", label: "Business pulse" },
     { id: "speed", label: "Speed & size", badge: `${m.avgMs} ms`, tone: m.avgMs >= 400 ? "bad" : m.avgMs >= 150 ? "warn" : "neutral" },
     { id: "errors", label: "Crashes & sign-ins", badge: errorsBadge, tone: !m.tracking ? "warn" : m.events.errors24 > 0 ? "bad" : "warn" },
     { id: "settings", label: "Settings", badge: missing > 0 ? String(missing) : null, tone: "bad" },
@@ -90,11 +87,6 @@ export default async function DeveloperHomePage() {
         initial="activity"
         panels={{
           activity: <ActivityPanel m={m} />,
-          business: (
-            <Suspense fallback={<PulseSkeleton />}>
-              <PulsePanel />
-            </Suspense>
-          ),
           speed: <SpeedPanel m={m} />,
           errors: <ErrorsPanel m={m} />,
           settings: <SettingsPanel m={m} />,

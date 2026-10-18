@@ -1,7 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { getDiagnostics } from "@/lib/developer/diagnostics";
-import { getQueues } from "@/lib/developer/pulse";
 
 /**
  * Everything the Developer Home shows: usage, who signs in, speed, size,
@@ -114,12 +113,12 @@ export async function getMonitor() {
     tables,
     inactive,
     neverSignedIn,
-    pendingOld,
     suspended,
     negWarehouse,
     negRep,
     overpaid,
-    queues,
+    growth,
+    reports,
     lastDaily,
     lastReport,
     reportSettings,
@@ -224,10 +223,6 @@ export async function getMonitor() {
         }),
       [],
     ),
-    safe(
-      () => prisma.user.count({ where: { status: "PENDING", createdAt: { lt: new Date(Date.now() - 3 * 86_400_000) } } }),
-      0,
-    ),
     safe(() => prisma.user.count({ where: { status: "SUSPENDED" } }), 0),
     safe(
       async () =>
@@ -256,7 +251,24 @@ export async function getMonitor() {
         ),
       null as number | null,
     ),
-    getQueues(),
+    safe(
+      () =>
+        prisma.$queryRaw<{ label: string; total: number; recent: number }[]>`
+          SELECT 'People' AS label, count(*)::int AS total, count(*) FILTER (WHERE "createdAt" >= ${since7})::int AS recent FROM "User"
+          UNION ALL SELECT 'Customers', count(*)::int, count(*) FILTER (WHERE "createdAt" >= ${since7})::int FROM "FieldCustomer"
+          UNION ALL SELECT 'Sales recorded', count(*)::int, count(*) FILTER (WHERE "createdAt" >= ${since7})::int FROM "FieldSale"
+          UNION ALL SELECT 'Payments collected', count(*)::int, count(*) FILTER (WHERE "createdAt" >= ${since7})::int FROM "FieldPayment"
+          UNION ALL SELECT 'Partner orders', count(*)::int, count(*) FILTER (WHERE "createdAt" >= ${since7})::int FROM "Request"
+          UNION ALL SELECT 'Stock movements', count(*)::int, count(*) FILTER (WHERE "createdAt" >= ${since7})::int FROM "StockMovement"
+          UNION ALL SELECT 'Activity log lines', count(*)::int, count(*) FILTER (WHERE "createdAt" >= ${since7})::int FROM "ActivityLog"
+          UNION ALL SELECT 'Alerts sent', count(*)::int, count(*) FILTER (WHERE "createdAt" >= ${since7})::int FROM "Notification"
+          UNION ALL SELECT 'Photos and files', count(*)::int, count(*) FILTER (WHERE "createdAt" >= ${since7})::int FROM "Attachment"`,
+      [],
+    ),
+    safe(
+      () => prisma.report.findMany({ orderBy: { createdAt: "desc" }, take: 5, select: { id: true, type: true, title: true, whatsappSent: true, createdAt: true } }),
+      [],
+    ),
     safe(() => prisma.report.findFirst({ where: { type: "DAILY" }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }), null),
     safe(() => prisma.report.findFirst({ orderBy: { createdAt: "desc" }, select: { createdAt: true, whatsappSent: true, title: true } }), null),
     safe(() => prisma.reportSettings.findUnique({ where: { id: "singleton" }, select: { dailyEnabled: true } }), null),
@@ -412,14 +424,6 @@ export async function getMonitor() {
       detail: "Wrong-password tries on your own account. After 5 wrong tries from one place it locks for 15 minutes.",
       hint: "If these were not you, change your password.",
     });
-  if (diag.stuckAlerts > 0)
-    problems.push({
-      level: "warning",
-      title: `${diag.stuckAlerts} alert${diag.stuckAlerts > 1 ? "s" : ""} waiting for more than a day`,
-      detail: "These ask someone to approve or receive something, and nobody has.",
-      hint: "Ask the right person to act, or check the workflow didn't forget to clear its alert.",
-      link: { label: "See what is waiting", href: "#business" },
-    });
   const nw = negWarehouse ?? 0;
   const nr = negRep ?? 0;
   const op = overpaid ?? 0;
@@ -439,13 +443,6 @@ export async function getMonitor() {
       hint: "Open Business → sales to find them. Money records must not be edited by hand.",
       link: { label: "Open Business", href: "/developer/records" },
     });
-  if (pendingOld > 0)
-    problems.push({
-      level: "info",
-      title: `${pendingOld} account${pendingOld > 1 ? "s" : ""} waiting over 3 days for approval`,
-      detail: "New partners cannot sign in until the owner approves them.",
-      hint: "Remind the owner to approve or reject them.",
-    });
   if (dbSize > 400 * 1024 * 1024)
     problems.push({
       level: "warning",
@@ -455,27 +452,6 @@ export async function getMonitor() {
       link: VERCEL_ENV,
     });
 
-  // Work stuck on a person for days (a workflow that nobody is moving).
-  const QUEUE_NAME: Record<string, { label: string; who: string }> = {
-    sales: { label: "sale", who: "Finance" },
-    collections: { label: "payment to verify", who: "Finance" },
-    orders: { label: "partner order", who: "the owner or Finance" },
-    fund: { label: "fund request", who: "the owner" },
-    expenses: { label: "expense to review", who: "the owner" },
-  };
-  for (const q of queues) {
-    const info = QUEUE_NAME[q.k];
-    if (!info || q.n === 0 || !q.oldest) continue;
-    const days = Math.floor((Date.now() - new Date(q.oldest).getTime()) / 86_400_000);
-    if (days >= 3)
-      problems.push({
-        level: days >= 7 ? "warning" : "info",
-        title: `${q.n} ${info.label}${q.n > 1 ? "s" : ""} waiting ${days} days`,
-        detail: `The oldest has been waiting for ${info.who} for ${days} days, so that work is stuck.`,
-        hint: `Ask ${info.who} to open it, or check that the alert for it reached them.`,
-        link: { label: "See what is waiting", href: "#business" },
-      });
-  }
   // Owner reports: did the daily one run, and did it reach WhatsApp?
   const dailyOn = reportSettings?.dailyEnabled !== false;
   const lastDailyAge = lastDaily ? Date.now() - lastDaily.createdAt.getTime() : Infinity;
@@ -546,6 +522,8 @@ export async function getMonitor() {
     ],
     tracking,
     incomplete,
+    growth,
+    reports,
     events,
     problems,
     score,

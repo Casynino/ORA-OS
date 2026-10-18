@@ -104,7 +104,12 @@ export function StatusStrip({ m }: { m: Monitor }) {
     { label: "Database", value: d.dbOk ? "Online" : "Down", hint: d.dbOk ? `${d.dbMs} ms · ${d.pooled ? "pooled" : "not pooled"}` : "cannot connect", tone: d.dbOk ? "text-success" : "text-destructive" },
     { label: "Signed in today", value: formatNumber(m.signedIn24), hint: "different people", tone: "" },
     { label: "Actions today", value: formatNumber(d.activity24h), hint: "saved in 24 hours", tone: "" },
-    { label: "Alerts waiting", value: formatNumber(d.openActions), hint: d.stuckAlerts > 0 ? `${d.stuckAlerts} over a day` : "none too long", tone: d.stuckAlerts > 0 ? "text-warning" : "" },
+    {
+      label: "Crashes today",
+      value: m.tracking ? formatNumber(m.events.errors24) : "—",
+      hint: m.tracking ? (m.events.errors24 > 0 ? "pages that broke" : "nothing broke") : "tracking is off",
+      tone: m.tracking && m.events.errors24 > 0 ? "text-destructive" : "",
+    },
   ];
   return (
     <Card>
@@ -192,7 +197,7 @@ export function Attention({ m }: { m: Monitor }) {
         />
         {act.length === 0 ? (
           <InfoCallout icon={CheckCircle2} tone="good" title="Nothing needs your attention">
-            Nothing is broken and nothing is waiting too long.
+            Nothing is broken.
           </InfoCallout>
         ) : (
           <div className="grid items-start gap-3 md:grid-cols-2">
@@ -245,7 +250,7 @@ export function ActivityPanel({ m }: { m: Monitor }) {
           tone="info"
           statusText="Activity"
           icon={Clock}
-          meaning={`Every sale, payment, approval or stock move counts as one action. Busiest hour: ${peakHour.n > 0 ? `${hourLabel(peakHour.hour)} (Tanzania time)` : "not enough data yet"}.`}
+          meaning={`Each thing a person does in the system is saved as one action. Busiest hour: ${peakHour.n > 0 ? `${hourLabel(peakHour.hour)} (Tanzania time)` : "not enough data yet"}.`}
         />
         <HealthCard
           label="Sign-ins in 14 days"
@@ -479,6 +484,63 @@ export function SpeedPanel({ m }: { m: Monitor }) {
                 </span>
               </li>
             </ul>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardContent className="p-0">
+            <div className="border-b border-border px-5 py-3.5">
+              <h2 className="text-sm font-semibold">How big the data is</h2>
+              <p className="text-xs text-muted-foreground">Records in the system, and how many were added in the last 7 days. A sudden jump can point to a bug.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Records</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Added in 7 days</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {m.growth.map((g) => (
+                    <TableRow key={g.label}>
+                      <TableCell className="text-sm">{g.label}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatNumber(g.total)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">{g.recent > 0 ? `+${formatNumber(g.recent)}` : "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-0">
+            <div className="border-b border-border px-5 py-3.5">
+              <h2 className="text-sm font-semibold">Scheduled reports</h2>
+              <p className="text-xs text-muted-foreground">The owner reports the system builds by itself. If they stop, the schedule or WhatsApp link is broken.</p>
+            </div>
+            {m.reports.length === 0 ? (
+              <p className="px-5 py-8 text-center text-sm text-muted-foreground">No reports have been built yet.</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {m.reports.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{r.title}</p>
+                      <p className="text-xs text-muted-foreground" title={eat(r.createdAt)}>
+                        {humanize(r.type)} · built {timeAgo(r.createdAt)}
+                      </p>
+                    </div>
+                    <Badge variant={r.whatsappSent ? "success" : "warning"}>{r.whatsappSent ? "Sent on WhatsApp" : "Not sent"}</Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -717,7 +779,6 @@ export function PeoplePanel({ m }: { m: Monitor }) {
                   <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">{info.text}</p>
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     <Badge variant="success">{c.active} active</Badge>
-                    {c.pending > 0 && <Badge variant="warning">{c.pending} waiting for approval</Badge>}
                     {c.suspended > 0 && <Badge variant="destructive">{c.suspended} suspended</Badge>}
                   </div>
                 </CardContent>
