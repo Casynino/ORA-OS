@@ -6,6 +6,7 @@ import {
   Boxes,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Clock,
   Database,
   FileText,
@@ -166,17 +167,17 @@ function ProblemRow({ p }: { p: Monitor["problems"][number] }) {
   const Icon = l.icon;
   return (
     <li className="relative">
-      <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1", l.stripe)} />
+      <span aria-hidden className={cn("absolute inset-y-0 left-0 w-[3px]", l.stripe)} />
       <details className="group">
-        <summary className="flex cursor-pointer list-none items-center gap-3 py-2.5 pl-6 pr-5 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
-          <Icon className={cn("size-[18px] shrink-0", l.text)} />
+        <summary className="flex cursor-pointer list-none items-center gap-3.5 py-3 pl-[1.1rem] pr-5 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+          <Icon className={cn("size-5 shrink-0", l.text)} />
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold leading-snug">{p.title}</span>
-            <span className="line-clamp-1 text-xs text-muted-foreground">{p.detail}</span>
+            <span className="block text-[15px] font-semibold leading-snug">{p.title}</span>
+            <span className="line-clamp-1 text-[13px] text-muted-foreground">{p.detail}</span>
           </span>
-          <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
         </summary>
-        <div className="space-y-1.5 border-t border-border/60 bg-muted/20 py-3 pl-12 pr-5 text-sm leading-relaxed">
+        <div className="space-y-1.5 border-t border-border/60 bg-muted/20 py-3 pl-[3.1rem] pr-5 text-sm leading-relaxed">
           <p className="text-muted-foreground">{p.detail}</p>
           <p>
             <span className="font-semibold">What to do: </span>
@@ -206,7 +207,7 @@ function CheckList({ checks }: { checks: Monitor["systemChecks"] }) {
   const sorted = [...checks].sort((a, b) => CHECK_ORDER[a.status] - CHECK_ORDER[b.status]);
   return (
     <details className="group border-t border-border">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-3 text-sm text-foreground/80 transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
         <span>
           What was checked · {okCount} of {checks.length} fine{unknown > 0 ? `, ${unknown} not checked yet` : ""}
         </span>
@@ -250,16 +251,17 @@ export function Attention({ m }: { m: Monitor }) {
   return (
     <section>
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-soft">
-        <div className="flex items-start justify-between gap-3 px-5 py-3">
+        <div className="flex items-start justify-between gap-3 px-5 py-4">
           <div className="min-w-0">
             <h2 className="font-display text-base font-semibold leading-tight tracking-tight">Needs your attention</h2>
-            <p className="text-xs text-muted-foreground">Checked just now. Tap a row to see what to do.</p>
+            <p className="mt-1 text-[13px] text-muted-foreground">Checked just now. Tap a card to see what it means and what to do.</p>
           </div>
-          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-            {act.length === 0 && <Badge variant="success">All clear</Badge>}
-            {crit > 0 && <Badge variant="destructive">{crit} to fix now</Badge>}
-            {warn > 0 && <Badge variant="warning">{warn} to look at</Badge>}
-          </div>
+          <p className="shrink-0 whitespace-nowrap text-sm font-medium">
+            {act.length === 0 && <span className="text-success">All clear</span>}
+            {crit > 0 && <span className="text-destructive">{crit} to fix now</span>}
+            {crit > 0 && warn > 0 && <span className="text-muted-foreground"> · </span>}
+            {warn > 0 && <span className="text-warning">{warn} to look at</span>}
+          </p>
         </div>
         <ul className="max-h-[18rem] divide-y divide-border overflow-y-auto border-t border-border">
           {act.length === 0 && (
