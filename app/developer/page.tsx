@@ -78,15 +78,18 @@ export default async function DeveloperHomePage() {
 
       <JumpBar
         items={[
+          { id: "activity", label: "Activity" },
           { id: "errors", label: "Crashes & sign-ins", badge: errorsBadge },
           { id: "speed", label: "Speed & size" },
           { id: "settings", label: "Settings", badge: missing > 0 ? String(missing) : null },
           { id: "people", label: "People" },
-          { id: "activity", label: "Activity" },
         ]}
       />
 
-      {/* Everything else, on this one page: what is broken first, then speed, settings, people, and usage (Activity) last */}
+      {/* Everything else, on this one page: Activity right under the attention list, then crashes, speed, settings, people */}
+      <HomeSection id="activity" title="Activity" description="Who is using the system, and what they are doing.">
+        <ActivityPanel m={m} />
+      </HomeSection>
       <HomeSection
         id="errors"
         title="Crashes & sign-ins"
@@ -103,9 +106,6 @@ export default async function DeveloperHomePage() {
       </HomeSection>
       <HomeSection id="people" title="People & my actions">
         <PeoplePanel m={m} />
-      </HomeSection>
-      <HomeSection id="activity" title="Activity">
-        <ActivityPanel m={m} />
       </HomeSection>
     </div>
   );

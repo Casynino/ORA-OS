@@ -109,19 +109,21 @@ export function JumpBar({ items }: { items: { id: string; label: string; badge?:
 export function HomeSection({
   id,
   title,
+  description,
   badge,
   tone = "neutral",
   children,
 }: {
   id: string;
   title: string;
+  description?: string;
   badge?: string | null;
   tone?: "neutral" | "warn" | "bad";
   children: React.ReactNode;
 }) {
   return (
     <section id={id} className="scroll-mt-32 border-t border-border pt-8">
-      <div className="mb-5 flex items-center gap-3">
+      <div className={cn("flex items-center gap-3", description ? "mb-1.5" : "mb-5")}>
         <h2 className="font-display text-2xl font-bold tracking-tight">{title}</h2>
         {badge && (
           <span
@@ -134,6 +136,7 @@ export function HomeSection({
           </span>
         )}
       </div>
+      {description && <p className="mb-5 text-sm text-muted-foreground">{description}</p>}
       {children}
     </section>
   );
