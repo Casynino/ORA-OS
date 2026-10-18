@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Clock,
   Database,
+  Gauge,
   Info,
   KeyRound,
   Monitor as Desktop,
@@ -334,7 +335,7 @@ export function ActivityPanel({ m }: { m: Monitor }) {
 
       <section className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardContent className="p-5">
+          <CardContent className="p-5 sm:p-5">
             <h2 className="text-sm font-semibold">Sign-ins per day</h2>
             <p className="mb-3 text-xs text-muted-foreground">Last 14 days, coloured by who signed in. Hover a bar for exact numbers.</p>
             <StackedBars
@@ -347,7 +348,7 @@ export function ActivityPanel({ m }: { m: Monitor }) {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-5">
+          <CardContent className="p-5 sm:p-5">
             <h2 className="text-sm font-semibold">Actions per day</h2>
             <p className="mb-3 text-xs text-muted-foreground">Everything saved in the activity log, split between the team and you.</p>
             <StackedBars
@@ -363,7 +364,7 @@ export function ActivityPanel({ m }: { m: Monitor }) {
 
       <section className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardContent className="p-5">
+          <CardContent className="p-5 sm:p-5">
             <h2 className="text-sm font-semibold">Busiest hours of the day</h2>
             <p className="mb-3 text-xs text-muted-foreground">
               When the team works (Tanzania time, last 14 days).
@@ -379,7 +380,7 @@ export function ActivityPanel({ m }: { m: Monitor }) {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-5">
+          <CardContent className="p-5 sm:p-5">
             <h2 className="text-sm font-semibold">Where the work happens</h2>
             <p className="mb-4 text-xs text-muted-foreground">Actions by area, last 7 days.</p>
             <HBars items={m.modules.slice(0, 6).map((x) => ({ label: humanize(x.name), value: x.n }))} />
@@ -387,81 +388,92 @@ export function ActivityPanel({ m }: { m: Monitor }) {
         </Card>
       </section>
 
-      <section className="space-y-4">
-        <Card>
-          <CardContent className="p-0">
+      <section className="grid gap-4 lg:grid-cols-3">
+        <Card className="overflow-hidden lg:col-span-2">
+          <CardContent className="p-0 sm:p-0">
             <div className="border-b border-border px-5 py-3.5">
               <h2 className="text-sm font-semibold">Recent sign-ins</h2>
-              <p className="text-xs text-muted-foreground">The last 8 successful sign-ins: who, on what device, from where.</p>
+              <p className="text-xs text-muted-foreground">The last {m.recentLogins.length || 8} successful sign-ins: who, on what device, from where.</p>
             </div>
             {m.recentLogins.length === 0 ? (
               <p className="px-5 py-8 text-center text-sm text-muted-foreground">No sign-ins recorded yet.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Person</TableHead>
-                      <TableHead>Device</TableHead>
-                      <TableHead>From</TableHead>
-                      <TableHead className="text-right">When</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {m.recentLogins.map((l) => (
-                      <TableRow key={l.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2.5">
-                            <Avatar name={l.user.name} src={l.user.avatar} className="size-8 text-[11px]" />
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium">{l.user.name}</p>
-                              <p className="text-xs text-muted-foreground">{humanize(l.user.role)}</p>
-                            </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="pl-5">Person</TableHead>
+                    <TableHead>Device</TableHead>
+                    <TableHead>From</TableHead>
+                    <TableHead className="pr-5 text-right">When</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {m.recentLogins.map((l) => (
+                    <TableRow key={l.id}>
+                      <TableCell className="pl-5">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar name={l.user.name} src={l.user.avatar} className="size-8 text-[11px]" />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{l.user.name}</p>
+                            <p className="text-xs text-muted-foreground">{humanize(l.user.role)}</p>
                           </div>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-sm">
-                          <span className="inline-flex items-center gap-1.5">
-                            {l.agent.mobile ? <Smartphone className="size-3.5 text-muted-foreground" /> : <Desktop className="size-3.5 text-muted-foreground" />}
-                            {l.agent.browser} · {l.agent.os}
-                          </span>
-                        </TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">{l.ip ?? "—"}</TableCell>
-                        <TableCell className="whitespace-nowrap text-right text-sm text-muted-foreground" title={eat(l.createdAt)}>
-                          {timeAgo(l.createdAt)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm">
+                        <span className="inline-flex items-center gap-1.5">
+                          {l.agent.mobile ? <Smartphone className="size-3.5 text-muted-foreground" /> : <Desktop className="size-3.5 text-muted-foreground" />}
+                          {l.agent.browser} · {l.agent.os}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{l.ip ?? "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap pr-5 text-right text-sm text-muted-foreground" title={eat(l.createdAt)}>
+                        {timeAgo(l.createdAt)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
 
-        <div className="grid items-start gap-4 lg:grid-cols-2">
+        <div className="grid content-stretch gap-4">
           <Card>
-            <CardContent className="p-5">
+            <CardContent className="p-5 sm:p-5">
               <h2 className="text-sm font-semibold">Most active people</h2>
               <p className="mb-4 text-xs text-muted-foreground">Actions saved in the last 7 days.</p>
-              <HBars items={m.topActors.map((x) => ({ label: x.name, value: x.n }))} color="hsl(var(--accent))" />
+              {m.topActors.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No actions yet.</p>
+              ) : (
+                <HBars items={m.topActors.slice(0, 5).map((x) => ({ label: x.name, value: x.n }))} color="hsl(var(--accent))" />
+              )}
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-5">
-              <h2 className="text-sm font-semibold">Not using the system</h2>
-              <p className="mb-3 text-xs text-muted-foreground">Active accounts that never signed in, or not for 30+ days.</p>
+            <CardContent className="p-0 sm:p-0">
+              <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-3.5">
+                <div>
+                  <h2 className="text-sm font-semibold">Not using the system</h2>
+                  <p className="text-xs text-muted-foreground">Never signed in, or not for 30+ days.</p>
+                </div>
+                <Badge variant={m.neverSignedIn.length + m.inactive.length ? "warning" : "success"}>
+                  {m.neverSignedIn.length + m.inactive.length}
+                </Badge>
+              </div>
               {m.neverSignedIn.length + m.inactive.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Everyone has signed in recently.</p>
+                <p className="flex items-center gap-2 px-5 py-4 text-sm text-muted-foreground">
+                  <CheckCircle2 className="size-4 text-success" /> Everyone has signed in recently.
+                </p>
               ) : (
-                <ul className="space-y-2 text-sm">
+                <ul className="divide-y divide-border">
                   {m.neverSignedIn.map((u) => (
-                    <li key={u.id} className="flex items-center justify-between gap-2">
+                    <li key={u.id} className="flex items-center justify-between gap-2 px-5 py-2.5 text-sm">
                       <span className="min-w-0 truncate">{u.name} <span className="text-xs text-muted-foreground">· {humanize(u.role)}</span></span>
                       <Badge variant="warning">Never</Badge>
                     </li>
                   ))}
                   {m.inactive.map((u) => (
-                    <li key={u.id} className="flex items-center justify-between gap-2">
+                    <li key={u.id} className="flex items-center justify-between gap-2 px-5 py-2.5 text-sm">
                       <span className="min-w-0 truncate">{u.name} <span className="text-xs text-muted-foreground">· {humanize(u.role)}</span></span>
                       <span className="shrink-0 text-xs text-muted-foreground">{u.lastLoginAt ? timeAgo(u.lastLoginAt) : ""}</span>
                     </li>
@@ -476,32 +488,59 @@ export function ActivityPanel({ m }: { m: Monitor }) {
   );
 }
 
-/* ───────────────────────── tab: Speed & size ───────────────────────── */
+/* ───────────────────────── Speed & size ───────────────────────── */
 
 export function SpeedPanel({ m }: { m: Monitor }) {
+  const slowest = m.probes.reduce((x, p) => Math.max(x, p.ms), 0);
+  const speedTone: Tone = m.avgMs < 150 ? "good" : m.avgMs < 400 ? "warn" : "bad";
+  const failing = m.checks.filter((c) => c.bad !== null && c.bad > 0);
+  const unchecked = m.checks.filter((c) => c.bad === null).length;
+  const checksTone: Tone = failing.length ? "bad" : unchecked ? "warn" : "good";
+  const biggest = m.tables[0];
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Real queries timed right now against the live database, and how big the database has grown.
-      </p>
-      <div className="grid items-start gap-4 lg:grid-cols-3">
+    <div className="space-y-6">
+      <div className="grid gap-3 md:grid-cols-3">
+        <HealthCard
+          label="Database speed"
+          value={`${m.avgMs} ms`}
+          detail={`average of ${m.probes.length} checks · slowest ${slowest} ms`}
+          tone={speedTone}
+          statusText={m.avgMs < 150 ? "Fast" : m.avgMs < 400 ? "A bit slow" : "Slow"}
+          icon={Gauge}
+          meaning="Real questions asked to the live database just now. Under 150 ms is fast; over 400 ms pages will feel slow."
+        />
+        <HealthCard
+          label="Database size"
+          value={bytes(m.dbSize)}
+          detail={biggest ? `largest table: ${biggest.name}` : "all tables together"}
+          tone="info"
+          statusText="Size"
+          icon={Database}
+          meaning="Everything stored: records, receipts and photos kept in the database. It only grows, so watch the biggest table."
+        />
+        <HealthCard
+          label="Data checks"
+          value={failing.length ? `${failing.length} failing` : unchecked ? "Partly checked" : "All OK"}
+          detail={`${m.checks.length} rules that must always be true`}
+          tone={checksTone}
+          statusText={failing.length ? "Fix now" : unchecked ? "Look at it" : "Healthy"}
+          icon={ShieldCheck}
+          meaning="If a rule fails, numbers on screen can be wrong (for example negative stock). The list is below."
+        />
+      </div>
+
+      <section className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardContent className="p-5">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold">Database speed</h2>
-              <Badge variant={m.avgMs < 150 ? "success" : m.avgMs < 400 ? "warning" : "destructive"}>average {m.avgMs} ms</Badge>
-            </div>
+          <CardContent className="p-5 sm:p-5">
+            <h2 className="text-sm font-semibold">How long each check took</h2>
             <p className="mb-4 text-xs text-muted-foreground">Each bar is one typical thing the app does. Shorter is faster.</p>
             <SpeedBars probes={m.probes} />
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-5">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold">Database size</h2>
-              <Badge variant="secondary">{bytes(m.dbSize)} total</Badge>
-            </div>
-            <p className="mb-4 text-xs text-muted-foreground">The biggest tables. Receipts and photos can make “Attachment” large when file storage is not set up.</p>
+          <CardContent className="p-5 sm:p-5">
+            <h2 className="text-sm font-semibold">Biggest tables</h2>
+            <p className="mb-4 text-xs text-muted-foreground">Where the space is used. Receipts and photos can make “Attachment” large when file storage is not set up.</p>
             <HBars
               items={m.tables.slice(0, 6).map((t) => ({ label: t.name, value: t.bytes, sub: t.rows > 0 ? `about ${formatNumber(t.rows)} rows` : undefined }))}
               color="hsl(var(--info))"
@@ -509,106 +548,91 @@ export function SpeedPanel({ m }: { m: Monitor }) {
             />
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-5">
-            <h2 className="text-sm font-semibold">Data checks</h2>
-            <p className="mb-4 text-xs text-muted-foreground">Rules that must always be true. If one fails, numbers on screen may be wrong.</p>
-            <ul className="space-y-3">
-              {m.checks.map((c) => (
-                <li key={c.label} className="flex items-start gap-2.5 text-sm">
-                  {c.bad === null ? (
-                    <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                  ) : c.bad === 0 ? (
-                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
-                  ) : (
-                    <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
-                  )}
-                  <span className="min-w-0">
-                    {c.label}
-                    <span
-                      className={cn(
-                        "ml-1.5 text-xs",
-                        c.bad === null ? "text-muted-foreground" : c.bad === 0 ? "text-success" : "font-semibold text-destructive",
-                      )}
-                    >
-                      {c.bad === null ? "could not check" : c.bad === 0 ? "OK" : `${c.bad} found`}
-                    </span>
-                  </span>
-                </li>
-              ))}
-              <li className="flex items-start gap-2.5 text-sm">
-                <Database className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <span className="text-muted-foreground">
-                  {m.suspended} suspended account{m.suspended === 1 ? "" : "s"} · {m.diag.env.filter((e) => !e.set).length} setting
-                  {m.diag.env.filter((e) => !e.set).length === 1 ? "" : "s"} not set
-                </span>
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
+      </section>
 
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <Card>
-          <CardContent className="p-0">
+      <section className="grid gap-4 lg:grid-cols-3">
+        <Card className="overflow-hidden lg:col-span-2">
+          <CardContent className="p-0 sm:p-0">
             <div className="border-b border-border px-5 py-3.5">
               <h2 className="text-sm font-semibold">How big the data is</h2>
-              <p className="text-xs text-muted-foreground">Records in the system, and how many were added in the last 7 days. A sudden jump can point to a bug.</p>
+              <p className="text-xs text-muted-foreground">Records in the system and how many were added in the last 7 days. A sudden jump can point to a bug.</p>
             </div>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Records</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Added in 7 days</TableHead>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-5">Records</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="pr-5 text-right">Added in 7 days</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {m.growth.map((g) => (
+                  <TableRow key={g.label}>
+                    <TableCell className="pl-5 text-sm">{g.label}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatNumber(g.total)}</TableCell>
+                    <TableCell className="pr-5 text-right tabular-nums text-muted-foreground">{g.recent > 0 ? `+${formatNumber(g.recent)}` : "—"}</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {m.growth.map((g) => (
-                    <TableRow key={g.label}>
-                      <TableCell className="text-sm">{g.label}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatNumber(g.total)}</TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">{g.recent > 0 ? `+${formatNumber(g.recent)}` : "—"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-0">
-            <div className="border-b border-border px-5 py-3.5">
-              <h2 className="text-sm font-semibold">Scheduled reports</h2>
-              <p className="text-xs text-muted-foreground">The owner reports the system builds by itself. If they stop, the schedule or WhatsApp link is broken.</p>
-            </div>
-            {m.reports.length === 0 ? (
-              <p className="px-5 py-8 text-center text-sm text-muted-foreground">No reports have been built yet.</p>
-            ) : (
+        <div className="grid content-stretch gap-4">
+          <Card>
+            <CardContent className="p-0 sm:p-0">
+              <div className="border-b border-border px-5 py-3.5">
+                <h2 className="text-sm font-semibold">Data checks</h2>
+                <p className="text-xs text-muted-foreground">Rules that must always be true.</p>
+              </div>
               <ul className="divide-y divide-border">
-                {m.reports.map((r) => (
-                  <li key={r.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{r.title}</p>
-                      <p className="text-xs text-muted-foreground" title={eat(r.createdAt)}>
-                        {humanize(r.type)} · built {timeAgo(r.createdAt)}
-                      </p>
-                    </div>
-                    <Badge variant={r.whatsappSent ? "success" : "warning"}>{r.whatsappSent ? "Sent on WhatsApp" : "Not sent"}</Badge>
+                {m.checks.map((c) => (
+                  <li key={c.label} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
+                    <span className="min-w-0">{c.label}</span>
+                    {c.bad === null ? (
+                      <Badge className="shrink-0 whitespace-nowrap" variant="secondary">Could not check</Badge>
+                    ) : c.bad === 0 ? (
+                      <Badge className="shrink-0" variant="success">OK</Badge>
+                    ) : (
+                      <Badge className="shrink-0 whitespace-nowrap" variant="destructive">{c.bad} found</Badge>
+                    )}
                   </li>
                 ))}
               </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-0 sm:p-0">
+              <div className="border-b border-border px-5 py-3.5">
+                <h2 className="text-sm font-semibold">Scheduled reports</h2>
+                <p className="text-xs text-muted-foreground">Built by the system for the owner. If they stop, the schedule or WhatsApp link is broken.</p>
+              </div>
+              {m.reports.length === 0 ? (
+                <p className="px-5 py-5 text-center text-sm text-muted-foreground">No reports have been built yet.</p>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {m.reports.slice(0, 3).map((r) => (
+                    <li key={r.id} className="flex items-center justify-between gap-3 px-5 py-2.5">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{r.title}</p>
+                        <p className="text-xs text-muted-foreground" title={eat(r.createdAt)}>
+                          {humanize(r.type)} · {timeAgo(r.createdAt)}
+                        </p>
+                      </div>
+                      <Badge className="shrink-0 whitespace-nowrap" variant={r.whatsappSent ? "success" : "warning"}>{r.whatsappSent ? "Sent" : "Not sent"}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
     </div>
   );
 }
 
-/* ───────────────────── tab: Crashes & sign-ins ───────────────────── */
+/* ───────────────────── Crashes & sign-ins ───────────────────── */
 
 export function ErrorsPanel({ m }: { m: Monitor }) {
   if (!m.tracking)
@@ -623,105 +647,145 @@ export function ErrorsPanel({ m }: { m: Monitor }) {
         </div>
       </InfoCallout>
     );
+  const crashes7 = m.events.groupedErrors.reduce((s, e) => s + e.n, 0);
+  const crashTone: Tone = m.events.errors24 === 0 ? "good" : m.events.errors24 >= 10 ? "bad" : "warn";
+  const failedTone: Tone = m.events.failed24 >= 10 ? "warn" : "good";
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Server errors (a page that crashed) and sign-ins that were refused. This is how you hear about a problem before
-        staff complain.
-      </p>
-      <div className="grid items-start gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardContent className="p-5">
-            <h2 className="text-sm font-semibold">Errors and failed sign-ins per day</h2>
-            <p className="mb-3 text-xs text-muted-foreground">
-              {m.events.errors24 === 0
-                ? "No crashes in the last 24 hours."
-                : `${m.events.errors24} crash${m.events.errors24 === 1 ? "" : "es"} in the last 24 hours.`}
-              {m.events.lastError && <> Last one {timeAgo(m.events.lastError)}.</>}
-            </p>
+    <div className="space-y-6">
+      <div className="grid gap-3 md:grid-cols-3">
+        <HealthCard
+          label="Crashes today"
+          value={formatNumber(m.events.errors24)}
+          detail={m.events.lastError ? `last one ${timeAgo(m.events.lastError)}` : "none recorded in 24 hours"}
+          tone={crashTone}
+          statusText={m.events.errors24 === 0 ? "None" : m.events.errors24 >= 10 ? "Fix now" : "Look at it"}
+          icon={AlertTriangle}
+          meaning="A crash is a page that failed on the server, so the person saw an error screen. Each one is saved below with where it broke."
+        />
+        <HealthCard
+          label="Crashes in 7 days"
+          value={formatNumber(crashes7)}
+          detail={`${m.events.groupedErrors.length} different problem${m.events.groupedErrors.length === 1 ? "" : "s"}`}
+          tone="info"
+          statusText="7 days"
+          icon={Clock}
+          meaning="The same error on the same page is counted once as a problem, with how many times it happened."
+        />
+        <HealthCard
+          label="Failed sign-ins today"
+          value={formatNumber(m.events.failed24)}
+          detail="wrong password or blocked account"
+          tone={failedTone}
+          statusText={m.events.failed24 >= 10 ? "Look at it" : "Normal"}
+          icon={UserX}
+          meaning="A few typing mistakes are normal. Many in a day can mean someone is guessing passwords."
+        />
+      </div>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardContent className="p-5 sm:p-5">
+            <h2 className="text-sm font-semibold">Crashes and failed sign-ins per day</h2>
+            <p className="mb-3 text-xs text-muted-foreground">Last 14 days. A tall bar on one day is worth opening.</p>
             <StackedBars
               data={m.errorSeries.map((d) => ({ label: d.day, values: { errors: d.errors, logins: d.logins } }))}
               series={ERROR_SERIES}
               labelEvery={2}
               formatLabel={shortDay}
-              height={160}
+              height={170}
               emptyText="No errors or failed sign-ins in 14 days. Good."
             />
             <Legend series={ERROR_SERIES} className="mt-4" />
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-0">
+        <Card className="overflow-hidden">
+          <CardContent className="p-0 sm:p-0">
             <div className="border-b border-border px-5 py-3.5">
               <h2 className="text-sm font-semibold">Failed sign-ins</h2>
-              <p className="text-xs text-muted-foreground">Latest refused attempts. Passwords are never stored. Repeats within a minute are merged into one line (×N).</p>
+              <p className="text-xs text-muted-foreground">Latest refused attempts. Passwords are never stored. Repeats within a minute are merged.</p>
             </div>
             {m.events.recentFailed.length === 0 ? (
-              <p className="px-5 py-8 text-center text-sm text-muted-foreground">None recorded.</p>
+              <p className="flex items-center justify-center gap-2 px-5 py-6 text-sm text-muted-foreground">
+                <CheckCircle2 className="size-4 text-success" /> None recorded.
+              </p>
             ) : (
-              <ul className="divide-y divide-border">
-                {m.events.recentFailed.map((f) => (
-                  <li key={f.id} className="px-5 py-2.5 text-sm">
-                    <p className="leading-snug">
-                      {f.message}
-                      {f.count > 1 && <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[11px] font-semibold tabular-nums">×{f.count}</span>}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground" title={eat(f.createdAt)}>
-                      {timeAgo(f.createdAt)}{f.ip ? ` · ${f.ip}` : ""}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
-          <div className="border-b border-border px-5 py-3.5">
-            <h2 className="text-sm font-semibold">Crashes in the last 7 days</h2>
-            <p className="text-xs text-muted-foreground">Same error on the same page is grouped. Newest first.</p>
-          </div>
-          {m.events.groupedErrors.length === 0 ? (
-            <p className="flex items-center justify-center gap-2 px-5 py-8 text-sm text-muted-foreground">
-              <CheckCircle2 className="size-4 text-success" /> No crashes recorded. Nothing to fix.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>What went wrong</TableHead>
-                    <TableHead>Where</TableHead>
-                    <TableHead className="text-right">Times</TableHead>
-                    <TableHead className="text-right">Last seen</TableHead>
+                    <TableHead className="pl-5">Attempt</TableHead>
+                    <TableHead className="text-right">Tries</TableHead>
+                    <TableHead>From</TableHead>
+                    <TableHead className="pr-5 text-right">When</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {m.events.groupedErrors.map((e, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="max-w-md text-sm">
-                        <p>{e.message}</p>
-                        {e.detail && (
-                          <details className="mt-1">
-                            <summary className="cursor-pointer text-xs font-medium text-primary hover:underline">Where it broke</summary>
-                            <pre className="mt-1.5 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-muted/50 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground">
-                              {e.detail}
-                            </pre>
-                          </details>
-                        )}
+                  {m.events.recentFailed.map((f) => (
+                    <TableRow key={f.id}>
+                      <TableCell className="max-w-[16rem] pl-5 text-sm">
+                        <span className="line-clamp-2">{f.message}</span>
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{e.path ?? "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{e.n}</TableCell>
-                      <TableCell className="whitespace-nowrap text-right text-sm text-muted-foreground" title={eat(e.last)}>
-                        {timeAgo(e.last)}
+                      <TableCell className="text-right tabular-nums">{f.count}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{f.ip ?? "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap pr-5 text-right text-sm text-muted-foreground" title={eat(f.createdAt)}>
+                        {timeAgo(f.createdAt)}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <Card className="overflow-hidden">
+        <CardContent className="p-0 sm:p-0">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3.5">
+            <div>
+              <h2 className="text-sm font-semibold">Crashes in the last 7 days</h2>
+              <p className="text-xs text-muted-foreground">Same error on the same page is grouped. Newest first.</p>
             </div>
+            <Badge variant={m.events.groupedErrors.length ? "warning" : "success"}>
+              {m.events.groupedErrors.length ? `${m.events.groupedErrors.length} to look at` : "All clear"}
+            </Badge>
+          </div>
+          {m.events.groupedErrors.length === 0 ? (
+            <p className="flex items-center justify-center gap-2 px-5 py-5 text-sm text-muted-foreground">
+              <CheckCircle2 className="size-4 text-success" /> No crashes recorded. Nothing to fix.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-5">What went wrong</TableHead>
+                  <TableHead>Where</TableHead>
+                  <TableHead className="text-right">Times</TableHead>
+                  <TableHead className="pr-5 text-right">Last seen</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {m.events.groupedErrors.map((e, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="max-w-md pl-5 text-sm">
+                      <p>{e.message}</p>
+                      {e.detail && (
+                        <details className="mt-1">
+                          <summary className="cursor-pointer text-xs font-medium text-primary hover:underline">Where it broke</summary>
+                          <pre className="mt-1.5 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-muted/50 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                            {e.detail}
+                          </pre>
+                        </details>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{e.path ?? "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums">{e.n}</TableCell>
+                    <TableCell className="whitespace-nowrap pr-5 text-right text-sm text-muted-foreground" title={eat(e.last)}>
+                      {timeAgo(e.last)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
@@ -729,66 +793,61 @@ export function ErrorsPanel({ m }: { m: Monitor }) {
   );
 }
 
-/* ───────────────────────── tab: Settings ───────────────────────── */
+/* ───────────────────────── Settings ───────────────────────── */
 
 export function SettingsPanel({ m }: { m: Monitor }) {
   const d = m.diag;
   const missingRequired = d.env.filter((e) => e.required && !e.set);
+  const setCount = d.env.filter((e) => e.set).length;
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        {missingRequired.length
-          ? "Some required settings are missing — fix those first. Only whether a setting exists is shown, never its secret value."
-          : "All required settings are in place. Only whether a setting exists is shown, never its secret value."}
-      </p>
-      <Card>
-        <CardContent className="p-0">
-          <ul className="divide-y divide-border">
-            {d.env.map((e) => {
-              const tone: Tone = e.set ? "good" : e.required ? "bad" : "warn";
-              return (
-                <li key={e.name} className="px-5 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <span
-                        className={cn(
-                          "mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg",
-                          tone === "good" && "bg-success/12 text-success",
-                          tone === "bad" && "bg-destructive/12 text-destructive",
-                          tone === "warn" && "bg-warning/15 text-warning",
-                        )}
-                      >
-                        <KeyRound className="size-4" />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold">
-                          {e.title} <span className="ml-1 font-mono text-[11px] font-normal text-muted-foreground">{e.name}</span>
-                        </p>
-                        <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">{e.purpose}</p>
-                        {!e.set && (
-                          <p
-                            className={cn(
-                              "mt-2 max-w-3xl rounded-lg px-3 py-2 text-xs leading-relaxed",
-                              e.required ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning",
-                            )}
-                          >
-                            <span className="font-semibold">Because it is missing: </span>
-                            {e.ifMissing}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <Badge variant={e.set ? "success" : e.required ? "destructive" : "warning"}>
-                      {e.set ? "Set" : e.required ? "Missing" : "Not set"}
-                    </Badge>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </CardContent>
-      </Card>
-    </div>
+    <Card className="overflow-hidden">
+      <CardContent className="p-0 sm:p-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3.5">
+          <div>
+            <h2 className="text-sm font-semibold">Settings the system needs</h2>
+            <p className="text-xs text-muted-foreground">
+              {missingRequired.length ? "Some required settings are missing — fix those first." : "All required settings are in place."} Only whether
+              a setting exists is shown, never its secret value.
+            </p>
+          </div>
+          <Badge variant={missingRequired.length ? "destructive" : "success"}>
+            {setCount} of {d.env.length} set
+          </Badge>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="pl-5">Setting</TableHead>
+              <TableHead>What it is for</TableHead>
+              <TableHead className="pr-5 text-right">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {d.env.map((e) => (
+              <TableRow key={e.name} className="align-top">
+                <TableCell className="whitespace-nowrap pl-5">
+                  <p className="text-sm font-medium">{e.title}</p>
+                  <p className="font-mono text-[11px] text-muted-foreground">{e.name}</p>
+                </TableCell>
+                <TableCell className="min-w-[18rem] text-xs leading-relaxed text-muted-foreground">
+                  <p>{e.purpose}</p>
+                  {!e.set && (
+                    <p className={cn("mt-1.5 font-medium", e.required ? "text-destructive" : "text-warning")}>
+                      Because it is missing: <span className="font-normal">{e.ifMissing}</span>
+                    </p>
+                  )}
+                </TableCell>
+                <TableCell className="pr-5 text-right">
+                  <Badge className="whitespace-nowrap" variant={e.set ? "success" : e.required ? "destructive" : "warning"}>
+                    {e.set ? "Set" : e.required ? "Missing" : "Not set"}
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -822,7 +881,7 @@ export function PeoplePanel({ m }: { m: Monitor }) {
             const Icon = info.icon;
             return (
               <Card key={role}>
-                <CardContent className="p-4">
+                <CardContent className="p-4 sm:p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -860,7 +919,7 @@ export function PeoplePanel({ m }: { m: Monitor }) {
       </section>
 
       <Card>
-        <CardContent className="p-0">
+        <CardContent className="p-0 sm:p-0">
           <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3.5">
             <div>
               <h2 className="text-sm font-semibold">Your recent actions</h2>
