@@ -5,6 +5,7 @@ import { writeDevAuditSafe } from "@/lib/developer/audit";
 import { devActivatableIds } from "@/lib/developer/eligibility";
 import { canWorkAs } from "@/lib/developer/acting";
 import { DevUserActions } from "@/components/developer/user-actions";
+import { CreateAccountButton } from "@/components/developer/create-account";
 import { InfoCallout, SectionTitle } from "@/components/developer/info";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,6 +37,7 @@ export default async function DeveloperUsersPage() {
     select: { id: true, name: true, email: true, role: true, status: true, lastLoginAt: true, avatar: true },
   });
   const visible = users.filter((u) => u.role !== "DEVELOPER");
+  const warehouses = await prisma.warehouse.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
   // Only accounts the Developer console itself suspended can be re-activated here.
   const activatable = await devActivatableIds(
     visible.filter((u) => u.status === "SUSPENDED").map((u) => u.id),
@@ -57,8 +59,10 @@ export default async function DeveloperUsersPage() {
     <div className="flex flex-col gap-7">
       <PageHeader
         title="Access"
-        description={`${formatNumber(visible.length)} accounts. Pick a person and press “Work as” to open their dashboard exactly as they see it — without their password. Everything you do is recorded under your name.`}
-      />
+        description={`${formatNumber(visible.length)} accounts. Create a new login with “New account”, or pick a person and press “Work as” to open their dashboard exactly as they see it — without their password. Everything you do is recorded under your name.`}
+      >
+        <CreateAccountButton warehouses={warehouses} />
+      </PageHeader>
 
       {/* What each button does, in plain words (after the people list on phones) */}
       <section className="order-last md:order-none">

@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import type { Role, UserStatus } from "@prisma/client";
@@ -427,4 +428,134 @@ export async function devEnableErrorTracking(): Promise<ActionResult> {
   resumeTracking();
   revalidatePath("/developer");
   return ok(undefined, "Error tracking is on. Crashes and failed sign-ins are now recorded.");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Create an account
+//
+//  The Developer creates the accounts (staff, partners — even the owner's Admin
+//  account) the same way the owner does in Admin → Users, but under the Developer's
+//  own name: the audit row is written in the SAME transaction as the new user, the
+//  owner is told in-app (and on WhatsApp when an ADMIN account is created), and the
+//  password is never stored or logged anywhere except as a hash. Developer accounts
+//  themselves are never created from here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const createAccountSchema = z.object({
+  name: z.string().trim().min(2, "Enter the full name.").max(120),
+  email: z.string().trim().email("Enter a valid email address.").max(160),
+  password: z.string().min(8, "The password needs at least 8 characters.").max(100),
+  role: z.enum(["ADMIN", "FINANCE", "WAREHOUSE", "PARTNER", "SALES_REP"]),
+  phone: z.string().trim().max(40).optional(),
+  organization: z.string().trim().max(120).optional(),
+  warehouseId: z.string().optional(),
+  position: z.string().trim().max(80).optional(),
+  canCreateTransfers: z.boolean().optional(),
+  /** Required (true) when creating an ADMIN account. */
+  confirmAdmin: z.boolean().optional(),
+});
+
+const ROLE_LABEL: Record<string, string> = {
+  ADMIN: "Admin (owner)",
+  FINANCE: "Finance",
+  WAREHOUSE: "Warehouse",
+  PARTNER: "Partner",
+  SALES_REP: "Sales rep",
+};
+
+export async function devCreateUser(
+  input: z.infer<typeof createAccountSchema>,
+): Promise<ActionResult<{ id: string }>> {
+  let actor;
+  try {
+    actor = await requireActor(["DEVELOPER"]);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+  const me = { id: actor.id, name: actor.name ?? "Developer" };
+  const meta = requestMeta(await headers());
+  const parsed = createAccountSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Check the details.");
+  const d = parsed.data;
+  const email = d.email.toLowerCase();
+
+  if (d.role === "ADMIN" && d.confirmAdmin !== true)
+    return fail("Tick the box to confirm you are creating an Admin (owner) account.");
+  if (d.role === "WAREHOUSE") {
+    if (!d.warehouseId) return fail("Choose the warehouse for this staff member.");
+    const wh = await prisma.warehouse.findUnique({ where: { id: d.warehouseId }, select: { id: true } });
+    if (!wh) return fail("That warehouse no longer exists.");
+  }
+
+  try {
+    const exists = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (exists) return fail("An account with this email already exists.");
+
+    const passwordHash = await bcrypt.hash(d.password, 10);
+    const isWarehouse = d.role === "WAREHOUSE";
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          name: d.name,
+          email,
+          passwordHash,
+          role: d.role,
+          status: "ACTIVE",
+          phone: d.phone || null,
+          organization: d.role === "PARTNER" ? d.organization || null : null,
+          warehouseId: isWarehouse ? d.warehouseId || null : null,
+          position: isWarehouse ? d.position || null : null,
+          canRecordSales: false, // warehouse staff never record sales
+          canCreateTransfers: isWarehouse ? !!d.canCreateTransfers : false,
+        },
+        select: { id: true, name: true },
+      });
+      // Audit row in the SAME transaction: no record, no account. The password is never included.
+      await writeDevAudit(tx, {
+        actor: me,
+        action: "DEV_USER_CREATED",
+        entity: "User",
+        entityId: created.id,
+        summary: `Developer created a ${ROLE_LABEL[d.role]} account for ${d.name} (${email}).`,
+        outcome: "SUCCESS",
+        after: { role: d.role, email, name: d.name },
+        ...meta,
+      });
+      return created;
+    });
+
+    await notifyInApp({
+      toRoles: ["ADMIN"],
+      category: "INFO",
+      type: "DEVELOPER_ACTION",
+      title: d.role === "ADMIN" ? "Developer created an Admin account" : "Developer created an account",
+      body: `${me.name} (Developer) created a ${ROLE_LABEL[d.role]} account for ${d.name}.`,
+      actorName: `${me.name} (Developer)`,
+      entityType: "User",
+      entityId: user.id,
+      actionUrl: "/admin/users",
+      actionLabel: "View users",
+    });
+    // A new Admin account is the most powerful thing this can create — also tell the owner on WhatsApp
+    // (best-effort, capped so it can never hold up the action).
+    if (d.role === "ADMIN") {
+      await Promise.race([
+        sendWhatsApp(`ORA security notice: Developer ${me.name} created an Admin account for ${d.name} (${email}).`),
+        new Promise((r) => setTimeout(r, 5000)),
+      ]);
+    }
+    revalidatePath("/developer/users");
+    revalidatePath("/admin/users");
+    return ok({ id: user.id }, `${user.name} can now sign in.`);
+  } catch (e) {
+    await writeDevAuditSafe({
+      actor: me,
+      action: "DEV_USER_CREATED",
+      entity: "User",
+      summary: `Failed to create an account for ${d.name}: ${errorMessage(e)}`,
+      outcome: "FAILED",
+      ...meta,
+    });
+    return fail(errorMessage(e));
+  }
 }
