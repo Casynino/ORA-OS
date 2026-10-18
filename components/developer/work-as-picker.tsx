@@ -50,19 +50,14 @@ export function WorkAsCard({ people }: { people: Person[] }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group flex w-full items-start gap-3.5 rounded-xl border border-border bg-card p-4 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
           <LogIn className="size-5" />
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5 text-sm font-semibold">
-            Work as someone
-            <ArrowRight className="size-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-          </span>
-          <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-            Pick a person and see their screens exactly as they do. Everything is recorded under your name.
-          </span>
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold">Work as</span>
+          <span className="block truncate text-xs text-muted-foreground">Open their screens</span>
         </span>
       </button>
 

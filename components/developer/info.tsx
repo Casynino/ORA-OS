@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Info, type LucideIcon } from "lucide-react";
+import { Info, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -115,7 +115,7 @@ export function HealthCard({
   );
 }
 
-/** A big, clickable card that sends the Developer somewhere, saying what it's for. */
+/** A compact, clickable tile that sends the Developer somewhere. */
 export function QuickLink({
   href,
   icon: Icon,
@@ -130,17 +130,14 @@ export function QuickLink({
   return (
     <Link
       href={href}
-      className="group flex items-start gap-3.5 rounded-xl border border-border bg-card p-4 shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
         <Icon className="size-5" />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5 text-sm font-semibold">
-          {title}
-          <ArrowRight className="size-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-        </span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{text}</span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="block truncate text-xs text-muted-foreground">{text}</span>
       </span>
     </Link>
   );

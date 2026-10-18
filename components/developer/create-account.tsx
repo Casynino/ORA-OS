@@ -37,8 +37,8 @@ export function CreateAccountButton({
   tone = "primary",
 }: {
   warehouses: { id: string; name: string }[];
-  /** "onHero" = a white pill for use on top of the gradient banner. */
-  tone?: "primary" | "onHero";
+  /** "tile" = a card that sits in the Home action row; "onHero" = a white pill for the banner. */
+  tone?: "primary" | "onHero" | "tile";
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -123,7 +123,21 @@ export function CreateAccountButton({
 
   return (
     <>
-      {tone === "onHero" ? (
+      {tone === "tile" ? (
+        <button
+          type="button"
+          onClick={openNew}
+          className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+            <UserPlus className="size-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold">Add an account</span>
+            <span className="block truncate text-xs text-muted-foreground">Create a login</span>
+          </span>
+        </button>
+      ) : tone === "onHero" ? (
         <button
           type="button"
           onClick={openNew}

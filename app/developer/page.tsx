@@ -59,38 +59,24 @@ export default async function DeveloperHomePage() {
 
   return (
     <div className="space-y-8">
-      <div className="relative">
-        <DashboardHero
-          eyebrow={dateLabel}
-          pill="Developer"
-          title={<>{greeting}, {firstName}.</>}
-          subtitle="Your control room for ORA — health, people and everything done, in one place."
-        />
-        <div className="absolute right-4 top-4 z-10 sm:right-6 sm:top-5">
-          <CreateAccountButton warehouses={warehouses} tone="onHero" />
-        </div>
-      </div>
+      <DashboardHero
+        eyebrow={dateLabel}
+        pill="Developer"
+        title={<>{greeting}, {firstName}.</>}
+        subtitle="Your control room for ORA — health, people and everything done, in one place."
+      />
+
+      {/* The things you do most: four plain tiles */}
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <WorkAsCard people={people} />
+        <CreateAccountButton warehouses={warehouses} tone="tile" />
+        <QuickLink href="/developer/audit" icon={ScrollText} title="Audit" text="Everything done" />
+        <QuickLink href="/developer/records" icon={BarChart3} title="Business" text="Sales and stock" />
+      </section>
 
       {/* Verdict + live numbers in one compact panel, then what needs attention */}
       <StatusStrip m={m} />
       <Attention m={m} />
-
-      {/* Where to go */}
-      <section className="grid gap-3 md:grid-cols-3">
-        <WorkAsCard people={people} />
-        <QuickLink
-          href="/developer/audit"
-          icon={ScrollText}
-          title="Open Audit"
-          text="The permanent diary of everything done in the system — by staff and by you. It can never be edited or deleted."
-        />
-        <QuickLink
-          href="/developer/records"
-          icon={BarChart3}
-          title="Open Business"
-          text="See sales, payments, stock and customers in read-only tables. Good for checking a number without risking a change."
-        />
-      </section>
 
       {/* The detail, one tab at a time */}
       <HomeTabs

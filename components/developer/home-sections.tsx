@@ -193,14 +193,17 @@ export function Attention({ m }: { m: Monitor }) {
         )}
       </div>
       {know.length > 0 && (
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Good to know · {know.length}</p>
-          <div className="grid items-start gap-3 md:grid-cols-2">
+        <details className="group">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
+            Good to know · {know.length}
+            <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-3 grid items-start gap-3 md:grid-cols-2">
             {know.map((p) => (
               <ProblemCard key={p.title} p={p} />
             ))}
           </div>
-        </div>
+        </details>
       )}
     </section>
   );
