@@ -32,6 +32,7 @@ export default async function DeveloperLayout({
         role: session.role,
         avatar: session.avatar ?? null,
       }}
+      profileHref="/developer/profile"
     >
       {children}
     </DashboardShell>

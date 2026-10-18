@@ -11,6 +11,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
+import { PasswordForm, SignOutEverywhereButton } from "@/components/admin/profile-forms";
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -194,6 +195,22 @@ export default async function PartnerProfilePage() {
           </CardContent>
         </Card>
       )}
+
+      <Card id="security" className="scroll-mt-24">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldCheck className="size-4" /> Change password
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="max-w-xl">
+            <PasswordForm />
+          </div>
+          <div className="mt-4 border-t border-border/60 pt-4">
+            <SignOutEverywhereButton />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

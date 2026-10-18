@@ -65,6 +65,8 @@ export async function updateMyProfile(
   }
 }
 
+const OWN_ACCOUNT_ROLES = ["ADMIN", "FINANCE", "WAREHOUSE", "PARTNER", "SALES_REP", "DEVELOPER"] as const;
+
 const passwordSchema = z.object({
   current: z.string().min(1, "Enter your current password."),
   next: z.string().min(8, "New password needs at least 8 characters.").max(100),
@@ -74,7 +76,7 @@ export async function changeMyPassword(
   input: z.infer<typeof passwordSchema>,
 ): Promise<ActionResult> {
   try {
-    const actor = await requireOwnIdentity(["ADMIN"]);
+    const actor = await requireOwnIdentity([...OWN_ACCOUNT_ROLES]);
     const parsed = passwordSchema.safeParse(input);
     if (!parsed.success)
       return fail(parsed.error.issues[0]?.message ?? "Invalid password.");
@@ -105,7 +107,7 @@ export async function changeMyPassword(
 /** Invalidate every session of this account — including this one. */
 export async function signOutAllDevices(): Promise<ActionResult> {
   try {
-    const actor = await requireOwnIdentity(["ADMIN"]);
+    const actor = await requireOwnIdentity([...OWN_ACCOUNT_ROLES]);
     await prisma.user.update({
       where: { id: actor.id },
       data: { sessionVersion: { increment: 1 } },

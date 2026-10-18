@@ -56,6 +56,7 @@ export default async function FinanceLayout({
       nav={nav}
       user={{ name: user.name, email: user.email, role: user.role }}
       areaLabel="Finance & Accounting"
+      profileHref="/finance/profile"
     >
       {children}
     </DashboardShell>

@@ -38,6 +38,7 @@ export default async function WarehouseLayout({
       nav={nav}
       user={{ name: user.name, email: user.email, role: user.role }}
       areaLabel="Warehouse"
+      profileHref="/warehouse/profile"
     >
       {children}
     </DashboardShell>
