@@ -681,39 +681,77 @@ const STATE_UI: Record<ReportState, { label: string; icon: LucideIcon; pill: str
   unknown: { label: "Could not read", icon: Info, pill: "bg-muted text-muted-foreground ring-border", dot: "bg-muted-foreground/25", note: "The report history could not be read just now" },
 };
 
+/** One day of the daily report: the day, how it went, and when it was sent. */
+function ReportRow({ d, g, today, yesterday }: { d: Monitor["messages"]["reportDays"][number]; g: Monitor["messages"]; today?: string; yesterday?: string }) {
+  const ui = STATE_UI[d.state];
+  const Icon = ui.icon;
+  const sent = d.builtAt && d.state === "ok";
+  return (
+    <li
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-5 py-2.5 sm:grid-cols-[minmax(0,1fr)_9rem_11rem]"
+      title={d.builtAt ? `${ui.note} · ${eat(d.builtAt)}` : ui.note}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="whitespace-nowrap text-sm font-medium">{dayShort(d.day)}</span>
+        {d.day === today && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">Today</span>}
+        {d.day === yesterday && <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Yesterday</span>}
+      </div>
+      <span className={cn("inline-flex w-fit items-center gap-1.5 justify-self-end whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 sm:justify-self-start", ui.pill)}>
+        <Icon className="size-3.5" />
+        {ui.label}
+      </span>
+      <div className="col-span-2 flex items-baseline gap-2 text-sm sm:col-span-1 sm:justify-end">
+        {sent ? (
+          <>
+            <span className="font-display text-base font-semibold tabular-nums">{eatTime(d.builtAt!)}</span>
+            <span className="text-xs text-muted-foreground">{timeAgo(d.builtAt!)}</span>
+          </>
+        ) : d.builtAt ? (
+          <>
+            <span className="text-muted-foreground">Built {eatTime(d.builtAt)}</span>
+            <span className="text-xs text-muted-foreground">{timeAgo(d.builtAt)}</span>
+          </>
+        ) : (
+          <span className="text-muted-foreground">{d.state === "waiting" ? `Due ${String(g.dailyHour).padStart(2, "0")}:00` : "—"}</span>
+        )}
+      </div>
+    </li>
+  );
+}
+
 /**
- * The owner's daily report, front and centre: one row per day with whether it was built,
- * whether it reached WhatsApp, and at what time. The time shown is when the report was made;
- * it is sent in the same run, a few seconds later, so to the minute they are the same.
+ * The owner's daily report, up top and small: the latest 3 days, the other 4 one tap away.
+ * The time shown is when the report was made; it is sent in the same run a few seconds later,
+ * so to the minute they are the same.
  */
 export function DailyReportCard({ m }: { m: Monitor }) {
   const g = m.messages;
-  const todayKey = g.reportDays[0]?.day;
-  const yesterdayKey = g.reportDays[1]?.day;
+  const today = g.reportDays[0]?.day;
+  const yesterday = g.reportDays[1]?.day;
   const due = g.reportDays.filter((d) => !["waiting", "before", "off", "unknown"].includes(d.state));
   const sentN = due.filter((d) => d.state === "ok").length;
   const allGood = due.length > 0 && sentN === due.length;
+  const recent = g.reportDays.slice(0, 3);
+  const earlier = g.reportDays.slice(3);
   const monthly = g.lastMonthly;
   return (
     <section>
       <Card className="overflow-hidden">
         <CardContent className="p-0 sm:p-0">
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-border px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border px-5 py-3">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-soft">
-                <FileText className="size-5" />
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-soft">
+                <FileText className="size-[18px]" />
               </span>
               <div className="min-w-0">
-                <h2 className="font-display text-base font-semibold tracking-tight">Daily report to the owner</h2>
-                <p className="text-xs text-muted-foreground">
-                  Built at {String(g.dailyHour).padStart(2, "0")}:00 Tanzania time and sent on WhatsApp. The last 7 days.
-                </p>
+                <h2 className="font-display text-base font-semibold leading-tight tracking-tight">Daily report to the owner</h2>
+                <p className="text-xs text-muted-foreground">Built at {String(g.dailyHour).padStart(2, "0")}:00 Tanzania time, sent on WhatsApp.</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1" aria-hidden>
                 {[...g.reportDays].reverse().map((d) => (
-                  <span key={d.day} title={`${dayShort(d.day)}: ${STATE_UI[d.state].label}`} className={cn("h-5 w-2 rounded-full", STATE_UI[d.state].dot)} />
+                  <span key={d.day} title={`${dayShort(d.day)}: ${STATE_UI[d.state].label}`} className={cn("h-4 w-1.5 rounded-full", STATE_UI[d.state].dot)} />
                 ))}
               </div>
               <Badge variant={due.length === 0 ? "secondary" : allGood ? "success" : "warning"} className="whitespace-nowrap">
@@ -721,55 +759,25 @@ export function DailyReportCard({ m }: { m: Monitor }) {
               </Badge>
             </div>
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-5">Day</TableHead>
-                <TableHead>Report</TableHead>
-                <TableHead className="pr-5 text-right">Sent at (Tanzania time)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {g.reportDays.map((d) => {
-                const ui = STATE_UI[d.state];
-                const Icon = ui.icon;
-                const dueLabel = d.state === "waiting" ? `Due ${String(g.dailyHour).padStart(2, "0")}:00` : null;
-                return (
-                  <TableRow key={d.day} title={ui.note}>
-                    <TableCell className="pl-5">
-                      <div className="flex items-center gap-2">
-                        <span className="whitespace-nowrap text-sm font-medium">{dayShort(d.day)}</span>
-                        {d.day === todayKey && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">Today</span>}
-                        {d.day === yesterdayKey && <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Yesterday</span>}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1", ui.pill)}>
-                        <Icon className="size-3.5" />
-                        {ui.label}
-                      </span>
-                    </TableCell>
-                    <TableCell className="pr-5 text-right" title={d.builtAt ? `${ui.note} · ${eat(d.builtAt)}` : ui.note}>
-                      {d.builtAt && d.state === "ok" ? (
-                        <>
-                          <span className="font-display text-base font-semibold tabular-nums">{eatTime(d.builtAt)}</span>
-                          <span className="block text-xs text-muted-foreground">{timeAgo(d.builtAt)}</span>
-                        </>
-                      ) : d.builtAt ? (
-                        <>
-                          <span className="text-sm text-muted-foreground">Built {eatTime(d.builtAt)}</span>
-                          <span className="block text-xs text-muted-foreground">{timeAgo(d.builtAt)}</span>
-                        </>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">{dueLabel ?? "—"}</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/20 px-5 py-3 text-sm">
+          <ul className="divide-y divide-border">
+            {recent.map((d) => (
+              <ReportRow key={d.day} d={d} g={g} today={today} yesterday={yesterday} />
+            ))}
+          </ul>
+          {earlier.length > 0 && (
+            <details className="group border-t border-border">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+                <span>Earlier days · {earlier.length}</span>
+                <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" />
+              </summary>
+              <ul className="divide-y divide-border border-t border-border">
+                {earlier.map((d) => (
+                  <ReportRow key={d.day} d={d} g={g} today={today} yesterday={yesterday} />
+                ))}
+              </ul>
+            </details>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/20 px-5 py-2.5 text-sm">
             <span className="text-muted-foreground">Month-end report</span>
             {monthly ? (
               <span className="flex items-center gap-2">
@@ -781,7 +789,7 @@ export function DailyReportCard({ m }: { m: Monitor }) {
                 </span>
               </span>
             ) : (
-              <span className="text-xs text-muted-foreground">None yet. It is built on the last day of each month.</span>
+              <span className="text-xs text-muted-foreground">None yet. Built on the last day of each month.</span>
             )}
           </div>
         </CardContent>
