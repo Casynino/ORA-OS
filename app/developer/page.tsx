@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Bug, Gauge, ScrollText, SlidersHorizontal, Users } from "lucide-react";
+import { Activity, BarChart3, Bug, Gauge, ScrollText, Send, SlidersHorizontal, Users } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { getMonitor } from "@/lib/developer/monitor";
@@ -16,6 +16,7 @@ import {
   Attention,
   HomeSection,
   JumpBar,
+  MessagesPanel,
   PeoplePanel,
   SettingsPanel,
   SpeedPanel,
@@ -52,6 +53,7 @@ export default async function DeveloperHomePage() {
   }).format(new Date());
 
   const missing = d.env.filter((e) => !e.set && e.required).length;
+  const messagesBadge = m.messages.wa24.failed > 0 ? String(m.messages.wa24.failed) : null;
   const errorsBadge = !m.tracking ? "Off" : m.events.errors24 + m.events.failed24 > 0 ? String(m.events.errors24 + m.events.failed24) : null;
 
 
@@ -83,6 +85,7 @@ export default async function DeveloperHomePage() {
         items={[
           { id: "activity", label: "Activity" },
           { id: "errors", label: "Crashes & sign-ins", badge: errorsBadge },
+          { id: "messages", label: "Messages & reports", badge: messagesBadge },
           { id: "speed", label: "Speed & size" },
           { id: "settings", label: "Settings", badge: missing > 0 ? String(missing) : null },
           { id: "people", label: "People" },
@@ -101,6 +104,16 @@ export default async function DeveloperHomePage() {
         tone={!m.tracking ? "warn" : m.events.errors24 > 0 ? "bad" : "warn"}
       >
         <ErrorsPanel m={m} />
+      </HomeSection>
+      <HomeSection
+        id="messages"
+        title="Messages & reports"
+        icon={Send}
+        description="Is the owner getting his reports and messages? What runs by itself, and whether it arrived."
+        badge={messagesBadge ? `${messagesBadge} failed` : null}
+        tone="bad"
+      >
+        <MessagesPanel m={m} />
       </HomeSection>
       <HomeSection id="speed" title="Speed & size" icon={Gauge} badge={`${m.avgMs} ms`} tone={m.avgMs >= 400 ? "bad" : m.avgMs >= 150 ? "warn" : "neutral"}>
         <SpeedPanel m={m} />

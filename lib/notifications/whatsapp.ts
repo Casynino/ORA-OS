@@ -1,5 +1,6 @@
 import "server-only";
 import { workingAsContext } from "@/lib/developer/context";
+import { recordOpsEvent } from "@/lib/developer/ops-events";
 
 const BASE = "https://api.callmebot.com/whatsapp.php";
 
@@ -23,6 +24,23 @@ export type WhatsAppResult = {
  * CallMeBot is rate-limited; keep sends to genuinely important events only.
  */
 export async function sendWhatsApp(
+  rawText: string,
+  opts?: { phone?: string; apikey?: string },
+): Promise<WhatsAppResult> {
+  const result = await deliverWhatsApp(rawText, opts);
+  // Keep a record of whether it arrived (never the message text), so the Developer can
+  // answer "is the owner getting his messages?". Never throws.
+  await recordOpsEvent({
+    kind: "WHATSAPP",
+    message: result.ok ? "SENT" : result.skipped ? "SKIPPED" : "FAILED",
+    detail: result.ok
+      ? null
+      : [result.reason, result.status ? `HTTP ${result.status}` : null, result.error, result.body].filter(Boolean).join(" · "),
+  });
+  return result;
+}
+
+async function deliverWhatsApp(
   rawText: string,
   opts?: { phone?: string; apikey?: string },
 ): Promise<WhatsAppResult> {

@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { getDiagnostics } from "@/lib/developer/diagnostics";
+import { JOB_KEYS, type JobKey } from "@/lib/developer/job-runs";
 
 /**
  * Everything the Developer Home shows: usage, who signs in, speed, size,
@@ -10,6 +11,13 @@ import { getDiagnostics } from "@/lib/developer/diagnostics";
 
 const TZ = "Africa/Dar_es_Salaam";
 const DAYS = 14;
+/** auth.ts records every sign-in with an email that has no account under this one message (the typed email is never stored). */
+const UNKNOWN_EMAIL = "Sign-in with an email that has no account";
+/** vercel.json runs the daily report at 16:00 UTC = 19:00 EAT, and the credit reminder at 04:00 UTC = 07:00 EAT. */
+const DAILY_REPORT_HOUR_EAT = 19;
+const CREDIT_REMINDER_HOUR_EAT = 7;
+/** After the scheduled hour a report is only called missing once this many hours have passed (cron timing + build time). */
+const REPORT_GRACE_HOURS = 3;
 
 export type Level = "critical" | "warning" | "info";
 /** `link.href` is either an in-page tab ("#errors") or an outside page (Vercel, Neon). */
@@ -28,6 +36,9 @@ function lastDays(n: number): string[] {
   for (let i = n - 1; i >= 0; i--) out.push(fmt.format(new Date(Date.now() - i * 86_400_000)));
   return out;
 }
+
+/** "5 hours ago" up to two days, then "90 days ago". */
+const agoText = (ms: number) => (ms < 48 * 3_600_000 ? `${Math.floor(ms / 3_600_000)} hours ago` : `${Math.floor(ms / 86_400_000)} days ago`);
 
 async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
   try {
@@ -118,7 +129,6 @@ export async function getMonitor() {
     negRep,
     overpaid,
     growth,
-    reports,
     lastDaily,
     lastReport,
     reportSettings,
@@ -265,10 +275,6 @@ export async function getMonitor() {
           UNION ALL SELECT 'Photos and files', count(*)::int, count(*) FILTER (WHERE "createdAt" >= ${since7})::int FROM "Attachment"`,
       [],
     ),
-    safe(
-      () => prisma.report.findMany({ orderBy: { createdAt: "desc" }, take: 5, select: { id: true, type: true, title: true, whatsappSent: true, createdAt: true } }),
-      [],
-    ),
     safe(() => prisma.report.findFirst({ where: { type: "DAILY" }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }), null),
     safe(() => prisma.report.findFirst({ orderBy: { createdAt: "desc" }, select: { createdAt: true, whatsappSent: true, title: true } }), null),
     safe(() => prisma.reportSettings.findUnique({ where: { id: "singleton" }, select: { dailyEnabled: true } }), null),
@@ -327,6 +333,150 @@ export async function getMonitor() {
       };
     }
   })();
+
+  // ── Messages and scheduled jobs (written by sendWhatsApp and the two cron routes). ──
+  type JobRun = { job: JobKey; at: Date; ok: boolean; ms: number | null; note: string | null };
+  const ops = await (async () => {
+    const empty = {
+      wa24: { sent: 0, failed: 0, skipped: 0 },
+      wa7Failed: 0,
+      waSince: null as Date | null,
+      waByDay: [] as { day: string; status: string; n: number }[],
+      waTrouble: [] as { id: string; status: string; detail: string | null; createdAt: Date }[],
+      jobRuns: [] as { job: JobKey; last: JobRun | null; lastOk: JobRun | null }[],
+      failedByIp: [] as { ip: string; tries: number; accounts: number; unknown: number; last: Date }[],
+    };
+    if (!tracking) return empty;
+    try {
+      const [wa24Rows, wa7, waFirst, waByDay, waTrouble, jobRows, failedByIp] = await Promise.all([
+        prisma.systemEvent.groupBy({ by: ["message"], where: { kind: "WHATSAPP", createdAt: { gte: since24 } }, _sum: { count: true } }),
+        prisma.systemEvent.aggregate({ _sum: { count: true }, where: { kind: "WHATSAPP", message: "FAILED", createdAt: { gte: since7 } } }),
+        prisma.systemEvent.aggregate({ _min: { createdAt: true }, where: { kind: "WHATSAPP" } }),
+        prisma.$queryRaw<{ day: string; status: string; n: number }[]>`
+          SELECT to_char((("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Africa/Dar_es_Salaam')::date, 'YYYY-MM-DD') AS day,
+                 message AS status, coalesce(sum("count"), 0)::int AS n
+          FROM "SystemEvent" WHERE kind = 'WHATSAPP' AND "createdAt" >= ${since} GROUP BY 1, 2`,
+        prisma.systemEvent.findMany({
+          where: { kind: "WHATSAPP", message: { in: ["FAILED", "SKIPPED"] } },
+          orderBy: { createdAt: "desc" },
+          take: 15,
+          select: { id: true, message: true, detail: true, createdAt: true },
+        }),
+        // The newest run and the newest good run of each job, however long ago (a job that has been dead for months must still show as late).
+        Promise.all(
+          JOB_KEYS.map(async (job) => {
+            const [last, lastOk] = await Promise.all([
+              prisma.systemEvent.findFirst({ where: { kind: "JOB_RUN", message: job }, orderBy: { createdAt: "desc" }, select: { detail: true, createdAt: true } }),
+              prisma.systemEvent.findFirst({
+                where: { kind: "JOB_RUN", message: job, detail: { contains: '"ok":true' } },
+                orderBy: { createdAt: "desc" },
+                select: { detail: true, createdAt: true },
+              }),
+            ]);
+            return { job, last, lastOk };
+          }),
+        ),
+        prisma.$queryRaw<{ ip: string; tries: number; accounts: number; unknown: number; last: Date }[]>`
+          SELECT ip, coalesce(sum("count"), 0)::int AS tries,
+                 count(DISTINCT message) FILTER (WHERE message <> ${UNKNOWN_EMAIL})::int AS accounts,
+                 coalesce(sum("count") FILTER (WHERE message = ${UNKNOWN_EMAIL}), 0)::int AS unknown,
+                 max("createdAt") AS last
+          FROM "SystemEvent" WHERE kind = 'LOGIN_FAILED' AND ip IS NOT NULL AND "createdAt" >= ${since7}
+          GROUP BY ip ORDER BY tries DESC, last DESC LIMIT 8`,
+      ]);
+      const wa = (status: string) => wa24Rows.find((r) => r.message === status)?._sum.count ?? 0;
+      const toRun = (job: JobKey, e: { detail: string | null; createdAt: Date } | null): JobRun | null => {
+        if (!e) return null;
+        let d: { ok?: boolean; ms?: number; note?: string | null } = {};
+        try {
+          d = JSON.parse(e.detail ?? "{}");
+        } catch {
+          // keep the defaults: a row we cannot read counts as a failed run
+        }
+        return { job, at: e.createdAt, ok: d.ok === true, ms: typeof d.ms === "number" ? d.ms : null, note: d.note ?? null };
+      };
+      const jobRuns = jobRows.map((r) => ({ job: r.job, last: toRun(r.job, r.last), lastOk: toRun(r.job, r.lastOk) }));
+      return {
+        wa24: { sent: wa("SENT"), failed: wa("FAILED"), skipped: wa("SKIPPED") },
+        wa7Failed: wa7._sum.count ?? 0,
+        waSince: waFirst._min.createdAt ?? null,
+        waByDay,
+        waTrouble: waTrouble.map((t) => ({ id: t.id, status: t.message, detail: t.detail, createdAt: t.createdAt })),
+        jobRuns,
+        failedByIp,
+      };
+    } catch {
+      incomplete.push("message and job history");
+      return empty;
+    }
+  })();
+
+  const JOB_META: Record<JobKey, { title: string; schedule: string }> = {
+    "daily-report": { title: "Daily report (and the month-end report)", schedule: `${String(DAILY_REPORT_HOUR_EAT).padStart(2, "0")}:00 every day` },
+    "credit-reminder": { title: "Morning credit reminder", schedule: `${String(CREDIT_REMINDER_HOUR_EAT).padStart(2, "0")}:00 every day` },
+  };
+  const LATE_AFTER_MS = 36 * 3_600_000; // both jobs are daily: late once a run is 1.5 days old
+  const jobs = JOB_KEYS.map((key) => {
+    const found = ops.jobRuns.find((r) => r.job === key);
+    const last = found?.last ?? null;
+    const lastOk = found?.lastOk ?? null;
+    const state: "none" | "ok" | "late" | "failed" = !last
+      ? "none"
+      : !last.ok
+        ? "failed"
+        : Date.now() - last.at.getTime() > LATE_AFTER_MS
+          ? "late"
+          : "ok";
+    return { key, ...JOB_META[key], last, lastOk, state };
+  });
+
+  const eatDay = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  const [dailyReports, firstDaily, lastMonthly] = await Promise.all([
+    safe(
+      () =>
+        prisma.report.findMany({
+          where: { type: "DAILY", periodStart: { gte: new Date(Date.now() - 10 * 86_400_000) } },
+          orderBy: { createdAt: "desc" },
+          select: { periodStart: true, createdAt: true, whatsappSent: true },
+        }),
+      null,
+    ),
+    safe(() => prisma.report.findFirst({ where: { type: "DAILY" }, orderBy: { createdAt: "asc" }, select: { createdAt: true } }), null),
+    safe(
+      () => prisma.report.findFirst({ where: { type: "MONTHLY" }, orderBy: { createdAt: "desc" }, select: { title: true, createdAt: true, whatsappSent: true } }),
+      null,
+    ),
+  ]);
+  if (dailyReports === null) incomplete.push("daily report history");
+  const waConfigured = !!(process.env.CALLMEBOT_APIKEY && process.env.CALLMEBOT_PHONE);
+  const dailyEnabled = reportSettings?.dailyEnabled !== false;
+  const eatHourNow = Number(new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", hour12: false }).format(new Date()));
+  const reportDays = days
+    .slice(-7)
+    .reverse()
+    .map((day) => {
+      const r = dailyReports?.find((x) => eatDay(x.periodStart) === day);
+      const state: "ok" | "unsent" | "built" | "waiting" | "before" | "off" | "missing" | "unknown" = !dailyReports
+        ? "unknown"
+        : r
+        ? r.whatsappSent
+          ? "ok"
+          : waConfigured
+            ? "unsent"
+            : "built"
+        : day === days[days.length - 1] && eatHourNow < DAILY_REPORT_HOUR_EAT + REPORT_GRACE_HOURS
+          ? "waiting"
+          : !firstDaily || day < eatDay(firstDaily.createdAt)
+            ? "before"
+            : !dailyEnabled
+              ? "off"
+              : "missing";
+      return { day, state, builtAt: r?.createdAt ?? null };
+    });
+  const waSeries = days.map((day) => {
+    const n = (status: string) => ops.waByDay.find((x) => x.day === day && x.status === status)?.n ?? 0;
+    return { day, sent: n("SENT"), failed: n("FAILED"), skipped: n("SKIPPED") };
+  });
 
   // ── Build the day-by-day series. ──
   const ROLES = ["ADMIN", "FINANCE", "WAREHOUSE", "SALES_REP", "PARTNER", "DEVELOPER"] as const;
@@ -459,15 +609,42 @@ export async function getMonitor() {
     problems.push({
       level: "warning",
       title: "The daily owner report did not run",
-      detail: lastDaily ? `The last daily report was built ${Math.floor(lastDailyAge / 3_600_000)} hours ago.` : "No daily report has ever been built.",
+      detail: lastDaily ? `The last daily report was built ${agoText(lastDailyAge)}.` : "No daily report has ever been built.",
       hint: "The report is started by a scheduled call to /api/cron/daily-report. Check that your scheduler still calls it with the right secret.",
     });
-  if (lastReport && !lastReport.whatsappSent && process.env.CALLMEBOT_APIKEY && process.env.CALLMEBOT_PHONE)
+  const waFailing = ops.wa24.failed > 0; // one WhatsApp outage should raise one warning, not three
+  if (lastReport && !lastReport.whatsappSent && waConfigured && !waFailing)
     problems.push({
       level: "warning",
       title: "The latest owner report was not sent on WhatsApp",
       detail: `“${lastReport.title}” was built but did not reach WhatsApp.`,
       hint: "In the owner's Reports page press “Send test WhatsApp”. If it fails, the CallMeBot key may need to be activated again.",
+    });
+  for (const j of jobs) {
+    if (j.state === "failed" && !(waFailing && j.last?.note?.startsWith("Ran, but WhatsApp")))
+      problems.push({
+        level: "warning",
+        title: `${j.title} failed on its last run`,
+        detail: j.last?.note ?? "It ran but did not finish well.",
+        hint: "Open “Messages & reports” below to see when it last went well. If it keeps failing, look at the Vercel logs for that job.",
+        link: { label: "Open Messages & reports", href: "#messages" },
+      });
+    else if (j.state === "late" && !(j.key === "daily-report" && problems.some((p) => p.title === "The daily owner report did not run")))
+      problems.push({
+        level: "warning",
+        title: `${j.title} did not run on time`,
+        detail: `Its last run was ${agoText(Date.now() - (j.last?.at.getTime() ?? Date.now()))}; it should run every day.`,
+        hint: "In Vercel → Settings → Cron Jobs check that it is still scheduled, and that the CRON_SECRET setting exists.",
+        link: VERCEL_ENV,
+      });
+  }
+  if (ops.wa24.failed > 0)
+    problems.push({
+      level: "warning",
+      title: `${ops.wa24.failed} WhatsApp message${ops.wa24.failed > 1 ? "s" : ""} failed in the last 24 hours`,
+      detail: `The owner did not receive them.${jobs.some((j) => j.state === "failed" && j.last?.note?.startsWith("Ran, but WhatsApp")) ? " A scheduled report was among them." : ""}`,
+      hint: "The CallMeBot key may need to be activated again, or CallMeBot may be down. “Messages & reports” below shows the reason for each one.",
+      link: { label: "Open Messages & reports", href: "#messages" },
     });
   // Optional settings that are missing: not broken, but worth knowing what you lose.
   for (const e of diag.env.filter((x) => !x.required && !x.set))
@@ -487,6 +664,98 @@ export async function getMonitor() {
       detail: `Could not load: ${incomplete.join(", ")}. This is usually a short database hiccup.`,
       hint: "Refresh the page in a minute. If it keeps happening, check the database in the Neon dashboard.",
     });
+
+  // ── Every check that was made, passing or not (the "what was checked" list). ──
+  type CheckStatus = "ok" | "look" | "fix" | "unknown";
+  const systemChecks: { label: string; status: CheckStatus; detail: string }[] = [];
+  const chk = (label: string, status: CheckStatus, detail: string) => systemChecks.push({ label, status, detail });
+  const dbDown = !diag.dbOk || failedProbes.length === probes.length;
+  chk(
+    "The database can be reached",
+    dbDown ? "fix" : failedProbes.length ? "look" : "ok",
+    dbDown ? "Cannot connect." : failedProbes.length ? `${failedProbes.length} of ${probes.length} timing checks failed.` : `Answers in ${diag.dbMs} ms.`,
+  );
+  chk("The database is fast", dbDown ? "unknown" : avgMs > 400 ? "look" : "ok", dbDown ? "Could not be timed." : `Average ${avgMs} ms (healthy is under 150 ms).`);
+  chk("The database link is the pooled one", dbDown ? "unknown" : diag.pooled ? "ok" : "look", diag.pooled ? "Pooled." : "Direct link: can run out of connections.");
+  chk(
+    "Required settings are in place",
+    missing.length ? "fix" : "ok",
+    missing.length ? `Missing: ${missing.map((x) => x.title).join(", ")}.` : "All required settings are set.",
+  );
+  const storageSet = diag.env.find((e) => e.name === "ORA_FILES_READ_WRITE_TOKEN")?.set ?? false;
+  chk("File storage is linked", storageSet ? "ok" : "look", storageSet ? "Receipts and reports go to cloud storage." : "Files are kept inside the database.");
+  chk("WhatsApp is set up", waConfigured ? "ok" : "look", waConfigured ? "Key and number are set." : "No WhatsApp alerts or reports are sent.");
+  chk("Error tracking is on", tracking ? "ok" : "look", tracking ? "Crashes and failed sign-ins are recorded." : "Crashes are not recorded.");
+  chk(
+    "No crashes in the last 24 hours",
+    !tracking ? "unknown" : events.errors24 === 0 ? "ok" : events.errors24 >= 10 ? "fix" : "look",
+    !tracking ? "Not recorded." : events.errors24 === 0 ? "Nothing broke." : `${events.errors24} crash${events.errors24 > 1 ? "es" : ""}.`,
+  );
+  chk(
+    "Failed sign-ins are normal",
+    !tracking ? "unknown" : events.failed24 < 10 ? "ok" : "look",
+    !tracking ? "Not recorded." : `${events.failed24} in 24 hours.`,
+  );
+  const dataChecks: [string, number | null][] = [
+    ["Warehouse stock is never negative or over-reserved", negWarehouse],
+    ["Sales-rep stock is never negative", negRep],
+    ["No sale shows more paid than its total", overpaid],
+  ];
+  for (const [label, bad] of dataChecks)
+    chk(label, bad === null ? "unknown" : bad > 0 ? "fix" : "ok", bad === null ? "Could not be checked just now." : bad > 0 ? `${bad} found.` : "No problems found.");
+  chk(
+    "The daily owner report was built",
+    !dailyOn ? "ok" : lastDailyAge > 36 * 3_600_000 ? "look" : "ok",
+    !dailyOn ? "Switched off in the report settings." : lastDaily ? `Last built ${agoText(lastDailyAge)}.` : "No report has been built yet.",
+  );
+  chk(
+    "The latest owner report reached WhatsApp",
+    !lastReport ? "unknown" : waConfigured && !lastReport.whatsappSent ? "look" : "ok",
+    !lastReport ? "No report yet." : waConfigured && !lastReport.whatsappSent ? "Built but not sent." : "Sent.",
+  );
+  for (const j of jobs)
+    chk(
+      `${j.title} runs on time`,
+      j.state === "none" ? "unknown" : j.state === "ok" ? "ok" : "look",
+      j.state === "none"
+        ? "No run recorded yet."
+        : j.state === "failed"
+          ? "Failed on its last run."
+          : j.state === "late"
+            ? "Its last run is more than a day and a half old."
+            : "Ran on schedule.",
+    );
+  const waAll = ops.wa24.sent + ops.wa24.failed;
+  chk(
+    "WhatsApp messages arrived (24 hours)",
+    !tracking || waAll === 0 ? "unknown" : ops.wa24.failed > 0 ? "look" : "ok",
+    !tracking ? "Not recorded." : waAll === 0 ? "No message recorded in 24 hours." : `${ops.wa24.sent} sent, ${ops.wa24.failed} failed.`,
+  );
+  chk(
+    "The database size is healthy",
+    dbSize <= 0 ? "unknown" : dbSize > 400 * 1024 * 1024 ? "look" : "ok",
+    dbSize <= 0 ? "Could not be read just now." : `${(dbSize / 1048576).toFixed(0)} MB.`,
+  );
+
+  const dbHost = (() => {
+    try {
+      return new URL(process.env.DATABASE_URL ?? "").hostname;
+    } catch {
+      return "";
+    }
+  })();
+  const deployment = {
+    build: diag.build,
+    node: diag.node,
+    env: process.env.VERCEL_ENV ?? diag.nodeEnv ?? "unknown",
+    region: process.env.VERCEL_REGION ?? null,
+    branch: process.env.VERCEL_GIT_COMMIT_REF ?? null,
+    commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
+    message: process.env.VERCEL_GIT_COMMIT_MESSAGE?.split("\n")[0].slice(0, 120) ?? null,
+    dbProvider: /neon\.tech$/.test(dbHost) ? "Neon" : dbHost ? "PostgreSQL" : null,
+    dbRegion: dbHost.match(/\.([a-z]{2}-[a-z]+-\d)\./)?.[1] ?? null,
+    pooled: diag.pooled,
+  };
 
   const score = Math.max(
     0,
@@ -523,8 +792,23 @@ export async function getMonitor() {
     tracking,
     incomplete,
     growth,
-    reports,
     events,
+    failedByIp: ops.failedByIp,
+    messages: {
+      configured: waConfigured,
+      disabled: process.env.NOTIFICATIONS_DISABLED === "1",
+      wa24: ops.wa24,
+      wa7Failed: ops.wa7Failed,
+      since: ops.waSince,
+      series: waSeries,
+      trouble: ops.waTrouble,
+      jobs,
+      reportDays,
+      dailyHour: DAILY_REPORT_HOUR_EAT,
+      lastMonthly,
+    },
+    systemChecks,
+    deployment,
     problems,
     score,
   };

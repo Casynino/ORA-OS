@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { cronAuthorized } from "@/lib/reports/cron-auth";
 import { generateDailyReport } from "@/lib/reports/generate-daily";
 import { generateMonthlyReport } from "@/lib/reports/generate-monthly";
+import { withJobRun } from "@/lib/developer/job-runs";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,7 +19,10 @@ export const maxDuration = 60;
  */
 export async function GET(req: Request) {
   if (!cronAuthorized(req)) return new NextResponse("Unauthorized", { status: 401 });
+  return withJobRun("daily-report", () => run(req));
+}
 
+async function run(req: Request) {
   const settings = await prisma.reportSettings.findUnique({ where: { id: "singleton" } });
   const url = new URL(req.url);
 

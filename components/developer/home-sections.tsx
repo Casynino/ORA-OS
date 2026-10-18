@@ -8,10 +8,12 @@ import {
   ChevronDown,
   Clock,
   Database,
+  FileText,
   Gauge,
   Info,
   KeyRound,
   Monitor as Desktop,
+  Send,
   ShieldCheck,
   Smartphone,
   Store,
@@ -51,6 +53,12 @@ const ERROR_SERIES: Series[] = [
   { key: "logins", label: "Failed sign-ins", color: "hsl(var(--warning))" },
 ];
 
+const WA_SERIES: Series[] = [
+  { key: "sent", label: "Sent", color: "hsl(var(--success))" },
+  { key: "failed", label: "Failed", color: "hsl(var(--destructive))" },
+  { key: "skipped", label: "Not sent (switched off)", color: "hsl(var(--muted-foreground))" },
+];
+
 const LEVEL: Record<Level, { icon: LucideIcon; box: string; chip: string; label: string }> = {
   critical: { icon: XCircle, box: "border-destructive/30 bg-destructive/10", chip: "bg-destructive/15 text-destructive", label: "Fix now" },
   warning: { icon: AlertTriangle, box: "border-warning/30 bg-warning/10", chip: "bg-warning/20 text-warning", label: "Look at it" },
@@ -80,6 +88,8 @@ const shortDay = (d: string) =>
 /** Hover text for times: always Tanzania time, clearly labelled. */
 const eat = (d: Date) =>
   `${new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Dar_es_Salaam", dateStyle: "medium", timeStyle: "short" }).format(d)} EAT`;
+/** "2026-10-17" — the Tanzania calendar day of a moment. */
+const eatKey = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Dar_es_Salaam", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 const bytes = (n: number) =>
   n >= 1073741824 ? `${(n / 1073741824).toFixed(2)} GB` : n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
@@ -132,11 +142,11 @@ export function HomeSection({
             <Icon className="size-[18px]" />
           </span>
         )}
-        <h2 className="font-display text-2xl font-bold tracking-tight">{title}</h2>
+        <h2 className="min-w-0 font-display text-2xl font-bold tracking-tight">{title}</h2>
         {badge && (
           <span
             className={cn(
-              "rounded-full px-2.5 py-1 text-xs font-semibold leading-none tabular-nums",
+              "shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold leading-none tabular-nums",
               tone === "bad" ? "bg-destructive/15 text-destructive" : tone === "warn" ? "bg-warning/20 text-warning" : "bg-muted text-muted-foreground",
             )}
           >
@@ -191,6 +201,50 @@ function ProblemCard({ p, showLevel = false }: { p: Monitor["problems"][number];
   );
 }
 
+const CHECK_ORDER = { fix: 0, look: 1, unknown: 2, ok: 3 } as const;
+
+/** Every check that was made, passing or not, folded away until asked for. */
+function CheckList({ checks }: { checks: Monitor["systemChecks"] }) {
+  const okCount = checks.filter((c) => c.status === "ok").length;
+  const unknown = checks.filter((c) => c.status === "unknown").length;
+  const sorted = [...checks].sort((a, b) => CHECK_ORDER[a.status] - CHECK_ORDER[b.status]);
+  return (
+    <details className="group border-t border-border">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+        <span>
+          What was checked · {okCount} of {checks.length} fine{unknown > 0 ? `, ${unknown} not checked yet` : ""}
+        </span>
+        <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" />
+      </summary>
+      <ul className="divide-y divide-border border-t border-border">
+        {sorted.map((c) => (
+          <li key={c.label} className="flex items-start gap-3 px-5 py-2.5">
+            {c.status === "ok" ? (
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+            ) : c.status === "fix" ? (
+              <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+            ) : c.status === "look" ? (
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+            ) : (
+              <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm">{c.label}</p>
+              <p className="text-xs text-muted-foreground">{c.detail}</p>
+            </div>
+            <Badge
+              className="shrink-0 whitespace-nowrap"
+              variant={c.status === "ok" ? "success" : c.status === "fix" ? "destructive" : c.status === "look" ? "warning" : "secondary"}
+            >
+              {c.status === "ok" ? "Fine" : c.status === "fix" ? "Fix now" : c.status === "look" ? "Look at it" : "Not checked yet"}
+            </Badge>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 /** Problems, most urgent first, in one bounded panel. "Good to know" stays folded at the bottom. */
 export function Attention({ m }: { m: Monitor }) {
   const act = m.problems.filter((p) => p.level !== "info");
@@ -235,6 +289,7 @@ export function Attention({ m }: { m: Monitor }) {
             </div>
           )}
         </div>
+        <CheckList checks={m.systemChecks} />
         {know.length > 0 && (
           <details className="group border-t border-border">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
@@ -572,30 +627,290 @@ export function SpeedPanel({ m }: { m: Monitor }) {
           <Card>
             <CardContent className="p-0 sm:p-0">
               <div className="border-b border-border px-5 py-3.5">
-                <h2 className="text-sm font-semibold">Scheduled reports</h2>
-                <p className="text-xs text-muted-foreground">Built by the system for the owner. If they stop, the schedule or WhatsApp link is broken.</p>
+                <h2 className="text-sm font-semibold">This deployment</h2>
+                <p className="text-xs text-muted-foreground">The version that is live right now, and where it runs.</p>
               </div>
-              {m.reports.length === 0 ? (
-                <p className="px-5 py-5 text-center text-sm text-muted-foreground">No reports have been built yet.</p>
-              ) : (
-                <ul className="divide-y divide-border">
-                  {m.reports.slice(0, 3).map((r) => (
-                    <li key={r.id} className="flex items-center justify-between gap-3 px-5 py-2.5">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{r.title}</p>
-                        <p className="text-xs text-muted-foreground" title={eat(r.createdAt)}>
-                          {humanize(r.type)} · {timeAgo(r.createdAt)}
-                        </p>
-                      </div>
-                      <Badge className="shrink-0 whitespace-nowrap" variant={r.whatsappSent ? "success" : "warning"}>{r.whatsappSent ? "Sent" : "Not sent"}</Badge>
-                    </li>
+              <dl className="divide-y divide-border">
+                {[
+                  ["Version", [m.deployment.commit ?? m.deployment.build.slice(0, 8), m.deployment.branch].filter(Boolean).join(" · ")],
+                  ["Last change", m.deployment.message],
+                  ["Environment", m.deployment.env],
+                  ["Server region", m.deployment.region],
+                  [
+                    "Database",
+                    m.deployment.dbProvider
+                      ? [m.deployment.dbProvider, m.deployment.dbRegion, m.deployment.pooled ? "pooled" : "direct link"].filter(Boolean).join(" · ")
+                      : null,
+                  ],
+                  ["Node", m.deployment.node],
+                ]
+                  .filter((r): r is [string, string] => !!r[1])
+                  .map(([k, v]) => (
+                    <div key={k} className="flex items-baseline justify-between gap-4 px-5 py-2.5 text-sm">
+                      <dt className="shrink-0 text-muted-foreground">{k}</dt>
+                      <dd className="min-w-0 truncate text-right font-medium" title={v}>
+                        {v}
+                      </dd>
+                    </div>
                   ))}
-                </ul>
-              )}
+              </dl>
             </CardContent>
           </Card>
         </div>
       </section>
+    </div>
+  );
+}
+
+/* ───────────────────── Messages & reports ───────────────────── */
+
+const dayLabel = (d: string) =>
+  new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+
+const REPORT_STATE = {
+  ok: { label: "Sent", variant: "success", note: "Built and sent on WhatsApp" },
+  unsent: { label: "Not sent", variant: "warning", note: "Built, but it did not reach WhatsApp" },
+  built: { label: "Built", variant: "secondary", note: "Built (WhatsApp is not set up)" },
+  waiting: { label: "Waiting", variant: "secondary", note: "Not due yet today" },
+  missing: { label: "Not built", variant: "warning", note: "No report was made for this day" },
+  unknown: { label: "Could not read", variant: "secondary", note: "The report history could not be read just now" },
+  off: { label: "Switched off", variant: "secondary", note: "Daily reports are off in the report settings" },
+  before: { label: "None yet", variant: "secondary", note: "Before the first report" },
+} as const;
+
+const took = (ms: number | null) => (ms === null ? "—" : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`);
+
+export function MessagesPanel({ m }: { m: Monitor }) {
+  if (!m.tracking)
+    return (
+      <InfoCallout icon={AlertTriangle} tone="warn" title="Error tracking is not switched on yet">
+        <p>
+          Messages and scheduled jobs are written down in the same small technical table as crashes. Switch it on once
+          (it never touches business data) and this section starts filling in.
+        </p>
+        <div className="mt-3">
+          <EnableTrackingButton />
+        </div>
+      </InfoCallout>
+    );
+  const g = m.messages;
+  const never = !g.since;
+  const latestDay = g.reportDays.find((d) => d.state !== "waiting");
+  const dailyTone: Tone = !latestDay ? "neutral" : latestDay.state === "ok" ? "good" : latestDay.state === "unsent" || latestDay.state === "missing" ? "warn" : "neutral";
+  const monthly = g.lastMonthly;
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <HealthCard
+          label="WhatsApp messages (24h)"
+          value={never ? "—" : formatNumber(g.wa24.sent)}
+          detail={
+            never
+              ? "recording starts with the next message"
+              : g.wa24.failed
+                ? `${g.wa24.failed} failed`
+                : g.wa24.skipped
+                  ? `${g.wa24.skipped} not sent (switched off)`
+                  : g.wa24.sent
+                    ? "none failed"
+                    : "nothing sent in 24 hours"
+          }
+          tone={never || g.wa24.sent === 0 ? (g.wa24.failed ? "warn" : "neutral") : g.wa24.failed ? "warn" : "good"}
+          statusText={
+            never
+              ? "Waiting for data"
+              : g.wa24.failed
+                ? "Look at it"
+                : g.wa24.sent > 0
+                  ? "Normal"
+                  : g.wa24.skipped > 0
+                    ? "Switched off"
+                    : "Quiet"
+          }
+          icon={Send}
+          meaning="Alerts and reports sent to the owner's WhatsApp through CallMeBot. A failed message means the owner did not get it. Only counted from the day this was switched on."
+        />
+        <HealthCard
+          label="Daily report"
+          value={latestDay ? REPORT_STATE[latestDay.state].label : "—"}
+          detail={latestDay ? `for ${dayLabel(latestDay.day)}` : "no report yet"}
+          tone={dailyTone}
+          statusText={latestDay?.state === "ok" ? "OK" : latestDay?.state === "unsent" || latestDay?.state === "missing" ? "Look at it" : "Info"}
+          icon={FileText}
+          meaning={`The owner's summary of the day, built every day at ${String(g.dailyHour).padStart(2, "0")}:00 Tanzania time and sent on WhatsApp.`}
+        />
+        <HealthCard
+          label="Month-end report"
+          value={monthly ? (monthly.whatsappSent ? "Sent" : g.configured ? "Not sent" : "Built") : "None yet"}
+          detail={monthly ? `built ${timeAgo(monthly.createdAt)}` : "built on the last day of each month"}
+          tone={!monthly ? "neutral" : monthly.whatsappSent ? "good" : g.configured ? "warn" : "neutral"}
+          statusText={!monthly ? "Info" : monthly.whatsappSent ? "OK" : g.configured ? "Look at it" : "Info"}
+          icon={FileText}
+          meaning="The monthly summary for the owner. It is built together with the daily report on the last day of the month."
+        />
+        <HealthCard
+          label="Failed in 7 days"
+          value={never ? "—" : formatNumber(g.wa7Failed)}
+          detail={never ? "recording starts with the next message" : "WhatsApp messages not delivered"}
+          tone={never ? "neutral" : g.wa7Failed ? "warn" : "good"}
+          statusText={never ? "Waiting for data" : g.wa7Failed ? "Look at it" : "None failed"}
+          icon={AlertTriangle}
+          meaning="Each message is tried up to 3 times. Only a message that failed all its tries is counted here."
+        />
+      </div>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardContent className="p-5 sm:p-5">
+            <h2 className="text-sm font-semibold">Messages per day</h2>
+            <p className="mb-3 text-xs text-muted-foreground">
+              WhatsApp messages by how they went, last 14 days.{g.since && <> Counted since {shortDay(eatKey(g.since))}.</>}
+            </p>
+            <StackedBars
+              data={g.series.map((d) => ({ label: d.day, values: { sent: d.sent, failed: d.failed, skipped: d.skipped } }))}
+              series={WA_SERIES}
+              labelEvery={2}
+              formatLabel={shortDay}
+              height={170}
+              emptyText="No messages recorded yet."
+            />
+            <Legend series={WA_SERIES} className="mt-4" />
+          </CardContent>
+        </Card>
+        <Card className="overflow-hidden">
+          <CardContent className="p-0 sm:p-0">
+            <div className="border-b border-border px-5 py-3.5">
+              <h2 className="text-sm font-semibold">Daily report, last 7 days</h2>
+              <p className="text-xs text-muted-foreground">Was each day&apos;s report made, and did it reach the owner?</p>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-5">Day</TableHead>
+                  <TableHead>Report</TableHead>
+                  <TableHead className="pr-5 text-right">Built</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {g.reportDays.map((d) => {
+                  const st = REPORT_STATE[d.state];
+                  return (
+                    <TableRow key={d.day} title={st.note}>
+                      <TableCell className="whitespace-nowrap pl-5 text-sm">{dayLabel(d.day)}</TableCell>
+                      <TableCell>
+                        <Badge variant={st.variant}>{st.label}</Badge>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap pr-5 text-right text-sm text-muted-foreground" title={d.builtAt ? eat(d.builtAt) : undefined}>
+                        {d.builtAt ? timeAgo(d.builtAt) : "—"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </section>
+
+      <Card className="overflow-hidden">
+        <CardContent className="p-0 sm:p-0">
+          <div className="border-b border-border px-5 py-3.5">
+            <h2 className="text-sm font-semibold">Automatic jobs</h2>
+            <p className="text-xs text-muted-foreground">
+              What Vercel runs by itself on a timer. Late means no run for a day and a half. A run is written down from the day this was switched
+              on, so a job shows “Not recorded yet” until its next scheduled time.
+            </p>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-5">Job</TableHead>
+                <TableHead>Runs</TableHead>
+                <TableHead>Last run</TableHead>
+                <TableHead>Last went well</TableHead>
+                <TableHead>Result</TableHead>
+                <TableHead className="text-right">Took</TableHead>
+                <TableHead className="pr-5 text-right">On time?</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {g.jobs.map((j) => (
+                <TableRow key={j.key} className="align-top">
+                  <TableCell className="pl-5">
+                    <p className="text-sm font-medium">{j.title}</p>
+                    <p className="font-mono text-[11px] text-muted-foreground">/api/cron/{j.key}</p>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-sm">{j.schedule}</TableCell>
+                  <TableCell className="whitespace-nowrap text-sm" title={j.last ? eat(j.last.at) : undefined}>
+                    {j.last ? timeAgo(j.last.at) : <span className="text-muted-foreground">Not recorded yet</span>}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-sm" title={j.lastOk ? eat(j.lastOk.at) : undefined}>
+                    {j.lastOk ? timeAgo(j.lastOk.at) : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {j.last ? (
+                      <>
+                        <Badge variant={j.last.ok ? "success" : "destructive"}>{j.last.ok ? "OK" : "Failed"}</Badge>
+                        {j.last.note && <p className="mt-1 max-w-[16rem] text-xs text-muted-foreground">{j.last.note}</p>}
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-right text-sm tabular-nums">{took(j.last?.ms ?? null)}</TableCell>
+                  <TableCell className="pr-5 text-right">
+                    <Badge
+                      className="whitespace-nowrap"
+                      variant={j.state === "ok" ? "success" : j.state === "none" ? "secondary" : j.state === "late" ? "warning" : "destructive"}
+                    >
+                      {j.state === "ok" ? "On time" : j.state === "none" ? "Not recorded yet" : j.state === "late" ? "Late" : "Failed"}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <CardContent className="p-0 sm:p-0">
+          <div className="border-b border-border px-5 py-3.5">
+            <h2 className="text-sm font-semibold">Messages that did not arrive</h2>
+            <p className="text-xs text-muted-foreground">The newest 15 that failed or were not sent. The message text is never stored, only what went wrong.</p>
+          </div>
+          {g.trouble.length === 0 ? (
+            <p className="flex items-center justify-center gap-2 px-5 py-5 text-sm text-muted-foreground">
+              <CheckCircle2 className="size-4 text-success" /> None recorded.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-5">When</TableHead>
+                  <TableHead>Result</TableHead>
+                  <TableHead className="pr-5">Why</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {g.trouble.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="whitespace-nowrap pl-5 text-sm text-muted-foreground" title={eat(t.createdAt)}>
+                      {timeAgo(t.createdAt)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className="whitespace-nowrap" variant={t.status === "FAILED" ? "destructive" : "secondary"}>
+                        {t.status === "FAILED" ? "Not delivered" : "Not sent"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="pr-5 text-sm text-muted-foreground">{t.detail ?? "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -618,9 +933,10 @@ export function ErrorsPanel({ m }: { m: Monitor }) {
   const crashes7 = m.events.groupedErrors.reduce((s, e) => s + e.n, 0);
   const crashTone: Tone = m.events.errors24 === 0 ? "good" : m.events.errors24 >= 10 ? "bad" : "warn";
   const failedTone: Tone = m.events.failed24 >= 10 ? "warn" : "good";
+  const devFailed = m.diag.failedDevLogins24h;
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <HealthCard
           label="Crashes today"
           value={formatNumber(m.events.errors24)}
@@ -648,6 +964,15 @@ export function ErrorsPanel({ m }: { m: Monitor }) {
           icon={UserX}
           meaning="A few typing mistakes are normal. Many in a day can mean someone is guessing passwords."
         />
+        <HealthCard
+          label="Your Developer sign-in"
+          value={formatNumber(devFailed)}
+          detail="wrong tries on your account (24h)"
+          tone={devFailed > 0 ? "warn" : "good"}
+          statusText={devFailed > 0 ? "Look at it" : "Normal"}
+          icon={KeyRound}
+          meaning="After 5 wrong tries from one place your account locks for 15 minutes. If these were not you, change your password."
+        />
       </div>
 
       <section className="grid gap-4 lg:grid-cols-2">
@@ -669,33 +994,37 @@ export function ErrorsPanel({ m }: { m: Monitor }) {
         <Card className="overflow-hidden">
           <CardContent className="p-0 sm:p-0">
             <div className="border-b border-border px-5 py-3.5">
-              <h2 className="text-sm font-semibold">Failed sign-ins</h2>
-              <p className="text-xs text-muted-foreground">Latest refused attempts. Passwords are never stored. Repeats within a minute are merged.</p>
+              <h2 className="text-sm font-semibold">Failed tries by address</h2>
+              <p className="text-xs text-muted-foreground">Last 7 days. One address trying many accounts, or many emails that do not exist, is a warning sign.</p>
             </div>
-            {m.events.recentFailed.length === 0 ? (
+            {m.failedByIp.length === 0 ? (
               <p className="flex items-center justify-center gap-2 px-5 py-6 text-sm text-muted-foreground">
-                <CheckCircle2 className="size-4 text-success" /> None recorded.
+                <CheckCircle2 className="size-4 text-success" /> No wrong tries from any address.
               </p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="pl-5">Attempt</TableHead>
+                    <TableHead className="pl-5">Address</TableHead>
                     <TableHead className="text-right">Tries</TableHead>
-                    <TableHead>From</TableHead>
-                    <TableHead className="pr-5 text-right">When</TableHead>
+                    <TableHead className="text-right" title="Different real accounts this address tried">
+                      Accounts
+                    </TableHead>
+                    <TableHead className="text-right" title="Tries with an email that has no account">
+                      Unknown emails
+                    </TableHead>
+                    <TableHead className="pr-5 text-right">Last</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {m.events.recentFailed.map((f) => (
-                    <TableRow key={f.id}>
-                      <TableCell className="max-w-[16rem] pl-5 text-sm">
-                        <span className="line-clamp-2">{f.message}</span>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{f.count}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{f.ip ?? "—"}</TableCell>
-                      <TableCell className="whitespace-nowrap pr-5 text-right text-sm text-muted-foreground" title={eat(f.createdAt)}>
-                        {timeAgo(f.createdAt)}
+                  {m.failedByIp.map((r) => (
+                    <TableRow key={r.ip}>
+                      <TableCell className="pl-5 font-mono text-xs">{r.ip}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.tries}</TableCell>
+                      <TableCell className={cn("text-right tabular-nums", r.accounts >= 3 && "font-semibold text-warning")}>{r.accounts}</TableCell>
+                      <TableCell className={cn("text-right tabular-nums", r.unknown >= 10 && "font-semibold text-warning")}>{r.unknown}</TableCell>
+                      <TableCell className="whitespace-nowrap pr-5 text-right text-sm text-muted-foreground" title={eat(r.last)}>
+                        {timeAgo(r.last)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -705,6 +1034,43 @@ export function ErrorsPanel({ m }: { m: Monitor }) {
           </CardContent>
         </Card>
       </section>
+
+      <Card className="overflow-hidden">
+        <CardContent className="p-0 sm:p-0">
+          <div className="border-b border-border px-5 py-3.5">
+            <h2 className="text-sm font-semibold">Latest failed tries</h2>
+            <p className="text-xs text-muted-foreground">Latest refused attempts. Passwords are never stored. Repeats within a minute are merged.</p>
+          </div>
+          {m.events.recentFailed.length === 0 ? (
+            <p className="flex items-center justify-center gap-2 px-5 py-5 text-sm text-muted-foreground">
+              <CheckCircle2 className="size-4 text-success" /> None recorded.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-5">Attempt</TableHead>
+                  <TableHead className="text-right">Tries</TableHead>
+                  <TableHead>From</TableHead>
+                  <TableHead className="pr-5 text-right">When</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {m.events.recentFailed.map((f) => (
+                  <TableRow key={f.id}>
+                    <TableCell className="pl-5 text-sm">{f.message}</TableCell>
+                    <TableCell className="text-right tabular-nums">{f.count}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{f.ip ?? "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap pr-5 text-right text-sm text-muted-foreground" title={eat(f.createdAt)}>
+                      {timeAgo(f.createdAt)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="overflow-hidden">
         <CardContent className="p-0 sm:p-0">

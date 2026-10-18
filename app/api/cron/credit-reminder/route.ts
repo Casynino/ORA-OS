@@ -4,6 +4,7 @@ import { cronAuthorized } from "@/lib/reports/cron-auth";
 import { sendWhatsApp } from "@/lib/notifications/whatsapp";
 import { eatDayRange } from "@/lib/reports/daily-data";
 import { formatCurrency } from "@/lib/utils";
+import { withJobRun } from "@/lib/developer/job-runs";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,10 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: Request) {
   if (!cronAuthorized(req)) return new NextResponse("Unauthorized", { status: 401 });
+  return withJobRun("credit-reminder", run);
+}
 
+async function run() {
   const settings = await prisma.reportSettings.findUnique({ where: { id: "singleton" } });
   if (settings && !settings.creditReminderEnabled) return NextResponse.json({ skipped: "credit reminders disabled" });
 
