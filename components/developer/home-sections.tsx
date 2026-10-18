@@ -720,12 +720,13 @@ function ReportRow({ d, g, today, yesterday }: { d: Monitor["messages"]["reportD
 }
 
 /**
- * The owner's daily report, up top and small: the latest 3 days, the other 4 one tap away.
+ * The daily report for the owner, up top and small: the latest 3 days, the other 4 one tap away.
  * The time shown is when the report was made; it is sent in the same run a few seconds later,
  * so to the minute they are the same.
  */
 export function DailyReportCard({ m }: { m: Monitor }) {
   const g = m.messages;
+  const who = m.ownerName ?? "the owner";
   const today = g.reportDays[0]?.day;
   const yesterday = g.reportDays[1]?.day;
   const due = g.reportDays.filter((d) => !["waiting", "before", "off", "unknown"].includes(d.state));
@@ -744,7 +745,7 @@ export function DailyReportCard({ m }: { m: Monitor }) {
                 <FileText className="size-[18px]" />
               </span>
               <div className="min-w-0">
-                <h2 className="font-display text-base font-semibold leading-tight tracking-tight">Daily report to the owner</h2>
+                <h2 className="font-display text-base font-semibold leading-tight tracking-tight">Daily report to {who}</h2>
                 <p className="text-xs text-muted-foreground">Built at {String(g.dailyHour).padStart(2, "0")}:00 Tanzania time, sent on WhatsApp.</p>
               </div>
             </div>
@@ -801,6 +802,7 @@ export function DailyReportCard({ m }: { m: Monitor }) {
 const took = (ms: number | null) => (ms === null ? "—" : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`);
 
 export function MessagesPanel({ m }: { m: Monitor }) {
+  const who = m.ownerName ?? "the owner";
   if (!m.tracking)
     return (
       <InfoCallout icon={AlertTriangle} tone="warn" title="Error tracking is not switched on yet">
@@ -845,7 +847,7 @@ export function MessagesPanel({ m }: { m: Monitor }) {
                     : "Quiet"
           }
           icon={Send}
-          meaning="Alerts and reports sent to the owner's WhatsApp through CallMeBot. A failed message means the owner did not get it. Only counted from the day this was switched on."
+          meaning={`Alerts and reports sent to ${who}'s WhatsApp through CallMeBot. A failed message means ${who} did not get it. Only counted from the day this was switched on.`}
         />
         <HealthCard
           label="Month-end report"
@@ -854,7 +856,7 @@ export function MessagesPanel({ m }: { m: Monitor }) {
           tone={!g.lastMonthly ? "neutral" : g.lastMonthly.whatsappSent ? "good" : g.configured ? "warn" : "neutral"}
           statusText={!g.lastMonthly ? "Info" : g.lastMonthly.whatsappSent ? "OK" : g.configured ? "Look at it" : "Info"}
           icon={FileText}
-          meaning="The monthly summary for the owner. It is built together with the daily report on the last day of the month."
+          meaning={`The monthly summary for ${who}. It is built together with the daily report on the last day of the month.`}
         />
         <HealthCard
           label="Failed in 7 days"

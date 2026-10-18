@@ -448,6 +448,12 @@ export async function getMonitor() {
     ),
   ]);
   if (dailyReports === null) incomplete.push("daily report history");
+  // Who the reports are for: the one active owner account, by the nickname used in greetings.
+  const owners = await safe(
+    () => prisma.user.findMany({ where: { role: "ADMIN", status: "ACTIVE" }, orderBy: { createdAt: "asc" }, take: 2, select: { name: true, preferredName: true } }),
+    [],
+  );
+  const ownerName = owners.length === 1 ? owners[0].preferredName?.trim() || owners[0].name.trim().split(/\s+/)[0] || null : null;
   const waConfigured = !!(process.env.CALLMEBOT_APIKEY && process.env.CALLMEBOT_PHONE);
   const dailyEnabled = reportSettings?.dailyEnabled !== false;
   const eatHourNow = Number(new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", hour12: false }).format(new Date()));
@@ -794,6 +800,7 @@ export async function getMonitor() {
     growth,
     events,
     failedByIp: ops.failedByIp,
+    ownerName,
     messages: {
       configured: waConfigured,
       disabled: process.env.NOTIFICATIONS_DISABLED === "1",

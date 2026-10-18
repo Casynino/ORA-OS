@@ -111,7 +111,7 @@ export default async function DeveloperHomePage() {
         id="messages"
         title="Messages & reports"
         icon={Send}
-        description="Is the owner getting his reports and messages? What runs by itself, and whether it arrived."
+        description={`Is ${m.ownerName ?? "the owner"} getting the reports and messages? What runs by itself, and whether it arrived.`}
         badge={messagesBadge ? `${messagesBadge} failed` : null}
         tone="bad"
       >
