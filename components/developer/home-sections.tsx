@@ -169,7 +169,7 @@ function ProblemRow({ p }: { p: Monitor["problems"][number] }) {
     <li className="relative">
       <span aria-hidden className={cn("absolute inset-y-0 left-0 w-[3px]", l.stripe)} />
       <details className="group">
-        <summary className="flex cursor-pointer list-none items-center gap-3 py-2.5 pl-[1.15rem] pr-5 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+        <summary className="flex h-14 cursor-pointer list-none items-center gap-3 pl-[1.15rem] pr-5 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
           <Icon className={cn("size-[18px] shrink-0", l.text)} />
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold leading-snug">{p.title}</span>
@@ -248,6 +248,9 @@ export function Attention({ m }: { m: Monitor }) {
   const know = m.problems.filter((p) => p.level === "info");
   const crit = act.filter((p) => p.level === "critical").length;
   const warn = act.length - crit;
+  const rows = [...act, ...know];
+  const total = rows.length + (act.length === 0 ? 1 : 0); // the all-clear line counts as an item
+  const SHOWN = 3; // the list is as tall as three items; any others scroll inside it
   return (
     <section>
       <div className="mb-2.5 flex items-center justify-between gap-3">
@@ -260,7 +263,7 @@ export function Attention({ m }: { m: Monitor }) {
         </p>
       </div>
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-soft">
-        <ul className="max-h-[18rem] divide-y divide-border overflow-y-auto">
+        <ul className="max-h-[170px] divide-y divide-border overflow-y-auto overscroll-contain">
           {act.length === 0 && (
             <li className="flex items-center gap-3 px-5 py-3 text-sm">
               <CheckCircle2 className="size-4 shrink-0 text-success" />
@@ -270,10 +273,15 @@ export function Attention({ m }: { m: Monitor }) {
               </p>
             </li>
           )}
-          {[...act, ...know].map((p) => (
+          {rows.map((p) => (
             <ProblemRow key={p.title} p={p} />
           ))}
         </ul>
+        {total > SHOWN && (
+          <p className="flex items-center justify-center gap-1.5 border-t border-border bg-muted/20 py-1.5 text-[11px] text-muted-foreground">
+            <ChevronDown className="size-3" /> scroll for {total - SHOWN} more
+          </p>
+        )}
         <CheckList checks={m.systemChecks} />
       </div>
     </section>
