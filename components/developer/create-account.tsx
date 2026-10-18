@@ -23,7 +23,7 @@ const ROLES: { value: Role; label: string; hint: string }[] = [
 ];
 
 /** 12 characters, no look-alikes (0/O, 1/l/I), from the browser's secure random source. */
-function makePassword() {
+export function makePassword() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
   const bytes = new Uint32Array(12);
   crypto.getRandomValues(bytes);

@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Lock, LogIn, LogOut, ShieldCheck, UserCheck, UserX } from "lucide-react";
-import { devSetUserStatus, devForceSignOut, devStartActing } from "@/lib/actions/developer";
+import { Check, Copy, Eye, EyeOff, KeyRound, Lock, LogIn, LogOut, RefreshCw, ShieldCheck, UserCheck, UserX } from "lucide-react";
+import { devSetUserStatus, devForceSignOut, devStartActing, devResetPassword } from "@/lib/actions/developer";
+import { makePassword } from "@/components/developer/create-account";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +69,29 @@ export function DevUserActions({
   const [pending, start] = useTransition();
   const [kind, setKind] = useState<Kind | null>(null);
   const [confirmWork, setConfirmWork] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [newPw, setNewPw] = useState("");
+  const [showPw, setShowPw] = useState(true);
+  const [pwDone, setPwDone] = useState(false);
+  const [pwCopied, setPwCopied] = useState(false);
+
+  function openReset() {
+    setNewPw(makePassword());
+    setShowPw(true);
+    setPwDone(false);
+    setPwCopied(false);
+    setResetOpen(true);
+  }
+  function submitReset() {
+    if (newPw.length < 8) return toast({ variant: "error", title: "The password needs at least 8 characters." });
+    start(async () => {
+      const res = await devResetPassword({ userId, password: newPw });
+      if (res.ok) {
+        setPwDone(true);
+        router.refresh();
+      } else toast({ variant: "error", title: res.error });
+    });
+  }
 
   function workAs() {
     start(async () => {
@@ -135,6 +159,9 @@ export function DevUserActions({
             <LogIn className="size-3.5" /> Work as
           </Button>
         )}
+        <Button size="sm" variant="ghost" onClick={openReset}>
+          <KeyRound className="size-3.5" /> Reset password
+        </Button>
         {isOwner ? (
           <span
             className="inline-flex items-center gap-1.5 rounded-lg bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground"
@@ -159,6 +186,78 @@ export function DevUserActions({
           </>
         )}
       </div>
+
+      {resetOpen && (
+        <Modal
+          open
+          onClose={() => setResetOpen(false)}
+          title={pwDone ? "New password set" : `Reset password — ${name}`}
+          description={
+            pwDone
+              ? `${name} was signed out everywhere and can sign in with this password.`
+              : "Set a new password for them. They are signed out of every device. The owner is told."
+          }
+        >
+          {pwDone ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 p-4">
+                <span className="font-mono text-base font-semibold">{newPw}</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(newPw);
+                      setPwCopied(true);
+                      setTimeout(() => setPwCopied(false), 1800);
+                    } catch {
+                      toast({ variant: "error", title: "Couldn't copy — select it and copy by hand." });
+                    }
+                  }}
+                  className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  aria-label="Copy password"
+                >
+                  {pwCopied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">It is shown only here, once. Share it with them privately.</p>
+              <Button className="w-full" onClick={() => setResetOpen(false)}>
+                Done
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <Label>New password</Label>
+                <div className="mt-1.5 flex gap-2">
+                  <Input
+                    type={showPw ? "text" : "password"}
+                    value={newPw}
+                    onChange={(e) => setNewPw(e.target.value)}
+                    className="font-mono"
+                    autoComplete="new-password"
+                    spellCheck={false}
+                  />
+                  <Button type="button" variant="outline" size="icon" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Hide password" : "Show password"}>
+                    {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </Button>
+                  <Button type="button" variant="outline" size="icon" onClick={() => setNewPw(makePassword())} aria-label="Make a new password">
+                    <RefreshCw className="size-4" />
+                  </Button>
+                </div>
+                <p className="mt-1.5 text-xs text-muted-foreground">Made for you. You can type your own (8+ characters).</p>
+              </div>
+              <div className="flex gap-3">
+                <Button type="button" variant="outline" onClick={() => setResetOpen(false)} disabled={pending}>
+                  Cancel
+                </Button>
+                <Button className="flex-1" onClick={submitReset} disabled={pending}>
+                  {pending ? "Saving…" : "Set new password"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
 
       {confirmWork && (
         <Modal

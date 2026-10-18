@@ -4,7 +4,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireOwnIdentity } from "@/lib/rbac";
+import { requireActor, requireOwnIdentity } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 
@@ -25,13 +25,20 @@ export async function updateMyProfile(
   input: z.infer<typeof profileSchema>,
 ): Promise<ActionResult> {
   try {
-    const actor = await requireOwnIdentity(["ADMIN"]);
+    // A Developer working as the owner may help with name, phone and photo (the activity log
+    // shows it was the Developer). The login email is the one thing he can't change this way.
+    const actor = await requireActor(["ADMIN"]);
     const parsed = profileSchema.safeParse(input);
     if (!parsed.success)
       return fail(parsed.error.issues[0]?.message ?? "Invalid profile.");
     const d = parsed.data;
 
     const email = d.email.toLowerCase().trim();
+    if (actor.impersonatedBy) {
+      const current = await prisma.user.findUnique({ where: { id: actor.id }, select: { email: true } });
+      if (current && current.email.toLowerCase() !== email)
+        return fail("The login email can't be changed while a Developer is working as someone.");
+    }
     const emailTaken = await prisma.user.findFirst({
       where: { email, NOT: { id: actor.id } },
       select: { id: true },

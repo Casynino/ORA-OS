@@ -555,3 +555,85 @@ export async function devCreateUser(
     return fail(errorMessage(e));
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Reset someone's password
+//
+//  Helps a person who is locked out. Done as the Developer (never while working as
+//  someone): audited under the Developer's own name in the same transaction, the person
+//  is signed out of every device, and the owner is told (also on WhatsApp when it is the
+//  owner's own account). Never stores or logs the new password.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const resetPasswordSchema = z.object({
+  userId: z.string().min(1),
+  password: z.string().min(8, "The password needs at least 8 characters.").max(100),
+});
+
+export async function devResetPassword(input: z.infer<typeof resetPasswordSchema>): Promise<ActionResult> {
+  let actor;
+  try {
+    actor = await requireActor(["DEVELOPER"]);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+  const me = { id: actor.id, name: actor.name ?? "Developer" };
+  const meta = requestMeta(await headers());
+  const parsed = resetPasswordSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Check the password.");
+  const target = await loadTarget(parsed.data.userId);
+  if (!target) return fail("User not found.");
+  if (target.id === actor.id) return fail("Change your own password from your account page.");
+  if (target.role === "DEVELOPER") return fail("Developer accounts can't be changed here.");
+
+  try {
+    const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: target.id },
+        data: { passwordHash, sessionVersion: { increment: 1 } }, // signs them out everywhere
+      });
+      await writeDevAudit(tx, {
+        actor: me,
+        action: "DEV_PASSWORD_RESET",
+        entity: "User",
+        entityId: target.id,
+        summary: `Developer set a new password for ${target.name} (${target.email}, ${target.role}) and signed them out of all devices.`,
+        outcome: "SUCCESS",
+        ...meta,
+      });
+    });
+  } catch (e) {
+    await writeDevAuditSafe({
+      actor: me,
+      action: "DEV_PASSWORD_RESET",
+      entity: "User",
+      entityId: target.id,
+      summary: `Failed to reset the password for ${target.name}: ${errorMessage(e)}`,
+      outcome: "FAILED",
+      ...meta,
+    });
+    return fail(errorMessage(e));
+  }
+
+  await notifyInApp({
+    toRoles: ["ADMIN"],
+    category: "INFO",
+    type: "DEVELOPER_ACTION",
+    title: "Developer reset a password",
+    body: `${me.name} (Developer) set a new password for ${target.name}.`,
+    actorName: `${me.name} (Developer)`,
+    entityType: "User",
+    entityId: target.id,
+    actionUrl: "/admin/activity",
+    actionLabel: "View activity",
+  });
+  if (target.role === "ADMIN") {
+    await Promise.race([
+      sendWhatsApp(`ORA security notice: Developer ${me.name} set a new password for the Admin account ${target.name}.`),
+      new Promise((r) => setTimeout(r, 5000)),
+    ]);
+  }
+  revalidateUsers();
+  return ok(undefined, `${target.name} has a new password and was signed out everywhere.`);
+}
