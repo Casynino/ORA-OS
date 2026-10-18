@@ -75,7 +75,7 @@ export default async function DeveloperHomePage() {
       <StatusStrip m={m} />
       <Attention m={m} />
 
-      {/* Everything else, on this one page: what is broken first, then speed, usage, settings, people */}
+      {/* Everything else, on this one page: what is broken first, then speed, settings, people, and usage (Activity) last */}
       <HomeSection
         id="errors"
         title="Crashes & sign-ins"
@@ -87,14 +87,14 @@ export default async function DeveloperHomePage() {
       <HomeSection id="speed" title="Speed & size" badge={`${m.avgMs} ms`} tone={m.avgMs >= 400 ? "bad" : m.avgMs >= 150 ? "warn" : "neutral"}>
         <SpeedPanel m={m} />
       </HomeSection>
-      <HomeSection id="activity" title="Activity">
-        <ActivityPanel m={m} />
-      </HomeSection>
       <HomeSection id="settings" title="Settings" badge={missing > 0 ? `${missing} missing` : null} tone="bad">
         <SettingsPanel m={m} />
       </HomeSection>
       <HomeSection id="people" title="People & my actions">
         <PeoplePanel m={m} />
+      </HomeSection>
+      <HomeSection id="activity" title="Activity">
+        <ActivityPanel m={m} />
       </HomeSection>
     </div>
   );
