@@ -173,31 +173,81 @@ export function SpeedBars({ probes }: { probes: { label: string; ms: number; ok:
 }
 
 /** A ring showing a 0–100 score. */
-export function ScoreRing({ score, size = 132 }: { score: number; size?: number }) {
-  const r = (size - 16) / 2;
-  const c = 2 * Math.PI * r;
-  const tone = score >= 85 ? "hsl(var(--success))" : score >= 60 ? "hsl(var(--warning))" : "hsl(var(--destructive))";
+
+/** A tiny trend line with a soft fill. Server-drawn, no library; stretches to the width it is given. */
+export function Sparkline({
+  id,
+  values,
+  color = "#ffffff",
+  width = 240,
+  height = 32,
+  className,
+}: {
+  /** Unique per page — names the fill gradient. */
+  id: string;
+  values: number[];
+  color?: string;
+  /** Drawing width; the picture stretches to fill whatever space it is given. */
+  width?: number;
+  height?: number;
+  className?: string;
+}) {
+  const pad = 3;
+  const n = values.length;
+  const max = Math.max(...values, 1);
+  const x = (i: number) => (n <= 1 ? width / 2 : pad + (i / (n - 1)) * (width - pad * 2));
+  const y = (v: number) => height - pad - (v / max) * (height - pad * 2);
+  const pts = values.map((v, i) => [x(i), y(v)] as const);
+  const line = pts.map(([px, py], i) => `${i ? "L" : "M"}${px.toFixed(1)} ${py.toFixed(1)}`).join(" ");
+  const last = pts[pts.length - 1] ?? [0, height];
+  const flat = values.every((v) => v === 0);
   return (
-    <div className="relative shrink-0" style={{ width: size, height: size }} role="img" aria-label={`Health score ${score} out of 100`}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={10} />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={tone}
-          strokeWidth={10}
-          strokeLinecap="round"
-          strokeDasharray={`${(score / 100) * c} ${c}`}
-        />
-      </svg>
-      <div className="absolute inset-0 grid place-items-center text-center">
-        <div>
-          <p className="font-display text-3xl font-bold tabular-nums leading-none">{score}</p>
-          <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">out of 100</p>
-        </div>
-      </div>
-    </div>
+    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden className={className}>
+      {flat ? (
+        <line x1={pad} x2={width - pad} y1={height - pad} y2={height - pad} stroke={color} strokeOpacity={0.35} strokeWidth={1.5} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      ) : (
+        <>
+          <defs>
+            <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <path d={`${line} L${last[0]} ${height} L${pts[0][0]} ${height} Z`} fill={`url(#${id})`} />
+          <path d={line} fill="none" stroke={color} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+/** A handful of small bars, one per value (used for the database timings). */
+export function MiniBars({
+  values,
+  colors,
+  floor = 1,
+  width = 240,
+  height = 32,
+  className,
+}: {
+  values: number[];
+  colors: string[];
+  /** The scale never goes below this, so a set of tiny values reads as small, not as full bars. */
+  floor?: number;
+  width?: number;
+  height?: number;
+  className?: string;
+}) {
+  const n = Math.max(values.length, 1);
+  const gap = 12;
+  const bw = (width - gap * (n - 1)) / n;
+  const max = Math.max(...values, floor);
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden className={className}>
+      {values.map((v, i) => {
+        const h = Math.max(3, (v / max) * (height - 2));
+        return <rect key={i} x={i * (bw + gap)} y={height - h} width={bw} height={h} rx={2} fill={colors[i] ?? colors[0]} />;
+      })}
+    </svg>
   );
 }

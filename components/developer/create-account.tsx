@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
+import { TileBody, tileClass } from "@/components/developer/info";
 import { cn } from "@/lib/utils";
 
 type Role = "WAREHOUSE" | "PARTNER" | "SALES_REP" | "FINANCE" | "ADMIN";
@@ -124,18 +125,8 @@ export function CreateAccountButton({
   return (
     <>
       {tone === "tile" ? (
-        <button
-          type="button"
-          onClick={openNew}
-          className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-            <UserPlus className="size-5" />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold">Add an account</span>
-            <span className="block truncate text-xs text-muted-foreground">Create a login</span>
-          </span>
+        <button type="button" onClick={openNew} className={tileClass}>
+          <TileBody icon={UserPlus} title="Add an account" text="Create a login" />
         </button>
       ) : tone === "onHero" ? (
         <button

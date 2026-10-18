@@ -7,6 +7,7 @@ import { Modal } from "@/components/ui/dialog";
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
+import { TileBody, tileClass } from "@/components/developer/info";
 
 export type Person = { id: string; name: string; role: string; avatar: string | null };
 
@@ -47,18 +48,8 @@ export function WorkAsCard({ people }: { people: Person[] }) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-          <LogIn className="size-5" />
-        </span>
-        <span className="min-w-0">
-          <span className="block text-sm font-semibold">Work as</span>
-          <span className="block truncate text-xs text-muted-foreground">Open their screens</span>
-        </span>
+      <button type="button" onClick={() => setOpen(true)} className={tileClass}>
+        <TileBody icon={LogIn} title="Work as" text={`${people.length} ${people.length === 1 ? "person" : "people"} to pick from`} />
       </button>
 
       {open && (

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Info, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, Info, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -115,10 +115,36 @@ export function HealthCard({
   );
 }
 
+/**
+ * Shared look for the four action tiles on the Developer Home. The icon sits above the words
+ * while the tile is narrow (phones, small laptops) and beside them once there is room, so a
+ * title like "Add an account" never gets cut to three letters.
+ */
+export const tileClass =
+  "group relative flex w-full flex-col items-start gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center sm:gap-3.5 lg:flex-col lg:items-start lg:gap-3 xl:flex-row xl:items-center xl:gap-3.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0";
+
+export function TileBody({ icon: Icon, title, text }: { icon: LucideIcon; title: string; text: string }) {
+  return (
+    <>
+      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-soft sm:size-11">
+        <Icon className="size-5" />
+      </span>
+      <span className="min-w-0 sm:flex-1 lg:flex-none xl:flex-1">
+        <span className="block text-sm font-semibold leading-tight">{title}</span>
+        <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{text}</span>
+      </span>
+      <ArrowUpRight
+        aria-hidden
+        className="absolute right-3 top-3 size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none"
+      />
+    </>
+  );
+}
+
 /** A compact, clickable tile that sends the Developer somewhere. */
 export function QuickLink({
   href,
-  icon: Icon,
+  icon,
   title,
   text,
 }: {
@@ -128,17 +154,8 @@ export function QuickLink({
   text: string;
 }) {
   return (
-    <Link
-      href={href}
-      className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-        <Icon className="size-5" />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-sm font-semibold">{title}</span>
-        <span className="block truncate text-xs text-muted-foreground">{text}</span>
-      </span>
+    <Link href={href} className={tileClass}>
+      <TileBody icon={icon} title={title} text={text} />
     </Link>
   );
 }

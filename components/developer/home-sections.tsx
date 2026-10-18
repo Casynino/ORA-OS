@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { HealthCard, InfoCallout, SectionTitle, type Tone } from "@/components/developer/info";
-import { HBars, Legend, ScoreRing, SpeedBars, StackedBars, type Series } from "@/components/developer/charts";
+import { HBars, Legend, SpeedBars, StackedBars, type Series } from "@/components/developer/charts";
 import { EnableTrackingButton } from "@/components/developer/enable-tracking";
 import { cn, formatNumber, humanize, timeAgo } from "@/lib/utils";
 
@@ -110,6 +110,7 @@ export function JumpBar({ items }: { items: { id: string; label: string; badge?:
 export function HomeSection({
   id,
   title,
+  icon: Icon,
   description,
   badge,
   tone = "neutral",
@@ -117,6 +118,7 @@ export function HomeSection({
 }: {
   id: string;
   title: string;
+  icon?: LucideIcon;
   description?: string;
   badge?: string | null;
   tone?: "neutral" | "warn" | "bad";
@@ -125,6 +127,11 @@ export function HomeSection({
   return (
     <section id={id} className="scroll-mt-32 border-t border-border pt-8">
       <div className={cn("flex items-center gap-3", description ? "mb-1.5" : "mb-5")}>
+        {Icon && (
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+            <Icon className="size-[18px]" />
+          </span>
+        )}
         <h2 className="font-display text-2xl font-bold tracking-tight">{title}</h2>
         {badge && (
           <span
@@ -143,85 +150,25 @@ export function HomeSection({
   );
 }
 
-/* ───────────────────── status strip (top of Home) ───────────────────── */
-
-/** One compact panel: the verdict, the score, and the four live numbers — no wasted space. */
-export function StatusStrip({ m }: { m: Monitor }) {
-  const d = m.diag;
-  const crit = m.problems.filter((p) => p.level === "critical").length;
-  const warn = m.problems.filter((p) => p.level === "warning").length;
-  const info = m.problems.length - crit - warn;
-  const headline = crit
-    ? "Needs attention now"
-    : warn
-      ? "Working, with a few things to look at"
-      : "Everything is healthy";
-  const summary = crit
-    ? `${crit} thing${crit > 1 ? "s are" : " is"} broken and should be fixed now.`
-    : warn
-      ? `${warn} thing${warn > 1 ? "s" : ""} worth a look. Nothing is broken.`
-      : "The database is fast, every required setting is in place and nothing has crashed.";
-  const metrics = [
-    { label: "Database", value: d.dbOk ? "Online" : "Down", hint: d.dbOk ? `${d.dbMs} ms · ${d.pooled ? "pooled" : "not pooled"}` : "cannot connect", tone: d.dbOk ? "text-success" : "text-destructive" },
-    { label: "Signed in today", value: formatNumber(m.signedIn24), hint: "different people", tone: "" },
-    { label: "Actions today", value: formatNumber(d.activity24h), hint: "saved in 24 hours", tone: "" },
-    {
-      label: "Crashes today",
-      value: m.tracking ? formatNumber(m.events.errors24) : "—",
-      hint: m.tracking ? (m.events.errors24 > 0 ? "pages that broke" : "nothing broke") : "tracking is off",
-      tone: m.tracking && m.events.errors24 > 0 ? "text-destructive" : "",
-    },
-  ];
-  return (
-    <Card>
-      <CardContent className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[auto_minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-8">
-        <div className="flex items-center gap-5">
-          <ScoreRing score={m.score} size={112} />
-          <div className="lg:hidden">
-            <p className="font-display text-lg font-semibold leading-tight">{headline}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{summary}</p>
-          </div>
-        </div>
-        <div className="hidden lg:block">
-          <p className="font-display text-xl font-semibold leading-tight">{headline}</p>
-          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{summary}</p>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            <Badge variant={crit ? "destructive" : "secondary"}>{crit} to fix now</Badge>
-            <Badge variant={warn ? "warning" : "secondary"}>{warn} to look at</Badge>
-            <Badge variant="secondary">{info} for information</Badge>
-          </div>
-        </div>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4 lg:grid-cols-2 lg:border-l lg:border-border lg:pl-8">
-          {metrics.map((x) => (
-            <div key={x.label} className="min-w-0">
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{x.label}</dt>
-              <dd className={cn("mt-1 font-display text-2xl font-bold leading-none tabular-nums", x.tone)}>{x.value}</dd>
-              <p className="mt-1 truncate text-xs text-muted-foreground">{x.hint}</p>
-            </div>
-          ))}
-        </dl>
-      </CardContent>
-    </Card>
-  );
-}
-
 /** A problem as a compact card; tap to see what it means and what to do. */
-function ProblemCard({ p }: { p: Monitor["problems"][number] }) {
+function ProblemCard({ p, showLevel = false }: { p: Monitor["problems"][number]; showLevel?: boolean }) {
   const l = LEVEL[p.level];
   const Icon = l.icon;
   return (
-    <details className={cn("group rounded-xl border open:shadow-soft", l.box)}>
+    <details className={cn("group min-w-0 rounded-xl border open:shadow-soft md:[&:last-child:nth-child(odd)]:col-span-2", l.box)}>
       <summary className="flex cursor-pointer list-none items-center gap-3 p-3.5 [&::-webkit-details-marker]:hidden">
         <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg", l.chip)}>
           <Icon className="size-4" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold">{p.title}</span>
+          <span className="line-clamp-2 text-sm font-semibold leading-snug">{p.title}</span>
           <span className="block truncate text-xs text-muted-foreground">{p.detail}</span>
         </span>
-        <span className={cn("hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide sm:inline", l.chip)}>
-          {l.label}
-        </span>
+        {showLevel && (
+          <span className={cn("hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide sm:inline", l.chip)}>
+            {l.label}
+          </span>
+        )}
         <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
       <div className="space-y-1.5 border-t border-border/60 px-3.5 py-3 text-sm leading-relaxed">
@@ -244,43 +191,64 @@ function ProblemCard({ p }: { p: Monitor["problems"][number] }) {
   );
 }
 
-/** Problems, most urgent first. Things to act on are up front; "good to know" is quieter. */
+/** Problems, most urgent first, in one bounded panel. "Good to know" stays folded at the bottom. */
 export function Attention({ m }: { m: Monitor }) {
   const act = m.problems.filter((p) => p.level !== "info");
   const know = m.problems.filter((p) => p.level === "info");
+  const crit = act.filter((p) => p.level === "critical").length;
+  const warn = act.length - crit;
+  // Name the level on a card only when the list mixes levels, or the card is critical.
+  const mixed = crit > 0 && warn > 0;
   return (
-    <section className="space-y-4">
-      <div>
-        <SectionTitle
-          title={act.length ? `Needs your attention · ${act.length}` : "Needs your attention"}
-          text="Checked just now. Tap a card to see what it means and what to do."
-          className="mb-3"
-        />
-        {act.length === 0 ? (
-          <InfoCallout icon={CheckCircle2} tone="good" title="Nothing needs your attention">
-            Nothing is broken.
-          </InfoCallout>
-        ) : (
-          <div className="grid items-start gap-3 md:grid-cols-2">
-            {act.map((p) => (
-              <ProblemCard key={p.title} p={p} />
-            ))}
+    <section>
+      <Card className="overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3.5">
+          <div>
+            <h2 className="font-display text-base font-semibold tracking-tight">Needs your attention</h2>
+            <p className="text-xs text-muted-foreground">Checked just now. Tap a card to see what it means and what to do.</p>
           </div>
+          {act.length === 0 ? (
+            <Badge variant="success">All clear</Badge>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {crit > 0 && <Badge variant="destructive">{crit} to fix now</Badge>}
+              {warn > 0 && <Badge variant="warning">{warn} to look at</Badge>}
+            </div>
+          )}
+        </div>
+        <div className="p-4 sm:p-5">
+          {act.length === 0 ? (
+            <div className="flex items-center gap-3.5">
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-success/15 text-success">
+                <CheckCircle2 className="size-5" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold">Nothing needs your attention</p>
+                <p className="text-sm text-muted-foreground">Nothing is broken, and every required setting is in place.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
+              {act.map((p) => (
+                <ProblemCard key={p.title} p={p} showLevel={mixed || p.level === "critical"} />
+              ))}
+            </div>
+          )}
+        </div>
+        {know.length > 0 && (
+          <details className="group border-t border-border">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+              <span>Good to know · {know.length}</span>
+              <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="grid grid-cols-1 items-start gap-3 px-4 pb-4 sm:px-5 sm:pb-5 md:grid-cols-2">
+              {know.map((p) => (
+                <ProblemCard key={p.title} p={p} />
+              ))}
+            </div>
+          </details>
         )}
-      </div>
-      {know.length > 0 && (
-        <details className="group">
-          <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
-            Good to know · {know.length}
-            <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="mt-3 grid items-start gap-3 md:grid-cols-2">
-            {know.map((p) => (
-              <ProblemCard key={p.title} p={p} />
-            ))}
-          </div>
-        </details>
-      )}
+      </Card>
     </section>
   );
 }

@@ -1,13 +1,14 @@
-import { BarChart3, ScrollText } from "lucide-react";
+import { Activity, BarChart3, Bug, Gauge, ScrollText, SlidersHorizontal, Users } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { getMonitor } from "@/lib/developer/monitor";
 import { ensureErrorTracking } from "@/lib/developer/tracking";
-import { DashboardHero } from "@/components/ui/dashboard-hero";
+import { CommandDeck } from "@/components/developer/command-deck";
 import { QuickLink } from "@/components/developer/info";
 import { CreateAccountButton } from "@/components/developer/create-account";
 import { WorkAsCard } from "@/components/developer/work-as-picker";
 import { canWorkAs } from "@/lib/developer/acting";
+import { formatNumber } from "@/lib/utils";
 import {
   ActivityPanel,
   ErrorsPanel,
@@ -17,7 +18,6 @@ import {
   PeoplePanel,
   SettingsPanel,
   SpeedPanel,
-  StatusStrip,
 } from "@/components/developer/home-sections";
 
 export const dynamic = "force-dynamic";
@@ -57,23 +57,18 @@ export default async function DeveloperHomePage() {
 
   return (
     <div className="space-y-10">
-      <DashboardHero
-        eyebrow={dateLabel}
-        pill="Developer"
-        title={<>{greeting}, {firstName}.</>}
-        subtitle="Your control room for ORA — health, people and everything done, in one place."
-      />
+      <div className="space-y-4">
+        <CommandDeck m={m} eyebrow={dateLabel} pill="Developer" title={<>{greeting}, {firstName}.</>} />
 
-      {/* The things you do most: four plain tiles */}
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <WorkAsCard people={people} />
-        <CreateAccountButton warehouses={warehouses} tone="tile" />
-        <QuickLink href="/developer/audit" icon={ScrollText} title="Audit" text="Everything done" />
-        <QuickLink href="/developer/records" icon={BarChart3} title="Business" text="Sales and stock" />
-      </section>
+        {/* The things you do most: four tiles */}
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <WorkAsCard people={people} />
+          <CreateAccountButton warehouses={warehouses} tone="tile" />
+          <QuickLink href="/developer/audit" icon={ScrollText} title="Audit" text={`${formatNumber(d.activity24h)} action${d.activity24h === 1 ? "" : "s"} today`} />
+          <QuickLink href="/developer/records" icon={BarChart3} title="Business" text="Sales and stock" />
+        </section>
+      </div>
 
-      {/* Verdict + live numbers in one compact panel, then what needs attention */}
-      <StatusStrip m={m} />
       <Attention m={m} />
 
       <JumpBar
@@ -87,24 +82,25 @@ export default async function DeveloperHomePage() {
       />
 
       {/* Everything else, on this one page: Activity right under the attention list, then crashes, speed, settings, people */}
-      <HomeSection id="activity" title="Activity" description="Who is using the system, and what they are doing.">
+      <HomeSection id="activity" title="Activity" icon={Activity} description="Who is using the system, and what they are doing.">
         <ActivityPanel m={m} />
       </HomeSection>
       <HomeSection
         id="errors"
         title="Crashes & sign-ins"
+        icon={Bug}
         badge={errorsBadge}
         tone={!m.tracking ? "warn" : m.events.errors24 > 0 ? "bad" : "warn"}
       >
         <ErrorsPanel m={m} />
       </HomeSection>
-      <HomeSection id="speed" title="Speed & size" badge={`${m.avgMs} ms`} tone={m.avgMs >= 400 ? "bad" : m.avgMs >= 150 ? "warn" : "neutral"}>
+      <HomeSection id="speed" title="Speed & size" icon={Gauge} badge={`${m.avgMs} ms`} tone={m.avgMs >= 400 ? "bad" : m.avgMs >= 150 ? "warn" : "neutral"}>
         <SpeedPanel m={m} />
       </HomeSection>
-      <HomeSection id="settings" title="Settings" badge={missing > 0 ? `${missing} missing` : null} tone="bad">
+      <HomeSection id="settings" title="Settings" icon={SlidersHorizontal} badge={missing > 0 ? `${missing} missing` : null} tone="bad">
         <SettingsPanel m={m} />
       </HomeSection>
-      <HomeSection id="people" title="People & my actions">
+      <HomeSection id="people" title="People & my actions" icon={Users}>
         <PeoplePanel m={m} />
       </HomeSection>
     </div>
