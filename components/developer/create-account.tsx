@@ -32,7 +32,14 @@ function makePassword() {
 
 type Created = { name: string; email: string; password: string; role: string };
 
-export function CreateAccountButton({ warehouses }: { warehouses: { id: string; name: string }[] }) {
+export function CreateAccountButton({
+  warehouses,
+  tone = "primary",
+}: {
+  warehouses: { id: string; name: string }[];
+  /** "onHero" = a white pill for use on top of the gradient banner. */
+  tone?: "primary" | "onHero";
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -116,9 +123,21 @@ export function CreateAccountButton({ warehouses }: { warehouses: { id: string; 
 
   return (
     <>
-      <Button onClick={openNew}>
-        <UserPlus className="size-4" /> Add an account
-      </Button>
+      {tone === "onHero" ? (
+        <button
+          type="button"
+          onClick={openNew}
+          className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-xs font-semibold text-primary shadow-soft transition-colors hover:bg-white/90 sm:text-sm"
+        >
+          <UserPlus className="size-4" />
+          <span className="hidden sm:inline">Add an account</span>
+          <span className="sm:hidden">Add</span>
+        </button>
+      ) : (
+        <Button onClick={openNew}>
+          <UserPlus className="size-4" /> Add an account
+        </Button>
+      )}
 
       {open && (
         <Modal

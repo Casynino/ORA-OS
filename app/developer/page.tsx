@@ -1,8 +1,10 @@
 import { BarChart3, LogIn, ScrollText } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
+import { prisma } from "@/lib/db";
 import { getMonitor } from "@/lib/developer/monitor";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { QuickLink } from "@/components/developer/info";
+import { CreateAccountButton } from "@/components/developer/create-account";
 import { HomeTabs, type HomeTab } from "@/components/developer/home-tabs";
 import {
   ActivityPanel,
@@ -18,7 +20,10 @@ export const dynamic = "force-dynamic";
 
 export default async function DeveloperHomePage() {
   const me = await requireRole("DEVELOPER");
-  const m = await getMonitor();
+  const [m, warehouses] = await Promise.all([
+    getMonitor(),
+    prisma.warehouse.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+  ]);
   const d = m.diag;
 
   const firstName = me.preferredName || (me.name ?? "Developer").split(" ")[0];
@@ -44,12 +49,17 @@ export default async function DeveloperHomePage() {
 
   return (
     <div className="space-y-8">
-      <DashboardHero
-        eyebrow={dateLabel}
-        pill="Developer"
-        title={<>{greeting}, {firstName}.</>}
-        subtitle="Your control room for ORA — health, people and everything done, in one place."
-      />
+      <div className="relative">
+        <DashboardHero
+          eyebrow={dateLabel}
+          pill="Developer"
+          title={<>{greeting}, {firstName}.</>}
+          subtitle="Your control room for ORA — health, people and everything done, in one place."
+        />
+        <div className="absolute right-4 top-4 z-10 sm:right-6 sm:top-5">
+          <CreateAccountButton warehouses={warehouses} tone="onHero" />
+        </div>
+      </div>
 
       {/* Verdict + live numbers in one compact panel, then what needs attention */}
       <StatusStrip m={m} />
