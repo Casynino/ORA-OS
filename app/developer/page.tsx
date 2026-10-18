@@ -14,6 +14,7 @@ import {
   ActivityPanel,
   ErrorsPanel,
   Attention,
+  DailyReportCard,
   HomeSection,
   JumpBar,
   MessagesPanel,
@@ -80,6 +81,7 @@ export default async function DeveloperHomePage() {
       {/* The verdict and live numbers, then what needs attention */}
       <StatusCard m={m} />
       <Attention m={m} />
+      <DailyReportCard m={m} />
 
       <JumpBar
         items={[

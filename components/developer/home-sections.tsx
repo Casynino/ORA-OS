@@ -664,19 +664,131 @@ export function SpeedPanel({ m }: { m: Monitor }) {
 
 /* ───────────────────── Messages & reports ───────────────────── */
 
-const dayLabel = (d: string) =>
-  new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const eatTime = (d: Date) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Dar_es_Salaam", hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+const dayShort = (d: string) =>
+  new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 
-const REPORT_STATE = {
-  ok: { label: "Sent", variant: "success", note: "Built and sent on WhatsApp" },
-  unsent: { label: "Not sent", variant: "warning", note: "Built, but it did not reach WhatsApp" },
-  built: { label: "Built", variant: "secondary", note: "Built (WhatsApp is not set up)" },
-  waiting: { label: "Waiting", variant: "secondary", note: "Not due yet today" },
-  missing: { label: "Not built", variant: "warning", note: "No report was made for this day" },
-  unknown: { label: "Could not read", variant: "secondary", note: "The report history could not be read just now" },
-  off: { label: "Switched off", variant: "secondary", note: "Daily reports are off in the report settings" },
-  before: { label: "None yet", variant: "secondary", note: "Before the first report" },
-} as const;
+type ReportState = Monitor["messages"]["reportDays"][number]["state"];
+const STATE_UI: Record<ReportState, { label: string; icon: LucideIcon; pill: string; dot: string; note: string }> = {
+  ok: { label: "Sent", icon: CheckCircle2, pill: "bg-success/15 text-success ring-success/30", dot: "bg-success", note: "Built and sent on WhatsApp" },
+  unsent: { label: "Not sent", icon: AlertTriangle, pill: "bg-warning/15 text-warning ring-warning/30", dot: "bg-warning", note: "Built, but it did not reach WhatsApp" },
+  built: { label: "Built", icon: FileText, pill: "bg-muted text-muted-foreground ring-border", dot: "bg-muted-foreground/40", note: "Built (WhatsApp is not set up)" },
+  waiting: { label: "Not due yet", icon: Clock, pill: "bg-muted text-muted-foreground ring-border", dot: "bg-muted-foreground/25", note: "Today's report is built in the evening" },
+  missing: { label: "Not built", icon: XCircle, pill: "bg-warning/15 text-warning ring-warning/30", dot: "bg-warning", note: "No report was made for this day" },
+  off: { label: "Switched off", icon: Info, pill: "bg-muted text-muted-foreground ring-border", dot: "bg-muted-foreground/25", note: "Daily reports are off in the report settings" },
+  before: { label: "No report yet", icon: Info, pill: "bg-muted text-muted-foreground ring-border", dot: "bg-muted-foreground/25", note: "Before the first report" },
+  unknown: { label: "Could not read", icon: Info, pill: "bg-muted text-muted-foreground ring-border", dot: "bg-muted-foreground/25", note: "The report history could not be read just now" },
+};
+
+/**
+ * The owner's daily report, front and centre: one row per day with whether it was built,
+ * whether it reached WhatsApp, and at what time. The time shown is when the report was made;
+ * it is sent in the same run, a few seconds later, so to the minute they are the same.
+ */
+export function DailyReportCard({ m }: { m: Monitor }) {
+  const g = m.messages;
+  const todayKey = g.reportDays[0]?.day;
+  const yesterdayKey = g.reportDays[1]?.day;
+  const due = g.reportDays.filter((d) => !["waiting", "before", "off", "unknown"].includes(d.state));
+  const sentN = due.filter((d) => d.state === "ok").length;
+  const allGood = due.length > 0 && sentN === due.length;
+  const monthly = g.lastMonthly;
+  return (
+    <section>
+      <Card className="overflow-hidden">
+        <CardContent className="p-0 sm:p-0">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-border px-5 py-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-soft">
+                <FileText className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="font-display text-base font-semibold tracking-tight">Daily report to the owner</h2>
+                <p className="text-xs text-muted-foreground">
+                  Built at {String(g.dailyHour).padStart(2, "0")}:00 Tanzania time and sent on WhatsApp. The last 7 days.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1" aria-hidden>
+                {[...g.reportDays].reverse().map((d) => (
+                  <span key={d.day} title={`${dayShort(d.day)}: ${STATE_UI[d.state].label}`} className={cn("h-5 w-2 rounded-full", STATE_UI[d.state].dot)} />
+                ))}
+              </div>
+              <Badge variant={due.length === 0 ? "secondary" : allGood ? "success" : "warning"} className="whitespace-nowrap">
+                {due.length === 0 ? "No reports yet" : allGood ? `${sentN} of ${due.length} sent` : `${sentN} of ${due.length} sent · look at it`}
+              </Badge>
+            </div>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-5">Day</TableHead>
+                <TableHead>Report</TableHead>
+                <TableHead className="pr-5 text-right">Sent at (Tanzania time)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {g.reportDays.map((d) => {
+                const ui = STATE_UI[d.state];
+                const Icon = ui.icon;
+                const dueLabel = d.state === "waiting" ? `Due ${String(g.dailyHour).padStart(2, "0")}:00` : null;
+                return (
+                  <TableRow key={d.day} title={ui.note}>
+                    <TableCell className="pl-5">
+                      <div className="flex items-center gap-2">
+                        <span className="whitespace-nowrap text-sm font-medium">{dayShort(d.day)}</span>
+                        {d.day === todayKey && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">Today</span>}
+                        {d.day === yesterdayKey && <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Yesterday</span>}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1", ui.pill)}>
+                        <Icon className="size-3.5" />
+                        {ui.label}
+                      </span>
+                    </TableCell>
+                    <TableCell className="pr-5 text-right" title={d.builtAt ? `${ui.note} · ${eat(d.builtAt)}` : ui.note}>
+                      {d.builtAt && d.state === "ok" ? (
+                        <>
+                          <span className="font-display text-base font-semibold tabular-nums">{eatTime(d.builtAt)}</span>
+                          <span className="block text-xs text-muted-foreground">{timeAgo(d.builtAt)}</span>
+                        </>
+                      ) : d.builtAt ? (
+                        <>
+                          <span className="text-sm text-muted-foreground">Built {eatTime(d.builtAt)}</span>
+                          <span className="block text-xs text-muted-foreground">{timeAgo(d.builtAt)}</span>
+                        </>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">{dueLabel ?? "—"}</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/20 px-5 py-3 text-sm">
+            <span className="text-muted-foreground">Month-end report</span>
+            {monthly ? (
+              <span className="flex items-center gap-2">
+                <Badge variant={monthly.whatsappSent ? "success" : g.configured ? "warning" : "secondary"}>
+                  {monthly.whatsappSent ? "Sent" : g.configured ? "Not sent" : "Built"}
+                </Badge>
+                <span className="text-xs text-muted-foreground" title={eat(monthly.createdAt)}>
+                  {eatTime(monthly.createdAt)} · {timeAgo(monthly.createdAt)}
+                </span>
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">None yet. It is built on the last day of each month.</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
 
 const took = (ms: number | null) => (ms === null ? "—" : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`);
 
@@ -695,12 +807,9 @@ export function MessagesPanel({ m }: { m: Monitor }) {
     );
   const g = m.messages;
   const never = !g.since;
-  const latestDay = g.reportDays.find((d) => d.state !== "waiting");
-  const dailyTone: Tone = !latestDay ? "neutral" : latestDay.state === "ok" ? "good" : latestDay.state === "unsent" || latestDay.state === "missing" ? "warn" : "neutral";
-  const monthly = g.lastMonthly;
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <HealthCard
           label="WhatsApp messages (24h)"
           value={never ? "—" : formatNumber(g.wa24.sent)}
@@ -731,20 +840,11 @@ export function MessagesPanel({ m }: { m: Monitor }) {
           meaning="Alerts and reports sent to the owner's WhatsApp through CallMeBot. A failed message means the owner did not get it. Only counted from the day this was switched on."
         />
         <HealthCard
-          label="Daily report"
-          value={latestDay ? REPORT_STATE[latestDay.state].label : "—"}
-          detail={latestDay ? `for ${dayLabel(latestDay.day)}` : "no report yet"}
-          tone={dailyTone}
-          statusText={latestDay?.state === "ok" ? "OK" : latestDay?.state === "unsent" || latestDay?.state === "missing" ? "Look at it" : "Info"}
-          icon={FileText}
-          meaning={`The owner's summary of the day, built every day at ${String(g.dailyHour).padStart(2, "0")}:00 Tanzania time and sent on WhatsApp.`}
-        />
-        <HealthCard
           label="Month-end report"
-          value={monthly ? (monthly.whatsappSent ? "Sent" : g.configured ? "Not sent" : "Built") : "None yet"}
-          detail={monthly ? `built ${timeAgo(monthly.createdAt)}` : "built on the last day of each month"}
-          tone={!monthly ? "neutral" : monthly.whatsappSent ? "good" : g.configured ? "warn" : "neutral"}
-          statusText={!monthly ? "Info" : monthly.whatsappSent ? "OK" : g.configured ? "Look at it" : "Info"}
+          value={g.lastMonthly ? (g.lastMonthly.whatsappSent ? "Sent" : g.configured ? "Not sent" : "Built") : "None yet"}
+          detail={g.lastMonthly ? `built ${timeAgo(g.lastMonthly.createdAt)}` : "built on the last day of each month"}
+          tone={!g.lastMonthly ? "neutral" : g.lastMonthly.whatsappSent ? "good" : g.configured ? "warn" : "neutral"}
+          statusText={!g.lastMonthly ? "Info" : g.lastMonthly.whatsappSent ? "OK" : g.configured ? "Look at it" : "Info"}
           icon={FileText}
           meaning="The monthly summary for the owner. It is built together with the daily report on the last day of the month."
         />
@@ -759,58 +859,23 @@ export function MessagesPanel({ m }: { m: Monitor }) {
         />
       </div>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardContent className="p-5 sm:p-5">
-            <h2 className="text-sm font-semibold">Messages per day</h2>
-            <p className="mb-3 text-xs text-muted-foreground">
-              WhatsApp messages by how they went, last 14 days.{g.since && <> Counted since {shortDay(eatKey(g.since))}.</>}
-            </p>
-            <StackedBars
-              data={g.series.map((d) => ({ label: d.day, values: { sent: d.sent, failed: d.failed, skipped: d.skipped } }))}
-              series={WA_SERIES}
-              labelEvery={2}
-              formatLabel={shortDay}
-              height={170}
-              emptyText="No messages recorded yet."
-            />
-            <Legend series={WA_SERIES} className="mt-4" />
-          </CardContent>
-        </Card>
-        <Card className="overflow-hidden">
-          <CardContent className="p-0 sm:p-0">
-            <div className="border-b border-border px-5 py-3.5">
-              <h2 className="text-sm font-semibold">Daily report, last 7 days</h2>
-              <p className="text-xs text-muted-foreground">Was each day&apos;s report made, and did it reach the owner?</p>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="pl-5">Day</TableHead>
-                  <TableHead>Report</TableHead>
-                  <TableHead className="pr-5 text-right">Built</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {g.reportDays.map((d) => {
-                  const st = REPORT_STATE[d.state];
-                  return (
-                    <TableRow key={d.day} title={st.note}>
-                      <TableCell className="whitespace-nowrap pl-5 text-sm">{dayLabel(d.day)}</TableCell>
-                      <TableCell>
-                        <Badge variant={st.variant}>{st.label}</Badge>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap pr-5 text-right text-sm text-muted-foreground" title={d.builtAt ? eat(d.builtAt) : undefined}>
-                        {d.builtAt ? timeAgo(d.builtAt) : "—"}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </section>
+      <Card>
+        <CardContent className="p-5 sm:p-5">
+          <h2 className="text-sm font-semibold">Messages per day</h2>
+          <p className="mb-3 text-xs text-muted-foreground">
+            WhatsApp messages by how they went, last 14 days.{g.since && <> Counted since {shortDay(eatKey(g.since))}.</>}
+          </p>
+          <StackedBars
+            data={g.series.map((d) => ({ label: d.day, values: { sent: d.sent, failed: d.failed, skipped: d.skipped } }))}
+            series={WA_SERIES}
+            labelEvery={1}
+            formatLabel={shortDay}
+            height={170}
+            emptyText="No messages recorded yet."
+          />
+          <Legend series={WA_SERIES} className="mt-4" />
+        </CardContent>
+      </Card>
 
       <Card className="overflow-hidden">
         <CardContent className="p-0 sm:p-0">
