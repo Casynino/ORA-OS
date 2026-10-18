@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { notDeleted } from "@/lib/deleted-accounts";
 
 // Money events the CEO should see in the financial activity feed —
 // confirmations, expenses, payroll, petty cash, settlements, credit.
@@ -247,7 +248,7 @@ export async function getCommandCenter() {
       select: { createdAt: true, amount: true },
     }),
     prisma.user.findMany({
-      where: { role: "PARTNER" },
+      where: { role: "PARTNER", ...notDeleted },
       select: { createdAt: true },
     }),
     prisma.request.findMany({

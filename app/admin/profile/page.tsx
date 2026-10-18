@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { notDeleted } from "@/lib/deleted-accounts";
 import {
   ShieldCheck,
   Crown,
@@ -61,7 +62,7 @@ export default async function AdminProfilePage() {
     prisma.user.findUnique({ where: { id: session.id } }),
     prisma.warehouse.count({ where: { isActive: true } }),
     prisma.user.count({ where: { role: "PARTNER", status: "ACTIVE" } }),
-    prisma.user.count({ where: { role: "SALES_REP" } }),
+    prisma.user.count({ where: { role: "SALES_REP", ...notDeleted } }),
     prisma.loginEvent.findMany({
       where: { userId: session.id },
       orderBy: { createdAt: "desc" },

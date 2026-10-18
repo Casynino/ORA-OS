@@ -1,9 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Copy, Eye, EyeOff, KeyRound, Lock, LogIn, LogOut, RefreshCw, ShieldCheck, UserCheck, UserX } from "lucide-react";
-import { devSetUserStatus, devForceSignOut, devStartActing, devResetPassword } from "@/lib/actions/developer";
+import { Check, Copy, Eye, EyeOff, KeyRound, Loader2, Lock, LogIn, LogOut, RefreshCw, ShieldCheck, Trash2, UserCheck, UserX } from "lucide-react";
+import {
+  devSetUserStatus,
+  devForceSignOut,
+  devStartActing,
+  devResetPassword,
+  devDeletePreview,
+  devDeleteUser,
+  type DeletePreview,
+} from "@/lib/actions/developer";
 import { makePassword } from "@/components/developer/create-account";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -41,6 +49,128 @@ const WORK_AS_SEES: Record<string, string> = {
 };
 
 /**
+ * Delete an account. Says plainly what happens first: access and the account go; everything the
+ * person recorded stays under their name. Needs a written reason and the word DELETE.
+ */
+function DeleteAccountModal({ userId, name, onClose }: { userId: string; name: string; onClose: () => void }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [info, setInfo] = useState<DeletePreview | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [confirm, setConfirm] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    devDeletePreview({ userId })
+      .then((r) => {
+        if (!alive) return;
+        if (r.ok && r.data) setInfo(r.data);
+        else setLoadError(r.ok ? "Couldn't check this account." : r.error);
+      })
+      .catch(() => alive && setLoadError("Couldn't check this account."));
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
+
+  const ready = !!info && !info.blocked && reason.trim().length >= 10 && confirm.trim() === "DELETE";
+
+  function submit() {
+    start(async () => {
+      const res = await devDeleteUser({ userId, reason, confirm });
+      if (res.ok) {
+        toast({ variant: "success", title: res.message ?? "Account deleted." });
+        onClose();
+        router.refresh();
+      } else toast({ variant: "error", title: res.error });
+    });
+  }
+
+  return (
+    <Modal
+      open
+      onClose={() => (pending ? null : onClose())}
+      title={`Delete ${name}?`}
+      description="Removes their access and their account. What they recorded is not touched."
+    >
+      <div className="space-y-4">
+        {loadError ? (
+          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">{loadError}</p>
+        ) : !info ? (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" /> Checking what this account is linked to…
+          </p>
+        ) : info.blocked ? (
+          <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-sm text-warning">{info.blocked}</p>
+        ) : (
+          <div className="space-y-3 rounded-lg border border-border bg-muted/30 px-3.5 py-3 text-sm">
+            {info.erase ? (
+              <p className="text-muted-foreground">
+                <strong className="text-foreground">{name} has no records</strong>, so the account is erased completely.
+              </p>
+            ) : (
+              <>
+                <p className="text-muted-foreground">
+                  <strong className="text-foreground">{name} has {info.records} records</strong>
+                  {info.items.length > 0 && <> ({info.items.slice(0, 5).map((i) => `${i.label}: ${i.count}`).join(", ")}
+                  {info.items.length > 5 ? " and more" : ""})</>}
+                  . <strong className="text-foreground">All of them stay exactly as they are</strong>, still under their name,
+                  so money, stock and history keep adding up and still show who did what.
+                </p>
+                <ul className="space-y-1.5 text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 size-4 shrink-0 text-success" /> Their login and access are removed. They can never sign in again.
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 size-4 shrink-0 text-success" /> The account disappears from the people lists, and the email can be used for a new account.
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 size-4 shrink-0 text-success" /> Their sign-in history and notifications are cleared.
+                  </li>
+                </ul>
+              </>
+            )}
+            <p className="text-xs text-muted-foreground">This cannot be undone. It is recorded under your name and the owner is told.</p>
+          </div>
+        )}
+        <div>
+          <Label htmlFor="dev-del-reason">Reason (recorded in the audit log)</Label>
+          <Input
+            id="dev-del-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            maxLength={300}
+            placeholder="e.g. Left the company — removing access"
+            className="mt-1.5"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">At least 10 characters.</p>
+        </div>
+        <div>
+          <Label htmlFor="dev-del-confirm">Type DELETE to proceed</Label>
+          <Input
+            id="dev-del-confirm"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            autoComplete="off"
+            className="mt-1.5 tracking-widest"
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose} disabled={pending}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={submit} disabled={!ready || pending}>
+            <Trash2 className="size-4" />
+            {pending ? "Deleting…" : "Delete account"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/**
  * Sensitive account actions. Each needs a written reason AND the word CONFIRM —
  * the server re-checks both, and records the action under the Developer's own
  * name with before/after values and the reason.
@@ -53,6 +183,7 @@ export function DevUserActions({
   canActivate,
   canWorkAs,
   isOwner,
+  onlyAdmin,
 }: {
   userId: string;
   name: string;
@@ -62,14 +193,17 @@ export function DevUserActions({
   canActivate: boolean;
   /** An active account you may work as. */
   canWorkAs: boolean;
-  /** The owner's Admin account: can be worked as, but never suspended/signed out here. */
+  /** The owner's Admin account (shows an extra warning before you work as them). */
   isOwner: boolean;
+  /** The only active Admin: can't be suspended or deleted, or the business would have no owner. */
+  onlyAdmin: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [kind, setKind] = useState<Kind | null>(null);
   const [confirmWork, setConfirmWork] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [newPw, setNewPw] = useState("");
   const [showPw, setShowPw] = useState(true);
   const [pwDone, setPwDone] = useState(false);
@@ -142,12 +276,20 @@ export function DevUserActions({
   // the Developer console can't act on them, so say so instead of offering a button.
   if (status !== "ACTIVE" && !canActivate) {
     return (
-      <span className="inline-flex max-w-xs items-start gap-1.5 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-        <Lock className="mt-0.5 size-3.5 shrink-0" />
-        {status === "PENDING"
-          ? "Waiting for the owner to approve this account. That decision is hers."
-          : "Suspended by the business. Only the owner can re-activate it."}
-      </span>
+      <>
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          <span className="inline-flex max-w-xs items-start gap-1.5 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+            <Lock className="mt-0.5 size-3.5 shrink-0" />
+            {status === "PENDING"
+              ? "Waiting for the owner to approve this account. That decision is hers."
+              : "Suspended by the business. Only the owner can re-activate it."}
+          </span>
+          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDeleteOpen(true)}>
+            <Trash2 className="size-3.5" /> Delete
+          </Button>
+        </div>
+        {deleteOpen && <DeleteAccountModal userId={userId} name={name} onClose={() => setDeleteOpen(false)} />}
+      </>
     );
   }
 
@@ -162,28 +304,29 @@ export function DevUserActions({
         <Button size="sm" variant="ghost" onClick={openReset}>
           <KeyRound className="size-3.5" /> Reset password
         </Button>
-        {isOwner ? (
+        {onlyAdmin ? (
           <span
             className="inline-flex items-center gap-1.5 rounded-lg bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground"
-            title="The owner's account can't be suspended or signed out from the Developer console."
+            title="This is the only active Admin. Create another Admin first, so the business is never left without an owner."
           >
-            <Lock className="size-3.5" /> Can&apos;t be suspended here
+            <Lock className="size-3.5" /> Only active Admin
           </span>
+        ) : status === "ACTIVE" ? (
+          <Button size="sm" variant="ghost" onClick={() => setKind("suspend")}>
+            <UserX className="size-3.5" /> Suspend
+          </Button>
         ) : (
-          <>
-            {status === "ACTIVE" ? (
-              <Button size="sm" variant="ghost" onClick={() => setKind("suspend")}>
-                <UserX className="size-3.5" /> Suspend
-              </Button>
-            ) : (
-              <Button size="sm" variant="outline" onClick={() => setKind("activate")}>
-                <UserCheck className="size-3.5" /> Activate
-              </Button>
-            )}
-            <Button size="sm" variant="ghost" onClick={() => setKind("signout")}>
-              <LogOut className="size-3.5" /> Sign out
-            </Button>
-          </>
+          <Button size="sm" variant="outline" onClick={() => setKind("activate")}>
+            <UserCheck className="size-3.5" /> Activate
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" onClick={() => setKind("signout")}>
+          <LogOut className="size-3.5" /> Sign out
+        </Button>
+        {!onlyAdmin && (
+          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDeleteOpen(true)}>
+            <Trash2 className="size-3.5" /> Delete
+          </Button>
         )}
       </div>
 
@@ -311,6 +454,8 @@ export function DevUserActions({
           </div>
         </Modal>
       )}
+
+      {deleteOpen && <DeleteAccountModal userId={userId} name={name} onClose={() => setDeleteOpen(false)} />}
 
       {kind && (
         <Modal open onClose={close} title={`${COPY[kind].title} — ${name}`} description={COPY[kind].blurb}>

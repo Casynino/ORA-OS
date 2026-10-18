@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { getDiagnostics } from "@/lib/developer/diagnostics";
 import { JOB_KEYS, type JobKey } from "@/lib/developer/job-runs";
+import { notDeleted } from "@/lib/deleted-accounts";
 
 /**
  * Everything the Developer Home shows: usage, who signs in, speed, size,
@@ -233,7 +234,7 @@ export async function getMonitor() {
         }),
       [],
     ),
-    safe(() => prisma.user.count({ where: { status: "SUSPENDED" } }), 0),
+    safe(() => prisma.user.count({ where: { status: "SUSPENDED", ...notDeleted } }), 0),
     safe(
       async () =>
         Number(

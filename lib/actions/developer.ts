@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import type { Role, UserStatus } from "@prisma/client";
@@ -9,6 +10,8 @@ import { prisma } from "@/lib/db";
 import { requireActor } from "@/lib/rbac";
 import { writeDevAudit, writeDevAuditSafe, requestMeta } from "@/lib/developer/audit";
 import { devActivatableIds } from "@/lib/developer/eligibility";
+import { accountRecords } from "@/lib/developer/account-records";
+import { deletedEmail } from "@/lib/deleted-accounts";
 import { canWorkAs } from "@/lib/developer/acting";
 import { auth, unstable_update } from "@/auth";
 import { dashboardPath } from "@/lib/rbac";
@@ -23,8 +26,8 @@ import { fail, ok, errorMessage, type ActionResult } from "@/lib/types";
 //  Every action here:
 //   • is server-authorised for the DEVELOPER role only (never ADMIN/staff),
 //   • needs a written reason (≥10 chars) AND the word CONFIRM typed,
-//   • refuses to touch the business owner's Admin account, other Developer
-//     accounts, or the Developer's own account,
+//   • refuses to touch the Developer's own account, and never suspends or deletes the
+//     LAST active Admin (the business is never left without an owner),
 //   • writes its audit row INSIDE the same transaction as the change — if the
 //     audit row can't be written, the change does not happen,
 //   • records failures too, always under the Developer's OWN identity,
@@ -61,14 +64,27 @@ type Target = {
 function refuseTarget(actorId: string, target: Target | null): string | null {
   if (!target) return "User not found.";
   if (target.id === actorId) return "You can't change your own account here.";
-  if (target.role === "ADMIN")
-    return "The business owner's Admin account can't be changed from the Developer console.";
-  if (target.role === "DEVELOPER") return "Developer accounts can't be changed here.";
   return null;
+}
+
+/** The business must never be left without a working owner account. */
+async function lastOwnerRefusal(db: Pick<typeof prisma, "user">, target: Target): Promise<string | null> {
+  if (target.role !== "ADMIN" || target.status !== "ACTIVE") return null;
+  const others = await db.user.count({ where: { role: "ADMIN", status: "ACTIVE", id: { not: target.id } } });
+  return others === 0
+    ? "This is the only active Admin account. Create another Admin first, so the business is never left without an owner."
+    : null;
 }
 
 async function loadTarget(userId: string): Promise<Target | null> {
   return prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, name: true, email: true, role: true, status: true },
+  });
+}
+
+async function loadTargetIn(db: Pick<typeof prisma, "user">, userId: string): Promise<Target | null> {
+  return db.user.findUnique({
     where: { id: userId },
     select: { id: true, name: true, email: true, role: true, status: true },
   });
@@ -106,6 +122,7 @@ export async function devSetUserStatus(
   if (!refusal && target && d.status === "ACTIVE" && !(await devActivatableIds([target.id])).has(target.id))
     refusal =
       "Only accounts suspended from the Developer console can be re-activated here. Ask the business owner to re-activate this one.";
+  if (!refusal && target && d.status === "SUSPENDED") refusal = await lastOwnerRefusal(prisma, target);
   if (refusal || !target) {
     await writeDevAuditSafe({
       actor: { id: actor.id, name: actor.name ?? "Developer" },
@@ -173,6 +190,12 @@ export async function devSetUserStatus(
     actionUrl: "/admin/activity",
     actionLabel: "View activity",
   });
+  if (target.role === "ADMIN") {
+    await Promise.race([
+      sendWhatsApp(`ORA security notice: Developer ${actor.name} ${verb} the Admin account ${target.name}.`),
+      new Promise((r) => setTimeout(r, 5000)),
+    ]);
+  }
   revalidateUsers();
   return ok(undefined, `${target.name} ${verb}.`);
 }
@@ -257,6 +280,201 @@ export async function devForceSignOut(
   });
   revalidateUsers();
   return ok(undefined, `${target.name} was signed out everywhere.`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Delete an account
+//
+//  Deleting removes the person's ACCESS and their account from the system's people lists.
+//  It never touches what they recorded: every sale, payment, stock move and log line stays,
+//  still under their name, so history shows who did what. Those records point at the user
+//  row, so when there are any the row stays (name untouched) with the login, email, password
+//  and photo removed and the account locked; the real email is freed for a new account. An
+//  account with no records at all is erased outright. Audited under the Developer's name in
+//  the same transaction; the owner is told. Never the Developer's own account, and never the
+//  last active Admin.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type DeletePreview = {
+  name: string;
+  role: Role;
+  status: UserStatus;
+  /** True when the account has no records at all, so it is erased completely. */
+  erase: boolean;
+  records: number;
+  items: { label: string; count: number }[];
+  /** Why it can't be deleted right now (null = it can). */
+  blocked: string | null;
+};
+
+/** Read-only: what deleting this account would do, shown before you confirm. */
+export async function devDeletePreview(input: { userId: string }): Promise<ActionResult<DeletePreview>> {
+  let actor;
+  try {
+    actor = await requireActor(["DEVELOPER"]);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+  const target = await loadTarget(String(input?.userId ?? ""));
+  if (!target) return fail("User not found.");
+  try {
+    const blocked = refuseTarget(actor.id, target) ?? (await lastOwnerRefusal(prisma, target));
+    const records = await accountRecords(prisma, target.id);
+    return ok({
+      name: target.name,
+      role: target.role,
+      status: target.status,
+      erase: records.total === 0,
+      records: records.total,
+      items: records.items.slice(0, 8),
+      blocked,
+    });
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+const deleteSchema = baseSchema;
+
+export async function devDeleteUser(
+  input: z.infer<typeof deleteSchema>,
+): Promise<ActionResult<{ erased: boolean; records: number }>> {
+  let actor;
+  try {
+    actor = await requireActor(["DEVELOPER"]);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+  const me = { id: actor.id, name: actor.name ?? "Developer" };
+  const meta = requestMeta(await headers());
+  const parsed = deleteSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid request.");
+  const d = parsed.data;
+  if (d.confirm.trim() !== "DELETE") return fail("Type DELETE to proceed.");
+
+  const target = await loadTarget(d.userId);
+  const refusal = refuseTarget(actor.id, target) ?? (target ? await lastOwnerRefusal(prisma, target) : null);
+  if (refusal || !target) {
+    await writeDevAuditSafe({
+      actor: me,
+      action: "DEV_USER_DELETED",
+      entity: "User",
+      entityId: d.userId,
+      summary: `Refused: delete account — ${refusal}`,
+      outcome: "FAILED",
+      reason: d.reason,
+      ...meta,
+    });
+    return fail(refusal ?? "User not found.");
+  }
+
+  // An unguessable password nobody knows, so the kept row can never be signed in to.
+  const lockedHash = await bcrypt.hash(randomBytes(32).toString("hex"), 10);
+  let outcome: { erased: boolean; records: number };
+  try {
+    outcome = await prisma.$transaction(
+      async (tx) => {
+        // Lock the row: nothing can attach new records to this person while we decide.
+        const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "User" WHERE id = ${target.id} FOR UPDATE`;
+        if (locked.length === 0) throw new Error("This account no longer exists.");
+        const fresh = await loadTargetIn(tx, target.id);
+        if (!fresh) throw new Error("This account no longer exists.");
+        const stillLastOwner = await lastOwnerRefusal(tx, fresh);
+        if (stillLastOwner) throw new Error(stillLastOwner);
+
+        const records = await accountRecords(tx, fresh.id);
+        const before = { name: fresh.name, email: fresh.email, role: fresh.role, status: fresh.status };
+
+        if (records.total === 0) {
+          await writeDevAudit(tx, {
+            actor: me,
+            action: "DEV_USER_DELETED",
+            entity: "User",
+            entityId: fresh.id,
+            summary: `Developer deleted ${fresh.name} (${fresh.email}, ${fresh.role}). The account had no records, so it was erased completely.`,
+            outcome: "SUCCESS",
+            reason: d.reason,
+            before,
+            after: { deleted: "erased" },
+            ...meta,
+          });
+          await tx.user.delete({ where: { id: fresh.id } });
+          return { erased: true, records: 0 };
+        }
+
+        // Their own sign-in history and inbox go with the account; everything they recorded stays.
+        await tx.loginEvent.deleteMany({ where: { userId: fresh.id } });
+        await tx.notification.deleteMany({ where: { userId: fresh.id } });
+        await tx.user.update({
+          where: { id: fresh.id },
+          data: {
+            email: deletedEmail(fresh.id), // frees the real email for a new account; also what hides it from lists
+            passwordHash: lockedHash,
+            status: "SUSPENDED",
+            avatar: null,
+            preferredName: null,
+            canRecordSales: false,
+            canCreateTransfers: false,
+            sessionVersion: { increment: 1 }, // signs them out everywhere
+          },
+        });
+        await writeDevAudit(tx, {
+          actor: me,
+          action: "DEV_USER_DELETED",
+          entity: "User",
+          entityId: fresh.id,
+          summary: `Developer deleted ${fresh.name} (${fresh.email}, ${fresh.role}). Access removed; their ${records.total} records stay under their name.`,
+          outcome: "SUCCESS",
+          reason: d.reason,
+          before,
+          after: { deleted: "access-removed", recordsKept: records.items.slice(0, 12) },
+          ...meta,
+        });
+        return { erased: false, records: records.total };
+      },
+      { timeout: 20_000 },
+    );
+  } catch (e) {
+    await writeDevAuditSafe({
+      actor: me,
+      action: "DEV_USER_DELETED",
+      entity: "User",
+      entityId: target.id,
+      summary: `Failed to delete ${target.name}: ${errorMessage(e)}`,
+      outcome: "FAILED",
+      reason: d.reason,
+      ...meta,
+    });
+    return fail(errorMessage(e));
+  }
+
+  await notifyInApp({
+    toRoles: ["ADMIN"],
+    category: "INFO",
+    type: "DEVELOPER_ACTION",
+    title: "Developer deleted an account",
+    body: `${me.name} (Developer) deleted the account of ${target.name}. ${
+      outcome.erased ? "It had no records." : "Their records stay under their name."
+    } Reason: ${d.reason}`,
+    actorName: `${me.name} (Developer)`,
+    entityType: "User",
+    entityId: target.id,
+    actionUrl: "/admin/activity",
+    actionLabel: "View activity",
+  });
+  if (target.role === "ADMIN") {
+    await Promise.race([
+      sendWhatsApp(`ORA security notice: Developer ${me.name} deleted the Admin account ${target.name}.`),
+      new Promise((r) => setTimeout(r, 5000)),
+    ]);
+  }
+  revalidateUsers();
+  return ok(
+    outcome,
+    outcome.erased
+      ? `${target.name}'s account was erased.`
+      : `${target.name}'s account was deleted. Their ${outcome.records} records stay under their name.`,
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

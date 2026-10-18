@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { notDeleted } from "@/lib/deleted-accounts";
 
 /**
  * ORA's master customer database — partners AND rep-acquired field customers.
@@ -8,7 +9,7 @@ import { prisma } from "@/lib/db";
 export async function getMasterCustomers() {
   const [partners, fieldCustomers] = await Promise.all([
     prisma.user.findMany({
-      where: { role: "PARTNER" },
+      where: { role: "PARTNER", ...notDeleted },
       orderBy: { createdAt: "desc" },
       // These rows go to the browser — never include the password hash.
       omit: { passwordHash: true },

@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { notDeleted } from "@/lib/deleted-accounts";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -48,7 +49,7 @@ export default async function WarehouseDetailPage({
 
   const w = await prisma.warehouse.findUnique({
     where: { id },
-    include: { staff: { select: { name: true, email: true }, orderBy: { createdAt: "asc" } } },
+    include: { staff: { where: notDeleted, select: { name: true, email: true }, orderBy: { createdAt: "asc" } } },
   });
   if (!w) notFound();
 

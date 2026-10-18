@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { blobConfigured } from "@/lib/blob-config";
+import { notDeleted } from "@/lib/deleted-accounts";
 import { BUILD_ID } from "@/lib/build-id";
 
 /**
@@ -107,7 +108,7 @@ export async function getDiagnostics() {
   };
 
   const [usersByRole, activity24h, failedDevLogins24h, lastDevLogin, stuckAlerts, recentDev, openActions] = await Promise.all([
-    safe(() => prisma.user.groupBy({ by: ["role", "status"], _count: { _all: true } }), []),
+    safe(() => prisma.user.groupBy({ by: ["role", "status"], where: { ...notDeleted }, _count: { _all: true } }), []),
     safe(() => prisma.activityLog.count({ where: { createdAt: { gte: day } } }), 0),
     safe(
       () =>

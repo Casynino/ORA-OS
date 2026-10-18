@@ -1,10 +1,12 @@
 import { prisma } from "@/lib/db";
+import { notDeleted } from "@/lib/deleted-accounts";
 import { PageHeader } from "@/components/ui/page-header";
 import { UsersManager } from "@/components/admin/users-manager";
 
 export default async function AdminUsersPage() {
   const [users, products, partnerPrices, warehouses] = await Promise.all([
     prisma.user.findMany({
+      where: notDeleted, // deleted accounts keep their records but are no longer people to manage
       orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     }),
     prisma.product.findMany({

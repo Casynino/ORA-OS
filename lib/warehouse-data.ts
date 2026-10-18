@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { notDeleted } from "@/lib/deleted-accounts";
 
 export type WarehouseSummary = {
   id: string;
@@ -26,7 +27,7 @@ const OPEN_RETURN = ["PENDING", "IN_TRANSIT"] as const;
 export async function getWarehouseSummaries(): Promise<WarehouseSummary[]> {
   const [warehouses, stock, transfers, returns, orders] = await Promise.all([
     prisma.warehouse.findMany({
-      include: { staff: { select: { name: true }, orderBy: { createdAt: "asc" } } },
+      include: { staff: { where: notDeleted, select: { name: true }, orderBy: { createdAt: "asc" } } },
       orderBy: { createdAt: "asc" },
     }),
     prisma.warehouseStock.findMany({

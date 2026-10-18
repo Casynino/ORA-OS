@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { notDeleted } from "@/lib/deleted-accounts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Field-sales read models — shared by the rep portal and admin control pages.
@@ -247,7 +248,7 @@ export async function getRepsPerformance(): Promise<RepPerformanceRow[]> {
   const month = startOfMonth(now);
 
   const reps = await prisma.user.findMany({
-    where: { role: "SALES_REP" },
+    where: { role: "SALES_REP", ...notDeleted },
     orderBy: { createdAt: "asc" },
     select: { id: true, name: true, email: true, phone: true, region: true, status: true },
   });

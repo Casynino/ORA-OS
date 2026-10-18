@@ -1,4 +1,5 @@
 import { Users, CreditCard, AlertTriangle, TrendingUp } from "lucide-react";
+import { notDeleted } from "@/lib/deleted-accounts";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { getPartnerCredit } from "@/lib/services/credit";
@@ -29,7 +30,7 @@ export default async function FinancePartnersPage() {
 
   const [partners, products, partnerPrices] = await Promise.all([
     prisma.user.findMany({
-      where: { role: "PARTNER", status: { in: ["ACTIVE", "SUSPENDED"] } },
+      where: { role: "PARTNER", status: { in: ["ACTIVE", "SUSPENDED"] }, ...notDeleted },
       orderBy: { name: "asc" },
       select: {
         id: true,

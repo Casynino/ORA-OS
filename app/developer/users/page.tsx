@@ -1,9 +1,10 @@
-import { Banknote, Boxes, Lock, LogIn, LogOut, ShieldCheck, Store, UserX, Wallet, type LucideIcon } from "lucide-react";
+import { Banknote, Boxes, Lock, LogIn, LogOut, ShieldCheck, Store, Trash2, UserCog, UserX, Wallet, type LucideIcon } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { writeDevAuditSafe } from "@/lib/developer/audit";
 import { devActivatableIds } from "@/lib/developer/eligibility";
 import { canWorkAs } from "@/lib/developer/acting";
+import { DELETED_EMAIL_DOMAIN, notDeleted } from "@/lib/deleted-accounts";
 import { DevUserActions } from "@/components/developer/user-actions";
 import { CreateAccountButton } from "@/components/developer/create-account";
 import { InfoCallout, SectionTitle } from "@/components/developer/info";
@@ -27,16 +28,20 @@ const GROUPS: { role: string; title: string; text: string; icon: LucideIcon }[] 
   { role: "WAREHOUSE", title: "Warehouse", text: "Receives, stores and hands out stock. No money powers.", icon: Boxes },
   { role: "SALES_REP", title: "Sales reps", text: "Sell in the field, collect payments and request stock.", icon: Banknote },
   { role: "PARTNER", title: "Partners", text: "Customers and distributors who order products.", icon: Store },
+  { role: "DEVELOPER", title: "Other developers", text: "Other Developer accounts. They can be suspended or deleted, not worked as.", icon: UserCog },
 ];
 
 export default async function DeveloperUsersPage() {
   const me = await requireRole("DEVELOPER");
   const users = await prisma.user.findMany({
-    where: { id: { not: me.id } },
+    where: { id: { not: me.id }, ...notDeleted },
     orderBy: [{ role: "asc" }, { name: "asc" }],
     select: { id: true, name: true, email: true, role: true, status: true, lastLoginAt: true, avatar: true },
   });
-  const visible = users.filter((u) => u.role !== "DEVELOPER");
+  const visible = users;
+  const activeAdmins = users.filter((u) => u.role === "ADMIN" && u.status === "ACTIVE").length;
+  // Deleted accounts are kept (their records point at them) but are not listed here.
+  const deletedCount = await prisma.user.count({ where: { email: { endsWith: `@${DELETED_EMAIL_DOMAIN}` } } });
   const warehouses = await prisma.warehouse.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
   // Only accounts the Developer console itself suspended can be re-activated here.
   const activatable = await devActivatableIds(
@@ -59,7 +64,7 @@ export default async function DeveloperUsersPage() {
     <div className="flex flex-col gap-7">
       <PageHeader
         title="Access"
-        description={`${formatNumber(visible.length)} accounts. Create a new login with “New account”, or pick a person and press “Work as” to open their dashboard exactly as they see it — without their password. Everything you do is recorded under your name.`}
+        description={`${formatNumber(visible.length)} accounts${deletedCount > 0 ? ` (${formatNumber(deletedCount)} deleted, hidden)` : ""}. Create a new login with “New account”, or pick a person and press “Work as” to open their dashboard exactly as they see it — without their password. Everything you do is recorded under your name.`}
       >
         <CreateAccountButton warehouses={warehouses} />
       </PageHeader>
@@ -67,7 +72,7 @@ export default async function DeveloperUsersPage() {
       {/* What each button does, in plain words (after the people list on phones) */}
       <section className="order-last md:order-none">
         <SectionTitle title="What the buttons do" />
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <InfoCallout icon={LogIn} tone="info" title="Work as">
             Opens that person&apos;s dashboard with their real permissions and data. A small pill in the corner shows who
             you are working as; press <strong className="text-foreground">Stop</strong> on it to come back here. It
@@ -80,6 +85,11 @@ export default async function DeveloperUsersPage() {
           <InfoCallout icon={LogOut} tone="neutral" title="Sign out everywhere">
             Ends every open session on every phone and computer. The person can sign straight back in — useful if a
             phone was lost.
+          </InfoCallout>
+          <InfoCallout icon={Trash2} tone="warn" title="Delete">
+            Removes the person&apos;s access and their account from the system. Everything they recorded stays
+            exactly as it is, still under their name. You must write a reason and type DELETE. The only active Admin
+            can&apos;t be deleted.
           </InfoCallout>
         </div>
         <InfoCallout icon={ShieldCheck} tone="good" className="mt-3" title="Safety rules while working as someone">
@@ -145,6 +155,7 @@ export default async function DeveloperUsersPage() {
                             canActivate={activatable.has(u.id)}
                             canWorkAs={canWorkAs(u, me.id)}
                             isOwner={isOwner}
+                            onlyAdmin={isOwner && u.status === "ACTIVE" && activeAdmins === 1}
                           />
                         </div>
                       </li>
