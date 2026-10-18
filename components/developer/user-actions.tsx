@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Copy, Eye, EyeOff, KeyRound, Loader2, Lock, LogIn, LogOut, RefreshCw, ShieldCheck, Trash2, UserCheck, UserX } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, KeyRound, Lock, LogIn, LogOut, RefreshCw, ShieldCheck, Trash2, UserCheck, UserX } from "lucide-react";
 import {
   devSetUserStatus,
   devForceSignOut,
   devStartActing,
   devResetPassword,
-  devDeletePreview,
   devDeleteUser,
-  type DeletePreview,
 } from "@/lib/actions/developer";
 import { makePassword } from "@/components/developer/create-account";
 import { Modal } from "@/components/ui/dialog";
@@ -48,37 +46,14 @@ const WORK_AS_SEES: Record<string, string> = {
   PARTNER: "the partner portal — orders, credit and invoices",
 };
 
-/**
- * Delete an account. Says plainly what happens first: access and the account go; everything the
- * person recorded stays under their name. Needs a written reason and the word DELETE.
- */
+/** Delete an account: one short message and a confirm button. Records are never touched. */
 function DeleteAccountModal({ userId, name, onClose }: { userId: string; name: string; onClose: () => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [info, setInfo] = useState<DeletePreview | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [reason, setReason] = useState("");
-  const [confirm, setConfirm] = useState("");
-
-  useEffect(() => {
-    let alive = true;
-    devDeletePreview({ userId })
-      .then((r) => {
-        if (!alive) return;
-        if (r.ok && r.data) setInfo(r.data);
-        else setLoadError(r.ok ? "Couldn't check this account." : r.error);
-      })
-      .catch(() => alive && setLoadError("Couldn't check this account."));
-    return () => {
-      alive = false;
-    };
-  }, [userId]);
-
-  const ready = !!info && !info.blocked && reason.trim().length >= 10 && confirm.trim() === "DELETE";
 
   function submit() {
     start(async () => {
-      const res = await devDeleteUser({ userId, reason, confirm });
+      const res = await devDeleteUser({ userId });
       if (res.ok) {
         toast({ variant: "success", title: res.message ?? "Account deleted." });
         onClose();
@@ -92,77 +67,22 @@ function DeleteAccountModal({ userId, name, onClose }: { userId: string; name: s
       open
       onClose={() => (pending ? null : onClose())}
       title={`Delete ${name}?`}
-      description="Removes their access and their account. What they recorded is not touched."
+      description="They lose access and the account is removed. Everything they recorded stays under their name."
     >
-      <div className="space-y-4">
-        {loadError ? (
-          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">{loadError}</p>
-        ) : !info ? (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" /> Checking what this account is linked to…
-          </p>
-        ) : info.blocked ? (
-          <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-sm text-warning">{info.blocked}</p>
-        ) : (
-          <div className="space-y-3 rounded-lg border border-border bg-muted/30 px-3.5 py-3 text-sm">
-            {info.erase ? (
-              <p className="text-muted-foreground">
-                <strong className="text-foreground">{name} has no records</strong>, so the account is erased completely.
-              </p>
-            ) : (
-              <>
-                <p className="text-muted-foreground">
-                  <strong className="text-foreground">{name} has {info.records} records</strong>
-                  {info.items.length > 0 && <> ({info.items.slice(0, 5).map((i) => `${i.label}: ${i.count}`).join(", ")}
-                  {info.items.length > 5 ? " and more" : ""})</>}
-                  . <strong className="text-foreground">All of them stay exactly as they are</strong>, still under their name,
-                  so money, stock and history keep adding up and still show who did what.
-                </p>
-                <ul className="space-y-1.5 text-muted-foreground">
-                  <li className="flex items-start gap-2">
-                    <Check className="mt-0.5 size-4 shrink-0 text-success" /> Their login and access are removed. They can never sign in again.
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="mt-0.5 size-4 shrink-0 text-success" /> The account disappears from the people lists, and the email can be used for a new account.
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="mt-0.5 size-4 shrink-0 text-success" /> Their sign-in history and notifications are cleared.
-                  </li>
-                </ul>
-              </>
-            )}
-            <p className="text-xs text-muted-foreground">This cannot be undone. It is recorded under your name and the owner is told.</p>
-          </div>
-        )}
-        <div>
-          <Label htmlFor="dev-del-reason">Reason (recorded in the audit log)</Label>
-          <Input
-            id="dev-del-reason"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            maxLength={300}
-            placeholder="e.g. Left the company — removing access"
-            className="mt-1.5"
-          />
-          <p className="mt-1 text-xs text-muted-foreground">At least 10 characters.</p>
-        </div>
-        <div>
-          <Label htmlFor="dev-del-confirm">Type DELETE to proceed</Label>
-          <Input
-            id="dev-del-confirm"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            autoComplete="off"
-            className="mt-1.5 tracking-widest"
-          />
+      <div className="space-y-5">
+        <div className="flex items-start gap-3 rounded-xl border border-destructive/25 bg-destructive/10 p-3.5 text-sm">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-destructive/15 text-destructive">
+            <Trash2 className="size-[18px]" />
+          </span>
+          <p className="pt-1.5 text-muted-foreground">They can never sign in again. This can&apos;t be undone.</p>
         </div>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose} disabled={pending}>
             Cancel
           </Button>
-          <Button variant="destructive" onClick={submit} disabled={!ready || pending}>
+          <Button variant="destructive" onClick={submit} disabled={pending}>
             <Trash2 className="size-4" />
-            {pending ? "Deleting…" : "Delete account"}
+            {pending ? "Deleting…" : "Confirm delete"}
           </Button>
         </div>
       </div>

@@ -88,8 +88,8 @@ export default async function DeveloperUsersPage() {
           </InfoCallout>
           <InfoCallout icon={Trash2} tone="warn" title="Delete">
             Removes the person&apos;s access and their account from the system. Everything they recorded stays
-            exactly as it is, still under their name. You must write a reason and type DELETE. The only active Admin
-            can&apos;t be deleted.
+            exactly as it is, still under their name. You are asked to confirm. The only active Admin can&apos;t be
+            deleted.
           </InfoCallout>
         </div>
         <InfoCallout icon={ShieldCheck} tone="good" className="mt-3" title="Safety rules while working as someone">

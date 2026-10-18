@@ -290,51 +290,15 @@ export async function devForceSignOut(
 //  still under their name, so history shows who did what. Those records point at the user
 //  row, so when there are any the row stays (name untouched) with the login, email, password
 //  and photo removed and the account locked; the real email is freed for a new account. An
-//  account with no records at all is erased outright. Audited under the Developer's name in
-//  the same transaction; the owner is told. Never the Developer's own account, and never the
+//  account with no records at all is erased outright. One tap of confirmation on screen. Audited
+//  under the Developer's name in the same transaction; the owner is told. Never the Developer's own account, and never the
 //  last active Admin.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type DeletePreview = {
-  name: string;
-  role: Role;
-  status: UserStatus;
-  /** True when the account has no records at all, so it is erased completely. */
-  erase: boolean;
-  records: number;
-  items: { label: string; count: number }[];
-  /** Why it can't be deleted right now (null = it can). */
-  blocked: string | null;
-};
+const deleteSchema = z.object({ userId: z.string().min(1) });
 
-/** Read-only: what deleting this account would do, shown before you confirm. */
-export async function devDeletePreview(input: { userId: string }): Promise<ActionResult<DeletePreview>> {
-  let actor;
-  try {
-    actor = await requireActor(["DEVELOPER"]);
-  } catch (e) {
-    return fail(errorMessage(e));
-  }
-  const target = await loadTarget(String(input?.userId ?? ""));
-  if (!target) return fail("User not found.");
-  try {
-    const blocked = refuseTarget(actor.id, target) ?? (await lastOwnerRefusal(prisma, target));
-    const records = await accountRecords(prisma, target.id);
-    return ok({
-      name: target.name,
-      role: target.role,
-      status: target.status,
-      erase: records.total === 0,
-      records: records.total,
-      items: records.items.slice(0, 8),
-      blocked,
-    });
-  } catch (e) {
-    return fail(errorMessage(e));
-  }
-}
-
-const deleteSchema = baseSchema;
+/** Deleting asks for one tap of confirmation on screen; the audit row notes where it came from. */
+const DELETE_REASON = "Deleted from the Developer Access page.";
 
 export async function devDeleteUser(
   input: z.infer<typeof deleteSchema>,
@@ -350,7 +314,6 @@ export async function devDeleteUser(
   const parsed = deleteSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid request.");
   const d = parsed.data;
-  if (d.confirm.trim() !== "DELETE") return fail("Type DELETE to proceed.");
 
   const target = await loadTarget(d.userId);
   const refusal = refuseTarget(actor.id, target) ?? (target ? await lastOwnerRefusal(prisma, target) : null);
@@ -362,7 +325,7 @@ export async function devDeleteUser(
       entityId: d.userId,
       summary: `Refused: delete account — ${refusal}`,
       outcome: "FAILED",
-      reason: d.reason,
+      reason: DELETE_REASON,
       ...meta,
     });
     return fail(refusal ?? "User not found.");
@@ -393,7 +356,7 @@ export async function devDeleteUser(
             entityId: fresh.id,
             summary: `Developer deleted ${fresh.name} (${fresh.email}, ${fresh.role}). The account had no records, so it was erased completely.`,
             outcome: "SUCCESS",
-            reason: d.reason,
+            reason: DELETE_REASON,
             before,
             after: { deleted: "erased" },
             ...meta,
@@ -425,7 +388,7 @@ export async function devDeleteUser(
           entityId: fresh.id,
           summary: `Developer deleted ${fresh.name} (${fresh.email}, ${fresh.role}). Access removed; their ${records.total} records stay under their name.`,
           outcome: "SUCCESS",
-          reason: d.reason,
+          reason: DELETE_REASON,
           before,
           after: { deleted: "access-removed", recordsKept: records.items.slice(0, 12) },
           ...meta,
@@ -442,7 +405,7 @@ export async function devDeleteUser(
       entityId: target.id,
       summary: `Failed to delete ${target.name}: ${errorMessage(e)}`,
       outcome: "FAILED",
-      reason: d.reason,
+      reason: DELETE_REASON,
       ...meta,
     });
     return fail(errorMessage(e));
@@ -455,7 +418,7 @@ export async function devDeleteUser(
     title: "Developer deleted an account",
     body: `${me.name} (Developer) deleted the account of ${target.name}. ${
       outcome.erased ? "It had no records." : "Their records stay under their name."
-    } Reason: ${d.reason}`,
+    }`,
     actorName: `${me.name} (Developer)`,
     entityType: "User",
     entityId: target.id,
