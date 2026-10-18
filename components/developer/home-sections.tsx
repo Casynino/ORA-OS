@@ -348,7 +348,7 @@ export function ActivityPanel({ m }: { m: Monitor }) {
             <StackedBars
               data={m.hourSeries.map((h) => ({ label: String(h.hour), values: { n: h.n } }))}
               series={[{ key: "n", label: "Actions", color: "hsl(var(--primary))" }]}
-              height={170}
+              height={225}
               labelEvery={3}
               formatLabel={(h) => `${h}h`}
             />
@@ -358,17 +358,17 @@ export function ActivityPanel({ m }: { m: Monitor }) {
           <CardContent className="p-5">
             <h2 className="text-sm font-semibold">Where the work happens</h2>
             <p className="mb-4 text-xs text-muted-foreground">Actions by area, last 7 days.</p>
-            <HBars items={m.modules.map((x) => ({ label: humanize(x.name), value: x.n }))} />
+            <HBars items={m.modules.slice(0, 6).map((x) => ({ label: humanize(x.name), value: x.n }))} />
           </CardContent>
         </Card>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+      <section className="space-y-4">
+        <Card>
           <CardContent className="p-0">
             <div className="border-b border-border px-5 py-3.5">
               <h2 className="text-sm font-semibold">Recent sign-ins</h2>
-              <p className="text-xs text-muted-foreground">The last 12 successful sign-ins: who, on what device, from where.</p>
+              <p className="text-xs text-muted-foreground">The last 8 successful sign-ins: who, on what device, from where.</p>
             </div>
             {m.recentLogins.length === 0 ? (
               <p className="px-5 py-8 text-center text-sm text-muted-foreground">No sign-ins recorded yet.</p>
@@ -414,7 +414,7 @@ export function ActivityPanel({ m }: { m: Monitor }) {
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
+        <div className="grid items-start gap-4 lg:grid-cols-2">
           <Card>
             <CardContent className="p-5">
               <h2 className="text-sm font-semibold">Most active people</h2>
@@ -460,7 +460,7 @@ export function SpeedPanel({ m }: { m: Monitor }) {
       <p className="text-sm text-muted-foreground">
         Real queries timed right now against the live database, and how big the database has grown.
       </p>
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid items-start gap-4 lg:grid-cols-3">
         <Card>
           <CardContent className="p-5">
             <div className="mb-1 flex items-center justify-between gap-2">
@@ -524,7 +524,7 @@ export function SpeedPanel({ m }: { m: Monitor }) {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
         <Card>
           <CardContent className="p-0">
             <div className="border-b border-border px-5 py-3.5">
@@ -605,7 +605,7 @@ export function ErrorsPanel({ m }: { m: Monitor }) {
         Server errors (a page that crashed) and sign-ins that were refused. This is how you hear about a problem before
         staff complain.
       </p>
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid items-start gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardContent className="p-5">
             <h2 className="text-sm font-semibold">Errors and failed sign-ins per day</h2>
@@ -710,7 +710,6 @@ export function ErrorsPanel({ m }: { m: Monitor }) {
 export function SettingsPanel({ m }: { m: Monitor }) {
   const d = m.diag;
   const missingRequired = d.env.filter((e) => e.required && !e.set);
-  const missingOptional = d.env.filter((e) => !e.required && !e.set);
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
@@ -718,56 +717,53 @@ export function SettingsPanel({ m }: { m: Monitor }) {
           ? "Some required settings are missing — fix those first. Only whether a setting exists is shown, never its secret value."
           : "All required settings are in place. Only whether a setting exists is shown, never its secret value."}
       </p>
-      <div className="grid gap-3 md:grid-cols-2">
-        {d.env.map((e) => {
-          const tone: Tone = e.set ? "good" : e.required ? "bad" : "warn";
-          return (
-            <Card key={e.name}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <span
-                      className={cn(
-                        "mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg",
-                        tone === "good" && "bg-success/12 text-success",
-                        tone === "bad" && "bg-destructive/12 text-destructive",
-                        tone === "warn" && "bg-warning/15 text-warning",
-                      )}
-                    >
-                      <KeyRound className="size-4" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold">{e.title}</p>
-                      <p className="font-mono text-[11px] text-muted-foreground">{e.name}</p>
+      <Card>
+        <CardContent className="p-0">
+          <ul className="divide-y divide-border">
+            {d.env.map((e) => {
+              const tone: Tone = e.set ? "good" : e.required ? "bad" : "warn";
+              return (
+                <li key={e.name} className="px-5 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <span
+                        className={cn(
+                          "mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg",
+                          tone === "good" && "bg-success/12 text-success",
+                          tone === "bad" && "bg-destructive/12 text-destructive",
+                          tone === "warn" && "bg-warning/15 text-warning",
+                        )}
+                      >
+                        <KeyRound className="size-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold">
+                          {e.title} <span className="ml-1 font-mono text-[11px] font-normal text-muted-foreground">{e.name}</span>
+                        </p>
+                        <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">{e.purpose}</p>
+                        {!e.set && (
+                          <p
+                            className={cn(
+                              "mt-2 max-w-3xl rounded-lg px-3 py-2 text-xs leading-relaxed",
+                              e.required ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning",
+                            )}
+                          >
+                            <span className="font-semibold">Because it is missing: </span>
+                            {e.ifMissing}
+                          </p>
+                        )}
+                      </div>
                     </div>
+                    <Badge variant={e.set ? "success" : e.required ? "destructive" : "warning"}>
+                      {e.set ? "Set" : e.required ? "Missing" : "Not set"}
+                    </Badge>
                   </div>
-                  <Badge variant={e.set ? "success" : e.required ? "destructive" : "warning"}>
-                    {e.set ? "Set" : e.required ? "Missing" : "Not set"}
-                  </Badge>
-                </div>
-                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{e.purpose}</p>
-                {!e.set && (
-                  <p
-                    className={cn(
-                      "mt-2.5 rounded-lg px-3 py-2 text-xs leading-relaxed",
-                      e.required ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning",
-                    )}
-                  >
-                    <span className="font-semibold">Because it is missing: </span>
-                    {e.ifMissing}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-      {missingOptional.length > 0 && missingRequired.length === 0 && (
-        <p className="text-xs text-muted-foreground">
-          {missingOptional.length} optional setting{missingOptional.length > 1 ? "s are" : " is"} not set. The system
-          works without {missingOptional.length > 1 ? "them" : "it"}; the note on each card explains what you lose.
-        </p>
-      )}
+                </li>
+              );
+            })}
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -824,55 +820,53 @@ export function PeoplePanel({ m }: { m: Monitor }) {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-5">
-        <Card className="lg:col-span-3">
-          <CardContent className="p-0">
-            <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3.5">
-              <div>
-                <h2 className="text-sm font-semibold">Your recent actions</h2>
-                <p className="text-xs text-muted-foreground">The last things recorded under your name.</p>
-              </div>
-              <Link href="/developer/audit?scope=developer" className="text-xs font-medium text-primary hover:underline">
-                See all
-              </Link>
-            </div>
-            {d.recentDev.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-muted-foreground">Nothing yet. Your actions will appear here.</p>
-            ) : (
-              <ul className="divide-y divide-border">
-                {d.recentDev.map((log) => {
-                  const meta = (log.meta ?? {}) as { outcome?: string };
-                  const tone: Tone = meta.outcome === "FAILED" ? "bad" : "info";
-                  return (
-                    <li key={log.id} className="flex items-start gap-3 px-5 py-3">
-                      <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", TONE_DOT[tone])} />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm leading-snug">{log.summary}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{timeAgo(log.createdAt)}</p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="space-y-3 lg:col-span-2">
-          <InfoCallout icon={ShieldCheck} tone="good" title="Everything you do is on record">
-            Your name is attached to every action, including when you work as someone else (it shows as “you as
-            them”). The business owner is told, and these records cannot be edited or deleted — not even by you.
-          </InfoCallout>
-          <InfoCallout icon={KeyRound} tone="warn" title="What you cannot do while working as someone">
-            Change passwords or login emails, create new accounts, or sign people out of all devices. This stops
-            “work as” from being used to take over an account.
-          </InfoCallout>
-          <InfoCallout title="Good to know">
-            Your session ends after 8 hours. Working as someone ends by itself after 4 hours. Build{" "}
-            <span className="font-mono">{d.build.slice(0, 8)}</span> · Node {d.node} · {d.nodeEnv}.
-          </InfoCallout>
-        </div>
+      <section className="grid gap-3 md:grid-cols-3">
+        <InfoCallout icon={ShieldCheck} tone="good" title="Everything you do is on record">
+          Your name is attached to every action, including when you work as someone else (it shows as “you as them”).
+          The business owner is told, and these records cannot be edited or deleted — not even by you.
+        </InfoCallout>
+        <InfoCallout icon={KeyRound} tone="warn" title="While working as someone">
+          You can help with their profile, but you can’t change their password or sign them out of all devices from
+          their screens — use Access for that, as yourself.
+        </InfoCallout>
+        <InfoCallout title="Good to know">
+          Your session ends after 8 hours. Working as someone ends by itself after 4 hours. Build{" "}
+          <span className="font-mono">{d.build.slice(0, 8)}</span> · Node {d.node} · {d.nodeEnv}.
+        </InfoCallout>
       </section>
+
+      <Card>
+        <CardContent className="p-0">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3.5">
+            <div>
+              <h2 className="text-sm font-semibold">Your recent actions</h2>
+              <p className="text-xs text-muted-foreground">The last things recorded under your name.</p>
+            </div>
+            <Link href="/developer/audit?scope=developer" className="text-xs font-medium text-primary hover:underline">
+              See all
+            </Link>
+          </div>
+          {d.recentDev.length === 0 ? (
+            <p className="px-5 py-6 text-sm text-muted-foreground">Nothing yet. Your actions will appear here.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {d.recentDev.map((log) => {
+                const meta = (log.meta ?? {}) as { outcome?: string };
+                const tone: Tone = meta.outcome === "FAILED" ? "bad" : "info";
+                return (
+                  <li key={log.id} className="flex items-start gap-3 px-5 py-3">
+                    <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", TONE_DOT[tone])} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm leading-snug">{log.summary}</p>
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(log.createdAt)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -175,7 +175,7 @@ export async function getMonitor() {
       () =>
         prisma.loginEvent.findMany({
           orderBy: { createdAt: "desc" },
-          take: 12,
+          take: 8,
           select: {
             id: true,
             ip: true,

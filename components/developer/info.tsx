@@ -100,7 +100,7 @@ export function HealthCard({
           <Icon className="size-5" />
         </span>
       </div>
-      <div className="mt-auto space-y-2 border-t border-border bg-muted/20 px-5 py-3.5">
+      <div className="mt-auto min-h-[9.25rem] space-y-2 border-t border-border bg-muted/20 px-5 py-3.5">
         <span
           className={cn(
             "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
