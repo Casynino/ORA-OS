@@ -451,8 +451,6 @@ const createAccountSchema = z.object({
   warehouseId: z.string().optional(),
   position: z.string().trim().max(80).optional(),
   canCreateTransfers: z.boolean().optional(),
-  /** Required (true) when creating an ADMIN account. */
-  confirmAdmin: z.boolean().optional(),
 });
 
 const ROLE_LABEL: Record<string, string> = {
@@ -479,8 +477,6 @@ export async function devCreateUser(
   const d = parsed.data;
   const email = d.email.toLowerCase();
 
-  if (d.role === "ADMIN" && d.confirmAdmin !== true)
-    return fail("Tick the box to confirm you are creating an Admin (owner) account.");
   if (d.role === "WAREHOUSE") {
     if (!d.warehouseId) return fail("Choose the warehouse for this staff member.");
     const wh = await prisma.warehouse.findUnique({ where: { id: d.warehouseId }, select: { id: true } });
