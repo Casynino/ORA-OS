@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { getMonitor } from "@/lib/developer/monitor";
+import { ensureErrorTracking } from "@/lib/developer/tracking";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { QuickLink } from "@/components/developer/info";
 import { CreateAccountButton } from "@/components/developer/create-account";
@@ -24,6 +25,8 @@ export const dynamic = "force-dynamic";
 
 export default async function DeveloperHomePage() {
   const me = await requireRole("DEVELOPER");
+  // The Developer's job is to see what is wrong, so crash recording must be on.
+  await ensureErrorTracking({ id: me.id, name: me.name ?? "Developer" });
   const [m, warehouses, accounts] = await Promise.all([
     getMonitor(),
     prisma.warehouse.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),

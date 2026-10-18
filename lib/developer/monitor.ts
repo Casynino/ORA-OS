@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { getDiagnostics } from "@/lib/developer/diagnostics";
+import { getQueues } from "@/lib/developer/pulse";
 
 /**
  * Everything the Developer Home shows: usage, who signs in, speed, size,
@@ -12,7 +13,11 @@ const TZ = "Africa/Dar_es_Salaam";
 const DAYS = 14;
 
 export type Level = "critical" | "warning" | "info";
-export type Problem = { level: Level; title: string; detail: string; hint: string };
+/** `link.href` is either an in-page tab ("#errors") or an outside page (Vercel, Neon). */
+export type Problem = { level: Level; title: string; detail: string; hint: string; link?: { label: string; href: string } };
+
+const VERCEL_ENV = { label: "Open Vercel settings", href: "https://vercel.com/dashboard" };
+const NEON = { label: "Open Neon (database)", href: "https://console.neon.tech" };
 export type Probe = { label: string; ms: number; ok: boolean };
 
 export type Monitor = Awaited<ReturnType<typeof getMonitor>>;
@@ -114,6 +119,10 @@ export async function getMonitor() {
     negWarehouse,
     negRep,
     overpaid,
+    queues,
+    lastDaily,
+    lastReport,
+    reportSettings,
   ] = await Promise.all([
     safe(
       () =>
@@ -247,6 +256,10 @@ export async function getMonitor() {
         ),
       null as number | null,
     ),
+    getQueues(),
+    safe(() => prisma.report.findFirst({ where: { type: "DAILY" }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }), null),
+    safe(() => prisma.report.findFirst({ orderBy: { createdAt: "desc" }, select: { createdAt: true, whatsappSent: true, title: true } }), null),
+    safe(() => prisma.reportSettings.findUnique({ where: { id: "singleton" }, select: { dailyEnabled: true } }), null),
   ]);
 
   // ── Errors + failed sign-ins (only once the SystemEvent table exists). ──
@@ -262,8 +275,9 @@ export async function getMonitor() {
           SELECT to_char((("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Africa/Dar_es_Salaam')::date, 'YYYY-MM-DD') AS day,
                  kind, coalesce(sum("count"), 0)::int AS n
           FROM "SystemEvent" WHERE "createdAt" >= ${since} GROUP BY 1, 2`,
-        prisma.$queryRaw<{ message: string; path: string | null; n: number; last: Date }[]>`
-          SELECT message, path, coalesce(sum("count"), 0)::int AS n, max("createdAt") AS last
+        prisma.$queryRaw<{ message: string; path: string | null; n: number; last: Date; detail: string | null }[]>`
+          SELECT message, path, coalesce(sum("count"), 0)::int AS n, max("createdAt") AS last,
+                 (array_agg(detail ORDER BY "createdAt" DESC))[1] AS detail
           FROM "SystemEvent" WHERE kind = 'SERVER_ERROR' AND "createdAt" >= ${since7}
           GROUP BY 1, 2 ORDER BY max("createdAt") DESC LIMIT 10`,
         prisma.systemEvent.findFirst({
@@ -294,7 +308,7 @@ export async function getMonitor() {
       return {
         errors24: 0,
         errorsByDay: [] as { day: string; kind: string; n: number }[],
-        groupedErrors: [] as { message: string; path: string | null; n: number; last: Date }[],
+        groupedErrors: [] as { message: string; path: string | null; n: number; last: Date; detail: string | null }[],
         lastError: null as Date | null,
         failed24: 0,
         recentFailed: [] as { id: string; message: string; ip: string | null; createdAt: Date; count: number }[],
@@ -331,6 +345,7 @@ export async function getMonitor() {
       title: "The database cannot be reached",
       detail: "People cannot sign in or load pages right now.",
       hint: "Check the Neon dashboard for an outage and confirm the DATABASE_URL setting in Vercel.",
+      link: NEON,
     });
   else if (failedProbes.length)
     problems.push({
@@ -345,6 +360,7 @@ export async function getMonitor() {
       title: "The database is slow",
       detail: `Checks averaged ${avgMs} ms (healthy is under 150 ms; slowest was ${slowest} ms).`,
       hint: "A one-off spike after quiet time is normal (the database wakes up). If it stays slow, check the Neon dashboard.",
+      link: NEON,
     });
   if (diag.dbOk && !diag.pooled)
     problems.push({
@@ -352,6 +368,7 @@ export async function getMonitor() {
       title: "The database link is not the pooled one",
       detail: "The app uses a direct connection, which can run out of connections when many people are online.",
       hint: "Use the “pooled” connection string for DATABASE_URL in Vercel.",
+      link: VERCEL_ENV,
     });
   const missing = diag.env.filter((e) => e.required && !e.set);
   if (missing.length)
@@ -360,6 +377,7 @@ export async function getMonitor() {
       title: `Required setting missing: ${missing.map((m) => m.title).join(", ")}`,
       detail: missing.map((m) => m.ifMissing).join(" "),
       hint: "Add it in Vercel → Settings → Environment Variables, then redeploy.",
+      link: VERCEL_ENV,
     });
   if (!tracking)
     problems.push({
@@ -367,6 +385,7 @@ export async function getMonitor() {
       title: "Error tracking is switched off",
       detail: "Until it is on, crashes and failed sign-ins are not recorded here, so a problem could go unnoticed.",
       hint: "Open the “Crashes & sign-ins” tab below and press “Turn on error tracking”. It is one safe, additive step.",
+      link: { label: "Open Crashes & sign-ins", href: "#errors" },
     });
   if (events.errors24 > 0)
     problems.push({
@@ -376,6 +395,7 @@ export async function getMonitor() {
         ? `Most recent: “${events.groupedErrors[0].message.slice(0, 120)}” on ${events.groupedErrors[0].path ?? "an unknown page"}.`
         : "See the error table below.",
       hint: "Open the “Crashes & sign-ins” tab below. A page that crashes for staff usually shows up here first.",
+      link: { label: "Open Crashes & sign-ins", href: "#errors" },
     });
   if (events.failed24 >= 10)
     problems.push({
@@ -383,6 +403,7 @@ export async function getMonitor() {
       title: `${events.failed24} failed sign-ins in 24 hours`,
       detail: "That is more than normal typing mistakes and may be someone guessing passwords.",
       hint: "Check the failed sign-ins in the “Crashes & sign-ins” tab below. If it looks like an attack, suspend the targeted account from Access.",
+      link: { label: "Open Crashes & sign-ins", href: "#errors" },
     });
   if (diag.failedDevLogins24h > 0)
     problems.push({
@@ -397,6 +418,7 @@ export async function getMonitor() {
       title: `${diag.stuckAlerts} alert${diag.stuckAlerts > 1 ? "s" : ""} waiting for more than a day`,
       detail: "These ask someone to approve or receive something, and nobody has.",
       hint: "Ask the right person to act, or check the workflow didn't forget to clear its alert.",
+      link: { label: "See what is waiting", href: "#business" },
     });
   const nw = negWarehouse ?? 0;
   const nr = negRep ?? 0;
@@ -407,6 +429,7 @@ export async function getMonitor() {
       title: "Stock numbers do not add up",
       detail: `${nw} warehouse and ${nr} sales-rep stock line${nw + nr > 1 ? "s" : ""} have negative or impossible quantities.`,
       hint: "Open Business → stock to find them. Do not edit by hand; tell me and we fix the cause.",
+      link: { label: "Open Business", href: "/developer/records" },
     });
   if (op > 0)
     problems.push({
@@ -414,6 +437,7 @@ export async function getMonitor() {
       title: "Some sales show more paid than the total",
       detail: `${op} sale${op > 1 ? "s have" : " has"} a paid amount larger than the sale total (or below zero).`,
       hint: "Open Business → sales to find them. Money records must not be edited by hand.",
+      link: { label: "Open Business", href: "/developer/records" },
     });
   if (pendingOld > 0)
     problems.push({
@@ -428,6 +452,55 @@ export async function getMonitor() {
       title: "The database is getting large",
       detail: `Total size is ${(dbSize / 1048576).toFixed(0)} MB.`,
       hint: "Add file storage (BLOB_READ_WRITE_TOKEN) so receipts and proofs stop living inside the database.",
+      link: VERCEL_ENV,
+    });
+
+  // Work stuck on a person for days (a workflow that nobody is moving).
+  const QUEUE_NAME: Record<string, { label: string; who: string }> = {
+    sales: { label: "sale", who: "Finance" },
+    collections: { label: "payment to verify", who: "Finance" },
+    orders: { label: "partner order", who: "the owner or Finance" },
+    fund: { label: "fund request", who: "the owner" },
+    expenses: { label: "expense to review", who: "the owner" },
+  };
+  for (const q of queues) {
+    const info = QUEUE_NAME[q.k];
+    if (!info || q.n === 0 || !q.oldest) continue;
+    const days = Math.floor((Date.now() - new Date(q.oldest).getTime()) / 86_400_000);
+    if (days >= 3)
+      problems.push({
+        level: days >= 7 ? "warning" : "info",
+        title: `${q.n} ${info.label}${q.n > 1 ? "s" : ""} waiting ${days} days`,
+        detail: `The oldest has been waiting for ${info.who} for ${days} days, so that work is stuck.`,
+        hint: `Ask ${info.who} to open it, or check that the alert for it reached them.`,
+        link: { label: "See what is waiting", href: "#business" },
+      });
+  }
+  // Owner reports: did the daily one run, and did it reach WhatsApp?
+  const dailyOn = reportSettings?.dailyEnabled !== false;
+  const lastDailyAge = lastDaily ? Date.now() - lastDaily.createdAt.getTime() : Infinity;
+  if (dailyOn && lastDailyAge > 36 * 3_600_000)
+    problems.push({
+      level: "warning",
+      title: "The daily owner report did not run",
+      detail: lastDaily ? `The last daily report was built ${Math.floor(lastDailyAge / 3_600_000)} hours ago.` : "No daily report has ever been built.",
+      hint: "The report is started by a scheduled call to /api/cron/daily-report. Check that your scheduler still calls it with the right secret.",
+    });
+  if (lastReport && !lastReport.whatsappSent && process.env.CALLMEBOT_APIKEY && process.env.CALLMEBOT_PHONE)
+    problems.push({
+      level: "warning",
+      title: "The latest owner report was not sent on WhatsApp",
+      detail: `“${lastReport.title}” was built but did not reach WhatsApp.`,
+      hint: "In the owner's Reports page press “Send test WhatsApp”. If it fails, the CallMeBot key may need to be activated again.",
+    });
+  // Optional settings that are missing: not broken, but worth knowing what you lose.
+  for (const e of diag.env.filter((x) => !x.required && !x.set))
+    problems.push({
+      level: "info",
+      title: `${e.title} is not set`,
+      detail: e.ifMissing,
+      hint: "Add it in Vercel → Settings → Environment Variables, then redeploy.",
+      link: VERCEL_ENV,
     });
 
   if (negWarehouse === null || negRep === null || overpaid === null) incomplete.push("data checks");

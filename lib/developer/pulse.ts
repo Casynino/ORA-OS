@@ -24,6 +24,22 @@ function lastDays(n: number): string[] {
   return out;
 }
 
+
+/** Work that cannot move until a person acts, with how long the oldest item has waited. */
+export function getQueues() {
+  return safe(
+    () =>
+      prisma.$queryRaw<{ k: string; n: number; oldest: Date | null }[]>`
+        SELECT 'sales' AS k, count(*)::int AS n, min("createdAt") AS oldest FROM "FieldSale" WHERE "financeStatus" = 'PENDING' AND "voided" = false
+        UNION ALL SELECT 'collections', count(*)::int, min("createdAt") FROM "FieldPayment" WHERE "financeStatus" = 'PENDING'
+        UNION ALL SELECT 'orders', count(*)::int, min("createdAt") FROM "Request" WHERE "status" IN ('PENDING', 'PRICED')
+        UNION ALL SELECT 'fund', count(*)::int, min("createdAt") FROM "PettyCashRequest" WHERE "status" = 'PENDING'
+        UNION ALL SELECT 'expenses', count(*)::int, min("createdAt") FROM "ExpenseClaim" WHERE "status" = 'PENDING'
+        UNION ALL SELECT 'partners', count(*)::int, min("createdAt") FROM "User" WHERE "status" = 'PENDING' AND "role" = 'PARTNER'`,
+    [],
+  );
+}
+
 export type Pulse = Awaited<ReturnType<typeof getPulse>>;
 
 export async function getPulse() {
@@ -32,17 +48,7 @@ export async function getPulse() {
   const since7 = new Date(Date.now() - 7 * 86_400_000);
 
   const [queues, salesByDay, moneyIn, expenses, movesByDay, growth, openAlerts, reports, teamRows, teamActions] = await Promise.all([
-    safe(
-      () =>
-        prisma.$queryRaw<{ k: string; n: number; oldest: Date | null }[]>`
-          SELECT 'sales' AS k, count(*)::int AS n, min("createdAt") AS oldest FROM "FieldSale" WHERE "financeStatus" = 'PENDING' AND "voided" = false
-          UNION ALL SELECT 'collections', count(*)::int, min("createdAt") FROM "FieldPayment" WHERE "financeStatus" = 'PENDING'
-          UNION ALL SELECT 'orders', count(*)::int, min("createdAt") FROM "Request" WHERE "status" IN ('PENDING', 'PRICED')
-          UNION ALL SELECT 'fund', count(*)::int, min("createdAt") FROM "PettyCashRequest" WHERE "status" = 'PENDING'
-          UNION ALL SELECT 'expenses', count(*)::int, min("createdAt") FROM "ExpenseClaim" WHERE "status" = 'PENDING'
-          UNION ALL SELECT 'partners', count(*)::int, min("createdAt") FROM "User" WHERE "status" = 'PENDING' AND "role" = 'PARTNER'`,
-      [],
-    ),
+    getQueues(),
     safe(
       () =>
         prisma.$queryRaw<{ day: string; st: string; n: number; v: bigint }[]>`

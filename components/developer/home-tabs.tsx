@@ -14,8 +14,18 @@ export function HomeTabs({ tabs, panels, initial }: { tabs: HomeTab[]; panels: R
   const [active, setActive] = useState(initial);
 
   useEffect(() => {
-    const fromHash = window.location.hash.replace("#", "");
-    if (fromHash && tabs.some((t) => t.id === fromHash)) setActive(fromHash);
+    const sync = (scroll: boolean) => {
+      const fromHash = window.location.hash.replace("#", "");
+      if (fromHash && tabs.some((t) => t.id === fromHash)) {
+        setActive(fromHash);
+        if (scroll) document.getElementById("home-tabs")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    };
+    sync(false);
+    // A link such as "#errors" (from a problem card) switches to that tab and scrolls to it.
+    const onHash = () => sync(true);
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -29,7 +39,7 @@ export function HomeTabs({ tabs, panels, initial }: { tabs: HomeTab[]; panels: R
   }
 
   return (
-    <div>
+    <div id="home-tabs" className="scroll-mt-20">
       <div role="tablist" aria-label="Home sections" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
         {tabs.map((t) => {
           const on = t.id === active;

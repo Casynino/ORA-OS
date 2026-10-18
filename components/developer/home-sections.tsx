@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   AlertTriangle,
+  ArrowRight,
   Banknote,
   Boxes,
   CheckCircle2,
@@ -163,6 +164,15 @@ function ProblemCard({ p }: { p: Monitor["problems"][number] }) {
           <span className="font-semibold">What to do: </span>
           {p.hint}
         </p>
+        {p.link && (
+          <a
+            href={p.link.href}
+            {...(p.link.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+            className="mt-1 inline-flex items-center gap-1 rounded-full bg-background px-3 py-1.5 text-xs font-semibold text-primary ring-1 ring-border transition-colors hover:bg-muted"
+          >
+            {p.link.label} <ArrowRight className="size-3.5" />
+          </a>
+        )}
       </div>
     </details>
   );
@@ -569,7 +579,17 @@ export function ErrorsPanel({ m }: { m: Monitor }) {
                 <TableBody>
                   {m.events.groupedErrors.map((e, i) => (
                     <TableRow key={i}>
-                      <TableCell className="max-w-md text-sm">{e.message}</TableCell>
+                      <TableCell className="max-w-md text-sm">
+                        <p>{e.message}</p>
+                        {e.detail && (
+                          <details className="mt-1">
+                            <summary className="cursor-pointer text-xs font-medium text-primary hover:underline">Where it broke</summary>
+                            <pre className="mt-1.5 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-muted/50 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                              {e.detail}
+                            </pre>
+                          </details>
+                        )}
+                      </TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">{e.path ?? "—"}</TableCell>
                       <TableCell className="text-right tabular-nums">{e.n}</TableCell>
                       <TableCell className="whitespace-nowrap text-right text-sm text-muted-foreground" title={eat(e.last)}>
