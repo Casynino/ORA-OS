@@ -169,10 +169,10 @@ function ProblemRow({ p }: { p: Monitor["problems"][number] }) {
     <li className="relative">
       <span aria-hidden className={cn("absolute inset-y-0 left-0 w-[3px]", l.stripe)} />
       <details className="group">
-        <summary className="flex cursor-pointer list-none items-center gap-3.5 py-3 pl-[1.1rem] pr-5 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
-          <Icon className={cn("size-5 shrink-0", l.text)} />
+        <summary className="flex cursor-pointer list-none items-center gap-3 py-2.5 pl-[1.15rem] pr-5 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+          <Icon className={cn("size-[18px] shrink-0", l.text)} />
           <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold leading-snug">{p.title}</span>
+            <span className="block text-sm font-semibold leading-snug">{p.title}</span>
             <span className="line-clamp-1 text-[13px] text-muted-foreground">{p.detail}</span>
           </span>
           <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
@@ -207,7 +207,7 @@ function CheckList({ checks }: { checks: Monitor["systemChecks"] }) {
   const sorted = [...checks].sort((a, b) => CHECK_ORDER[a.status] - CHECK_ORDER[b.status]);
   return (
     <details className="group border-t border-border">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-3 text-sm text-foreground/80 transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-2.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
         <span>
           What was checked · {okCount} of {checks.length} fine{unknown > 0 ? `, ${unknown} not checked yet` : ""}
         </span>
@@ -242,7 +242,7 @@ function CheckList({ checks }: { checks: Monitor["systemChecks"] }) {
   );
 }
 
-/** Problems, most urgent first, in one slim panel: a row each, and "what was checked" folded at the bottom. */
+/** Problems, most urgent first, in one slim panel: a label above, a row each, and "what was checked" folded at the bottom. */
 export function Attention({ m }: { m: Monitor }) {
   const act = m.problems.filter((p) => p.level !== "info");
   const know = m.problems.filter((p) => p.level === "info");
@@ -250,25 +250,24 @@ export function Attention({ m }: { m: Monitor }) {
   const warn = act.length - crit;
   return (
     <section>
+      <div className="mb-2.5 flex items-center justify-between gap-3">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Needs your attention</h2>
+        <p className="shrink-0 whitespace-nowrap text-sm font-medium">
+          {act.length === 0 && <span className="text-success">All clear</span>}
+          {crit > 0 && <span className="text-destructive">{crit} to fix now</span>}
+          {crit > 0 && warn > 0 && <span className="text-muted-foreground"> · </span>}
+          {warn > 0 && <span className="text-warning">{warn} to look at</span>}
+        </p>
+      </div>
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-soft">
-        <div className="flex items-start justify-between gap-3 px-5 py-4">
-          <div className="min-w-0">
-            <h2 className="font-display text-base font-semibold leading-tight tracking-tight">Needs your attention</h2>
-            <p className="mt-1 text-[13px] text-muted-foreground">Checked just now. Tap a card to see what it means and what to do.</p>
-          </div>
-          <p className="shrink-0 whitespace-nowrap text-sm font-medium">
-            {act.length === 0 && <span className="text-success">All clear</span>}
-            {crit > 0 && <span className="text-destructive">{crit} to fix now</span>}
-            {crit > 0 && warn > 0 && <span className="text-muted-foreground"> · </span>}
-            {warn > 0 && <span className="text-warning">{warn} to look at</span>}
-          </p>
-        </div>
-        <ul className="max-h-[18rem] divide-y divide-border overflow-y-auto border-t border-border">
+        <ul className="max-h-[18rem] divide-y divide-border overflow-y-auto">
           {act.length === 0 && (
-            <li className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-5 py-2.5 text-sm">
-              <CheckCircle2 className="size-[18px] shrink-0 text-success" />
-              <span className="font-semibold">Nothing needs your attention</span>
-              <span className="text-xs text-muted-foreground">Nothing is broken and every required setting is in place.</span>
+            <li className="flex items-center gap-3 px-5 py-3 text-sm">
+              <CheckCircle2 className="size-4 shrink-0 text-success" />
+              <p className="min-w-0">
+                <span className="font-semibold">Nothing needs your attention.</span>{" "}
+                <span className="text-muted-foreground">Nothing is broken, and every required setting is in place.</span>
+              </p>
             </li>
           )}
           {[...act, ...know].map((p) => (
