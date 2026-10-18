@@ -267,14 +267,9 @@ export function DashboardShell({
 
       {/* Content */}
       <div className="lg:pl-64">
-        {/* A Developer working as a staff member always sees who they really are. */}
+        {/* A Developer working as someone gets a small floating pill (Stop lives there). */}
         {acting && <ActingBanner state={acting} />}
-        <header
-          className={cn(
-            "sticky z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur lg:px-8",
-            acting ? "top-9" : "top-0",
-          )}
-        >
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur lg:px-8">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setOpen(true)}

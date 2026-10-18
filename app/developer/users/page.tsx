@@ -65,9 +65,9 @@ export default async function DeveloperUsersPage() {
         <SectionTitle title="What the buttons do" />
         <div className="grid gap-3 md:grid-cols-3">
           <InfoCallout icon={LogIn} tone="info" title="Work as">
-            Opens that person&apos;s dashboard with their real permissions and data. A bar at the top shows who you
-            are working as; press <strong className="text-foreground">Stop</strong> to come back here. It ends by
-            itself after 4 hours.
+            Opens that person&apos;s dashboard with their real permissions and data. A small pill in the corner shows who
+            you are working as; press <strong className="text-foreground">Stop</strong> on it to come back here. It
+            ends by itself after 4 hours.
           </InfoCallout>
           <InfoCallout icon={UserX} tone="warn" title="Suspend">
             Blocks the account and signs the person out until it is re-activated. You must write a reason and type

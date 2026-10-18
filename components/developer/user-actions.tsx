@@ -190,8 +190,8 @@ export function DevUserActions({
                   accounts, or sign people out of all devices while working as them.
                 </>,
                 <>
-                  A bar at the top stays on screen. Press <strong className="text-foreground">Stop</strong> to come
-                  back — or it ends by itself after 4 hours.
+                  A small pill in the corner shows who you are working as. Press <strong className="text-foreground">Stop</strong> on it to
+                  come back — or it ends by itself after 4 hours.
                 </>,
               ].map((line, i) => (
                 <li key={i} className="flex items-start gap-2.5 text-muted-foreground">
