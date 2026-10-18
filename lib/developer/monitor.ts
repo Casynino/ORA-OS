@@ -448,7 +448,7 @@ export async function getMonitor() {
       level: "warning",
       title: "The database is getting large",
       detail: `Total size is ${(dbSize / 1048576).toFixed(0)} MB.`,
-      hint: "Add file storage (BLOB_READ_WRITE_TOKEN) so receipts and proofs stop living inside the database.",
+      hint: "Link the public Vercel Blob store (ora-files, Storage tab) so receipts and proofs stop living inside the database.",
       link: VERCEL_ENV,
     });
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { blobConfigured } from "@/lib/blob-config";
 import { sendWhatsApp } from "@/lib/notifications/whatsapp";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export async function GET(req: Request) {
     callmebotApikeySet: !!process.env.CALLMEBOT_APIKEY,
     notificationsDisabled: process.env.NOTIFICATIONS_DISABLED === "1",
     cronSecretSet: !!process.env.CRON_SECRET,
-    blobTokenSet: !!process.env.BLOB_READ_WRITE_TOKEN,
+    blobTokenSet: blobConfigured(),
     appUrl: process.env.NEXT_PUBLIC_APP_URL ?? null,
     onVercel: !!process.env.VERCEL,
   };

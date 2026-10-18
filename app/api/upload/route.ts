@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
+import { blobConfigured, blobToken } from "@/lib/blob-config";
 import { requireActor } from "@/lib/rbac";
 
 // 10 MB. Deliberately below the point where the base64 DATA-URL fallback (used
@@ -60,11 +61,12 @@ export async function POST(req: Request) {
     // Preferred: Vercel Blob (scales, keeps DB rows lean). Falls back to an
     // inline data URL if Blob isn't configured OR the upload fails — so proof
     // capture never hard-blocks a sale, even on Vercel's read-only filesystem.
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
+    if (blobConfigured()) {
       try {
         const blob = await put(`uploads/${storedName}`, bytes, {
           access: "public",
           contentType,
+          token: blobToken(),
         });
         return NextResponse.json({ url: blob.url, name: displayName, contentType, size: file.size });
       } catch (e) {

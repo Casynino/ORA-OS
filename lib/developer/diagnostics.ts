@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { blobConfigured } from "@/lib/blob-config";
 import { BUILD_ID } from "@/lib/build-id";
 
 /**
@@ -42,9 +43,9 @@ const ENV_CHECKS: EnvCheck[] = [
     required: true,
   },
   {
-    name: "BLOB_READ_WRITE_TOKEN",
+    name: "ORA_FILES_READ_WRITE_TOKEN",
     title: "File storage",
-    purpose: "Cloud storage for receipts, proofs and report PDFs (Vercel Blob).",
+    purpose: "Cloud storage for receipts, proofs and report PDFs (Vercel Blob, the public store “ora-files”).",
     ifMissing: "Uploads still work — files are kept inside the database instead. That is fine for now, but the database grows faster. Add it in Vercel when you want faster pages and a lighter database.",
     required: false,
   },
@@ -76,7 +77,12 @@ export type EnvStatus = EnvCheck & { set: boolean };
 export async function getDiagnostics() {
   const env: EnvStatus[] = ENV_CHECKS.map((c) => ({
     ...c,
-    set: c.name === "AUTH_SECRET" ? !!(process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET) : !!process.env[c.name],
+    set:
+      c.name === "AUTH_SECRET"
+        ? !!(process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET)
+        : c.name === "ORA_FILES_READ_WRITE_TOKEN"
+          ? blobConfigured()
+          : !!process.env[c.name],
   }));
   const pooled = /-pooler/i.test(process.env.DATABASE_URL ?? "");
 

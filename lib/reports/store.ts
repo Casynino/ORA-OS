@@ -1,5 +1,6 @@
 import "server-only";
 import { put } from "@vercel/blob";
+import { blobConfigured, blobToken } from "@/lib/blob-config";
 
 /**
  * Store a generated report PDF and return a public, unguessable URL — or `null`
@@ -8,17 +9,23 @@ import { put } from "@vercel/blob";
  * the system works with or without Blob.
  *
  * - Vercel Blob (token present): upload → public CDN URL (opens inline, no login).
- * - Local dev (no token, not on Vercel): write to /public/reports.
+ *   If the upload itself fails we fall through, so a storage hiccup never stops a report.
+ * - Local dev (no Blob, not on Vercel): write to /public/reports.
  * - Serverless without Blob: return null → regenerate on view.
  */
 export async function storeReportPdf(bytes: Uint8Array, filename: string): Promise<string | null> {
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const blob = await put(`reports/${filename}`, Buffer.from(bytes), {
-      access: "public",
-      contentType: "application/pdf",
-      addRandomSuffix: true,
-    });
-    return blob.url;
+  if (blobConfigured()) {
+    try {
+      const blob = await put(`reports/${filename}`, Buffer.from(bytes), {
+        access: "public",
+        contentType: "application/pdf",
+        addRandomSuffix: true,
+        token: blobToken(),
+      });
+      return blob.url;
+    } catch (e) {
+      console.error("Vercel Blob report upload failed, regenerating on view instead:", e);
+    }
   }
   if (!process.env.VERCEL) {
     // Local dev only — the read-only Vercel filesystem can't be written to.

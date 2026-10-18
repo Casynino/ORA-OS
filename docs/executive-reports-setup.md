@@ -21,7 +21,7 @@ Project → Settings → Environment Variables (Production), then **redeploy**:
 | `CALLMEBOT_PHONE` | Admin WhatsApp number, international, no `+` — e.g. `447516239665` |
 | `CALLMEBOT_APIKEY` | Your CallMeBot API key |
 | `CRON_SECRET` | A random secret — generate with `openssl rand -hex 24` |
-| `BLOB_READ_WRITE_TOKEN` | Already set (used for PDF storage). Add a Vercel Blob store if missing. |
+| `ORA_FILES_READ_WRITE_TOKEN` | Token of the public Vercel Blob store `ora-files` (PDF + receipt storage). Falls back to `BLOB_READ_WRITE_TOKEN`. Without either, files stay in the database and reports regenerate on view. |
 | `NEXT_PUBLIC_APP_URL` | `https://ora-os-eight.vercel.app` (used to build report links) |
 
 > To pause all WhatsApp sending, set `NOTIFICATIONS_DISABLED=1`. Or toggle
