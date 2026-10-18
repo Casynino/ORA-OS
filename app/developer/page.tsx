@@ -3,7 +3,8 @@ import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { getMonitor } from "@/lib/developer/monitor";
 import { ensureErrorTracking } from "@/lib/developer/tracking";
-import { CommandDeck } from "@/components/developer/command-deck";
+import { DashboardHero } from "@/components/ui/dashboard-hero";
+import { StatusCard } from "@/components/developer/status-card";
 import { QuickLink } from "@/components/developer/info";
 import { CreateAccountButton } from "@/components/developer/create-account";
 import { WorkAsCard } from "@/components/developer/work-as-picker";
@@ -58,7 +59,12 @@ export default async function DeveloperHomePage() {
   return (
     <div className="space-y-10">
       <div className="space-y-4">
-        <CommandDeck m={m} eyebrow={dateLabel} pill="Developer" title={<>{greeting}, {firstName}.</>} />
+        <DashboardHero
+          eyebrow={dateLabel}
+          pill="Developer"
+          title={<>{greeting}, {firstName}.</>}
+          subtitle="Your control room for ORA — health, people and everything done, in one place."
+        />
 
         {/* The things you do most: four tiles */}
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -69,6 +75,8 @@ export default async function DeveloperHomePage() {
         </section>
       </div>
 
+      {/* The verdict and live numbers, then what needs attention */}
+      <StatusCard m={m} />
       <Attention m={m} />
 
       <JumpBar
