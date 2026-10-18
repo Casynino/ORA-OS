@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 import { loginAction } from "@/lib/actions/auth";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
 
@@ -35,14 +36,13 @@ export function LoginForm() {
 
       <div>
         <Label htmlFor="password">Password</Label>
-        <Input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           autoComplete="current-password"
           placeholder="••••••••"
           required
-          className="mt-1.5"
+          wrapperClassName="mt-1.5"
         />
       </div>
 

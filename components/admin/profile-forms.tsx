@@ -12,6 +12,7 @@ import {
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 
@@ -170,16 +171,16 @@ export function PasswordForm() {
     <div className="space-y-3">
       <div>
         <Label>Current password</Label>
-        <Input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} className="mt-1.5" />
+        <PasswordInput value={current} onChange={(e) => setCurrent(e.target.value)} wrapperClassName="mt-1.5" />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>New password</Label>
-          <Input type="password" value={next} onChange={(e) => setNext(e.target.value)} className="mt-1.5" />
+          <PasswordInput value={next} onChange={(e) => setNext(e.target.value)} wrapperClassName="mt-1.5" />
         </div>
         <div>
           <Label>Confirm new password</Label>
-          <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className="mt-1.5" />
+          <PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)} wrapperClassName="mt-1.5" />
         </div>
       </div>
       <Button

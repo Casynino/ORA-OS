@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertCircle, CheckCircle2, Store } from "lucide-react";
 import { registerAction } from "@/lib/actions/auth";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -129,14 +130,13 @@ export function RegisterForm() {
 
       <div>
         <Label htmlFor="password">Password</Label>
-        <Input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           autoComplete="new-password"
           required
           minLength={8}
-          className="mt-1.5"
+          wrapperClassName="mt-1.5"
         />
         <p className="mt-1 text-xs text-muted-foreground">
           At least 8 characters.
