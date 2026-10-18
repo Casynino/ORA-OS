@@ -82,6 +82,27 @@ const eat = (d: Date) =>
 const bytes = (n: number) =>
   n >= 1073741824 ? `${(n / 1073741824).toFixed(2)} GB` : n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
+/** A slim bar that stays under the header while you scroll: one tap jumps to any section. */
+export function JumpBar({ items }: { items: { id: string; label: string; badge?: string | null }[] }) {
+  return (
+    <nav
+      aria-label="Jump to a section"
+      className="sticky top-16 z-20 -mx-1 flex gap-1.5 overflow-x-auto border-b border-border bg-background/90 px-1 py-2.5 backdrop-blur"
+    >
+      {items.map((i) => (
+        <a
+          key={i.id}
+          href={`#${i.id}`}
+          className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+        >
+          {i.label}
+          {i.badge && <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums">{i.badge}</span>}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 /* ───────────────────────── one section of the Home page ───────────────────────── */
 
 /** A titled block on the single Home page. `id` lets a problem card jump straight to it ("#errors"). */
@@ -99,7 +120,7 @@ export function HomeSection({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-20 border-t border-border pt-8">
+    <section id={id} className="scroll-mt-32 border-t border-border pt-8">
       <div className="mb-5 flex items-center gap-3">
         <h2 className="font-display text-2xl font-bold tracking-tight">{title}</h2>
         {badge && (

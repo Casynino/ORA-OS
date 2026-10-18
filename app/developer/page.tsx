@@ -13,6 +13,7 @@ import {
   ErrorsPanel,
   Attention,
   HomeSection,
+  JumpBar,
   PeoplePanel,
   SettingsPanel,
   SpeedPanel,
@@ -74,6 +75,16 @@ export default async function DeveloperHomePage() {
       {/* Verdict + live numbers in one compact panel, then what needs attention */}
       <StatusStrip m={m} />
       <Attention m={m} />
+
+      <JumpBar
+        items={[
+          { id: "errors", label: "Crashes & sign-ins", badge: errorsBadge },
+          { id: "speed", label: "Speed & size" },
+          { id: "settings", label: "Settings", badge: missing > 0 ? String(missing) : null },
+          { id: "people", label: "People" },
+          { id: "activity", label: "Activity" },
+        ]}
+      />
 
       {/* Everything else, on this one page: what is broken first, then speed, settings, people, and usage (Activity) last */}
       <HomeSection
