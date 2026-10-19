@@ -92,10 +92,10 @@ export default async function DeveloperUsersPage() {
             deleted.
           </InfoCallout>
         </div>
-        <InfoCallout icon={ShieldCheck} tone="good" className="mt-3" title="Safety rules while working as someone">
-          You can&apos;t change passwords or login emails, create new accounts, or sign people out of all devices
-          while working as them — so “Work as” can never be used to take over an account. The owner is told every
-          time you start.
+        <InfoCallout icon={ShieldCheck} tone="good" className="mt-3" title="While working as someone">
+          You have that person&apos;s full access: change, add and edit anything they can, including passwords and
+          login emails. Everything is still recorded as “you (Developer) as them”, and the owner is told every time
+          you start. It ends by itself after 4 hours.
         </InfoCallout>
       </section>
 

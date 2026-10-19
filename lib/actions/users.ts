@@ -523,11 +523,6 @@ export async function updateCustomer(
     });
     if (!user || user.role === "DEVELOPER") return fail("Customer not found.");
 
-    // The email is the login — it can't be changed while a Developer is working
-    // as the Admin (account-takeover guard).
-    if (admin.impersonatedBy && parsed.data.email.toLowerCase().trim() !== user.email.toLowerCase())
-      return fail("The login email can't be changed while a Developer is working as someone.");
-
     // Guard against email collisions with another account.
     if (parsed.data.email.toLowerCase() !== user.email.toLowerCase()) {
       const clash = await prisma.user.findUnique({

@@ -8,9 +8,10 @@ import type { Role, UserStatus } from "@prisma/client";
  *     another Developer and never yourself,
  *   • everything done while working-as is written to the activity log as
  *     "<Developer> (Developer) as <person>" — never as the person alone,
- *   • sign-in / credential actions (passwords, emails, new accounts, "sign out
- *     everywhere") are blocked while working-as — see requireOwnIdentity() — so it
- *     can't be used to take over, or plant a backdoor into, anyone's account.
+ *   • while working as someone you have THEIR full access: you can change, add and edit
+ *     anything they can, including passwords, login emails and new accounts (the owner's
+ *     decision). The only things that still apply are the audit label above, the owner being
+ *     told when you start, Stop, and the automatic end after 4 hours.
  */
 /** What the session token remembers while a Developer is working as someone. */
 export type ActAs = {

@@ -348,8 +348,8 @@ export function DevUserActions({
                 </>,
                 <>The owner is told that you started, and each alert says it was done by the Developer.</>,
                 <>
-                  You <strong className="text-foreground">cannot</strong> change passwords or login emails, create
-                  accounts, or sign people out of all devices while working as them.
+                  You have their <strong className="text-foreground">full access</strong>: change, add and edit anything
+                  they can, including passwords and login emails.
                 </>,
                 <>
                   A small pill in the corner shows who you are working as. Press <strong className="text-foreground">Stop</strong> on it to

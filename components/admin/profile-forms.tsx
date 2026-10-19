@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
+import { useActing } from "@/components/developer/acting-banner";
 
 export function ProfileForm({
   initial,
@@ -146,6 +147,8 @@ export function ProfileForm({
 }
 
 export function PasswordForm() {
+  // A Developer working as this person has their full access: no need to know the current password.
+  const acting = useActing();
   const [pending, start] = useTransition();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -169,10 +172,12 @@ export function PasswordForm() {
 
   return (
     <div className="space-y-3">
-      <div>
-        <Label>Current password</Label>
-        <PasswordInput value={current} onChange={(e) => setCurrent(e.target.value)} wrapperClassName="mt-1.5" />
-      </div>
+      {!acting && (
+        <div>
+          <Label>Current password</Label>
+          <PasswordInput value={current} onChange={(e) => setCurrent(e.target.value)} wrapperClassName="mt-1.5" />
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>New password</Label>
@@ -186,7 +191,7 @@ export function PasswordForm() {
       <Button
         variant="outline"
         className="rounded-full"
-        disabled={pending || !current || next.length < 8}
+        disabled={pending || (!acting && !current) || next.length < 8}
         onClick={submit}
       >
         <KeyRound className="size-4" />
