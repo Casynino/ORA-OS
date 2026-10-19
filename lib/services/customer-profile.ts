@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { notDeveloperTrack } from "@/lib/developer/audit-visibility";
 
 /**
  * One complete customer record, assembled once and shared by the Sales Rep,
@@ -225,7 +226,7 @@ export async function getFieldCustomerProfile(
     // Credit-limit / suspend / restore / note events are logged against the
     // FieldCustomer entity — they carry the non-sale part of the timeline.
     prisma.activityLog.findMany({
-      where: { entity: "FieldCustomer", entityId: id },
+      where: { entity: "FieldCustomer", entityId: id, ...notDeveloperTrack },
       orderBy: { createdAt: "desc" },
       select: { id: true, action: true, summary: true, createdAt: true },
     }),

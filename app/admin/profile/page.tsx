@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { notDeveloperTrack } from "@/lib/developer/audit-visibility";
 import { notDeleted } from "@/lib/deleted-accounts";
 import {
   ShieldCheck,
@@ -69,7 +70,7 @@ export default async function AdminProfilePage() {
       take: 8,
     }),
     prisma.activityLog.findMany({
-      where: { actorId: session.id },
+      where: { actorId: session.id, ...notDeveloperTrack },
       orderBy: { createdAt: "desc" },
       take: 8,
     }),

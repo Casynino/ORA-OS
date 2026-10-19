@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notDeveloperTrack } from "@/lib/developer/audit-visibility";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
@@ -76,7 +77,7 @@ export default async function CustomerProfilePage({
         orderBy: { createdAt: "desc" },
       }),
       prisma.activityLog.findMany({
-        where: { OR: [{ entityId: id }, { actorId: id }] },
+        where: { OR: [{ entityId: id }, { actorId: id }], ...notDeveloperTrack },
         orderBy: { createdAt: "desc" },
         take: 40,
       }),

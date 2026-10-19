@@ -9,8 +9,10 @@ import { prisma } from "@/lib/db";
  * protects from UPDATE/DELETE (see scripts/developer-account.sql).
  *
  * Mutating actions call writeDevAudit() INSIDE the same transaction as the change
- * (no audit row ⇒ the change rolls back). Read-only views and failed logins use
- * writeDevAuditSafe(), which never throws.
+ * (no audit row ⇒ the change rolls back). writeDevAuditSafe() never throws and keeps
+ * the trail to real CHANGES only (the owner's rule): signing in, looking at pages and
+ * refused or failed attempts leave no track. The one exception is failed sign-ins,
+ * which the password lockout counts.
  */
 
 type Db = Prisma.TransactionClient | typeof prisma;
@@ -64,8 +66,14 @@ export async function writeDevAudit(db: Db, input: DevAuditInput): Promise<strin
   return row.id;
 }
 
-/** Best-effort variant for reads / failed logins — never throws. */
+/** Failed sign-ins are kept because the lockout (5 wrong tries) counts them. */
+const ALWAYS_KEEP = new Set(["DEV_LOGIN_FAILED", "DEV_LOGIN_BLOCKED"]);
+/** Looking and signing in are not changes: no track. */
+const NOT_A_CHANGE = new Set(["DEV_VIEW", "DEV_LOGIN"]);
+
+/** Best-effort variant — never throws. Only successful changes (and failed sign-ins) leave a track. */
 export async function writeDevAuditSafe(input: DevAuditInput): Promise<void> {
+  if (!ALWAYS_KEEP.has(input.action) && (input.outcome !== "SUCCESS" || NOT_A_CHANGE.has(input.action))) return;
   try {
     await writeDevAudit(prisma, input);
   } catch (e) {

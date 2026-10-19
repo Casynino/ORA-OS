@@ -81,7 +81,7 @@ export async function authenticateDeveloper(
           return false;
         }
 
-        await log("DEV_LOGIN", "Developer signed in.", "SUCCESS");
+        // A successful sign-in leaves no track (the audit records changes only); failed ones are kept for the lockout.
         return true;
       },
       { maxWait: 10_000, timeout: 20_000 },

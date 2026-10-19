@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { notDeveloperTrack } from "@/lib/developer/audit-visibility";
 import { notDeleted } from "@/lib/deleted-accounts";
 
 // Money events the CEO should see in the financial activity feed —
@@ -224,7 +225,7 @@ export async function getCommandCenter() {
       take: 1,
     }),
     prisma.request.groupBy({ by: ["status"], _count: { _all: true } }),
-    prisma.activityLog.findMany({ take: 9, orderBy: { createdAt: "desc" } }),
+    prisma.activityLog.findMany({ where: notDeveloperTrack, take: 9, orderBy: { createdAt: "desc" } }),
     // CEO financial activity feed — every verified money event, newest first.
     prisma.activityLog.findMany({
       where: { action: { in: FINANCIAL_ACTIONS } },

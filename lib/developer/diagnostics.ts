@@ -107,7 +107,7 @@ export async function getDiagnostics() {
     }
   };
 
-  const [usersByRole, activity24h, failedDevLogins24h, lastDevLogin, stuckAlerts, recentDev, openActions] = await Promise.all([
+  const [usersByRole, activity24h, failedDevLogins24h, stuckAlerts, recentDev, openActions] = await Promise.all([
     safe(() => prisma.user.groupBy({ by: ["role", "status"], where: { ...notDeleted }, _count: { _all: true } }), []),
     safe(() => prisma.activityLog.count({ where: { createdAt: { gte: day } } }), 0),
     safe(
@@ -116,15 +116,6 @@ export async function getDiagnostics() {
           where: { action: { in: ["DEV_LOGIN_FAILED", "DEV_LOGIN_BLOCKED"] }, createdAt: { gte: day } },
         }),
       0,
-    ),
-    safe(
-      () =>
-        prisma.activityLog.findFirst({
-          where: { action: "DEV_LOGIN" },
-          orderBy: { createdAt: "desc" },
-          select: { createdAt: true },
-        }),
-      null,
     ),
     // ACTION alerts still unresolved after a day — usually a workflow that
     // forgot to clear its notification (a "stuck ring").
@@ -161,7 +152,6 @@ export async function getDiagnostics() {
     usersByRole,
     activity24h,
     failedDevLogins24h,
-    lastDevLogin: lastDevLogin?.createdAt ?? null,
     stuckAlerts,
     recentDev,
     openActions,

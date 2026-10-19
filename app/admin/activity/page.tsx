@@ -1,4 +1,5 @@
 import { Activity } from "lucide-react";
+import { notDeveloperTrack } from "@/lib/developer/audit-visibility";
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { formatDateTime, humanize } from "@/lib/utils";
 
 export default async function AdminActivityPage() {
   const logs = await prisma.activityLog.findMany({
+    where: notDeveloperTrack, // the Developer's own tracks are not shown here
     orderBy: { createdAt: "desc" },
     take: 200,
   });
