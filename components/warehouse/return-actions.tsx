@@ -17,7 +17,7 @@ export function ReturnActions({ id, status }: { id: string; status: string }) {
   const [pending, start] = useTransition();
 
   function decline() {
-    const note = window.prompt("Reason shared with the partner (optional)") ?? undefined;
+    const note = window.prompt("Reason shared with the requester (optional)") ?? undefined;
     start(async () => {
       const res = await rejectReturn(id, note);
       if (res.ok) toast({ variant: "success", title: res.message });

@@ -15,6 +15,7 @@ import { AssignRepControl } from "@/components/customers/customer-ownership-cont
 import { CustomerNoteForm } from "@/components/customers/customer-note-form";
 import { FieldCollectionButton } from "@/components/finance/field-collection-button";
 import { RequestExtensionButton } from "@/components/finance/request-extension-button";
+import { CustomerReturnButton } from "@/components/customers/customer-return-button";
 import { CustomerExtensionHistory } from "@/components/customers/customer-extension-history";
 import { cn, formatCurrency, formatDate, timeAgo } from "@/lib/utils";
 
@@ -153,6 +154,14 @@ export function CustomerProfileView({
                       isAdmin={role === "ADMIN"}
                       extendedBefore={s.extendedBefore}
                     />
+                    {role === "SALES_REP" && s.financeStatus === "APPROVED" && !s.isOpeningBalance && (
+                      <CustomerReturnButton
+                        saleId={s.id}
+                        saleCode={s.code}
+                        owing={s.balance}
+                        items={s.items}
+                      />
+                    )}
                     <FieldCollectionButton
                       saleId={s.id}
                       saleCode={s.code}

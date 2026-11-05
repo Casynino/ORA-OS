@@ -88,7 +88,7 @@ export function ReturnsManager({
 
   function reject(id: string) {
     const reason =
-      window.prompt("Reason shared with the partner (optional)") ?? undefined;
+      window.prompt("Reason shared with the requester (optional)") ?? undefined;
     start(async () => {
       const res = await rejectReturn(id, reason);
       if (res.ok) toast({ variant: "success", title: res.message });

@@ -86,7 +86,8 @@ export type CustomerProfile = {
     hasPendingExtension: boolean;
     extendedBefore: boolean; // ≥1 approved extension already — a further one needs boss approval
     isOpeningBalance: boolean;
-    items: { name: string; quantity: number }[];
+    // productId / unitPrice / returned feed the rep's "Return goods" form.
+    items: { productId: string; name: string; quantity: number; unitPrice: number; returned: number }[];
   }[];
   extensions: ExtensionEntry[];
   timeline: TimelineEntry[];
@@ -210,7 +211,7 @@ export async function getFieldCustomerProfile(
           include: {
             items: { include: { product: { select: { name: true } } } },
             payments: { orderBy: { createdAt: "desc" } },
-            returns: { select: { code: true, quantity: true, creditValue: true, status: true, createdAt: true } },
+            returns: { select: { code: true, productId: true, quantity: true, creditValue: true, status: true, createdAt: true } },
           },
         },
         creditExtensions: {
@@ -495,7 +496,15 @@ export async function getFieldCustomerProfile(
       hasPendingExtension: pendingExtSaleIds.has(s.id),
       extendedBefore: approvedExtSaleIds.has(s.id),
       isOpeningBalance: s.isOpeningBalance,
-      items: s.items.map((i) => ({ name: i.product.name, quantity: i.quantity })),
+      items: s.items.map((i) => ({
+        productId: i.productId,
+        name: i.product.name,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        returned: s.returns
+          .filter((r) => r.productId === i.productId && r.status !== "REJECTED")
+          .reduce((sum, r) => sum + r.quantity, 0),
+      })),
     })),
     extensions,
     timeline,

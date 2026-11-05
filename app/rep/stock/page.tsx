@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Package, MapPin, Gift, PlusCircle } from "lucide-react";
+import { Package, MapPin, Gift, PlusCircle, Undo2 } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
+import { REP_RETURN_TYPE } from "@/lib/rep-returns";
 import { PageHeader } from "@/components/ui/page-header";
 import { ConfirmCollectionButton } from "@/components/field/confirm-collection";
 import { buttonVariants } from "@/components/ui/button";
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function RepStockPage() {
   const me = await requireRole("SALES_REP");
 
-  const [stock, ready] = await Promise.all([
+  const [stock, ready, sentBack] = await Promise.all([
     prisma.repStock.findMany({
       where: { repId: me.id },
       include: { product: { select: { name: true, unitsPerCarton: true, notForSale: true } } },
@@ -27,7 +28,14 @@ export default async function RepStockPage() {
         warehouse: { select: { name: true, location: true } },
       },
     }),
+    // Pieces the warehouse has already received back from this rep.
+    prisma.returnRequest.groupBy({
+      by: ["productId"],
+      where: { requesterId: me.id, reasonType: REP_RETURN_TYPE, status: "COMPLETED" },
+      _sum: { quantity: true },
+    }),
   ]);
+  const returnedBy = new Map(sentBack.map((r) => [r.productId, r._sum.quantity ?? 0]));
 
   const forSale = stock.filter((s) => !s.product.notForSale);
   const samples = stock.filter((s) => s.product.notForSale);
@@ -38,6 +46,9 @@ export default async function RepStockPage() {
         title="My stock"
         description="What's in your hands right now."
       >
+        <Link href="/rep/stock/return" className={cn(buttonVariants({ size: "sm", variant: "outline" }), "rounded-full")}>
+          <Undo2 className="size-4" /> Return stock
+        </Link>
         <Link href="/rep/stock/request" className={cn(buttonVariants({ size: "sm" }), "rounded-full")}>
           <PlusCircle className="size-4" /> Request stock
         </Link>
@@ -119,6 +130,7 @@ export default async function RepStockPage() {
                   </div>
                   <p className="mt-2.5 text-xs text-muted-foreground">
                     received {formatNumber(s.receivedQty)} · sold {formatNumber(s.soldQty)}
+                    {(returnedBy.get(s.productId) ?? 0) > 0 ? ` · returned ${formatNumber(returnedBy.get(s.productId) ?? 0)}` : ""}
                   </p>
                 </div>
               );
@@ -150,6 +162,7 @@ export default async function RepStockPage() {
                 </div>
                 <p className="mt-2.5 text-xs text-muted-foreground">
                   received {formatNumber(s.receivedQty)} · distributed {formatNumber(s.sampledQty)}
+                  {(returnedBy.get(s.productId) ?? 0) > 0 ? ` · returned ${formatNumber(returnedBy.get(s.productId) ?? 0)}` : ""}
                 </p>
               </div>
             ))}
