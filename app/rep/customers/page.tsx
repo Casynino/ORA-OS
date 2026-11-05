@@ -28,7 +28,7 @@ export default async function RepCustomersPage() {
         <NewCustomerForm />
       </PageHeader>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="kpi-grid">
         <StatCard label="Customers" value={formatNumber(rows.length)} icon={Users} accent="primary" />
         <StatCard
           label="Outstanding credit"

@@ -125,7 +125,7 @@ export default async function AdminInventoryPage() {
       </div>
 
       {/* Count KPIs */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="kpi-grid-2">
         <StatCard
           label="Total products"
           value={formatNumber(products.length)}

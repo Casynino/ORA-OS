@@ -34,7 +34,7 @@ export default async function FinanceSalesPage() {
         </Link>
       </PageHeader>
 
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+      <div className="kpi-grid-5">
         <KpiCard label="Total sales" value={rows.length} icon={ShoppingCart} accent="primary" />
         <KpiCard label="Revenue (confirmed)" value={revenue} prefix="TSh " icon={TrendingUp} accent="success" />
         <KpiCard label="Cash sales" value={cashTotal} prefix="TSh " icon={Banknote} accent="success" />

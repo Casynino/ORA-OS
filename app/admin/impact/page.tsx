@@ -47,7 +47,7 @@ export default async function AdminImpactPage() {
         </Link>
       </PageHeader>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="kpi-grid">
         <StatCard label="Published activities" value={formatNumber(published.length)} icon={Sparkles} accent="primary" hint={activities.length !== published.length ? `${activities.length - published.length} hidden` : undefined} />
         <StatCard label="Pads distributed (activities)" value={formatNumber(pads)} icon={Package} accent="accent" />
         <StatCard label="People reached (activities)" value={formatNumber(people)} icon={Users} accent="success" />

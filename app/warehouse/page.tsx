@@ -299,7 +299,7 @@ export default async function WarehouseOverviewPage() {
       </Reveal>
 
       {/* Operational KPIs — counts only, never money. */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="kpi-grid">
         {tiles.map((t) => (
           <Link key={t.label} href={t.href} className="transition-transform hover:-translate-y-0.5">
             <StatCard label={t.label} value={formatNumber(t.count)} icon={t.icon} accent={t.accent} />

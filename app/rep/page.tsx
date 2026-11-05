@@ -129,7 +129,7 @@ export default async function RepOverviewPage() {
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           At a glance
         </h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="kpi-grid-2">
           {summary.map((s, i) => (
             <Reveal key={s.label} delay={i * 0.03}>
               {s.href ? (
@@ -179,7 +179,7 @@ export default async function RepOverviewPage() {
               <span className="text-sm text-muted-foreground">Credit still to collect</span>
               <CreditCard className={cn("size-4", d.creditOutstanding > 0 ? "text-warning" : "text-success")} />
             </div>
-            <p className="mt-2 font-display text-2xl font-bold sm:text-3xl">{formatCurrency(d.creditOutstanding)}</p>
+            <div className="kpi-value mt-2"><p className="kpi-num font-display font-bold">{formatCurrency(d.creditOutstanding)}</p></div>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {d.openCreditCount} open · {d.overdueCount > 0 ? `${d.overdueCount} overdue — chase now` : "none overdue"}
             </p>

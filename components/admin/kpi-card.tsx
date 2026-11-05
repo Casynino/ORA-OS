@@ -31,7 +31,7 @@ export function KpiCard({
   trend?: { value: string; up: boolean };
 }) {
   return (
-    <div className="glass-card relative overflow-hidden rounded-2xl p-5">
+    <div className="glass-card relative min-w-0 overflow-hidden rounded-2xl p-4 sm:p-5">
       <div
         className={cn(
           "pointer-events-none absolute -right-8 -top-8 size-28 rounded-full bg-gradient-to-br opacity-70 blur-2xl",
@@ -39,20 +39,22 @@ export function KpiCard({
         )}
       />
       <div className="relative flex items-center justify-between">
-        <span className="text-sm font-medium text-muted-foreground">
+        <span className="min-w-0 truncate pr-2 text-sm font-medium text-muted-foreground">
           {label}
         </span>
         <span
           className={cn(
-            "flex size-9 items-center justify-center rounded-xl bg-gradient-to-br",
+            "flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br",
             accents[accent],
           )}
         >
           <Icon className="size-4" />
         </span>
       </div>
-      <div className="relative mt-3 font-display text-3xl font-bold tracking-tight">
-        <CountUp value={value} prefix={prefix} suffix={suffix} />
+      <div className="kpi-value relative mt-3">
+        <div className="kpi-num font-display font-bold tracking-tight">
+          <CountUp value={value} prefix={prefix} suffix={suffix} />
+        </div>
       </div>
       {(trend || hint) && (
         <div className="relative mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">

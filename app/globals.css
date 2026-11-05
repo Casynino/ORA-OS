@@ -445,3 +445,60 @@
 @media (prefers-reduced-motion: reduce) {
   .tz-bloom { animation: none; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Number cards that fit on every screen.
+   A fixed 30px amount like "TSh 56,331,900" needs ~270px; on a laptop the
+   content area (viewport − sidebar − padding) only leaves ~140–180px per card
+   when five sit side by side, so the number wrapped ("…,90 / 0"). Two fixes:
+   1) the amount SHRINKS to the width of its own card (container query units),
+   2) card rows only add columns while each card stays wide enough to read.
+   ───────────────────────────────────────────────────────────────────────────── */
+.kpi-value { container-type: inline-size; min-width: 0; }
+.kpi-num {
+  font-size: clamp(0.85rem, 9.5cqw, 1.875rem);
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-grid,
+.kpi-grid-2,
+.kpi-grid-5,
+.kpi-grid-6 {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr); /* phones: one card per row */
+}
+.kpi-grid-2,
+.kpi-grid-5,
+.kpi-grid-6 {
+  grid-template-columns: repeat(2, minmax(0, 1fr)); /* phones: two per row */
+}
+/* Generic rows: as many columns as fit with each card ≥ 13.5rem wide. */
+@media (min-width: 640px) {
+  .kpi-grid,
+  .kpi-grid-2 {
+    grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
+  }
+  .kpi-grid-5,
+  .kpi-grid-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+/* Five / six-card rows wait for a wide desktop before going single-line. */
+@media (min-width: 1536px) {
+  .kpi-grid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+@media (min-width: 1792px) {
+  .kpi-grid-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+/* Amounts in tables never split "TSh" from the figure when columns get tight. */
+table td.text-right,
+table th.text-right,
+.tabular-nums {
+  white-space: nowrap;
+}

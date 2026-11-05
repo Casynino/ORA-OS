@@ -65,7 +65,7 @@ export default async function AdminReportsPage() {
       {/* ── 2 · Live business snapshot (at-a-glance figures) ── */}
       <section>
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Live business snapshot</p>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="kpi-grid">
           <KpiCard label="Stock on hand" value={stock.warehouse} suffix=" units" icon={Package} accent="primary" />
           <KpiCard label="With partners" value={stock.assigned} suffix=" units" icon={Package} accent="warning" />
           <KpiCard label="Distributed" value={stock.distributed} suffix=" units" icon={Package} accent="success" />

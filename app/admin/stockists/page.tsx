@@ -38,7 +38,7 @@ export default async function AdminStockistsPage() {
         </Link>
       </PageHeader>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="kpi-grid">
         <StatCard label="Active stockists" value={formatNumber(active.length)} icon={Store} accent="primary" hint={rows.length !== active.length ? `${rows.length - active.length} hidden` : undefined} />
         <StatCard label="Regions covered" value={formatNumber(regions)} icon={Map} accent="accent" />
         <StatCard label="Districts reached" value={formatNumber(districts)} icon={MapPin} accent="success" />

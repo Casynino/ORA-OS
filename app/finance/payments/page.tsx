@@ -58,7 +58,7 @@ export default async function FinancePaymentsPage() {
         description="Verify each incoming payment against the receiving account, then confirm — the order moves to the warehouse automatically."
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="kpi-grid">
         <StatCard label="Awaiting confirmation" value={formatNumber(pending.length)} hint={formatCurrency(pendingValue)} icon={ClipboardCheck} accent={pending.length > 0 ? "warning" : "success"} />
         <StatCard label="Claimed by customers" value={formatNumber(claimed.length)} hint="customer says they've paid" icon={Clock} accent={claimed.length > 0 ? "info" : "success"} />
         <StatCard label="Confirmed today" value={formatNumber(confirmedToday.length)} hint={formatCurrency(confirmedTodayValue)} icon={CheckCircle2} accent="success" />

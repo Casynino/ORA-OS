@@ -67,7 +67,7 @@ export default async function AdminFieldCustomersPage() {
         </div>
       </PageHeader>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="kpi-grid-2">
         <StatCard label="Customers" value={formatNumber(totals.customers)} icon={Users} />
         <StatCard label="Acquired by" value={`${totals.reps} rep${totals.reps === 1 ? "" : "s"}`} accent="info" />
         <StatCard label="Lifetime sales" value={formatCurrency(totals.revenue)} accent="success" />

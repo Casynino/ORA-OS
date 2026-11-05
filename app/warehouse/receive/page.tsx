@@ -84,7 +84,7 @@ export default async function WarehouseReceivePage() {
       />
 
       {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="kpi-grid">
         <StatCard label="Received today" value={formatNumber(todayAgg._sum.quantity ?? 0)} hint="units" icon={ArrowDownToLine} accent="success" />
         <StatCard label="Received this month" value={formatNumber(monthAgg._sum.quantity ?? 0)} hint="units" icon={CalendarClock} accent="info" />
         <StatCard label="Stock on hand" value={formatNumber(onHand)} hint={`${stock.length} products`} icon={Boxes} accent="primary" />

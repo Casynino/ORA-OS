@@ -75,7 +75,7 @@ export default async function FinanceReportsPage() {
       />
 
       {/* Headline figures — this month */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="kpi-grid">
         <StatCard
           label="Income this month"
           value={formatCurrency(w.income.income)}

@@ -62,7 +62,7 @@ export default async function AdminFinanceProfitPage({
       <PeriodTabs period={period} basePath="/admin/finance/profit" />
 
       {/* Headline */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="kpi-grid">
         <StatCard
           label={`Revenue ${PERIOD_LABEL[period]}`}
           value={formatCurrency(w.revenue)}

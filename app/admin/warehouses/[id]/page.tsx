@@ -168,7 +168,7 @@ export default async function WarehouseDetailPage({
       </div>
 
       {/* Overview */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="kpi-grid-6">
         <StatCard label="Stock on hand" value={formatNumber(onHand)} icon={Package} accent="success" />
         <StatCard label="Stock value" value={formatCurrency(stockValue)} icon={Coins} accent="primary" />
         <StatCard label="Products" value={formatNumber(stock.length)} icon={Boxes} accent="info" />

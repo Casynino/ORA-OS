@@ -146,7 +146,7 @@ export default async function AdminSalesApprovalsPage() {
         description="Rep-recorded money awaiting sign-off. Finance handles these day-to-day; you can review and act on any of them directly here. Nothing is official until confirmed."
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="kpi-grid">
         <StatCard label="Cash sales to verify" value={formatNumber(cashSales.length)} hint={formatCurrency(cashTotal)} icon={Banknote} accent={cashSales.length > 0 ? "warning" : "success"} />
         <StatCard label="Credit sales to review" value={formatNumber(creditSales.length)} hint={formatCurrency(creditTotal)} icon={CreditCard} accent={creditSales.length > 0 ? "warning" : "success"} />
         <StatCard label="Collections to verify" value={formatNumber(collections.length)} hint={formatCurrency(collTotal)} icon={ClipboardCheck} accent={collections.length > 0 ? "warning" : "success"} />

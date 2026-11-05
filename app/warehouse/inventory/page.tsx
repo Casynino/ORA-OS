@@ -67,7 +67,7 @@ export default async function WarehouseInventoryPage() {
     <div className="space-y-6">
       <PageHeader title="Inventory" description={`Stock held at ${me.warehouse.name}.`} />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="kpi-grid">
         <StatCard label="Available" value={formatNumber(onHand)} hint="units on hand" accent="success" />
         <StatCard label="Reserved" value={formatNumber(reserved)} hint="held for pickup" accent="warning" />
         <StatCard label="Incoming" value={formatNumber(incoming)} hint="transfers arriving" accent="info" />

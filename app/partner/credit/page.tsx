@@ -188,7 +188,7 @@ export default async function AgentCreditPage() {
       </Card>
 
       {/* Summary */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="kpi-grid">
         <StatCard
           label="Total credit issued"
           value={formatCurrency(totalIssued)}

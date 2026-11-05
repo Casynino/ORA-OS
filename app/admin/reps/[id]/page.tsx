@@ -142,7 +142,7 @@ export default async function AdminRepDetailPage({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="kpi-grid">
         <StatCard
           label="Sales this month"
           value={formatCurrency(d.salesMonth)}

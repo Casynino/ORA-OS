@@ -91,7 +91,7 @@ export default async function WarehouseRepRequestsPage() {
         description={`Approve and prepare stock for collection at ${wh.name}. Approved pieces are reserved here until the rep collects and confirms.`}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="kpi-grid">
         <StatCard label="Awaiting review" value={formatNumber(pending.length)} icon={ClipboardList} accent={pending.length > 0 ? "warning" : "success"} />
         <StatCard label="Awaiting pickup" value={formatNumber(ready.length)} icon={Clock} accent={ready.length > 0 ? "info" : "success"} />
         <StatCard label="Collected (recent)" value={formatNumber(recentIssued.length)} icon={CheckCircle2} accent="success" />

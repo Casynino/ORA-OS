@@ -29,18 +29,18 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-card p-5 shadow-soft",
+        "min-w-0 rounded-xl border border-border bg-card p-4 shadow-soft sm:p-5",
         className,
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <span className="text-sm font-medium text-muted-foreground">
+        <span className="min-w-0 text-sm font-medium text-muted-foreground">
           {label}
         </span>
         {Icon && (
           <span
             className={cn(
-              "flex size-9 items-center justify-center rounded-lg",
+              "flex size-9 shrink-0 items-center justify-center rounded-lg",
               accentStyles[accent],
             )}
           >
@@ -48,8 +48,8 @@ export function StatCard({
           </span>
         )}
       </div>
-      <div className="mt-3 font-display text-3xl font-semibold tracking-tight">
-        {value}
+      <div className="kpi-value mt-3">
+        <div className="kpi-num font-display font-semibold tracking-tight">{value}</div>
       </div>
       {hint && (
         <div className="mt-1 text-xs text-muted-foreground">{hint}</div>

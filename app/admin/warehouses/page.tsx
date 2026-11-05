@@ -51,7 +51,7 @@ export default async function AdminWarehousesPage() {
         <NewWarehouseButton />
       </PageHeader>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="kpi-grid">
         <KpiCard label="Warehouses" value={summaries.length} icon={WIcon} accent="primary" />
         <KpiCard label="Stock on hand" value={totalStock} suffix=" units" icon={Package} accent="success" />
         <KpiCard label="In transit" value={inTransit} suffix=" units" icon={ArrowLeftRight} accent="info" />

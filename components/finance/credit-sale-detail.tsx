@@ -114,7 +114,7 @@ export function CreditSaleDetail({
       )}
 
       {/* Numbers */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="kpi-grid-2">
         <StatCard label="Order total" value={formatCurrency(sale.total)} icon={Wallet} accent="primary" />
         <StatCard label="Collected" value={formatCurrency(sale.amountPaid)} icon={Banknote} accent="success" hint={`${sale.payments.length} payment${sale.payments.length === 1 ? "" : "s"}`} />
         <StatCard label="Owing" value={formatCurrency(owing)} accent={owing > 0 ? "warning" : "success"} />

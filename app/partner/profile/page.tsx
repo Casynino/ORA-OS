@@ -100,7 +100,7 @@ export default async function PartnerProfilePage() {
       </Card>
 
       {/* Credit summary */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="kpi-grid">
         <StatCard label="Credit limit" value={formatCurrency(limit)} icon={CreditCard} accent="primary" />
         <StatCard label="Outstanding" value={formatCurrency(outstanding)} icon={CreditCard} accent="warning" />
         <StatCard label="Available credit" value={formatCurrency(available)} icon={CreditCard} accent="success" />

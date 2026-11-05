@@ -179,7 +179,7 @@ export default async function FinanceDashboardPage() {
       {/* ── This month ───────────────────────────────────────── */}
       <section>
         <SectionLabel>This month</SectionLabel>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="kpi-grid">
           <StatCard label="Revenue" value={formatCurrency(w.revenue)} hint={`collected ${formatCurrency(w.income.total - w.income.capital)}`} icon={TrendingUp} accent="primary" />
           <StatCard label="Expenses" value={formatCurrency(w.expenses)} hint={`net ${w.netProfit >= 0 ? "+" : ""}${formatCurrency(w.netProfit)}`} icon={TrendingDown} accent={w.netProfit >= 0 ? "success" : "warning"} />
           <StatCard label="Today's collections" value={formatCurrency(todayCollections)} hint="customer money in today" icon={ArrowDownToLine} accent="success" />

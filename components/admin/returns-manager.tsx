@@ -105,7 +105,7 @@ export function ReturnsManager({
   return (
     <div className="space-y-6">
       {/* Insights */}
-      <div className={`grid gap-4 sm:grid-cols-2 ${showValue ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+      <div className="kpi-grid">
         <StatCard
           label="Awaiting action"
           value={formatNumber(counts.open)}

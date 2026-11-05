@@ -350,7 +350,7 @@ export default async function FinanceSalesApprovalsPage({
       </div>
 
       {/* Always-on "needs action" KPIs */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="kpi-grid">
         <StatCard
           label="Cash sales to verify"
           value={formatNumber(cashPendingCount)}

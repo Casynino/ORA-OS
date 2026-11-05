@@ -154,7 +154,7 @@ export default async function AdminFinancePage({
       )}
 
       {/* Financial health cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="kpi-grid">
         <StatCard label="Cash on hand" value={formatCurrency(cashOnHand)} icon={Banknote} accent="success" hint="received, not yet banked" />
         <StatCard label={`Revenue ${PERIOD_LABEL[period]}`} value={formatCurrency(w.revenue)} icon={TrendingUp} accent="success" hint={`${formatNumber(w.unitsSold)} packs sold`} />
         <StatCard label={`Total expenses ${PERIOD_LABEL[period]}`} value={formatCurrency(w.expenses)} icon={TrendingDown} accent="warning" />

@@ -31,7 +31,7 @@ export function BusinessHealth({
   return (
     <section>
       <SectionLabel>Business health · right now</SectionLabel>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="kpi-grid">
         <KpiCard label="Cash available" value={cashAvailable} prefix="TSh " icon={Wallet} accent="primary" hint="money to run ORA" />
         <KpiCard label="Owed by customers" value={outstandingCredit} prefix="TSh " icon={CreditCard} accent="warning" hint="outstanding credit" />
         <KpiCard label="Revenue this month" value={revenueMonth} prefix="TSh " icon={TrendingUp} accent="info" hint="total sales generated" />

@@ -44,7 +44,7 @@ export default async function RepSamplesPage() {
         description="Every free pad you hand out is tracked — location, reason and quantity."
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="kpi-grid">
         <StatCard label="Samples in hand" value={formatNumber(inHand)} icon={Gift} accent="accent" />
         <StatCard label="Distributed this month" value={formatNumber(monthAgg._sum.quantity ?? 0)} icon={Gift} accent="primary" />
         <StatCard label="Distributed all-time" value={formatNumber(totalAgg._sum.quantity ?? 0)} icon={MapPin} accent="success" />

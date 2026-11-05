@@ -213,7 +213,7 @@ export default async function PartnerOverviewPage() {
       </Reveal>
 
       {/* Overview cards */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="kpi-grid">
         {overview.map((o, i) => (
           <Reveal key={o.label} delay={i * 0.04}>
             <StatCard label={o.label} value={o.value} icon={o.icon} accent={o.accent} />

@@ -30,7 +30,7 @@ export default async function RepCollectionsPage() {
         description="Customers who owe you — open one to record a payment and upload the proof."
       />
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <div className="kpi-grid-2">
         <StatCard label="Customers owing" value={formatNumber(rows.length)} icon={CreditCard} accent="warning" />
         <StatCard label="Total outstanding" value={formatCurrency(totalOwed)} icon={CreditCard} accent="warning" />
         <StatCard label="Overdue" value={formatNumber(overdue)} icon={AlertTriangle} accent={overdue > 0 ? "warning" : "success"} />

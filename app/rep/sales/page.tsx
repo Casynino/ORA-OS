@@ -30,7 +30,7 @@ export default async function RepSalesHistoryPage() {
         </Link>
       </PageHeader>
 
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+      <div className="kpi-grid-5">
         <KpiCard label="My sales" value={rows.length} icon={ShoppingCart} accent="primary" />
         <KpiCard label="Confirmed value" value={confirmed.reduce((s, r) => s + r.total, 0)} prefix="TSh " icon={TrendingUp} accent="success" />
         <KpiCard label="Cash sales" value={cashTotal} prefix="TSh " icon={Banknote} accent="success" />

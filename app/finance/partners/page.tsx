@@ -77,7 +77,7 @@ export default async function FinancePartnersPage() {
         description="Every partner's financial standing — credit limits, utilisation, scores and agreed pricing. The admin can override any decision."
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="kpi-grid">
         <StatCard label="Partners" value={formatNumber(rows.length)} icon={Users} accent="primary" />
         <StatCard label="Total credit extended" value={formatCurrency(totals.limit)} icon={CreditCard} accent="info" />
         <StatCard

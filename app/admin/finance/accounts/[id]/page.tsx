@@ -274,7 +274,7 @@ export default async function AccountLedgerPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="kpi-grid">
         <StatCard label="Balance" value={formatCurrency(balance)} accent={balance < 0 ? "warning" : "success"} hint={`${formatNumber(rows.length)} movements`} />
         <StatCard label="Received (all time)" value={formatCurrency(inTotal)} accent="primary" />
         <StatCard label="Paid / withdrawn (all time)" value={formatCurrency(outTotal)} accent="warning" hint={`net this month ${formatCurrency(monthNet)}`} />

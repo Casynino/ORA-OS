@@ -23,7 +23,7 @@ export default async function AdminSalesDashboardPage() {
       </PageHeader>
 
       {/* Period revenue (confirmed sales) */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="kpi-grid-2">
         <KpiCard label="Sales today" value={d.revenueToday} prefix="TSh " icon={CalendarDays} accent="primary" />
         <KpiCard label="This week" value={d.revenueWeek} prefix="TSh " icon={CalendarRange} accent="info" />
         <KpiCard label="This month" value={d.revenueMonth} prefix="TSh " icon={CalendarClock} accent="accent" />
@@ -31,7 +31,7 @@ export default async function AdminSalesDashboardPage() {
       </div>
 
       {/* Mix + what's owed / pending */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="kpi-grid-2">
         <KpiCard label="Cash sales" value={d.cash} prefix="TSh " icon={Banknote} accent="success" />
         <KpiCard label="Credit sales" value={d.credit} prefix="TSh " icon={CreditCard} accent="accent" />
         <KpiCard label="Credit collected" value={d.collected} prefix="TSh " icon={Banknote} accent={d.collected > 0 ? "success" : "warning"} />
