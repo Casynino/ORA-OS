@@ -502,3 +502,30 @@ table th.text-right,
 .tabular-nums {
   white-space: nowrap;
 }
+
+/* Phones & tablets: stable like an app.
+   iPhone/iPad Safari zooms the whole page in when a field smaller than 16px is
+   tapped and does not zoom back out — pages then look cut off, shifted and
+   overlapping. So on touch screens every text field, select and textarea is
+   16px (desktop keeps the compact 14px). Taps also respond instantly (no
+   double-tap-to-zoom delay) and don't flash a grey highlight. */
+@media (pointer: coarse), (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+  a,
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea,
+  label,
+  summary {
+    touch-action: manipulation;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
