@@ -9,6 +9,7 @@ const nav: NavGroup[] = [
   { items: [{ href: "/admin", label: "Home", icon: "dashboard" }] },
   {
     label: "Operations",
+    icon: "inventory",
     items: [
       { href: "/admin/products", label: "Products", icon: "products" },
       { href: "/admin/inventory", label: "Inventory", icon: "inventory" },
@@ -20,6 +21,7 @@ const nav: NavGroup[] = [
   },
   {
     label: "Sales",
+    icon: "sales",
     items: [
       { href: "/admin/sales-dashboard", label: "Sales insights", icon: "profit" },
       { href: "/admin/requests", label: "Orders", icon: "requests" },
@@ -33,6 +35,7 @@ const nav: NavGroup[] = [
   },
   {
     label: "Finance",
+    icon: "finance",
     items: [
       { href: "/admin/finance", label: "Finance", icon: "finance" },
       { href: "/admin/finance/operational-fund", label: "Expenses", icon: "payments" },
@@ -42,6 +45,7 @@ const nav: NavGroup[] = [
   },
   {
     label: "Partner Network",
+    icon: "users",
     items: [
       { href: "/admin/applications", label: "Applications", icon: "applications" },
       { href: "/admin/users", label: "Users", icon: "users" },
@@ -50,6 +54,7 @@ const nav: NavGroup[] = [
   },
   {
     label: "Impact",
+    icon: "impact",
     items: [
       { href: "/admin/news", label: "News & Posts", icon: "news" },
       { href: "/admin/impact", label: "Impact Management", icon: "activities" },
@@ -59,6 +64,7 @@ const nav: NavGroup[] = [
   },
   {
     label: "Reports",
+    icon: "reports",
     items: [
       { href: "/admin/reports", label: "Reports", icon: "reports" },
       { href: "/admin/activity", label: "Activity Log", icon: "activity" },
@@ -89,6 +95,7 @@ export default async function AdminLayout({
         preferredName: me?.preferredName ?? null,
       }}
       areaLabel="Admin Console"
+      collapsibleNav
       profileHref="/admin/profile"
     >
       {children}

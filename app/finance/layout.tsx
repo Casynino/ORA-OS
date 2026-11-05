@@ -12,6 +12,7 @@ const nav: NavGroup[] = [
   { items: [{ href: "/finance", label: "Home", icon: "dashboard" }] },
   {
     label: "Customers",
+    icon: "customers",
     items: [
       { href: "/finance/customers", label: "Customers", icon: "customers" },
       { href: "/finance/sell", label: "Record sale", icon: "sales" },
@@ -21,6 +22,7 @@ const nav: NavGroup[] = [
   },
   {
     label: "Verify",
+    icon: "approvals",
     items: [
       { href: "/finance/sales-approvals", label: "Sales approvals", icon: "sales" },
       { href: "/finance/sales", label: "Sales history", icon: "audit" },
@@ -30,6 +32,7 @@ const nav: NavGroup[] = [
   },
   {
     label: "Money",
+    icon: "finance",
     items: [
       { href: "/finance/cash", label: "Cash & deposits", icon: "settlements" },
       { href: "/finance/operational-fund", label: "Expenses", icon: "finance" },
@@ -56,6 +59,7 @@ export default async function FinanceLayout({
       nav={nav}
       user={{ name: user.name, email: user.email, role: user.role }}
       areaLabel="Finance & Accounting"
+      collapsibleNav
       profileHref="/finance/profile"
     >
       {children}

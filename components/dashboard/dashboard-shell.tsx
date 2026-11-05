@@ -48,6 +48,7 @@ import {
   BadgeCheck,
   Wallet,
   ChevronDown,
+  ChevronRight,
   UserRound,
   CalendarClock,
 } from "lucide-react";
@@ -100,16 +101,20 @@ const ICONS: Record<string, LucideIcon> = {
   reps: BadgeCheck,
   finance: Wallet,
   extensions: CalendarClock,
+  impact: HeartHandshake,
 };
 
 export type NavItem = { href: string; label: string; icon: string };
-export type NavGroup = { label?: string; items: NavItem[] };
+/** `icon` is the group's own icon (only used when the menu is collapsible);
+ *  without it the first item's icon is used. */
+export type NavGroup = { label?: string; icon?: string; items: NavItem[] };
 
 export function DashboardShell({
   nav,
   user,
   areaLabel,
   profileHref,
+  collapsibleNav = false,
   children,
 }: {
   nav: NavGroup[];
@@ -123,6 +128,9 @@ export function DashboardShell({
   /** Small heading above the menu (and in the phone top bar). Leave out for none. */
   areaLabel?: string;
   profileHref?: string;
+  /** Labelled menu groups open and close (the group you're in stays open; your
+   *  choices are remembered on this device). Off = every group always shown. */
+  collapsibleNav?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -162,39 +170,134 @@ export function DashboardShell({
 
   const isActive = (href: string) => href === activeHref && activeHref !== "";
 
-  const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
-    <nav className="flex flex-1 flex-col gap-4">
-      {nav.map((group, gi) => (
-        <div key={gi}>
-          {group.label && (
-            <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-              {group.label}
-            </p>
-          )}
-          <div className="flex flex-col gap-0.5">
-            {group.items.map((item) => {
-              const Icon = ICONS[item.icon] ?? LayoutDashboard;
-              const active = isActive(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onNavigate}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                    active
-                      ? "bg-primary/12 text-primary"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                >
-                  <Icon className="size-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
+  // ── Collapsible groups (only when `collapsibleNav`) ──────────────────────
+  // A group with a label and 2+ pages opens/closes. The group you are in is
+  // always open; the rest start closed and remember what you chose (this device).
+  const groupKey = (g: NavGroup, gi: number) => g.label ?? `group-${gi}`;
+  const isCollapsible = (g: NavGroup) => collapsibleNav && !!g.label && g.items.length > 1;
+  const activeGroupKey =
+    nav
+      .map((g, gi) => ({ g, gi }))
+      .find(({ g }) => isCollapsible(g) && g.items.some((i) => i.href === activeHref))
+      ?.g.label ?? null;
+  const storeKey = `ora-nav-open:${homeHref}`;
+  const [openKeys, setOpenKeys] = useState<string[]>(() => (activeGroupKey ? [activeGroupKey] : []));
+
+  // Restore what was open last time (once), keeping the current group open.
+  useEffect(() => {
+    if (!collapsibleNav) return;
+    try {
+      const raw = localStorage.getItem(storeKey);
+      const saved: unknown = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(saved)) {
+        const keep = saved.filter((k): k is string => typeof k === "string");
+        setOpenKeys((prev) => Array.from(new Set([...keep, ...prev])));
+      }
+    } catch {
+      /* storage blocked — the menu just starts at its default */
+    }
+  }, [collapsibleNav, storeKey]);
+
+  // Moving to a page in another group opens that group.
+  useEffect(() => {
+    if (activeGroupKey) setOpenKeys((prev) => (prev.includes(activeGroupKey) ? prev : [...prev, activeGroupKey]));
+  }, [activeGroupKey]);
+
+  function toggleGroup(key: string) {
+    const next = openKeys.includes(key) ? openKeys.filter((k) => k !== key) : [...openKeys, key];
+    setOpenKeys(next);
+    try {
+      localStorage.setItem(storeKey, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const renderNavItem = (item: NavItem, onNavigate?: () => void) => {
+    const Icon = ICONS[item.icon] ?? LayoutDashboard;
+    const active = isActive(item.href);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={onNavigate}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+          active
+            ? "bg-primary/12 text-primary"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        )}
+      >
+        <Icon className="size-4 shrink-0" />
+        <span className="min-w-0 truncate">{item.label}</span>
+      </Link>
+    );
+  };
+
+  // Called as a function (not a component) so the open/close animation isn't
+  // reset every time the shell re-renders.
+  const renderNav = (onNavigate?: () => void) => (
+    <nav className={cn("flex flex-1 flex-col", collapsibleNav ? "gap-1" : "gap-4")}>
+      {nav.map((group, gi) => {
+        if (!isCollapsible(group)) {
+          // Single-page groups in a collapsible menu are plain links (nothing to hide).
+          if (collapsibleNav && group.items.length === 1) {
+            return <div key={groupKey(group, gi)}>{renderNavItem(group.items[0], onNavigate)}</div>;
+          }
+          return (
+            <div key={groupKey(group, gi)}>
+              {group.label && (
+                <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                  {group.label}
+                </p>
+              )}
+              <div className="flex flex-col gap-0.5">{group.items.map((item) => renderNavItem(item, onNavigate))}</div>
+            </div>
+          );
+        }
+
+        const key = groupKey(group, gi);
+        const isOpen = openKeys.includes(key);
+        const hasActive = group.items.some((i) => i.href === activeHref);
+        const GroupIcon = ICONS[group.icon ?? group.items[0].icon] ?? LayoutDashboard;
+        return (
+          <div key={key}>
+            <button
+              type="button"
+              onClick={() => toggleGroup(key)}
+              aria-expanded={isOpen}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider transition-colors hover:bg-muted",
+                hasActive ? "text-primary" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <GroupIcon className="size-4 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">{group.label}</span>
+              {hasActive && !isOpen && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" />}
+              <ChevronRight
+                aria-hidden
+                className={cn(
+                  "size-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 motion-reduce:transition-none",
+                  isOpen && "rotate-90",
+                )}
+              />
+            </button>
+            <div
+              className={cn(
+                "grid transition-[grid-template-rows,visibility] duration-200 ease-out motion-reduce:transition-none",
+                isOpen ? "visible grid-rows-[1fr]" : "invisible grid-rows-[0fr]",
+              )}
+            >
+              <div className="min-h-0 overflow-hidden">
+                <div className="mb-1 ml-5 mt-0.5 flex flex-col gap-0.5 border-l border-border pl-2.5">
+                  {group.items.map((item) => renderNavItem(item, onNavigate))}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </nav>
   );
 
@@ -234,7 +337,7 @@ export function DashboardShell({
               {areaLabel}
             </p>
           )}
-          <NavLinks />
+          {renderNav()}
         </div>
         <UserCard />
       </aside>
@@ -258,7 +361,7 @@ export function DashboardShell({
               </button>
             </div>
             <div className="flex flex-1 flex-col overflow-y-auto p-3">
-              <NavLinks onNavigate={() => setOpen(false)} />
+              {renderNav(() => setOpen(false))}
             </div>
             <UserCard />
           </aside>
