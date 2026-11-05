@@ -11,8 +11,26 @@ import {
 import { ActionButton } from "@/components/dashboard/action-button";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
+import { ReceiveRepReturn } from "@/components/warehouse/receive-rep-return";
 
-export function ReturnActions({ id, status }: { id: string; status: string }) {
+export type RepReturnInfo = {
+  quantity: number;
+  requesterName: string;
+  productName: string;
+  unitsPerCarton: number;
+  notForSale: boolean;
+};
+
+export function ReturnActions({
+  id,
+  status,
+  repReturn,
+}: {
+  id: string;
+  status: string;
+  /** Set for a rep's stock return — receipt then asks for the counted quantity. */
+  repReturn?: RepReturnInfo;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
 
@@ -51,14 +69,25 @@ export function ReturnActions({ id, status }: { id: string; status: string }) {
   if (status === "IN_TRANSIT") {
     return (
       <div className="flex flex-wrap gap-2">
-        <ActionButton
-          variant="success"
-          action={() => completeReturn(id)}
-          onDone={() => router.refresh()}
-          pendingText="Receiving…"
-        >
-          <PackageCheck className="size-4" /> Confirm receipt
-        </ActionButton>
+        {repReturn ? (
+          <ReceiveRepReturn
+            id={id}
+            requested={repReturn.quantity}
+            requesterName={repReturn.requesterName}
+            productName={repReturn.productName}
+            unitsPerCarton={repReturn.unitsPerCarton}
+            notForSale={repReturn.notForSale}
+          />
+        ) : (
+          <ActionButton
+            variant="success"
+            action={() => completeReturn(id)}
+            onDone={() => router.refresh()}
+            pendingText="Receiving…"
+          >
+            <PackageCheck className="size-4" /> Confirm receipt
+          </ActionButton>
+        )}
         <Button
           variant="outline"
           className="text-destructive hover:bg-destructive/10"

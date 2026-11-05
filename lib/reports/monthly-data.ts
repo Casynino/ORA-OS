@@ -47,7 +47,7 @@ export async function getMonthlyReportData(ref: Date = new Date()): Promise<Mont
     prisma.fieldSale.findMany({ where: { type: "CREDIT", voided: false, financeStatus: "APPROVED", creditStatus: { in: ["PENDING", "PARTIAL", "OVERDUE"] } }, select: { total: true, amountPaid: true } }),
     prisma.fieldCustomer.count({ where: { createdAt: { gte: start, lt: end } } }),
     prisma.inventory.aggregate({ _sum: { warehouseQty: true } }),
-    prisma.stockMovement.aggregate({ _sum: { quantity: true }, where: { type: "DISTRIBUTED", createdAt: { gte: start, lt: end } } }),
+    prisma.stockMovement.aggregate({ _sum: { quantity: true }, where: { type: "DISTRIBUTED", OR: [{ reference: null }, { NOT: { reference: { startsWith: "RET-" } } }], createdAt: { gte: start, lt: end } } }),
     prisma.fieldSaleItem.groupBy({ by: ["productId"], _sum: { quantity: true }, where: { sale: { ...LIVE, createdAt: { gte: start, lt: end } } }, orderBy: { _sum: { quantity: "desc" } }, take: 5 }),
     prisma.fieldSale.findMany({ where: { ...LIVE, createdAt: { gte: start, lt: end }, customerId: { not: null } }, select: { total: true, customer: { select: { name: true, businessName: true } } } }),
     prisma.fieldSale.findMany({ where: { ...LIVE, createdAt: { gte: start, lt: end } }, select: { total: true, repId: true, rep: { select: { name: true } } } }),

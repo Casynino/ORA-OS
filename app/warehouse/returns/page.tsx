@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ReturnsManager } from "@/components/admin/returns-manager";
+import { isRepStockReturn } from "@/lib/rep-returns";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export default async function WarehouseReturnsPage() {
     where: { warehouseName: me.warehouse.name },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     include: {
-      product: { select: { name: true } },
+      product: { select: { name: true, unitsPerCarton: true, notForSale: true } },
       requester: { select: { name: true } },
     },
   });
@@ -46,6 +47,9 @@ export default async function WarehouseReturnsPage() {
     value: 0, // never shown to warehouse staff
     status: r.status,
     createdAt: r.createdAt.toISOString(),
+    isRepStock: isRepStockReturn(r),
+    unitsPerCarton: r.product.unitsPerCarton,
+    notForSale: r.product.notForSale,
   }));
 
   return (

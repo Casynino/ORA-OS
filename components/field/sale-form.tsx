@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { recordFieldSale, createFieldCustomer } from "@/lib/actions/field";
+import { editFieldSale } from "@/lib/actions/sale-edit";
 import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,31 @@ type CustomerRow = {
   creditLimit?: number | null;
 };
 
+/** Present when the form edits an existing sale instead of recording a new one. */
+export type SaleEditMode = {
+  saleId: string;
+  code: string;
+  /** Finance already confirmed it — saving sends it back for confirmation again. */
+  reconfirm: boolean;
+  /** The sale already has a cheque photo on file. */
+  chequePhotoOnFile: boolean;
+  initial: {
+    type: "CASH" | "CREDIT";
+    qty: Record<string, string>;
+    price: Record<string, string>;
+    customerId: string;
+    customerName: string;
+    dueDate: string;
+    note: string;
+    payMethod: string;
+    payAccountId: string;
+    reference: string;
+    chequeBank: string;
+    chequeNumber: string;
+    chequeDate: string;
+  };
+};
+
 export function FieldSaleForm({
   products,
   customers,
@@ -50,6 +76,7 @@ export function FieldSaleForm({
   initialCustomerId,
   warehouse = false,
   hideStockCount = false,
+  edit,
 }: {
   products: ProductRow[];
   customers: CustomerRow[];
@@ -62,31 +89,33 @@ export function FieldSaleForm({
   // Show only "In stock" / "Out of stock" instead of the exact quantity. Warehouse
   // counts are visible only to Admin & Warehouse; Finance (and reps) see status.
   hideStockCount?: boolean;
+  edit?: SaleEditMode;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [type, setType] = useState<"CASH" | "CREDIT">("CASH");
+  const [type, setType] = useState<"CASH" | "CREDIT">(edit?.initial.type ?? "CASH");
   // Where the money lands (CASH sales).
   const firstMethod = accounts[0]?.type ?? "CASH";
-  const [payMethod, setPayMethod] = useState(firstMethod);
+  const [payMethod, setPayMethod] = useState(edit?.initial.payMethod ?? firstMethod);
   const [payAccountId, setPayAccountId] = useState(
-    accounts.find((a) => a.type === firstMethod)?.id ?? "",
+    edit?.initial.payAccountId ?? (accounts.find((a) => a.type === firstMethod)?.id ?? ""),
   );
-  const [payReference, setPayReference] = useState("");
+  const [payReference, setPayReference] = useState(edit?.initial.reference ?? "");
   // Direct bank/mobile payments: the rep attaches the customer's receipt so
   // finance can verify the money actually reached ORA's account.
   const [payProofs, setPayProofs] = useState<AttachmentInput[]>([]);
   // Cheque payments capture the instrument details for finance to verify.
-  const [chequeBank, setChequeBank] = useState("");
-  const [chequeNumber, setChequeNumber] = useState("");
-  const [chequeDate, setChequeDate] = useState("");
+  const [chequeBank, setChequeBank] = useState(edit?.initial.chequeBank ?? "");
+  const [chequeNumber, setChequeNumber] = useState(edit?.initial.chequeNumber ?? "");
+  const [chequeDate, setChequeDate] = useState(edit?.initial.chequeDate ?? "");
   const isDirectPay = type === "CASH" && payMethod !== "CASH";
   const isCheque = type === "CASH" && payMethod === "CHEQUE";
-  const [qty, setQty] = useState<Record<string, string>>({});
-  const [price, setPrice] = useState<Record<string, string>>(
-    Object.fromEntries(products.map((p) => [p.id, String(p.price)])),
-  );
-  const [customerId, setCustomerId] = useState(initialCustomerId ?? "");
+  const [qty, setQty] = useState<Record<string, string>>(edit?.initial.qty ?? {});
+  const [price, setPrice] = useState<Record<string, string>>({
+    ...Object.fromEntries(products.map((p) => [p.id, String(p.price)])),
+    ...(edit?.initial.price ?? {}),
+  });
+  const [customerId, setCustomerId] = useState(initialCustomerId ?? edit?.initial.customerId ?? "");
   const [newCustomer, setNewCustomer] = useState(false);
   // Customers saved during this visit — visible & selectable immediately,
   // before the server refresh lands.
@@ -107,9 +136,9 @@ export function FieldSaleForm({
   const [ncTax, setNcTax] = useState("");
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsBusy, setGpsBusy] = useState(false);
-  const [customerName, setCustomerName] = useState(""); // cash walk-in
-  const [dueDate, setDueDate] = useState("");
-  const [note, setNote] = useState("");
+  const [customerName, setCustomerName] = useState(edit?.initial.customerName ?? ""); // cash walk-in
+  const [dueDate, setDueDate] = useState(edit?.initial.dueDate ?? "");
+  const [note, setNote] = useState(edit?.initial.note ?? "");
 
   // Full book = server list + just-saved ones (deduped by id).
   const allCustomers = useMemo(() => {
@@ -254,11 +283,39 @@ export function FieldSaleForm({
         variant: "error",
         title: "Enter the cheque bank, number and date.",
       });
-    if (isCheque && payProofs.length === 0)
+    if (isCheque && payProofs.length === 0 && !edit?.chequePhotoOnFile)
       return toast({
         variant: "error",
         title: "Attach a photo of the cheque.",
       });
+
+    if (edit) {
+      start(async () => {
+        const res = await editFieldSale(edit.saleId, {
+          type,
+          items,
+          paymentMethod: type === "CASH" ? METHOD_LABELS[payMethod] ?? payMethod : "",
+          paymentAccountId: type === "CASH" && !isCheque ? payAccountId : "",
+          reference: type === "CASH" ? payReference : "",
+          attachments: isDirectPay ? payProofs : [],
+          chequeBank: isCheque ? chequeBank : "",
+          chequeNumber: isCheque ? chequeNumber : "",
+          chequeDate: isCheque ? chequeDate : "",
+          customerId: customerId || undefined,
+          customerName: type === "CASH" && !customerId ? customerName : "",
+          note,
+          dueDate: type === "CREDIT" ? dueDate : "",
+        });
+        if (res.ok) {
+          toast({ variant: "success", title: res.message });
+          router.push("/rep/sales");
+          router.refresh();
+        } else {
+          toast({ variant: "error", title: res.error });
+        }
+      });
+      return;
+    }
 
     start(async () => {
       const res = await recordFieldSale({
@@ -700,15 +757,23 @@ export function FieldSaleForm({
         onClick={submit}
       >
         {pending
-          ? "Recording…"
-          : total > 0
-            ? `Record ${type === "CASH" ? "cash" : "credit"} sale · ${formatCurrency(total)}`
-            : "Record sale"}
+          ? edit
+            ? "Saving…"
+            : "Recording…"
+          : edit
+            ? `Save changes · ${formatCurrency(total)}`
+            : total > 0
+              ? `Record ${type === "CASH" ? "cash" : "credit"} sale · ${formatCurrency(total)}`
+              : "Record sale"}
       </Button>
       <p className="text-center text-xs text-muted-foreground">
-        {warehouse
-          ? "Stock is deducted from the warehouse the moment the sale is recorded."
-          : "Stock is deducted from your hand the moment the sale is recorded."}
+        {edit
+          ? edit.reconfirm
+            ? "Finance already confirmed this sale. After you save, they must confirm the new numbers again — until then it does not count as confirmed money."
+            : "Your stock is adjusted by the difference when you save. Finance will see the new numbers."
+          : warehouse
+            ? "Stock is deducted from the warehouse the moment the sale is recorded."
+            : "Stock is deducted from your hand the moment the sale is recorded."}
       </p>
     </div>
   );

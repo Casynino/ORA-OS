@@ -23,6 +23,7 @@ import {
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/use-toast";
+import { ReceiveRepReturn } from "@/components/warehouse/receive-rep-return";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 
 type ReturnDTO = {
@@ -37,6 +38,10 @@ type ReturnDTO = {
   value: number;
   status: string;
   createdAt: string;
+  // Rep stock returns are received with a counted quantity.
+  isRepStock?: boolean;
+  unitsPerCarton?: number;
+  notForSale?: boolean;
 };
 
 const TABS = [
@@ -253,16 +258,28 @@ export function ReturnsManager({
                           </div>
                         ) : r.status === "IN_TRANSIT" ? (
                           <div className="flex justify-end gap-1.5">
-                            <ActionButton
-                              size="sm"
-                              variant="success"
-                              action={() => completeReturn(r.id)}
-                              onDone={() => router.refresh()}
-                              pendingText="…"
-                            >
-                              <PackageCheck className="size-3.5" />
-                              Confirm receipt
-                            </ActionButton>
+                            {r.isRepStock ? (
+                              <ReceiveRepReturn
+                                id={r.id}
+                                requested={r.quantity}
+                                requesterName={r.requesterName}
+                                productName={r.productName}
+                                unitsPerCarton={r.unitsPerCarton ?? 24}
+                                notForSale={r.notForSale ?? false}
+                                size="sm"
+                              />
+                            ) : (
+                              <ActionButton
+                                size="sm"
+                                variant="success"
+                                action={() => completeReturn(r.id)}
+                                onDone={() => router.refresh()}
+                                pendingText="…"
+                              >
+                                <PackageCheck className="size-3.5" />
+                                Confirm receipt
+                              </ActionButton>
+                            )}
                             <Button
                               size="sm"
                               variant="outline"

@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ReturnActions } from "@/components/warehouse/return-actions";
+import { isRepStockReturn } from "@/lib/rep-returns";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/utils";
 
 const STEPS = ["PENDING", "IN_TRANSIT", "COMPLETED"] as const;
@@ -29,7 +30,7 @@ export default async function AdminReturnDetailPage({
   const ret = await prisma.returnRequest.findUnique({
     where: { id },
     include: {
-      product: { select: { name: true, sku: true, price: true } },
+      product: { select: { name: true, sku: true, price: true, unitsPerCarton: true, notForSale: true } },
       requester: { select: { name: true, organization: true, phone: true } },
       reviewedBy: { select: { name: true } },
     },
@@ -73,7 +74,21 @@ export default async function AdminReturnDetailPage({
               </p>
             </div>
           </div>
-          <ReturnActions id={ret.id} status={ret.status} />
+          <ReturnActions
+            id={ret.id}
+            status={ret.status}
+            repReturn={
+              isRepStockReturn(ret)
+                ? {
+                    quantity: ret.quantity,
+                    requesterName: ret.requester.name,
+                    productName: ret.product.name,
+                    unitsPerCarton: ret.product.unitsPerCarton,
+                    notForSale: ret.product.notForSale,
+                  }
+                : undefined
+            }
+          />
         </CardContent>
       </Card>
 

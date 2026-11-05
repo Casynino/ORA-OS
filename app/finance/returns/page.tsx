@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FinanceReturnButton } from "@/components/finance/finance-return-form";
+import { CUSTOMER_RETURN_TYPE } from "@/lib/rep-returns";
 import { formatCurrency, formatDate, timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +33,8 @@ export default async function FinanceReturnsPage() {
       },
     }),
     prisma.returnRequest.findMany({
-      where: { financeInitiated: true },
+      // Finance's own debt-recovery returns, plus goods customers sent back to reps.
+      where: { OR: [{ financeInitiated: true }, { reasonType: CUSTOMER_RETURN_TYPE }] },
       orderBy: { createdAt: "desc" },
       take: 40,
       include: {
@@ -107,7 +109,7 @@ export default async function FinanceReturnsPage() {
           <PackageCheck className="size-5 text-primary" /> Return requests
         </h2>
         {financeReturns.length === 0 ? (
-          <EmptyState icon={Undo2} title="No returns yet" description="Debt-recovery returns you start appear here until the warehouse receives them." />
+          <EmptyState icon={Undo2} title="No returns yet" description="Debt-recovery returns you start, and goods customers send back to reps, appear here." />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-border bg-card">
             <ul className="divide-y divide-border/60">
@@ -117,9 +119,12 @@ export default async function FinanceReturnsPage() {
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">{r.code}</span>
                       <StatusBadge status={r.status} />
+                      {r.reasonType === CUSTOMER_RETURN_TYPE && (
+                        <Badge variant="secondary" className="text-[10px]">Customer return</Badge>
+                      )}
                       {r.status === "COMPLETED" && r.creditValue ? (
                         <Badge variant="success" className="text-[10px]">
-                          {formatCurrency(r.creditValue)} recovered
+                          {formatCurrency(r.creditValue)} {r.reasonType === CUSTOMER_RETURN_TYPE ? "credited" : "recovered"}
                         </Badge>
                       ) : null}
                     </span>

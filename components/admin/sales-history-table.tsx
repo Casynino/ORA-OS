@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { Search, ChevronDown, Package } from "lucide-react";
+import Link from "next/link";
+import { Search, ChevronDown, Package, Pencil } from "lucide-react";
 import type { SalesHistoryRow } from "@/lib/services/sales-history";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -30,7 +31,14 @@ const STATUSES: { key: StatusFilter; label: string }[] = [
   { key: "owing", label: "Credit owing" },
 ];
 
-export function SalesHistoryTable({ rows }: { rows: SalesHistoryRow[] }) {
+export function SalesHistoryTable({
+  rows,
+  editBase,
+}: {
+  rows: SalesHistoryRow[];
+  /** When set (rep view), editable sales get an Edit link to `${editBase}/<id>/edit`. */
+  editBase?: string;
+}) {
   const [q, setQ] = useState("");
   const [channel, setChannel] = useState<ChannelFilter>("all");
   const [type, setType] = useState<TypeFilter>("all");
@@ -163,7 +171,18 @@ export function SalesHistoryTable({ rows }: { rows: SalesHistoryRow[] }) {
                         )}
                       </td>
                       <td className="px-3 py-2.5 align-top text-muted-foreground">
-                        <ChevronDown className={cn("size-4 transition-transform", isOpen && "rotate-180")} />
+                        <div className="flex items-center gap-2">
+                          {editBase && r.editable && (
+                            <Link
+                              href={`${editBase}/${r.id}/edit`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted"
+                            >
+                              <Pencil className="size-3" /> Edit
+                            </Link>
+                          )}
+                          <ChevronDown className={cn("size-4 transition-transform", isOpen && "rotate-180")} />
+                        </div>
                       </td>
                     </tr>
                     {isOpen && (

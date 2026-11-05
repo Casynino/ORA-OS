@@ -38,7 +38,7 @@ export default async function RepSalesHistoryPage() {
         <KpiCard label="Awaiting finance" value={pending} icon={AlertTriangle} accent={pending > 0 ? "warning" : "success"} />
       </div>
 
-      <SalesHistoryTable rows={rows} />
+      <SalesHistoryTable rows={rows} editBase="/rep/sales" />
     </div>
   );
 }

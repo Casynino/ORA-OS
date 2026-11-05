@@ -12,12 +12,14 @@ import {
   CUSTOMER_RETURN_TYPE,
   REP_RETURN_REASONS,
   REP_RETURN_TYPE,
+  isCustomerReturn,
   isRepStockReturn,
 } from "@/lib/rep-returns";
 import {
   getRepReturnableStock,
   receiveRepReturnInTx,
   takeCustomerReturnInTx,
+  undoCustomerReturnInTx,
 } from "@/lib/services/rep-returns";
 import { refCode } from "@/lib/utils";
 import { notifyInApp, resolveInApp } from "@/lib/notifications/in-app";
@@ -273,6 +275,81 @@ export async function cancelRepReturn(returnId: string): Promise<ActionResult> {
   }
 }
 
+// A rep can fix the details of their own return while the warehouse hasn't
+// accepted it yet. Once accepted it is locked — the warehouse corrects the count
+// when the goods arrive.
+const repReturnEditSchema = z.object({
+  quantity: z.number().int().positive("Enter how many pieces you are returning.").max(1000000),
+  reason: z.enum(REP_RETURN_REASONS),
+  note: z.string().max(500).optional(),
+});
+
+export async function updateRepStockReturn(
+  returnId: string,
+  input: z.infer<typeof repReturnEditSchema>,
+): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["SALES_REP"]);
+    const parsed = repReturnEditSchema.safeParse(input);
+    if (!parsed.success) {
+      return fail(parsed.error.issues[0]?.message ?? "Invalid return.");
+    }
+    const { quantity, reason } = parsed.data;
+    const ret = await prisma.returnRequest.findUnique({
+      where: { id: returnId },
+      include: { product: { select: { name: true } } },
+    });
+    if (!ret || ret.requesterId !== actor.id || !isRepStockReturn(ret)) {
+      return fail("Return not found.");
+    }
+    if (ret.status !== "PENDING") {
+      return fail("The warehouse already accepted this return, so it can't be edited. They will correct the count when they receive it.");
+    }
+    // Same rule as creating: only what you hold, minus your OTHER open returns.
+    const line = (await getRepReturnableStock(actor.id, ret.id)).get(ret.productId);
+    const available = line?.available ?? 0;
+    if (quantity > available) {
+      return fail(
+        `You can return at most ${available.toLocaleString("en-US")} pcs of ${ret.product.name} (what you hold, after your other waiting returns).`,
+      );
+    }
+    const note = parsed.data.note?.trim();
+    const claimed = await prisma.returnRequest.updateMany({
+      where: { id: ret.id, status: "PENDING", requesterId: actor.id },
+      data: { quantity, reason: note ? `${reason} — ${note}` : reason },
+    });
+    if (claimed.count === 0) {
+      return fail("The warehouse just handled this return, so it can't be edited any more.");
+    }
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "RETURN_REQUESTED",
+      entity: "ReturnRequest",
+      entityId: ret.id,
+      summary: `${actor.name} changed return ${ret.code} to ${quantity} × ${ret.product.name} (was ${ret.quantity}) — ${reason}.`,
+    });
+    revalidateReturns();
+    if (quantity !== ret.quantity) {
+      await notifyInApp({
+        toRoles: ["WAREHOUSE", "ADMIN"],
+        category: "INFO",
+        type: "RETURN_EDITED",
+        title: "Return changed",
+        body: `${actor.name} changed return ${ret.code} from ${ret.quantity.toLocaleString("en-US")} to ${quantity.toLocaleString("en-US")} × ${ret.product.name}.`,
+        actorName: actor.name,
+        entityType: "ReturnRequest",
+        entityId: ret.id,
+        actionUrl: "/warehouse/returns",
+        actionLabel: "Review return",
+      });
+    }
+    return ok(undefined, `Return ${ret.code} updated.`);
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
 // ── Customer sends goods back to the rep ───────────────────────────────────
 //  The rep has already taken the goods back from the customer, so this is a
 //  plain RECORD — no approval step. It happens in one transaction: the pieces go
@@ -319,12 +396,17 @@ export async function createCustomerReturn(
     const sale = await prisma.fieldSale.findUnique({
       where: { id: d.saleId },
       include: {
-        customer: { select: { businessName: true, name: true } },
+        customer: { select: { businessName: true, name: true, repId: true } },
         items: { include: { product: { select: { name: true } } } },
         returns: { select: { productId: true, quantity: true, status: true } },
       },
     });
     if (!sale || sale.repId !== actor.id) return fail("Sale not found.");
+    // The customer must still be in this rep's book — if they were reassigned to
+    // someone else, the returned goods aren't coming back to this rep.
+    if (sale.customer && sale.customer.repId !== actor.id) {
+      return fail("This customer is no longer in your book, so you can't record a return for them. Speak to Finance.");
+    }
     if (sale.voided) return fail("This sale was voided.");
     if (sale.isOpeningBalance || sale.directSale) {
       return fail("Returns can't be recorded on this kind of sale.");
@@ -335,9 +417,22 @@ export async function createCustomerReturn(
     if (sale.type !== "CREDIT") {
       return fail("Returns here apply to credit sales. For a refund on a cash sale, speak to Finance.");
     }
-    const outstanding = sale.total - sale.amountPaid;
+    // A customer payment you already recorded but Finance hasn't verified yet also
+    // comes off this balance — don't let the goods use the same money twice.
+    const pendingClaims =
+      (
+        await prisma.fieldPayment.aggregate({
+          _sum: { amount: true },
+          where: { saleId: sale.id, financeStatus: "PENDING" },
+        })
+      )._sum.amount ?? 0;
+    const outstanding = sale.total - sale.amountPaid - pendingClaims;
     if (outstanding <= 0) {
-      return fail("This sale is already fully paid, so there's no balance to take the goods off. Speak to Finance about a refund.");
+      return fail(
+        pendingClaims > 0
+          ? "A payment you recorded on this sale is still waiting for Finance to verify. Wait for that, then record the return."
+          : "This sale is already fully paid, so there's no balance to take the goods off. Speak to Finance about a refund.",
+      );
     }
 
     // Merge duplicate product lines, then validate each against what was sold.
@@ -411,7 +506,7 @@ export async function createCustomerReturn(
     revalidateCustomerReturns(sale.customerId, actor.id);
     // Heads-up only (no ringing): Finance sees every customer return as it happens.
     await notifyInApp({
-      toRoles: ["FINANCE", "ADMIN"],
+      toRoles: ["FINANCE"],
       category: "INFO",
       type: "CUSTOMER_RETURN",
       title: "Customer return recorded",
@@ -426,6 +521,63 @@ export async function createCustomerReturn(
       { codes },
       `Return recorded — goods are back in your stock and TSh ${totalValue.toLocaleString("en-US")} came off ${sale.code}.`,
     );
+  } catch (e) {
+    return fail(errorMessage(e));
+  }
+}
+
+/** The rep takes back a customer return they recorded by mistake: the pieces leave
+ *  their stock again and the value goes back onto the customer's balance. */
+export async function undoCustomerReturn(returnId: string): Promise<ActionResult> {
+  try {
+    const actor = await requireActor(["SALES_REP"]);
+    const ret = await prisma.returnRequest.findUnique({
+      where: { id: returnId },
+      include: {
+        product: { select: { name: true } },
+        requester: { select: { name: true } },
+        fieldSale: { select: { customerId: true } },
+      },
+    });
+    if (!ret || ret.requesterId !== actor.id || !isCustomerReturn(ret)) {
+      return fail("Return not found.");
+    }
+    if (ret.status !== "COMPLETED") return fail("This return was already undone.");
+
+    let out = { restored: 0, saleCode: "" };
+    await prisma.$transaction(async (tx) => {
+      // Claim first so a double-click can't reverse it twice. REJECTED = "no longer
+      // counts": it frees those pieces to be returned again and drops off the books.
+      const claimed = await tx.returnRequest.updateMany({
+        where: { id: ret.id, status: "COMPLETED", requesterId: actor.id, reasonType: CUSTOMER_RETURN_TYPE },
+        data: { status: "REJECTED", adminNote: "Undone by the rep" },
+      });
+      if (claimed.count === 0) throw new Error("This return was already undone.");
+      out = await undoCustomerReturnInTx(tx, ret, actor.id);
+    });
+
+    await logActivity({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "RETURN_REJECTED",
+      entity: "ReturnRequest",
+      entityId: ret.id,
+      summary: `${actor.name} undid customer return ${ret.code} — ${ret.quantity} × ${ret.product.name} left their stock again and TSh ${out.restored.toLocaleString("en-US")} is owed again on ${out.saleCode}.`,
+    });
+    revalidateCustomerReturns(ret.fieldSale?.customerId, actor.id);
+    await notifyInApp({
+      toRoles: ["FINANCE"],
+      category: "INFO",
+      type: "CUSTOMER_RETURN_UNDONE",
+      title: "Customer return undone",
+      body: `${actor.name} undid return ${ret.code}: TSh ${out.restored.toLocaleString("en-US")} is owed again on ${out.saleCode}.`,
+      actorName: actor.name,
+      entityType: "ReturnRequest",
+      entityId: ret.id,
+      actionUrl: "/finance/returns",
+      actionLabel: "View returns",
+    });
+    return ok(undefined, `Return ${ret.code} undone — TSh ${out.restored.toLocaleString("en-US")} is owed again on ${out.saleCode}.`);
   } catch (e) {
     return fail(errorMessage(e));
   }
@@ -475,8 +627,21 @@ export async function createFinanceReturn(
     }
     const line = sale.items.find((i) => i.productId === d.productId);
     if (!line) return fail("That product isn't on this sale.");
-    if (d.quantity > line.quantity) {
-      return fail(`At most ${line.quantity} unit(s) of ${line.product.name} were sold on this order.`);
+    // Net of goods already returned (or waiting to be) against this sale.
+    const alreadyBack =
+      (
+        await prisma.returnRequest.aggregate({
+          _sum: { quantity: true },
+          where: { fieldSaleId: sale.id, productId: d.productId, status: { not: "REJECTED" } },
+        })
+      )._sum.quantity ?? 0;
+    const left = line.quantity - alreadyBack;
+    if (d.quantity > left) {
+      return fail(
+        left <= 0
+          ? `All ${line.quantity} unit(s) of ${line.product.name} on this order are already returned or in a return.`
+          : `At most ${left} unit(s) of ${line.product.name} can still be returned on this order.`,
+      );
     }
 
     const ret = await prisma.returnRequest.create({
@@ -555,8 +720,10 @@ export async function approveReturn(
         : ret.quantity;
     const note = parsed.success ? parsed.data.note?.trim() : undefined;
 
-    await prisma.returnRequest.update({
-      where: { id: ret.id },
+    // Compare-and-swap on status AND quantity: a rep editing their pending return
+    // at the same moment must not be silently overwritten by this acceptance.
+    const accepted = await prisma.returnRequest.updateMany({
+      where: { id: ret.id, status: "PENDING", quantity: ret.quantity },
       data: {
         status: "IN_TRANSIT",
         quantity: approvedQty,
@@ -565,6 +732,9 @@ export async function approveReturn(
         reviewedAt: new Date(),
       },
     });
+    if (accepted.count === 0) {
+      return fail("This return just changed — refresh the page and try again.");
+    }
 
     await logActivity({
       actorId: actor.id,
@@ -601,7 +771,11 @@ export async function approveReturn(
 }
 
 // ── Step 3: warehouse confirms the physical units arrived → reconcile stock. ──
-export async function completeReturn(returnId: string): Promise<ActionResult> {
+export async function completeReturn(
+  returnId: string,
+  /** Rep stock returns only: the pieces the warehouse actually counted in. */
+  receivedQty?: number,
+): Promise<ActionResult> {
   try {
     const actor = await requireActor(["ADMIN", "WAREHOUSE"]);
     const ret = await prisma.returnRequest.findUnique({
@@ -621,6 +795,20 @@ export async function completeReturn(returnId: string): Promise<ActionResult> {
       return fail("Only authorised returns in transit can be received.");
     }
     const repReturn = isRepStockReturn(ret);
+    if (receivedQty !== undefined && !repReturn) {
+      return fail("Only a rep's stock return can be received with a different count.");
+    }
+    // The warehouse counts what actually arrived — it can differ from what the rep
+    // said (e.g. "I'm returning 10" but 9 arrive). Whatever isn't counted in
+    // simply stays in the rep's stock.
+    const finalQty = repReturn && receivedQty !== undefined ? receivedQty : ret.quantity;
+    if (!Number.isInteger(finalQty) || finalQty <= 0 || finalQty > 1000000) {
+      return fail("Enter how many pieces you received (1 or more). To refuse the return, decline it instead.");
+    }
+    const countNote =
+      repReturn && finalQty !== ret.quantity
+        ? `${ret.requester.name} said ${ret.quantity.toLocaleString("en-US")}, warehouse counted ${finalQty.toLocaleString("en-US")}`
+        : null;
 
     let recovered = 0;
     await prisma.$transaction(async (tx) => {
@@ -629,14 +817,23 @@ export async function completeReturn(returnId: string): Promise<ActionResult> {
       // queues) must not both restock the goods or both recover the debt.
       const claimed = await tx.returnRequest.updateMany({
         where: { id: ret.id, status: "IN_TRANSIT" },
-        data: { status: "COMPLETED", receivedAt: new Date() },
+        data: {
+          status: "COMPLETED",
+          receivedAt: new Date(),
+          ...(countNote
+            ? {
+                quantity: finalQty,
+                adminNote: ret.adminNote ? `${ret.adminNote} · ${countNote}` : countNote,
+              }
+            : {}),
+        },
       });
       if (claimed.count === 0) {
         throw new Error("This return has already been received.");
       }
       if (repReturn) {
         // Rep → warehouse: take it out of the rep's hands, put it back on the shelf.
-        await receiveRepReturnInTx(tx, ret, actor.id);
+        await receiveRepReturnInTx(tx, { ...ret, quantity: finalQty }, actor.id);
         return;
       }
       await applyMovement(tx, {
@@ -686,7 +883,7 @@ export async function completeReturn(returnId: string): Promise<ActionResult> {
       entity: "ReturnRequest",
       entityId: ret.id,
       summary: repReturn
-        ? `Return ${ret.code} received — ${ret.requester.name} sent back ${ret.quantity} × ${ret.product.name} to ${ret.warehouseName ?? "the warehouse"}; it left their stock and is back on the shelf.`
+        ? `Return ${ret.code} received — ${ret.requester.name} sent back ${finalQty} × ${ret.product.name} to ${ret.warehouseName ?? "the warehouse"}; it left their stock and is back on the shelf.${countNote ? ` (${countNote}.)` : ""}`
         : recovered > 0
           ? `Return ${ret.code} received — ${ret.quantity} × ${ret.product.name} restocked and TSh ${recovered.toLocaleString()} recovered off ${ret.fieldSale?.code ?? "the debt"}.`
           : `Return ${ret.code} received — ${ret.quantity} × ${ret.product.name} reconciled into the warehouse.`,
@@ -706,7 +903,9 @@ export async function completeReturn(returnId: string): Promise<ActionResult> {
         category: "INFO",
         type: "RETURN_RECEIVED",
         title: "Return received",
-        body: `${ret.warehouseName ?? "The warehouse"} received your ${ret.quantity.toLocaleString("en-US")} × ${ret.product.name} (${ret.code}). It is out of your stock now.`,
+        body: countNote
+          ? `${ret.warehouseName ?? "The warehouse"} received ${finalQty.toLocaleString("en-US")} × ${ret.product.name} for ${ret.code} — you said ${ret.quantity.toLocaleString("en-US")}. Only the ${finalQty.toLocaleString("en-US")} counted left your stock; check the difference.`
+          : `${ret.warehouseName ?? "The warehouse"} received your ${ret.quantity.toLocaleString("en-US")} × ${ret.product.name} (${ret.code}). It is out of your stock now.`,
         actorName: actor.name,
         entityType: "ReturnRequest",
         entityId: ret.id,
@@ -718,7 +917,9 @@ export async function completeReturn(returnId: string): Promise<ActionResult> {
       undefined,
       recovered > 0
         ? `Return ${ret.code} received — TSh ${recovered.toLocaleString()} recovered off the debt.`
-        : `Return ${ret.code} received and reconciled.`,
+        : countNote
+          ? `Return ${ret.code} received — ${finalQty.toLocaleString("en-US")} counted in (${ret.requester.name} said ${ret.quantity.toLocaleString("en-US")}); the rest stays with them.`
+          : `Return ${ret.code} received and reconciled.`,
     );
   } catch (e) {
     return fail(errorMessage(e));
@@ -740,8 +941,10 @@ export async function rejectReturn(
     if (ret.status !== "PENDING" && ret.status !== "IN_TRANSIT") {
       return fail("This return can no longer be rejected.");
     }
-    await prisma.returnRequest.update({
-      where: { id: ret.id },
+    // Compare-and-swap on status: a return received (or cancelled) a moment ago
+    // must never be flipped back to REJECTED after its stock already moved.
+    const declined = await prisma.returnRequest.updateMany({
+      where: { id: ret.id, status: { in: ["PENDING", "IN_TRANSIT"] } },
       data: {
         status: "REJECTED",
         adminNote: note?.trim() || null,
@@ -749,6 +952,7 @@ export async function rejectReturn(
         reviewedAt: new Date(),
       },
     });
+    if (declined.count === 0) return fail("This return was already handled.");
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,

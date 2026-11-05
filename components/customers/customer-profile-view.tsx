@@ -16,6 +16,7 @@ import { CustomerNoteForm } from "@/components/customers/customer-note-form";
 import { FieldCollectionButton } from "@/components/finance/field-collection-button";
 import { RequestExtensionButton } from "@/components/finance/request-extension-button";
 import { CustomerReturnButton } from "@/components/customers/customer-return-button";
+import { UndoReturnButton } from "@/components/customers/undo-return-button";
 import { CustomerExtensionHistory } from "@/components/customers/customer-extension-history";
 import { cn, formatCurrency, formatDate, timeAgo } from "@/lib/utils";
 
@@ -176,6 +177,30 @@ export function CustomerProfileView({
           </section>
         );
       })()}
+
+      {/* Goods this customer sent back — the rep can undo a return recorded by mistake. */}
+      {role === "SALES_REP" && profile.customerReturns.length > 0 && (
+        <section className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+          <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Returns you recorded
+          </h2>
+          <ul className="divide-y divide-border/60">
+            {profile.customerReturns.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
+                <span className="min-w-0">
+                  <span className="font-medium">
+                    {r.quantity.toLocaleString("en-US")} × {r.productName}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {r.code} · {r.saleCode} · {formatCurrency(r.value)} off the balance · {formatDate(r.date)}
+                  </span>
+                </span>
+                <UndoReturnButton returnId={r.id} code={r.code} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <CustomerFinancialSummary f={profile.finance} />
 

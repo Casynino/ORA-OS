@@ -30,7 +30,7 @@ export default async function RepReturnStockPage() {
       where: { requesterId: me.id, reasonType: REP_RETURN_TYPE },
       orderBy: { createdAt: "desc" },
       take: 30,
-      include: { product: { select: { name: true } } },
+      include: { product: { select: { name: true, unitsPerCarton: true, notForSale: true } } },
     }),
   ]);
 
@@ -80,6 +80,15 @@ export default async function RepReturnStockPage() {
               reason: r.reason,
               adminNote: r.adminNote,
               createdAt: r.createdAt.toISOString(),
+              unitsPerCarton: r.product.unitsPerCarton,
+              notForSale: r.product.notForSale,
+              // Editing a waiting return: what you hold minus your OTHER open returns.
+              maxQty: (() => {
+                const l = returnable.get(r.productId);
+                if (!l) return 0;
+                const others = l.inReturn - (r.status === "PENDING" ? r.quantity : 0);
+                return Math.max(0, l.inHand - others);
+              })(),
             }))}
           />
         )}

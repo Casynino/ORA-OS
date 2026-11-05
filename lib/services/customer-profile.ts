@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { CUSTOMER_RETURN_TYPE } from "@/lib/rep-returns";
 import { notDeveloperTrack } from "@/lib/developer/audit-visibility";
 
 /**
@@ -88,6 +89,16 @@ export type CustomerProfile = {
     isOpeningBalance: boolean;
     // productId / unitPrice / returned feed the rep's "Return goods" form.
     items: { productId: string; name: string; quantity: number; unitPrice: number; returned: number }[];
+  }[];
+  // Goods this customer sent back to the rep (still counted) — the rep can undo these.
+  customerReturns: {
+    id: string;
+    code: string;
+    saleCode: string;
+    productName: string;
+    quantity: number;
+    value: number;
+    date: Date;
   }[];
   extensions: ExtensionEntry[];
   timeline: TimelineEntry[];
@@ -211,7 +222,20 @@ export async function getFieldCustomerProfile(
           include: {
             items: { include: { product: { select: { name: true } } } },
             payments: { orderBy: { createdAt: "desc" } },
-            returns: { select: { code: true, productId: true, quantity: true, creditValue: true, status: true, createdAt: true } },
+            returns: {
+              select: {
+                id: true,
+                code: true,
+                productId: true,
+                quantity: true,
+                creditValue: true,
+                status: true,
+                reasonType: true,
+                adminNote: true,
+                createdAt: true,
+                product: { select: { name: true } },
+              },
+            },
           },
         },
         creditExtensions: {
@@ -317,8 +341,14 @@ export async function getFieldCustomerProfile(
   const onCreditMap = new Map<string, number>();
   for (const s of creditSales) {
     if (s.total - s.amountPaid <= 0) continue;
-    for (const it of s.items)
-      onCreditMap.set(it.product.name, (onCreditMap.get(it.product.name) ?? 0) + it.quantity);
+    for (const it of s.items) {
+      // Goods already sent back are no longer "on credit".
+      const back = s.returns
+        .filter((r) => r.productId === it.productId && r.status === "COMPLETED")
+        .reduce((a, r) => a + r.quantity, 0);
+      const qty = Math.max(0, it.quantity - back);
+      if (qty > 0) onCreditMap.set(it.product.name, (onCreditMap.get(it.product.name) ?? 0) + qty);
+    }
   }
   const onCredit = [...onCreditMap.entries()]
     .map(([name, quantity]) => ({ name, quantity }))
@@ -390,7 +420,8 @@ export async function getFieldCustomerProfile(
         detail: `${r.quantity} unit(s)`,
         amount: r.creditValue,
         date: r.createdAt,
-        status: r.status,
+        status:
+          r.status === "REJECTED" && r.adminNote === "Undone by the rep" ? "undone" : r.status,
       });
     }
   }
@@ -506,6 +537,22 @@ export async function getFieldCustomerProfile(
           .reduce((sum, r) => sum + r.quantity, 0),
       })),
     })),
+    customerReturns: customer.sales
+      .filter((sale) => isLive(sale))
+      .flatMap((sale) =>
+        sale.returns
+          .filter((r) => r.reasonType === CUSTOMER_RETURN_TYPE && r.status === "COMPLETED")
+          .map((r) => ({
+            id: r.id,
+            code: r.code,
+            saleCode: sale.code,
+            productName: r.product.name,
+            quantity: r.quantity,
+            value: r.creditValue ?? 0,
+            date: r.createdAt,
+          })),
+      )
+      .sort((a, b) => b.date.getTime() - a.date.getTime()),
     extensions,
     timeline,
   };

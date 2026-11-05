@@ -64,11 +64,20 @@ export function RepReturnForm({
           warehouseId: warehouseId || undefined,
         });
         if (!res.ok) {
-          toast({ variant: "error", title: `${l.p.name}: ${res.error}` });
+          toast({
+            variant: "error",
+            title: `${l.p.name}: ${res.error}${sent > 0 ? ` (${sent} earlier return${sent === 1 ? " was" : "s were"} already sent — fix this one and send again.)` : ""}`,
+          });
           router.refresh();
           return;
         }
         sent += 1;
+        // Clear the line that went through so a retry can't send it twice.
+        setQty((q) => {
+          const next = { ...q };
+          delete next[l.p.id];
+          return next;
+        });
       }
       toast({
         variant: "success",

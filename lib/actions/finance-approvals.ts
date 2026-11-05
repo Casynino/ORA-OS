@@ -180,6 +180,14 @@ export async function revertFieldSaleApproval(id: string): Promise<ActionResult>
       });
       if (posted > 0)
         throw new Error("This sale has collections posted against it — reject those first, then send it back.");
+      // Goods already returned on it (a customer return or a debt-recovery return)
+      // have moved stock and credit. Sending the sale back — and then rejecting it —
+      // would put those pieces back a second time, so undo the return first.
+      const returned = await tx.returnRequest.count({
+        where: { fieldSaleId: id, status: { not: "REJECTED" } },
+      });
+      if (returned > 0)
+        throw new Error("Goods were already returned on this sale — undo or reject that return first, then send it back.");
 
       await tx.fieldSale.update({
         where: { id },
@@ -256,7 +264,22 @@ export async function rejectFieldSale(
       // back into their hands (mirror of voidFieldSale) so a corrected
       // re-record doesn't double-deduct their stock, and the org ledger and
       // the rep's own totals stay accurate.
-      for (const item of sale.items) {
+      // Pieces already returned against this sale went back where they belong when
+      // that return completed — only restore the rest, or they'd be counted twice.
+      const alreadyBack = new Map(
+        (
+          await tx.returnRequest.groupBy({
+            by: ["productId"],
+            where: { fieldSaleId: sale.id, status: "COMPLETED" },
+            _sum: { quantity: true },
+          })
+        ).map((r) => [r.productId, r._sum.quantity ?? 0]),
+      );
+      for (const line of sale.items) {
+        const credit = Math.min(line.quantity, alreadyBack.get(line.productId) ?? 0);
+        alreadyBack.set(line.productId, (alreadyBack.get(line.productId) ?? 0) - credit);
+        const item = { productId: line.productId, quantity: line.quantity - credit };
+        if (item.quantity <= 0) continue;
         await applyMovement(tx, {
           productId: item.productId,
           type: "RESTOCKED",

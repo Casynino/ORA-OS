@@ -45,6 +45,8 @@ export type SalesHistoryRow = {
   /** Deposit-slip / receipt reference captured with the payment. */
   paymentProofRef: string | null;
   items: SalesHistoryItem[];
+  /** A rep's own field sale that is still open to edit (not rejected / office). */
+  editable?: boolean;
 };
 
 function splitUnits(qty: number, unitsPerCarton: number | null | undefined) {
@@ -155,6 +157,7 @@ export async function getSalesHistory(opts?: {
       attachments: fieldSaleAttachments[s.id] ?? [],
       paymentProofRef: s.depositProofRef,
       items,
+      editable: !isOffice && s.financeStatus !== "REJECTED",
     };
   });
 

@@ -55,7 +55,7 @@ export async function getDailyReportData(ref: Date = new Date()): Promise<DailyR
     prisma.fieldSale.findMany({ where: { type: "CREDIT", voided: false, financeStatus: "APPROVED", creditStatus: { in: ["PENDING", "PARTIAL", "OVERDUE"] } }, select: { total: true, amountPaid: true } }),
     prisma.fieldSale.count({ where: { type: "CREDIT", voided: false, financeStatus: "APPROVED", creditStatus: "OVERDUE" } }),
     prisma.fieldSale.count({ where: { type: "CREDIT", voided: false, financeStatus: "APPROVED", creditStatus: { in: ["PENDING", "PARTIAL"] }, dueDate: { gte: end, lt: new Date(end.getTime() + 3 * 24 * 60 * 60 * 1000) } } }),
-    prisma.stockMovement.aggregate({ _sum: { quantity: true }, where: { type: "DISTRIBUTED", createdAt: { gte: start, lt: end } } }),
+    prisma.stockMovement.aggregate({ _sum: { quantity: true }, where: { type: "DISTRIBUTED", OR: [{ reference: null }, { NOT: { reference: { startsWith: "RET-" } } }], createdAt: { gte: start, lt: end } } }),
     prisma.stockMovement.aggregate({ _sum: { quantity: true }, where: { type: { in: ["RESTOCKED", "RETURNED"] }, createdAt: { gte: start, lt: end } } }),
     prisma.warehouseTransfer.count({ where: { createdAt: { gte: start, lt: end } } }),
     prisma.repStockRequest.count({ where: { status: "PENDING" } }),
@@ -105,7 +105,7 @@ export async function getDailyReportData(ref: Date = new Date()): Promise<DailyR
   }
   const finance: TeamRow[] = [...finMap.values()].map((f) => ({ name: f.name, a: f.verified, b: f.amount, c: 0 }));
 
-  const dispatchMovements = await prisma.stockMovement.findMany({ where: { type: "DISTRIBUTED", createdAt: { gte: start, lt: end } }, select: { quantity: true, createdById: true, createdBy: { select: { name: true, role: true } } } });
+  const dispatchMovements = await prisma.stockMovement.findMany({ where: { type: "DISTRIBUTED", OR: [{ reference: null }, { NOT: { reference: { startsWith: "RET-" } } }], createdAt: { gte: start, lt: end } }, select: { quantity: true, createdById: true, createdBy: { select: { name: true, role: true } } } });
   const whMap = new Map<string, { name: string; moves: number; qty: number }>();
   for (const m of dispatchMovements) {
     if (m.createdBy.role !== "WAREHOUSE") continue;

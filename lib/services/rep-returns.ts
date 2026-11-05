@@ -18,6 +18,8 @@ export type RepReturnableLine = {
  *  up in an open return are not offered twice. */
 export async function getRepReturnableStock(
   repId: string,
+  /** Leave one return out of the "already waiting" total (used when editing it). */
+  excludeReturnId?: string,
 ): Promise<Map<string, RepReturnableLine>> {
   const [stock, open] = await Promise.all([
     prisma.repStock.findMany({
@@ -35,6 +37,7 @@ export async function getRepReturnableStock(
         requesterId: repId,
         reasonType: REP_RETURN_TYPE,
         status: { in: ["PENDING", "IN_TRANSIT"] },
+        ...(excludeReturnId ? { id: { not: excludeReturnId } } : {}),
       },
       _sum: { quantity: true },
     }),
@@ -120,6 +123,13 @@ export async function receiveRepReturnInTx(
   });
 }
 
+/** Credit status of a sale after its paid amount changes. */
+function creditStatusAfter(total: number, paid: number, dueDate: Date | null) {
+  if (paid >= total) return "PAID" as const;
+  if (dueDate && dueDate < new Date()) return "OVERDUE" as const;
+  return paid > 0 ? ("PARTIAL" as const) : ("PENDING" as const);
+}
+
 /** Apply a customer's return inside the caller's transaction (the caller has
  *  just created the ReturnRequest). Puts the pieces back in the SELLING rep's
  *  hands and takes their value off what the customer still owes on that credit
@@ -157,14 +167,7 @@ export async function takeCustomerReturnInTx(
   // Guarded compare-and-swap on amountPaid so a payment landing at the same
   // moment can't be double-applied.
   const newPaid = sale.amountPaid + ret.creditValue;
-  const status =
-    newPaid >= sale.total
-      ? ("PAID" as const)
-      : sale.dueDate && sale.dueDate < new Date()
-        ? ("OVERDUE" as const)
-        : newPaid > 0
-          ? ("PARTIAL" as const)
-          : ("PENDING" as const);
+  const status = creditStatusAfter(sale.total, newPaid, sale.dueDate);
   const swapped = await tx.fieldSale.updateMany({
     where: { id: sale.id, amountPaid: sale.amountPaid, voided: false },
     data: { amountPaid: newPaid, creditStatus: status },
@@ -200,4 +203,66 @@ export async function takeCustomerReturnInTx(
     note: `Stock back in ${ret.requester.name}'s hands`,
   });
   return { credited: ret.creditValue, saleCode: sale.code };
+}
+
+/** Undo a customer return inside the caller's transaction (the caller has already
+ *  claimed the ReturnRequest). The exact reverse of {@link takeCustomerReturnInTx}:
+ *  the pieces leave the rep's stock again and the value goes back onto what the
+ *  customer owes. Refuses — rolling everything back — if the rep no longer holds
+ *  the pieces, or the sale was voided / its payments changed underneath. */
+export async function undoCustomerReturnInTx(
+  tx: Tx,
+  ret: {
+    code: string;
+    productId: string;
+    requesterId: string;
+    quantity: number;
+    creditValue: number | null;
+    fieldSaleId: string | null;
+    product: { name: string };
+    requester: { name: string };
+  },
+  actorId: string,
+): Promise<{ restored: number; saleCode: string }> {
+  if (!ret.fieldSaleId || !ret.creditValue || ret.creditValue <= 0) {
+    throw new Error("This return isn't linked to a sale.");
+  }
+  const sale = await tx.fieldSale.findUnique({ where: { id: ret.fieldSaleId } });
+  if (!sale) throw new Error("Sale not found.");
+  if (sale.voided) {
+    throw new Error("This sale was voided, so the return can't be undone.");
+  }
+  if (sale.repId !== ret.requesterId) throw new Error("This sale belongs to another rep.");
+  if (sale.amountPaid < ret.creditValue) {
+    throw new Error(
+      "Payments on this sale changed after the return, so it can't be undone here. Ask Finance.",
+    );
+  }
+  const newPaid = sale.amountPaid - ret.creditValue;
+  const swapped = await tx.fieldSale.updateMany({
+    where: { id: sale.id, amountPaid: sale.amountPaid, voided: false },
+    data: { amountPaid: newPaid, creditStatus: creditStatusAfter(sale.total, newPaid, sale.dueDate) },
+  });
+  if (swapped.count === 0) throw new Error("The sale balance changed — try again.");
+
+  // The pieces must still be in the rep's hands to take them out again.
+  const out = await tx.repStock.updateMany({
+    where: { repId: ret.requesterId, productId: ret.productId, sellableQty: { gte: ret.quantity } },
+    data: { sellableQty: { decrement: ret.quantity }, soldQty: { increment: ret.quantity } },
+  });
+  if (out.count === 0) {
+    throw new Error(
+      `${ret.requester.name} no longer holds ${ret.quantity} × ${ret.product.name} (already sold or sent back), so this return can't be undone.`,
+    );
+  }
+  // Org ledger: back out to the field — reverses the RESTOCKED + ASSIGNED pair.
+  await applyMovement(tx, {
+    productId: ret.productId,
+    type: "DISTRIBUTED",
+    quantity: ret.quantity,
+    createdById: actorId,
+    reference: ret.code,
+    note: `Undo customer return: ${ret.requester.name} → customer (${sale.code})`,
+  });
+  return { restored: ret.creditValue, saleCode: sale.code };
 }

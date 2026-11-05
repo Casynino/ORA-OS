@@ -56,7 +56,30 @@ async function reverseSaleInTx(
     select: { id: true },
   });
 
-  for (const item of sale.items) {
+  // A return still waiting (e.g. a debt-recovery return not yet received) is moot
+  // once the sale never happened — close it so it can't restock the goods later.
+  await tx.returnRequest.updateMany({
+    where: { fieldSaleId: sale.id, status: { in: ["PENDING", "IN_TRANSIT"] } },
+    data: { status: "REJECTED", adminNote: `Sale ${sale.code} was voided` },
+  });
+  // Goods already returned against this sale (customer → rep, or debt-recovery →
+  // warehouse) were put back where they belong when that return completed. Only
+  // the rest is restored now, or those pieces would be counted twice.
+  const alreadyBack = new Map(
+    (
+      await tx.returnRequest.groupBy({
+        by: ["productId"],
+        where: { fieldSaleId: sale.id, status: "COMPLETED" },
+        _sum: { quantity: true },
+      })
+    ).map((r) => [r.productId, r._sum.quantity ?? 0]),
+  );
+
+  for (const line of sale.items) {
+    const credit = Math.min(line.quantity, alreadyBack.get(line.productId) ?? 0);
+    alreadyBack.set(line.productId, (alreadyBack.get(line.productId) ?? 0) - credit);
+    const item = { productId: line.productId, quantity: line.quantity - credit };
+    if (item.quantity <= 0) continue;
     if (sale.directSale) {
       // Head-office sale drew from the WAREHOUSE — a void puts it back there.
       await applyMovement(tx, {
