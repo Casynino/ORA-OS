@@ -28,14 +28,11 @@ export function useActing(): ActingState | null {
 }
 
 /**
- * "Working as Rehema  [Stop]" — where Stop lives. Hover it to see who the actions
- * are recorded under.
- *  • Desktop (lg+): a small pill in the bottom-right corner that never covers the
- *    page and doesn't move anything.
- *  • Phones / tablets: a slim strip in the normal page flow, at the top of the
- *    content. It takes its own row, so nothing is ever covered or pushed under it
- *    (a floating pill would sit over the page content, the cart bar and the
- *    phone's home bar).
+ * A small pill in the bottom-right corner: "Working as Rehema  [Stop]". It's where
+ * Stop lives. Hover it to see who the actions are recorded under.
+ * On phones it sits clear of the home bar / browser toolbar (safe-area inset), and
+ * the dashboard shell adds room at the end of the page while it's showing, so the
+ * pill never hides the last row of content.
  */
 export function ActingBanner({ state }: { state: ActingState }) {
   const [pending, start] = useTransition();
@@ -50,19 +47,16 @@ export function ActingBanner({ state }: { state: ActingState }) {
 
   return (
     <div
-      className="flex items-center justify-between gap-3 bg-gradient-to-r from-primary to-accent py-1.5 pl-4 pr-3 text-white print:hidden lg:fixed lg:bottom-4 lg:right-4 lg:z-40 lg:max-w-[calc(100vw-2rem)] lg:justify-start lg:gap-2 lg:rounded-full lg:pr-1.5 lg:shadow-glow lg:ring-1 lg:ring-white/20"
+      className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-40 flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent py-1.5 pl-4 pr-1.5 text-white shadow-glow ring-1 ring-white/20 print:hidden"
       title={`${humanize(state.as.role)} · everything you do is recorded as ${state.developer} (Developer)`}
       role="status"
     >
-      <span className="min-w-0 truncate text-xs font-semibold sm:text-sm">
-        Working as {state.as.name}
-        <span className="font-normal text-white/80 lg:hidden"> · {humanize(state.as.role)}</span>
-      </span>
+      <span className="truncate text-xs font-semibold sm:text-sm">Working as {state.as.name}</span>
       <button
         type="button"
         onClick={stop}
         disabled={pending}
-        className="shrink-0 rounded-full bg-white px-3.5 py-1 text-xs font-bold text-primary transition-colors hover:bg-white/90 disabled:opacity-60 sm:text-sm lg:py-1.5"
+        className="shrink-0 rounded-full bg-white px-3.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-white/90 disabled:opacity-60 sm:text-sm"
       >
         {pending ? "Stopping…" : "Stop"}
       </button>

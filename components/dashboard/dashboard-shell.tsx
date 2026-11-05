@@ -382,7 +382,9 @@ export function DashboardShell({
             </div>
           </div>
         </header>
-        <main className="p-4 lg:p-8">{children}</main>
+        {/* While the "Working as" pill floats at the bottom, leave room at the end of
+            the page so it never covers the last row of content. */}
+        <main className={cn("p-4 lg:p-8", acting && "pb-24 lg:pb-24")}>{children}</main>
       </div>
     </div>
   );
