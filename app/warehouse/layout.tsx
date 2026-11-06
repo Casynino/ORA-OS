@@ -10,8 +10,8 @@ const nav: NavGroup[] = [
   {
     items: [
       { href: "/warehouse", label: "Home", icon: "dashboard" },
-      { href: "/warehouse/orders", label: "Partner orders", icon: "requests" },
-      { href: "/warehouse/rep-requests", label: "Rep requests", icon: "reps" },
+      { href: "/warehouse/orders", label: "Orders", icon: "requests" },
+      { href: "/warehouse/rep-requests", label: "Requests", icon: "reps" },
     ],
   },
   {
@@ -20,7 +20,7 @@ const nav: NavGroup[] = [
     items: [
       { href: "/warehouse/transfers", label: "Transfers", icon: "transfers" },
       { href: "/warehouse/returns", label: "Returns", icon: "returns" },
-      { href: "/warehouse/receive", label: "Receive stock", icon: "receive" },
+      { href: "/warehouse/receive", label: "Receive", icon: "receive" },
     ],
   },
   {

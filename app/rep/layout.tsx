@@ -8,23 +8,23 @@ const nav: NavGroup[] = [
   {
     items: [
       { href: "/rep", label: "Home", icon: "dashboard" },
-      { href: "/rep/sell", label: "Record sale", icon: "sales" },
-      { href: "/rep/stock", label: "My stock", icon: "inventory" },
+      { href: "/rep/sell", label: "Sell", icon: "sales" },
+      { href: "/rep/stock", label: "Stock", icon: "inventory" },
     ],
   },
   {
     label: "Customers",
     icon: "customers",
     items: [
-      { href: "/rep/customers", label: "My customers", icon: "customers" },
-      { href: "/rep/customers/new", label: "Register customer", icon: "newRequest" },
+      { href: "/rep/customers", label: "Customers", icon: "customers" },
+      { href: "/rep/customers/new", label: "Register", icon: "newRequest" },
     ],
   },
   {
     label: "Sales",
     icon: "reports",
     items: [
-      { href: "/rep/sales", label: "Sales history", icon: "reports" },
+      { href: "/rep/sales", label: "History", icon: "reports" },
       { href: "/rep/samples", label: "Samples", icon: "samples" },
     ],
   },
@@ -32,22 +32,22 @@ const nav: NavGroup[] = [
     label: "Stock",
     icon: "inventory",
     items: [
-      { href: "/rep/stock/request", label: "Request stock", icon: "newRequest" },
-      { href: "/rep/stock/requests", label: "Request history", icon: "requests" },
+      { href: "/rep/stock/request", label: "Request", icon: "newRequest" },
+      { href: "/rep/stock/requests", label: "History", icon: "requests" },
     ],
   },
   {
     label: "Collections",
     items: [
-      { href: "/rep/collections", label: "Credit customers", icon: "credit" },
+      { href: "/rep/collections", label: "Collections", icon: "credit" },
     ],
   },
   {
     label: "Reports",
     icon: "fieldReports",
     items: [
-      { href: "/rep/reports", label: "Daily reports", icon: "fieldReports" },
-      { href: "/rep/targets", label: "My targets", icon: "targets" },
+      { href: "/rep/reports", label: "Daily", icon: "fieldReports" },
+      { href: "/rep/targets", label: "Targets", icon: "targets" },
     ],
   },
   { items: [{ href: "/rep/profile", label: "Profile", icon: "profile" }] },
@@ -63,7 +63,7 @@ export default async function RepLayout({
     <DashboardShell
       nav={nav}
       user={{ name: user.name, email: user.email, role: user.role }}
-      areaLabel="Sales Rep"
+      areaLabel="Rep"
     >
       {children}
     </DashboardShell>

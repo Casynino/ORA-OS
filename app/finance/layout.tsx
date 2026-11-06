@@ -12,7 +12,7 @@ const nav: NavGroup[] = [
   {
     items: [
       { href: "/finance", label: "Home", icon: "dashboard" },
-      { href: "/finance/sales-approvals", label: "Sales approvals", icon: "approvals" },
+      { href: "/finance/sales-approvals", label: "Approvals", icon: "approvals" },
     ],
   },
   {
@@ -20,7 +20,7 @@ const nav: NavGroup[] = [
     icon: "customers",
     items: [
       { href: "/finance/customers", label: "Customers", icon: "customers" },
-      { href: "/finance/sell", label: "Record sale", icon: "sales" },
+      { href: "/finance/sell", label: "Sell", icon: "sales" },
       { href: "/finance/applications", label: "Applications", icon: "customers" },
       { href: "/finance/partners", label: "Partners", icon: "customers" },
     ],
@@ -29,7 +29,7 @@ const nav: NavGroup[] = [
     label: "Verify",
     icon: "approvals",
     items: [
-      { href: "/finance/sales", label: "Sales history", icon: "audit" },
+      { href: "/finance/sales", label: "History", icon: "audit" },
       { href: "/finance/payments", label: "Payments", icon: "payments" },
       { href: "/finance/returns", label: "Returns", icon: "warehouses" },
     ],
@@ -38,13 +38,13 @@ const nav: NavGroup[] = [
     label: "Money",
     icon: "finance",
     items: [
-      { href: "/finance/cash", label: "Cash & deposits", icon: "settlements" },
+      { href: "/finance/cash", label: "Cash", icon: "settlements" },
       { href: "/finance/operational-fund", label: "Expenses", icon: "finance" },
     ],
   },
   {
     label: "Credit",
-    items: [{ href: "/finance/credit", label: "Debts & settlements", icon: "credit" }],
+    items: [{ href: "/finance/credit", label: "Debts", icon: "credit" }],
   },
   {
     label: "Reports",
@@ -62,7 +62,7 @@ export default async function FinanceLayout({
     <DashboardShell
       nav={nav}
       user={{ name: user.name, email: user.email, role: user.role }}
-      areaLabel="Finance & Accounting"
+      areaLabel="Finance"
       profileHref="/finance/profile"
     >
       {children}

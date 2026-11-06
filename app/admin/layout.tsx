@@ -15,7 +15,7 @@ const nav: NavGroup[] = [
       { href: "/admin/inventory", label: "Inventory", icon: "inventory" },
       { href: "/admin/warehouses", label: "Warehouses", icon: "warehouses" },
       { href: "/admin/transfers", label: "Transfers", icon: "transfers" },
-      { href: "/admin/imports", label: "Imports & POs", icon: "imports" },
+      { href: "/admin/imports", label: "Imports", icon: "imports" },
       { href: "/admin/returns", label: "Returns", icon: "returns" },
     ],
   },
@@ -23,12 +23,12 @@ const nav: NavGroup[] = [
     label: "Sales",
     icon: "sales",
     items: [
-      { href: "/admin/sales-dashboard", label: "Sales insights", icon: "profit" },
+      { href: "/admin/sales-dashboard", label: "Insights", icon: "profit" },
       { href: "/admin/requests", label: "Orders", icon: "requests" },
-      { href: "/admin/sales-approvals", label: "Sales approvals", icon: "approvals" },
-      { href: "/admin/sales", label: "Sales history", icon: "sales" },
-      { href: "/admin/sell", label: "Record sale", icon: "newRequest" },
-      { href: "/admin/reps", label: "Sales Reps", icon: "reps" },
+      { href: "/admin/sales-approvals", label: "Approvals", icon: "approvals" },
+      { href: "/admin/sales", label: "History", icon: "sales" },
+      { href: "/admin/sell", label: "Sell", icon: "newRequest" },
+      { href: "/admin/reps", label: "Reps", icon: "reps" },
       { href: "/admin/customers", label: "Customers", icon: "customers" },
       { href: "/admin/invoices", label: "Invoices", icon: "invoices" },
     ],
@@ -40,11 +40,11 @@ const nav: NavGroup[] = [
       { href: "/admin/finance", label: "Finance", icon: "finance" },
       { href: "/admin/finance/operational-fund", label: "Expenses", icon: "payments" },
       { href: "/admin/credit", label: "Settlements", icon: "settlements" },
-      { href: "/admin/credit/extensions", label: "Credit Extensions", icon: "extensions" },
+      { href: "/admin/credit/extensions", label: "Extensions", icon: "extensions" },
     ],
   },
   {
-    label: "Partner Network",
+    label: "Partners",
     icon: "users",
     items: [
       { href: "/admin/applications", label: "Applications", icon: "applications" },
@@ -56,10 +56,10 @@ const nav: NavGroup[] = [
     label: "Impact",
     icon: "impact",
     items: [
-      { href: "/admin/news", label: "News & Posts", icon: "news" },
-      { href: "/admin/impact", label: "Impact Management", icon: "activities" },
-      { href: "/admin/stockists", label: "Stockists & Coverage", icon: "fieldReports" },
-      { href: "/admin/education", label: "Education Hub", icon: "education" },
+      { href: "/admin/news", label: "News", icon: "news" },
+      { href: "/admin/impact", label: "Activities", icon: "activities" },
+      { href: "/admin/stockists", label: "Stockists", icon: "fieldReports" },
+      { href: "/admin/education", label: "Education", icon: "education" },
     ],
   },
   {
@@ -67,7 +67,7 @@ const nav: NavGroup[] = [
     icon: "reports",
     items: [
       { href: "/admin/reports", label: "Reports", icon: "reports" },
-      { href: "/admin/activity", label: "Activity Log", icon: "activity" },
+      { href: "/admin/activity", label: "Activity", icon: "activity" },
     ],
   },
 ];
@@ -94,7 +94,7 @@ export default async function AdminLayout({
         avatar: me?.avatar ?? null,
         preferredName: me?.preferredName ?? null,
       }}
-      areaLabel="Admin Console"
+      areaLabel="Admin"
       profileHref="/admin/profile"
     >
       {children}

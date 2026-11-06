@@ -15,17 +15,17 @@ const nav: NavGroup[] = [
     label: "Ordering",
     icon: "requests",
     items: [
-      { href: "/partner/request", label: "New request", icon: "newRequest" },
-      { href: "/partner/requests", label: "My orders", icon: "requests" },
+      { href: "/partner/request", label: "Request", icon: "newRequest" },
+      { href: "/partner/requests", label: "Orders", icon: "requests" },
     ],
   },
   {
-    label: "Finance & support",
+    label: "Account",
     icon: "credit",
     items: [
-      { href: "/partner/credit", label: "Credit & payments", icon: "credit" },
+      { href: "/partner/credit", label: "Credit", icon: "credit" },
       { href: "/partner/returns", label: "Returns", icon: "returns" },
-      { href: "/partner/profile", label: "My profile", icon: "profile" },
+      { href: "/partner/profile", label: "Profile", icon: "profile" },
     ],
   },
 ];
@@ -40,7 +40,7 @@ export default async function PartnerLayout({
     <DashboardShell
       nav={nav}
       user={{ name: user.name, email: user.email, role: user.role }}
-      areaLabel="Partner Portal"
+      areaLabel="Partner"
       profileHref="/partner/profile"
     >
       {children}
