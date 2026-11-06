@@ -7,12 +7,17 @@ import {
 // Inventory operations only — no sales, pricing, finance or customer
 // management. Warehouse staff receive, prepare, dispatch and count stock.
 const nav: NavGroup[] = [
-  { items: [{ href: "/warehouse", label: "Home", icon: "dashboard" }] },
   {
-    label: "Operations",
     items: [
+      { href: "/warehouse", label: "Home", icon: "dashboard" },
       { href: "/warehouse/orders", label: "Partner orders", icon: "requests" },
       { href: "/warehouse/rep-requests", label: "Rep requests", icon: "reps" },
+    ],
+  },
+  {
+    label: "Operations",
+    icon: "dispatch",
+    items: [
       { href: "/warehouse/transfers", label: "Transfers", icon: "transfers" },
       { href: "/warehouse/returns", label: "Returns", icon: "returns" },
       { href: "/warehouse/receive", label: "Receive stock", icon: "receive" },
@@ -20,6 +25,7 @@ const nav: NavGroup[] = [
   },
   {
     label: "Stock",
+    icon: "inventory",
     items: [
       { href: "/warehouse/inventory", label: "Inventory", icon: "inventory" },
       { href: "/warehouse/movements", label: "Movements", icon: "transfers" },

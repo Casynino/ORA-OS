@@ -58,7 +58,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationBell } from "@/components/app/notification-bell";
 import { ActingBanner, useActing } from "@/components/developer/acting-banner";
 import { logoutAction } from "@/lib/actions/auth";
-import { cn } from "@/lib/utils";
+import { cn, humanize } from "@/lib/utils";
 
 const ICONS: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -114,7 +114,7 @@ export function DashboardShell({
   user,
   areaLabel,
   profileHref,
-  collapsibleNav = false,
+  collapsibleNav = true,
   children,
 }: {
   nav: NavGroup[];
@@ -129,7 +129,8 @@ export function DashboardShell({
   areaLabel?: string;
   profileHref?: string;
   /** Labelled menu groups open and close (the group you're in stays open; your
-   *  choices are remembered on this device). Off = every group always shown. */
+   *  choices are remembered on this device). On for every department; pass
+   *  `false` to always show every group. */
   collapsibleNav?: boolean;
   children: React.ReactNode;
 }) {
@@ -223,30 +224,38 @@ export function DashboardShell({
         onClick={onNavigate}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+          "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-colors",
           active
             ? "bg-primary/12 text-primary"
             : "text-muted-foreground hover:bg-muted hover:text-foreground",
         )}
       >
-        <Icon className="size-4 shrink-0" />
+        <Icon className="size-[15px] shrink-0" />
         <span className="min-w-0 truncate">{item.label}</span>
       </Link>
     );
   };
 
+  // Breathing room around the flat shortcuts (Home etc.) before / after the groups.
+  const flatGap = (g: NavGroup, gi: number) =>
+    !collapsibleNav ? undefined : gi === 0 ? "mb-2" : !g.label ? "mt-2" : undefined;
+
   // Called as a function (not a component) so the open/close animation isn't
   // reset every time the shell re-renders.
   const renderNav = (onNavigate?: () => void) => (
-    <nav className={cn("flex flex-1 flex-col", collapsibleNav ? "gap-1" : "gap-4")}>
+    <nav className={cn("flex flex-1 flex-col", collapsibleNav ? "gap-0.5" : "gap-4")}>
       {nav.map((group, gi) => {
         if (!isCollapsible(group)) {
           // Single-page groups in a collapsible menu are plain links (nothing to hide).
           if (collapsibleNav && group.items.length === 1) {
-            return <div key={groupKey(group, gi)}>{renderNavItem(group.items[0], onNavigate)}</div>;
+            return (
+              <div key={groupKey(group, gi)} className={flatGap(group, gi)}>
+                {renderNavItem(group.items[0], onNavigate)}
+              </div>
+            );
           }
           return (
-            <div key={groupKey(group, gi)}>
+            <div key={groupKey(group, gi)} className={flatGap(group, gi)}>
               {group.label && (
                 <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
                   {group.label}
@@ -268,17 +277,17 @@ export function DashboardShell({
               onClick={() => toggleGroup(key)}
               aria-expanded={isOpen}
               className={cn(
-                "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider transition-colors hover:bg-muted",
+                "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors hover:bg-muted",
                 hasActive ? "text-primary" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <GroupIcon className="size-4 shrink-0" />
+              <GroupIcon className="size-[15px] shrink-0" />
               <span className="min-w-0 flex-1 truncate">{group.label}</span>
               {hasActive && !isOpen && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" />}
               <ChevronRight
                 aria-hidden
                 className={cn(
-                  "size-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 motion-reduce:transition-none",
+                  "size-3.5 shrink-0 text-muted-foreground/70 transition-transform duration-200 motion-reduce:transition-none",
                   isOpen && "rotate-90",
                 )}
               />
@@ -290,7 +299,7 @@ export function DashboardShell({
               )}
             >
               <div className="min-h-0 overflow-hidden">
-                <div className="mb-1 ml-5 mt-0.5 flex flex-col gap-0.5 border-l border-border pl-2.5">
+                <div className="mb-1 ml-[1.05rem] mt-0.5 flex flex-col gap-px border-l border-border pl-2">
                   {group.items.map((item) => renderNavItem(item, onNavigate))}
                 </div>
               </div>
@@ -303,19 +312,19 @@ export function DashboardShell({
 
   const UserCard = () => (
     <div className="border-t border-border p-3">
-      <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-        <Avatar name={user.name} src={user.avatar} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{user.name}</p>
-          <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+      <div className="flex items-center gap-2.5 px-1 py-1" title={user.email ?? undefined}>
+        <Avatar name={user.name} src={user.avatar} className="size-8" />
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="truncate text-[13px] font-semibold">{user.name}</p>
+          <p className="truncate text-xs text-muted-foreground">{user.role ? humanize(user.role) : user.email}</p>
         </div>
       </div>
       <form action={logoutAction}>
         <button
           type="submit"
-          className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          className="mt-2 flex w-full items-center gap-2.5 rounded-lg border border-border px-3 py-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
         >
-          <LogOut className="size-4" />
+          <LogOut className="size-3.5" />
           Sign out
         </button>
       </form>
@@ -333,7 +342,7 @@ export function DashboardShell({
         </div>
         <div className="flex flex-1 flex-col overflow-y-auto scrollbar-thin p-3">
           {areaLabel && (
-            <p className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-primary">
+            <p className="px-2.5 pb-2 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
               {areaLabel}
             </p>
           )}

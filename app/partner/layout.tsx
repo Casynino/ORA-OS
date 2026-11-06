@@ -5,17 +5,23 @@ import {
 } from "@/components/dashboard/dashboard-shell";
 
 const nav: NavGroup[] = [
-  { items: [{ href: "/partner", label: "Home", icon: "dashboard" }] },
+  {
+    items: [
+      { href: "/partner", label: "Home", icon: "dashboard" },
+      { href: "/partner/catalogue", label: "Catalogue", icon: "catalogue" },
+    ],
+  },
   {
     label: "Ordering",
+    icon: "requests",
     items: [
-      { href: "/partner/catalogue", label: "Catalogue", icon: "catalogue" },
       { href: "/partner/request", label: "New request", icon: "newRequest" },
       { href: "/partner/requests", label: "My orders", icon: "requests" },
     ],
   },
   {
     label: "Finance & support",
+    icon: "credit",
     items: [
       { href: "/partner/credit", label: "Credit & payments", icon: "credit" },
       { href: "/partner/returns", label: "Returns", icon: "returns" },

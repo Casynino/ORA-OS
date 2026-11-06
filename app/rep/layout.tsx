@@ -5,9 +5,16 @@ import {
 } from "@/components/dashboard/dashboard-shell";
 
 const nav: NavGroup[] = [
-  { items: [{ href: "/rep", label: "Home", icon: "dashboard" }] },
+  {
+    items: [
+      { href: "/rep", label: "Home", icon: "dashboard" },
+      { href: "/rep/sell", label: "Record sale", icon: "sales" },
+      { href: "/rep/stock", label: "My stock", icon: "inventory" },
+    ],
+  },
   {
     label: "Customers",
+    icon: "customers",
     items: [
       { href: "/rep/customers", label: "My customers", icon: "customers" },
       { href: "/rep/customers/new", label: "Register customer", icon: "newRequest" },
@@ -15,16 +22,16 @@ const nav: NavGroup[] = [
   },
   {
     label: "Sales",
+    icon: "reports",
     items: [
-      { href: "/rep/sell", label: "Record sale", icon: "sales" },
       { href: "/rep/sales", label: "Sales history", icon: "reports" },
       { href: "/rep/samples", label: "Samples", icon: "samples" },
     ],
   },
   {
     label: "Stock",
+    icon: "inventory",
     items: [
-      { href: "/rep/stock", label: "My stock", icon: "inventory" },
       { href: "/rep/stock/request", label: "Request stock", icon: "newRequest" },
       { href: "/rep/stock/requests", label: "Request history", icon: "requests" },
     ],
@@ -37,6 +44,7 @@ const nav: NavGroup[] = [
   },
   {
     label: "Reports",
+    icon: "fieldReports",
     items: [
       { href: "/rep/reports", label: "Daily reports", icon: "fieldReports" },
       { href: "/rep/targets", label: "My targets", icon: "targets" },

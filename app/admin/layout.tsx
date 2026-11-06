@@ -95,7 +95,6 @@ export default async function AdminLayout({
         preferredName: me?.preferredName ?? null,
       }}
       areaLabel="Admin Console"
-      collapsibleNav
       profileHref="/admin/profile"
     >
       {children}

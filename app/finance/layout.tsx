@@ -9,7 +9,12 @@ import {
 // debt; the CEO owns all company accounts. No account management, no
 // payroll (handled by the CEO), no user/system/warehouse control.
 const nav: NavGroup[] = [
-  { items: [{ href: "/finance", label: "Home", icon: "dashboard" }] },
+  {
+    items: [
+      { href: "/finance", label: "Home", icon: "dashboard" },
+      { href: "/finance/sales-approvals", label: "Sales approvals", icon: "approvals" },
+    ],
+  },
   {
     label: "Customers",
     icon: "customers",
@@ -24,7 +29,6 @@ const nav: NavGroup[] = [
     label: "Verify",
     icon: "approvals",
     items: [
-      { href: "/finance/sales-approvals", label: "Sales approvals", icon: "sales" },
       { href: "/finance/sales", label: "Sales history", icon: "audit" },
       { href: "/finance/payments", label: "Payments", icon: "payments" },
       { href: "/finance/returns", label: "Returns", icon: "warehouses" },
@@ -59,7 +63,6 @@ export default async function FinanceLayout({
       nav={nav}
       user={{ name: user.name, email: user.email, role: user.role }}
       areaLabel="Finance & Accounting"
-      collapsibleNav
       profileHref="/finance/profile"
     >
       {children}
