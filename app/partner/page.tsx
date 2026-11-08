@@ -29,6 +29,7 @@ import { BarChart, DonutChart } from "@/components/ui/charts";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Reveal } from "@/components/ui/reveal";
+import { AttentionPanel, type AttentionPanelItem } from "@/components/ui/attention-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { productMeta } from "@/lib/product-meta";
 import { ORA_CONTACT } from "@/lib/constants";
@@ -156,12 +157,13 @@ export default async function PartnerOverviewPage() {
     { label: "Units purchased", value: formatNumber(unitsPurchased), icon: Boxes, accent: "info" as const },
   ];
 
-  const pendingActions = [
-    { label: "Awaiting ORA review", count: pendingApproval, href: "/partner/requests", icon: Clock, tone: "text-warning" },
-    { label: "In transit to you", count: inTransit, href: "/partner/requests", icon: Truck, tone: "text-accent" },
-    { label: "Outstanding payments", count: open.length, href: "/partner/credit", icon: CreditCard, tone: "text-primary" },
-    { label: "Returns under review", count: pendingReturns, href: "/partner/returns", icon: Undo2, tone: "text-info" },
-  ].filter((a) => a.count > 0);
+  const plural = (n: number, one: string, many: string) => `${formatNumber(n)} ${n === 1 ? one : many}`;
+  const pendingActions: AttentionPanelItem[] = [
+    { id: "review", group: "orders", tone: "warning", icon: "review", title: `${plural(pendingApproval, "order", "orders")} awaiting ORA review`, detail: "ORA is checking your request", href: "/partner/requests" },
+    { id: "transit", group: "orders", tone: "info", icon: "truck", title: `${plural(inTransit, "order", "orders")} in transit to you`, detail: "on the way to you now", href: "/partner/requests" },
+    { id: "pay", group: "money", tone: "warning", icon: "credit", title: `${plural(open.length, "outstanding payment", "outstanding payments")}`, detail: "pay from Credit & payments", href: "/partner/credit" },
+    { id: "returns", group: "money", tone: "info", icon: "return", title: `${plural(pendingReturns, "return", "returns")} under review`, detail: "ORA is reviewing your return", href: "/partner/returns" },
+  ].filter((a) => ({ review: pendingApproval, transit: inTransit, pay: open.length, returns: pendingReturns }[a.id] ?? 0) > 0) as AttentionPanelItem[];
 
   const quickActions = [
     { label: "Request stock", href: "/partner/request", icon: PlusCircle },
@@ -375,27 +377,13 @@ export default async function PartnerOverviewPage() {
             </div>
           </Reveal>
 
-          {/* Pending actions */}
+          {/* Needs your attention (the small shared panel) — only when something is waiting */}
           {pendingActions.length > 0 && (
             <Reveal delay={0.05}>
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-                <h2 className="font-display text-lg font-semibold">Needs attention</h2>
-                <div className="mt-3 space-y-2">
-                  {pendingActions.map((a) => (
-                    <Link
-                      key={a.label}
-                      href={a.href}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/40"
-                    >
-                      <span className="flex items-center gap-2 text-sm font-medium">
-                        <a.icon className={cn("size-4", a.tone)} />
-                        {a.label}
-                      </span>
-                      <Badge variant="secondary">{a.count}</Badge>
-                    </Link>
-                  ))}
-                </div>
-              </div>
+              <AttentionPanel
+                items={pendingActions}
+                tabs={[{ key: "orders", label: "Orders" }, { key: "money", label: "Money" }]}
+              />
             </Reveal>
           )}
         </div>

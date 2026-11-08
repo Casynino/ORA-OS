@@ -31,6 +31,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { DonutChart } from "@/components/ui/charts";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { Reveal } from "@/components/ui/reveal";
+import { AttentionPanel, type AttentionPanelItem } from "@/components/ui/attention-panel";
 import { cn, formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -134,6 +135,18 @@ export default async function FinanceDashboardPage() {
     .filter((s) => s.value > 0);
   const spendTotal = spendSegments.reduce((s, x) => s + x.value, 0);
 
+  // "Needs your attention" — only what is actually waiting (zero-count lines are not shown).
+  const pl = (n: number, one: string, many: string) => `${formatNumber(n)} ${n === 1 ? one : many}`;
+  const attnItems: AttentionPanelItem[] = [];
+  if (pendingCashSales > 0)
+    attnItems.push({ id: "cash", group: "sales", tone: "warning", icon: "cash", title: `${pl(pendingCashSales, "cash sale", "cash sales")} to confirm`, detail: "rep cash sales to receive & bank", href: "/finance/sales-approvals" });
+  if (pendingCreditSales > 0)
+    attnItems.push({ id: "credit", group: "sales", tone: "info", icon: "credit", title: `${pl(pendingCreditSales, "credit sale", "credit sales")} to approve`, detail: "rep credit sales to review", href: "/finance/sales-approvals" });
+  if (pendingPayments > 0)
+    attnItems.push({ id: "payments", group: "payments", tone: "warning", icon: "payment", title: `${pl(pendingPayments, "customer payment", "customer payments")} to verify`, detail: claimedPayments > 0 ? `${claimedPayments} claimed — verify receipt` : "direct payments to verify", href: "/finance/payments" });
+  if (pendingRepCollections > 0)
+    attnItems.push({ id: "deposits", group: "collections", tone: "info", icon: "deposit", title: `${pl(pendingRepCollections, "deposit", "deposits")} to post`, detail: "rep-collected repayments", href: "/finance/sales-approvals" });
+
   return (
     <div className="space-y-6">
       {/* ── Hero ─────────────────────────────────────────────── */}
@@ -165,16 +178,16 @@ export default async function FinanceDashboardPage() {
         </section>
       </Reveal>
 
-      {/* ── Needs your attention ─────────────────────────────── */}
-      <section>
-        <SectionLabel>Needs your attention</SectionLabel>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <AttnCard href="/finance/sales-approvals" icon={Banknote} label="Cash to confirm" value={formatNumber(pendingCashSales)} hint="rep cash sales to receive & bank" active={pendingCashSales > 0} />
-          <AttnCard href="/finance/sales-approvals" icon={CreditCard} label="Credit to approve" value={formatNumber(pendingCreditSales)} hint="rep credit sales to review" active={pendingCreditSales > 0} />
-          <AttnCard href="/finance/payments" icon={ClipboardCheck} label="Customer payments" value={formatNumber(pendingPayments)} hint={claimedPayments > 0 ? `${claimedPayments} claimed — verify receipt` : "direct payments to verify"} active={pendingPayments > 0} />
-          <AttnCard href="/finance/sales-approvals" icon={Landmark} label="Deposits to post" value={formatNumber(pendingRepCollections)} hint="rep-collected repayments" active={pendingRepCollections > 0} />
-        </div>
-      </section>
+      {/* ── Needs your attention (the small shared panel) ─────── */}
+      <AttentionPanel
+        items={attnItems}
+        tabs={[
+          { key: "sales", label: "Sales" },
+          { key: "payments", label: "Payments" },
+          { key: "collections", label: "Collections" },
+        ]}
+        empty="All clear — nothing is waiting for Finance right now."
+      />
 
       {/* ── This month ───────────────────────────────────────── */}
       <section>
@@ -320,41 +333,6 @@ function QuickAction({ icon: Icon, label, href }: { icon: LucideIcon; label: str
     <Link href={href} className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2 text-sm font-medium shadow-soft transition-colors hover:border-primary/40 hover:bg-muted/40">
       <Icon className="size-4 text-primary" />
       {label}
-    </Link>
-  );
-}
-
-function AttnCard({
-  href,
-  icon: Icon,
-  label,
-  value,
-  hint,
-  active,
-}: {
-  href: string;
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  hint: string;
-  active: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "group rounded-2xl border p-4 shadow-soft transition-all hover:-translate-y-0.5",
-        active ? "border-warning/30 bg-warning/[0.05] hover:border-warning/50" : "border-border bg-card hover:border-primary/30",
-      )}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-xs font-medium text-muted-foreground">{label}</span>
-        <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", active ? "bg-warning/15 text-warning" : "bg-success/12 text-success")}>
-          <Icon className="size-4" />
-        </span>
-      </div>
-      <p className="mt-2 font-display text-2xl font-bold tracking-tight">{value}</p>
-      <p className="mt-0.5 truncate text-xs text-muted-foreground">{hint}</p>
     </Link>
   );
 }

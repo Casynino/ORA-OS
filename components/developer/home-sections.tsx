@@ -28,6 +28,7 @@ import {
 import type { Monitor, Level } from "@/lib/developer/monitor";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ShowRows } from "@/components/ui/attention-panel";
 import { Avatar } from "@/components/ui/avatar";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { HealthCard, InfoCallout, SectionTitle, type Tone } from "@/components/developer/info";
@@ -166,16 +167,16 @@ function ProblemRow({ p }: { p: Monitor["problems"][number] }) {
   const l = LEVEL[p.level];
   const Icon = l.icon;
   return (
-    <li className="relative">
+    <li data-row className="relative">
       <span aria-hidden className={cn("absolute inset-y-0 left-0 w-[3px]", l.stripe)} />
       <details className="group">
-        <summary className="flex h-14 cursor-pointer list-none items-center gap-3 pl-[1.15rem] pr-5 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
-          <Icon className={cn("size-[18px] shrink-0", l.text)} />
+        <summary className="flex min-h-[52px] cursor-pointer list-none items-center gap-2.5 py-2 pl-[1.1rem] pr-3.5 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+          <Icon className={cn("size-4 shrink-0", l.text)} />
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold leading-snug">{p.title}</span>
-            <span className="line-clamp-1 text-[13px] text-muted-foreground">{p.detail}</span>
+            <span className="line-clamp-2 block text-[13px] font-semibold leading-tight sm:line-clamp-1">{p.title}</span>
+            <span className="line-clamp-1 text-[11px] leading-tight text-muted-foreground">{p.detail}</span>
           </span>
-          <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+          <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
         </summary>
         <div className="space-y-1.5 border-t border-border/60 bg-muted/20 py-3 pl-[3.1rem] pr-5 text-sm leading-relaxed">
           <p className="text-muted-foreground">{p.detail}</p>
@@ -242,7 +243,7 @@ function CheckList({ checks }: { checks: Monitor["systemChecks"] }) {
   );
 }
 
-/** Problems, most urgent first, in one slim panel: a label above, a row each, and "what was checked" folded at the bottom. */
+/** Problems, most urgent first, in the same small panel as every other dashboard: three rows in view, the rest a scroll away, "what was checked" folded at the bottom. */
 export function Attention({ m }: { m: Monitor }) {
   const act = m.problems.filter((p) => p.level !== "info");
   const know = m.problems.filter((p) => p.level === "info");
@@ -250,12 +251,14 @@ export function Attention({ m }: { m: Monitor }) {
   const warn = act.length - crit;
   const rows = [...act, ...know];
   const total = rows.length + (act.length === 0 ? 1 : 0); // the all-clear line counts as an item
-  const SHOWN = 3; // the list is as tall as three items; any others scroll inside it
   return (
-    <section>
-      <div className="mb-2.5 flex items-center justify-between gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Needs your attention</h2>
-        <p className="shrink-0 whitespace-nowrap text-sm font-medium">
+    <section aria-label="Needs your attention">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+          Needs your attention
+          <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-bold tracking-normal text-primary">{act.length}</span>
+        </h2>
+        <p className="shrink-0 whitespace-nowrap text-xs font-medium">
           {act.length === 0 && <span className="text-success">All clear</span>}
           {crit > 0 && <span className="text-destructive">{crit} to fix now</span>}
           {crit > 0 && warn > 0 && <span className="text-muted-foreground"> · </span>}
@@ -263,25 +266,22 @@ export function Attention({ m }: { m: Monitor }) {
         </p>
       </div>
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-soft">
-        <ul className="max-h-[170px] divide-y divide-border overflow-y-auto overscroll-contain">
-          {act.length === 0 && (
-            <li className="flex items-center gap-3 px-5 py-3 text-sm">
-              <CheckCircle2 className="size-4 shrink-0 text-success" />
-              <p className="min-w-0">
-                <span className="font-semibold">Nothing needs your attention.</span>{" "}
-                <span className="text-muted-foreground">Nothing is broken, and every required setting is in place.</span>
-              </p>
-            </li>
-          )}
-          {rows.map((p) => (
-            <ProblemRow key={p.title} p={p} />
-          ))}
-        </ul>
-        {total > SHOWN && (
-          <p className="flex items-center justify-center gap-1.5 border-t border-border bg-muted/20 py-1.5 text-[11px] text-muted-foreground">
-            <ChevronDown className="size-3" /> scroll for {total - SHOWN} more
-          </p>
-        )}
+        <ShowRows total={total}>
+          <ul className="divide-y divide-border/60">
+            {act.length === 0 && (
+              <li data-row className="flex items-center gap-2.5 px-3.5 py-2.5 text-[13px]">
+                <CheckCircle2 className="size-4 shrink-0 text-success" />
+                <p className="min-w-0">
+                  <span className="font-semibold">Nothing needs your attention.</span>{" "}
+                  <span className="text-muted-foreground">Nothing is broken, and every required setting is in place.</span>
+                </p>
+              </li>
+            )}
+            {rows.map((p) => (
+              <ProblemRow key={p.title} p={p} />
+            ))}
+          </ul>
+        </ShowRows>
         <CheckList checks={m.systemChecks} />
       </div>
     </section>
