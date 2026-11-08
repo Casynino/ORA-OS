@@ -25,6 +25,7 @@ export default async function DeveloperLayout({
   const session = await requireRole("DEVELOPER");
   return (
     <DashboardShell
+      mobileTabs={["/developer", "/developer/audit", "/developer/users", "/developer/records"]}
       nav={nav}
       user={{
         name: session.name,

@@ -115,6 +115,7 @@ export function DashboardShell({
   areaLabel,
   profileHref,
   collapsibleNav = true,
+  mobileTabs,
   children,
 }: {
   nav: NavGroup[];
@@ -132,6 +133,9 @@ export function DashboardShell({
    *  choices are remembered on this device). On for every department; pass
    *  `false` to always show every group. */
   collapsibleNav?: boolean;
+  /** Phones get an app-style bottom bar: these pages (hrefs from `nav`, up to 4) plus a
+   *  "Menu" button that opens the full menu. Leave out for no bottom bar. */
+  mobileTabs?: string[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -140,6 +144,22 @@ export function DashboardShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const homeHref = nav[0]?.items[0]?.href ?? "/";
   const displayName = user.preferredName || user.name;
+  const allItems = nav.flatMap((g) => g.items);
+  const tabs = (mobileTabs ?? [])
+    .map((h) => allItems.find((i) => i.href === h))
+    .filter((i): i is NavItem => !!i)
+    .slice(0, 4);
+  const hasTabs = tabs.length > 0;
+  // A tab is lit on its own page and on pages inside it (Home only on itself).
+  const tabActive = (href: string) => pathname === href || (href !== homeHref && pathname.startsWith(href + "/"));
+  const menuActive = hasTabs && !tabs.some((t) => tabActive(t.href));
+
+  // Tell the page-level pieces outside the shell (toasts) that the bottom bar is there.
+  useEffect(() => {
+    if (!hasTabs) return;
+    document.body.classList.add("has-app-shell");
+    return () => document.body.classList.remove("has-app-shell");
+  }, [hasTabs]);
 
   // Close the user menu on route change.
   useEffect(() => {
@@ -332,7 +352,7 @@ export function DashboardShell({
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-secondary/40 via-background to-background">
+    <div className={cn("min-h-dvh bg-gradient-to-b from-secondary/40 via-background to-background", hasTabs && "app-shell")}>
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-border bg-card/60 backdrop-blur-xl lg:flex">
         <div className="flex h-16 items-center border-b border-border px-5">
@@ -381,11 +401,11 @@ export function DashboardShell({
       <div className="lg:pl-64">
         {/* A Developer working as someone gets a small floating pill (Stop lives there). */}
         {acting && <ActingBanner state={acting} />}
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-30 flex h-[calc(4rem+env(safe-area-inset-top))] items-center justify-between border-b border-border bg-background/80 px-4 pt-[env(safe-area-inset-top)] backdrop-blur lg:px-8">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setOpen(true)}
-              className="-ml-1 rounded-md p-2 text-muted-foreground hover:bg-muted lg:hidden"
+              className={cn("-ml-1 rounded-md p-2 text-muted-foreground hover:bg-muted lg:hidden", hasTabs && "hidden")}
               aria-label="Open menu"
             >
               <Menu className="size-5" />
@@ -496,8 +516,61 @@ export function DashboardShell({
         </header>
         {/* While the "Working as" pill floats at the bottom, leave room at the end of
             the page so it never covers the last row of content. */}
-        <main className={cn("p-4 lg:p-8", acting && "pb-24 lg:pb-24")}>{children}</main>
+        <main
+          className={cn(
+            "p-4 pb-[calc(var(--app-bar,0px)+1.25rem)] lg:p-8",
+            acting && "pb-[calc(var(--app-bar,0px)+6rem)] lg:pb-24",
+          )}
+        >
+          {children}
+        </main>
       </div>
+
+      {/* Phone app bar: the department's main pages + Menu (the full menu). */}
+      {hasTabs && (
+        <nav
+          aria-label="Main"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden print:hidden"
+        >
+          <ul className="grid h-14" style={{ gridTemplateColumns: `repeat(${tabs.length + 1}, minmax(0, 1fr))` }}>
+            {tabs.map((t) => {
+              const Icon = ICONS[t.icon] ?? LayoutDashboard;
+              const active = tabActive(t.href);
+              return (
+                <li key={t.href} className="min-w-0">
+                  <Link
+                    href={t.href}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "relative flex h-full flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium transition-colors",
+                      active ? "text-primary" : "text-muted-foreground active:text-foreground",
+                    )}
+                  >
+                    {active && <span aria-hidden className="absolute inset-x-0 top-0 mx-auto h-0.5 w-8 rounded-b-full bg-primary" />}
+                    <Icon className="size-[22px] shrink-0" />
+                    <span className="max-w-full truncate">{t.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+            <li className="min-w-0">
+              <button
+                type="button"
+                onClick={() => setOpen(true)}
+                aria-label="Open menu"
+                className={cn(
+                  "relative flex h-full w-full flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium transition-colors",
+                  menuActive ? "text-primary" : "text-muted-foreground active:text-foreground",
+                )}
+              >
+                {menuActive && <span aria-hidden className="absolute inset-x-0 top-0 mx-auto h-0.5 w-8 rounded-b-full bg-primary" />}
+                <Menu className="size-[22px] shrink-0" />
+                <span>Menu</span>
+              </button>
+            </li>
+          </ul>
+        </nav>
+      )}
     </div>
   );
 }

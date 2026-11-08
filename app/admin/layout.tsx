@@ -86,6 +86,7 @@ export default async function AdminLayout({
   });
   return (
     <DashboardShell
+      mobileTabs={["/admin", "/admin/requests", "/admin/sales-approvals", "/admin/finance"]}
       nav={nav}
       user={{
         name: me?.name ?? session.name,

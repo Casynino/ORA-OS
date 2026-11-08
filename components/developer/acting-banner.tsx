@@ -30,9 +30,9 @@ export function useActing(): ActingState | null {
 /**
  * A small pill in the bottom-right corner: "Working as Rehema  [Stop]". It's where
  * Stop lives. Hover it to see who the actions are recorded under.
- * On phones it sits clear of the home bar / browser toolbar (safe-area inset), and
- * the dashboard shell adds room at the end of the page while it's showing, so the
- * pill never hides the last row of content.
+ * On phones it floats just above the bottom tab bar (--app-bar already includes the
+ * home-bar inset), and the dashboard shell adds room at the end of the page while it's
+ * showing, so the pill never hides the last row of content.
  */
 export function ActingBanner({ state }: { state: ActingState }) {
   const [pending, start] = useTransition();
@@ -47,7 +47,7 @@ export function ActingBanner({ state }: { state: ActingState }) {
 
   return (
     <div
-      className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-40 flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent py-1.5 pl-4 pr-1.5 text-white shadow-glow ring-1 ring-white/20 print:hidden"
+      className="fixed bottom-[calc(var(--app-bar,0px)+0.75rem)] right-4 z-40 lg:bottom-4 flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent py-1.5 pl-4 pr-1.5 text-white shadow-glow ring-1 ring-white/20 print:hidden"
       title={`${humanize(state.as.role)} · everything you do is recorded as ${state.developer} (Developer)`}
       role="status"
     >

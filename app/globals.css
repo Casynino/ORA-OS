@@ -529,3 +529,36 @@ table th.text-right,
     -webkit-tap-highlight-color: transparent;
   }
 }
+
+/* Sign-in scene: three real photos fade through one another slowly (each shows for
+   6s of an 18s loop) with a gentle push-in. Reduced motion shows the first photo, still. */
+@keyframes login-slide {
+  0% { opacity: 0; transform: scale(1.04); }
+  8% { opacity: 1; }
+  33% { opacity: 1; }
+  41% { opacity: 0; transform: scale(1.12); }
+  100% { opacity: 0; transform: scale(1.12); }
+}
+.login-slide {
+  animation: login-slide 18s ease-in-out infinite both;
+  will-change: opacity, transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-slide { animation: none; }
+  .login-slide:first-child { opacity: 1; }
+}
+
+/* App bar on phones: the dashboards get a bottom tab bar below the lg breakpoint.
+   --app-bar is how much room it takes (its height + the iPhone home-bar inset), so
+   anything pinned to the bottom (toasts, the "Working as" pill, the partner cart bar)
+   and the end of every page can clear it. 0 on desktop and on pages without the bar. */
+.app-shell,
+body.has-app-shell {
+  --app-bar: calc(3.5rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 1024px) {
+  .app-shell,
+  body.has-app-shell {
+    --app-bar: 0px;
+  }
+}

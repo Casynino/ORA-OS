@@ -258,7 +258,7 @@ export function PartnerCatalogue({
 
       {/* Sticky request bar */}
       {selected.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur lg:left-64">
+        <div className="fixed inset-x-0 bottom-[var(--app-bar,0px)] z-40 border-t border-border bg-card/95 backdrop-blur lg:left-64">
           <div className="container flex flex-wrap items-center justify-between gap-3 py-3">
             <div className="flex items-center gap-4">
               <div>

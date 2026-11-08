@@ -41,6 +41,7 @@ export default async function WarehouseLayout({
   const user = await requireRole("WAREHOUSE");
   return (
     <DashboardShell
+      mobileTabs={["/warehouse", "/warehouse/orders", "/warehouse/rep-requests", "/warehouse/inventory"]}
       nav={nav}
       user={{ name: user.name, email: user.email, role: user.role }}
       areaLabel="Warehouse"

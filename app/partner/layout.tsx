@@ -38,6 +38,7 @@ export default async function PartnerLayout({
   const user = await requireRole("PARTNER");
   return (
     <DashboardShell
+      mobileTabs={["/partner", "/partner/catalogue", "/partner/requests", "/partner/credit"]}
       nav={nav}
       user={{ name: user.name, email: user.email, role: user.role }}
       areaLabel="Partner"

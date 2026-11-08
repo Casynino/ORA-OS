@@ -61,6 +61,7 @@ export default async function RepLayout({
   const user = await requireRole("SALES_REP");
   return (
     <DashboardShell
+      mobileTabs={["/rep", "/rep/sell", "/rep/stock", "/rep/customers"]}
       nav={nav}
       user={{ name: user.name, email: user.email, role: user.role }}
       areaLabel="Rep"

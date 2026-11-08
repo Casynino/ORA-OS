@@ -60,6 +60,7 @@ export default async function FinanceLayout({
   const user = await requireRole("FINANCE");
   return (
     <DashboardShell
+      mobileTabs={["/finance", "/finance/sales-approvals", "/finance/payments", "/finance/cash"]}
       nav={nav}
       user={{ name: user.name, email: user.email, role: user.role }}
       areaLabel="Finance"
