@@ -10,9 +10,10 @@ import { cn } from "@/lib/utils";
 
 /**
  * "Needs your attention" — the ONE small panel used on every dashboard (Admin, Finance, Partner,
- * Developer). Same look and size everywhere, phone included: a tiny heading with a count, filter
- * pills (only when there is more than one group), then slim rows with three in view and the rest a
- * scroll away. The height is measured from the real rows, so exactly three fit even when a title
+ * Developer). Same look and size everywhere, phone included, and the same sizes as the Super Drive OS
+ * panel (chips 11px, rows py-2.5 with a 13px title and 11px detail, 16px icon, 3px bar): a tiny heading
+ * with a count, filter pills (All + each group that has something), then slim rows with three in view
+ * and the rest a scroll away. The height is measured from the real rows, so exactly three fit even when a title
  * wraps on a phone. Icons are chosen by a string key because a Server Component can't hand function
  * components to a client component.
  */
@@ -105,7 +106,7 @@ export function ShowRows({ total, children }: { total: number; children: ReactNo
         <div
           aria-hidden
           className={cn(
-            "pointer-events-none absolute inset-x-0 bottom-0 h-3 bg-gradient-to-t from-black/20 to-transparent transition-opacity dark:from-black/40",
+            "pointer-events-none absolute inset-x-0 bottom-0 h-3 bg-gradient-to-t from-black/25 to-transparent transition-opacity dark:from-black/50",
             !below && "opacity-0",
           )}
         />
@@ -134,11 +135,11 @@ export function ShowRows({ total, children }: { total: number; children: ReactNo
 /** The small heading: label + count, and an optional link on the right. */
 export function AttentionHeading({ count, action }: { count: number; action?: { label: string; href: string } }) {
   return (
-    <div className="mb-2 flex items-center justify-between gap-3">
-      <h2 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+    <div className="mb-2.5 flex items-center justify-between gap-3">
+      <h2 className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
         Needs your attention
         {count > 0 && (
-          <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-bold tracking-normal text-primary">{count}</span>
+          <span className="rounded-full bg-[#fdebc4] px-2 py-0.5 text-[11px] font-bold tracking-normal text-[#3a2a00]">{count}</span>
         )}
       </h2>
       {action && (
@@ -166,9 +167,9 @@ export function AttentionPanel({
   const [tab, setTab] = useState("all");
   const shown = tab === "all" ? items : items.filter((i) => i.group === tab);
   const count = (k: string) => (k === "all" ? items.length : items.filter((i) => i.group === k).length);
-  // Pills for groups with nothing in them are not drawn; a single group needs no pills at all.
-  const live = tabs.filter((t) => t.key === tab || count(t.key) > 0);
-  const chips: AttentionTab[] = live.length > 1 ? [{ key: "all", label: "All" }, ...live] : [];
+  // "All" first, then each group that has something in it (empty groups are not drawn). Nothing to filter when empty.
+  const chips: AttentionTab[] =
+    items.length === 0 ? [] : [{ key: "all", label: "All" }, ...tabs].filter((t) => t.key === "all" || t.key === tab || count(t.key) > 0);
 
   return (
     <section aria-label="Needs your attention" className={className}>
@@ -192,7 +193,7 @@ export function AttentionPanel({
           ))}
         </div>
       )}
-      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-soft">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
         {shown.length === 0 ? (
           <div className="flex items-center gap-2.5 px-3.5 py-3 text-[13px] text-success">
             <CheckCircle2 className="size-4 shrink-0" />

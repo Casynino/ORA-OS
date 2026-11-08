@@ -253,10 +253,10 @@ export function Attention({ m }: { m: Monitor }) {
   const total = rows.length + (act.length === 0 ? 1 : 0); // the all-clear line counts as an item
   return (
     <section aria-label="Needs your attention">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+      <div className="mb-2.5 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           Needs your attention
-          <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-bold tracking-normal text-primary">{act.length}</span>
+          <span className="rounded-full bg-[#fdebc4] px-2 py-0.5 text-[11px] font-bold tracking-normal text-[#3a2a00]">{act.length}</span>
         </h2>
         <p className="shrink-0 whitespace-nowrap text-xs font-medium">
           {act.length === 0 && <span className="text-success">All clear</span>}
@@ -265,7 +265,7 @@ export function Attention({ m }: { m: Monitor }) {
           {warn > 0 && <span className="text-warning">{warn} to look at</span>}
         </p>
       </div>
-      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-soft">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
         <ShowRows total={total}>
           <ul className="divide-y divide-border/60">
             {act.length === 0 && (
