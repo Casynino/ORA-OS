@@ -745,3 +745,7 @@ html.dark .glass-chip { background: #1d1033; color: #eadcf7; }
 @media (prefers-reduced-motion: reduce) {
   .arch-reveal, .arch-reveal-img, .ora-rise { animation: none; }
 }
+
+/* While the small "use it like an app" card is open at the foot of the sign-in page, the page's foot lines step aside. */
+.install-hide { transition: opacity 0.2s var(--ease-ora); }
+html[data-install-open] .install-hide { opacity: 0; pointer-events: none; }

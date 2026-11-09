@@ -105,15 +105,15 @@ export function LoginScreen({
           />
         </div>
 
-        <p className="mt-6 text-[11px] text-white/55 [@media(max-height:480px)]:hidden">
+        <p className="install-hide mt-6 text-[11px] text-white/55 [@media(max-height:480px)]:hidden">
           {formatNumber(pads)}+ pads delivered · {formatNumber(communities)} communities reached
         </p>
-        <p className="mt-1 text-[11px] text-white/40 [@media(max-height:480px)]:hidden">© {new Date().getFullYear()} ORA-Pads · Period dignity for all</p>
+        <p className="install-hide mt-1 text-[11px] text-white/40 [@media(max-height:480px)]:hidden">© {new Date().getFullYear()} ORA-Pads · Period dignity for all</p>
 
         {/* Who made the system — one quiet line to Nino's page and work (only here, on the sign-in page): the system's name
             ("Pad Distribution Chain", owner's words) and "by Nino", worded like the other systems' sign-in pages ("The Distribution Chain by Nino", "Sales Inventory
             System by Nino", "Sea Freight System by Nino"), plain text with no pill or badge around it (owner, 2026-11-09). */}
-        <p className="mt-1 flex flex-wrap items-center justify-center gap-x-1.5 text-xs text-white/55">
+        <p className="install-hide mt-1 flex flex-wrap items-center justify-center gap-x-1.5 text-xs text-white/55">
           <span>Pad Distribution Chain</span>
           <Link
             href="/nino"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Download, EllipsisVertical, Menu, Share, Smartphone, SquarePlus, TriangleAlert, X } from "lucide-react";
+import { ArrowDown, Download, EllipsisVertical, Menu, Share, SquarePlus, TriangleAlert, X } from "lucide-react";
 import { detectDevice, type Device } from "@/lib/device";
 
 /**
@@ -95,7 +95,7 @@ function stepsFor(d: Device): StepDef[] {
         text:
           d.browser === "safari" || d.inApp ? (
             <>
-              Tap <b>Share</b> below (newer iPhones: under <b>···</b>)
+              Tap <b>Share</b> (bottom bar, or <b>···</b>)
             </>
           ) : (
             <>
@@ -107,14 +107,14 @@ function stepsFor(d: Device): StepDef[] {
         icon: SquarePlus,
         text: (
           <>
-            Choose <b>Add to Home Screen</b>
+            Tap <b>Add to Home Screen</b>
           </>
         ),
       },
       {
         text: (
           <>
-            Tap <b>Add</b>
+            Tap <b>Add</b>, then open <b>ORA</b>
           </>
         ),
       },
@@ -173,59 +173,66 @@ function stepsFor(d: Device): StepDef[] {
 }
 
 /**
- * A small card at the foot of the screen, close to the browser's own Share/menu button — not a big dialog. One line of
- * title, three short steps on hairlines (no boxes around them), a small "Got it". On Android with Chrome's own install
- * offer it is one button. Escape or the cross closes it.
+ * A small card at the foot of the screen, close to the browser's own Share/menu button — not a big dialog. It matches
+ * the scene behind it (dark plum glass, white text, hairlines), like the Hao Labs one the owner held up (2026-11-09):
+ * a one-line title, three short steps, a cross to close; on an iPhone in Safari a small "Share ↓" points at the
+ * Share button in the bottom bar. On Android with Chrome's own install offer it is one button. Escape closes it.
  */
 export function InstallSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { device, canPrompt, install } = useInstall();
   const browserName = device.os === "ios" ? "Safari" : "Chrome";
+  const oneTap = canPrompt && !device.inApp;
+  const pointAtShare = !oneTap && device.os === "ios" && device.browser === "safari" && !device.inApp;
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // the page's own foot lines (marked .install-hide) step aside while the card sits there
+    document.documentElement.dataset.installOpen = "1";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      delete document.documentElement.dataset.installOpen;
+    };
   }, [open, onClose]);
 
   if (!open) return null;
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex justify-center px-3 pb-[calc(var(--sab,0px)+0.75rem)]">
+    <div
+      className={`pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex flex-col items-center px-4 ${
+        pointAtShare ? "pb-[calc(var(--sab,0px)+0.25rem)]" : "pb-[calc(var(--sab,0px)+0.75rem)]"
+      }`}
+    >
       <div
         role="dialog"
         aria-modal="false"
-        aria-label="Use ORA like an app"
-        className="ora-rise pointer-events-auto w-full max-w-[22rem] rounded-2xl border border-border bg-card p-4 text-left text-card-foreground shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
+        aria-label="Use it like an app"
+        className="ora-rise pointer-events-auto w-full max-w-[21rem] rounded-2xl border border-white/10 bg-[#1b0d24]/80 px-5 pb-2 pt-4 text-left text-white shadow-[0_12px_32px_rgba(0,0,0,0.35)] backdrop-blur-xl"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="flex items-center gap-2 text-[15px] font-medium leading-tight">
-              <Smartphone className="size-4 shrink-0 text-primary" strokeWidth={1.5} aria-hidden="true" />
-              Use ORA like an app
-            </p>
-            <p className="mt-1 text-[13px] leading-snug text-muted-foreground">Full screen, its own icon</p>
-          </div>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[16px] font-medium leading-tight">Use it like an app</p>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="-mr-1 -mt-1 grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="-mr-2 grid size-8 shrink-0 place-items-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white"
           >
             <X className="size-4" strokeWidth={1.5} />
           </button>
         </div>
 
         {device.inApp && (
-          <p className="mt-3 flex items-start gap-2 text-[13px] leading-snug">
+          <p className="mt-3 flex items-start gap-2 text-[13px] leading-snug text-white/80">
             <TriangleAlert className="mt-px size-4 shrink-0 text-warning" strokeWidth={1.5} aria-hidden="true" />
             <span>
-              Inside {device.appName} this can&apos;t be added. Tap <b>···</b> and choose <b>Open in {browserName}</b> first.
+              Inside {device.appName} this can&apos;t be added. Tap <b className="font-medium text-white">···</b> and choose{" "}
+              <b className="font-medium text-white">Open in {browserName}</b> first.
             </span>
           </p>
         )}
 
-        {canPrompt && !device.inApp ? (
-          <div className="mt-4 flex items-center gap-2">
+        {oneTap ? (
+          <div className="mb-2 mt-4 flex items-center gap-2">
             <button
               type="button"
               onClick={async () => {
@@ -239,34 +246,30 @@ export function InstallSheet({ open, onClose }: { open: boolean; onClose: () => 
             <button
               type="button"
               onClick={onClose}
-              className="h-10 rounded-full px-4 text-[14px] text-muted-foreground transition-colors hover:text-foreground"
+              className="h-10 rounded-full px-4 text-[14px] text-white/60 transition-colors hover:text-white"
             >
               Not now
             </button>
           </div>
         ) : (
-          <>
-            <ol className="mt-3 divide-y divide-border border-y border-border">
-              {stepsFor(device).map((st, i) => (
-                <li key={i} className="flex min-h-10 items-center gap-3 py-2 text-[13px] leading-snug">
-                  <span className="w-3 shrink-0 text-center text-[12px] font-medium tabular-nums text-primary">{i + 1}</span>
-                  <span className="min-w-0 flex-1">{st.text}</span>
-                  {st.icon && <st.icon className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />}
-                </li>
-              ))}
-            </ol>
-            <div className="mt-2 flex justify-end">
-              <button
-                type="button"
-                onClick={onClose}
-                className="h-9 rounded-full px-3 text-[13px] font-medium text-primary transition-colors hover:bg-primary/10"
-              >
-                Got it
-              </button>
-            </div>
-          </>
+          <ol className="mt-1 divide-y divide-white/10 [&_b]:font-medium [&_b]:text-white">
+            {stepsFor(device).map((st, i) => (
+              <li key={i} className="flex min-h-10 items-center gap-3 py-1.5 text-[14px] leading-snug text-white/75">
+                <span className="w-3 shrink-0 text-center text-[13px] tabular-nums text-[hsl(322_100%_72%)]">{i + 1}</span>
+                <span className="min-w-0 flex-1">{st.text}</span>
+                {st.icon && <st.icon className="size-4 shrink-0 text-white/50" strokeWidth={1.5} aria-hidden="true" />}
+              </li>
+            ))}
+          </ol>
         )}
       </div>
+
+      {pointAtShare && (
+        <p className="ora-rise ora-rise-2 mt-2 flex flex-col items-center text-[12px] text-white/80 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]" aria-hidden="true">
+          Share
+          <ArrowDown className="mt-0.5 size-4 text-[hsl(322_100%_72%)]" strokeWidth={1.5} />
+        </p>
+      )}
     </div>
   );
 }
