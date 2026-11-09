@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, ArrowUpRight, Smartphone, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { LoginForm } from "@/components/auth/login-form";
-import { InstallButton } from "@/components/app/install-app";
+import { InstallButton, InstallPrompt } from "@/components/app/install-app";
 import { formatNumber } from "@/lib/utils";
 
 // Real ORA outreach photos, cross-fading slowly behind the brand overlay.
@@ -124,6 +124,10 @@ export function LoginScreen({
           />
         </Link>
       </div>
+
+      {/* A phone that has not installed ORA is offered the full-screen app once, right here on arrival
+          (never on top of the sign-in pop-up). */}
+      {!open && <InstallPrompt />}
 
       {open && (
         <SignInSheet

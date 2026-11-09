@@ -1,17 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Download, EllipsisVertical, Menu, Share, Smartphone, SquarePlus } from "lucide-react";
+import { Download, EllipsisVertical, Menu, Share, Smartphone, SquarePlus, TriangleAlert } from "lucide-react";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { detectDevice, type Device } from "@/lib/device";
 
 /**
- * Use it as an app. A website in a browser tab always keeps the browser's own bars and no
- * page can hide them; the only full-screen version is the one put on the home screen. So a
- * phone that has not done that gets a small sheet saying how — one tap on Android Chrome,
- * a few steps on an iPhone, Samsung or Huawei. It opens by itself once after a phone first
- * signs in, and any time from the sign-in page. Nothing shows once the app is installed.
- * (Same idea as the Target Express and Super Drive systems.)
+ * Use it as an app. A website in a browser tab always keeps the browser's own bars and no page can hide
+ * them; the only full-screen version is the one put on the home screen. So a phone that has not done that
+ * gets a small sheet saying how — ONE TAP on Android (Chrome's own Install button), a few steps on an
+ * iPhone, Samsung or Huawei, and a clear warning when the page is open inside WhatsApp or another app
+ * (which cannot add anything to the home screen). It opens by itself once — on the sign-in page, or after
+ * sign-in — and any time from "Get the full-screen app" on the sign-in page and "Get the app" in the
+ * person's menu. Nothing shows once the app is installed. (Same as Super Drive OS and Target Express.)
  */
 
 type InstallEvent = Event & {
@@ -19,7 +21,7 @@ type InstallEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
-// Chrome on Android fires this once, early; kept here so any part of the page can use it later.
+// Android / Chrome fires this once, early; kept here so any part of the page can use it later.
 let deferred: InstallEvent | null = null;
 const listeners = new Set<() => void>();
 if (typeof window !== "undefined") {
@@ -36,34 +38,20 @@ if (typeof window !== "undefined") {
 
 const SEEN = "ora.installSeen";
 
-/**
- * Which phone browser this is, because the way to the home screen differs: Safari's Share
- * sheet, Chrome's ⋮ menu, Samsung Internet's and Huawei's ☰ menu at the bottom, and the
- * browser inside WhatsApp / Facebook / Instagram, which cannot add anything to the home
- * screen at all (links shared on WhatsApp open there).
- */
-type Browser = "safari" | "ios-other" | "chrome" | "samsung" | "huawei" | "android-other" | "in-app";
-
-function browserOf(ua: string, ios: boolean): Browser {
-  if (/MicroMessenger|WhatsApp|FBAN|FBAV|Instagram|Line\/|Snapchat|TikTok|musical_ly/i.test(ua)) return "in-app";
-  // An iPhone page view that is not Safari, Chrome, Firefox or Edge is an app's own browser;
-  // an Android WebView says "wv".
-  if (ios && !/Safari\//i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua)) return "in-app";
-  if (!ios && /; wv\)/i.test(ua)) return "in-app";
-  if (ios) return /CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua) ? "ios-other" : "safari";
-  if (/SamsungBrowser/i.test(ua)) return "samsung";
-  if (/HuaweiBrowser|HBPC|HarmonyOS|OpenHarmony|ArkWeb/i.test(ua)) return "huawei";
-  if (/Chrome\//i.test(ua) && !/EdgA|OPR|Firefox|YaBrowser|UCBrowser|MiuiBrowser|HeyTapBrowser/i.test(ua)) return "chrome";
-  return "android-other";
+function read(key: string) {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
 }
 
-function useInstall() {
-  const [state, setState] = useState({
+export function useInstall() {
+  const [state, setState] = useState<{ ready: boolean; phone: boolean; installed: boolean; device: Device; canPrompt: boolean }>({
     ready: false,
     phone: false,
     installed: false,
-    ios: false,
-    browser: "chrome" as Browser,
+    device: { os: "other", browser: "other", inApp: false },
     canPrompt: false,
   });
   useEffect(() => {
@@ -73,9 +61,8 @@ function useInstall() {
         window.matchMedia("(display-mode: fullscreen)").matches ||
         (navigator as Navigator & { standalone?: boolean }).standalone === true;
       const phone = window.matchMedia("(max-width: 1023px)").matches && window.matchMedia("(pointer: coarse)").matches;
-      const ios =
-        /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-      setState({ ready: true, phone, installed: standalone, ios, browser: browserOf(navigator.userAgent, ios), canPrompt: !!deferred });
+      const device = detectDevice(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
+      setState({ ready: true, phone, installed: standalone, device, canPrompt: !!deferred });
     };
     check();
     listeners.add(check);
@@ -92,20 +79,104 @@ function useInstall() {
   return { ...state, install };
 }
 
-function Step({ n, icon: Icon, children }: { n: number; icon?: typeof Share; children: React.ReactNode }) {
-  return (
-    <li className="flex items-center gap-3 rounded-xl bg-muted/60 px-3 py-2.5 text-[13px] leading-snug">
-      <span className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-        {n}
-      </span>
-      <span className="min-w-0 flex-1">{children}</span>
-      {Icon ? <Icon className="size-4 shrink-0 text-muted-foreground" /> : null}
-    </li>
-  );
+type StepDef = { text: React.ReactNode; icon?: typeof Share };
+
+/** The steps for this phone and browser. Every browser words them a little differently, so each gets its own. */
+function stepsFor(d: Device): StepDef[] {
+  const open: StepDef = {
+    text: (
+      <>
+        Open <b>ORA</b> from your home screen.
+      </>
+    ),
+  };
+  if (d.os === "ios") {
+    return [
+      {
+        icon: Share,
+        text:
+          d.browser === "safari" || d.inApp ? (
+            <>
+              Tap <b>Share</b> at the bottom of Safari (on newer iPhones it is under the <b>···</b> button).
+            </>
+          ) : (
+            <>
+              Tap <b>Share</b> next to the address at the top.
+            </>
+          ),
+      },
+      {
+        icon: SquarePlus,
+        text: (
+          <>
+            Scroll down and tap <b>Add to Home Screen</b>.
+          </>
+        ),
+      },
+      {
+        text: (
+          <>
+            Tap <b>Add</b>, then open <b>ORA</b> from your home screen.
+          </>
+        ),
+      },
+    ];
+  }
+  switch (d.browser) {
+    case "samsung":
+      return [
+        { icon: Menu, text: <>Tap the menu at the bottom right.</> },
+        {
+          text: (
+            <>
+              Tap <b>Add page to</b>, then <b>Home screen</b> (or <b>Install app</b> if you see it).
+            </>
+          ),
+        },
+        open,
+      ];
+    case "huawei":
+      return [
+        { icon: Menu, text: <>Open the browser menu (at the bottom, or the three dots at the top right).</> },
+        {
+          text: (
+            <>
+              Tap <b>Add to home screen</b> (some phones say <b>Add to desktop</b> or hide it under <b>Add to</b>), then confirm.
+            </>
+          ),
+        },
+        open,
+      ];
+    case "firefox":
+      return [
+        { icon: EllipsisVertical, text: <>Open the browser menu at the top right.</> },
+        {
+          text: (
+            <>
+              Tap <b>Install</b>, then <b>Add</b>.
+            </>
+          ),
+        },
+        open,
+      ];
+    default:
+      return [
+        { icon: EllipsisVertical, text: <>Open the browser menu (the three dots, top right or bottom).</> },
+        {
+          text: (
+            <>
+              Tap <b>Install app</b> or <b>Add to Home screen</b>, then <b>Install</b>.
+            </>
+          ),
+        },
+        open,
+      ];
+  }
 }
 
-function InstallSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { ios, browser, canPrompt, install } = useInstall();
+export function InstallSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { device, canPrompt, install } = useInstall();
+  const browserName = device.os === "ios" ? "Safari" : "Chrome";
   return (
     <Modal
       open={open}
@@ -125,7 +196,17 @@ function InstallSheet({ open, onClose }: { open: boolean; onClose: () => void })
         </span>
       }
     >
-      {canPrompt ? (
+      {device.inApp && (
+        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2.5 text-[13px] leading-snug">
+          <TriangleAlert className="mt-px size-4 shrink-0 text-warning" />
+          <span>
+            This page is open inside {device.appName}, which cannot put it on the home screen. Tap the <b>···</b> (or three dots) at the top and
+            choose <b>Open in {browserName}</b> or <b>Open in browser</b>, then do these steps.
+          </span>
+        </div>
+      )}
+
+      {canPrompt && !device.inApp ? (
         <div className="flex flex-col gap-2">
           <Button
             onClick={async () => {
@@ -142,60 +223,16 @@ function InstallSheet({ open, onClose }: { open: boolean; onClose: () => void })
       ) : (
         <>
           <ol className="space-y-2">
-            {browser === "in-app" ? (
-              <>
-                <Step n={1} icon={EllipsisVertical}>
-                  Tap the menu (⋯ or ⋮), then Open in browser.
-                </Step>
-                <Step n={2}>
-                  {ios
-                    ? "In Safari, sign in and tap Get the full-screen app again."
-                    : "In Chrome, sign in and tap Get the full-screen app again."}
-                </Step>
-              </>
-            ) : ios ? (
-              <>
-                <Step n={1} icon={Share}>
-                  {browser === "safari" ? "Tap Share at the bottom of Safari." : "Tap Share in the address bar or the menu."}
-                </Step>
-                <Step n={2} icon={SquarePlus}>
-                  Scroll down and tap Add to Home Screen.
-                </Step>
-                <Step n={3}>Tap Add, then open ORA from your home screen.</Step>
-              </>
-            ) : browser === "samsung" ? (
-              <>
-                <Step n={1} icon={Menu}>
-                  Tap the menu at the bottom right.
-                </Step>
-                <Step n={2}>Tap Add page to, then Home screen.</Step>
-                <Step n={3}>Open ORA from your home screen.</Step>
-              </>
-            ) : browser === "huawei" ? (
-              <>
-                <Step n={1} icon={Menu}>
-                  Tap the menu at the bottom of the browser.
-                </Step>
-                <Step n={2}>Tap Add to home screen (it may be under Add to).</Step>
-                <Step n={3}>Open ORA from your home screen.</Step>
-              </>
-            ) : (
-              <>
-                <Step n={1} icon={browser === "chrome" ? EllipsisVertical : Menu}>
-                  {browser === "chrome" ? "Open the browser menu at the top right." : "Open the browser menu."}
-                </Step>
-                <Step n={2}>Tap Install app or Add to Home screen.</Step>
-                <Step n={3}>Open ORA from your home screen.</Step>
-              </>
-            )}
+            {stepsFor(device).map((st, i) => (
+              <li key={i} className="flex items-center gap-3 rounded-xl bg-muted/60 px-3 py-2.5 text-[13px] leading-snug">
+                <span className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                  {i + 1}
+                </span>
+                <span className="min-w-0 flex-1">{st.text}</span>
+                {st.icon && <st.icon className="size-4 shrink-0 text-muted-foreground" />}
+              </li>
+            ))}
           </ol>
-          {browser !== "in-app" ? (
-            <p className="mt-3 text-[12px] text-muted-foreground">
-              {ios
-                ? "If this page opened inside WhatsApp or another app, open it in Safari first."
-                : "If this page opened inside WhatsApp or another app, open it in Chrome first."}
-            </p>
-          ) : null}
           <Button variant="outline" className="mt-4 w-full" onClick={onClose}>
             Got it
           </Button>
@@ -205,19 +242,14 @@ function InstallSheet({ open, onClose }: { open: boolean; onClose: () => void })
   );
 }
 
-/** Opens by itself once, a moment after a phone's browser opens the app (never when it is installed); closing it is remembered. */
+/** Opens by itself once, a moment after a phone's browser opens the app (not when it is already installed); "Not now" or closing it is remembered. */
 export function InstallPrompt() {
   const { ready, phone, installed } = useInstall();
   const [open, setOpen] = useState(false);
   useEffect(() => {
-    if (!ready || !phone || installed) return;
-    try {
-      if (window.localStorage.getItem(SEEN)) return;
-    } catch {
-      return;
-    }
-    const timer = window.setTimeout(() => setOpen(true), 2500);
-    return () => window.clearTimeout(timer);
+    if (!ready || !phone || installed || read(SEEN)) return;
+    const t = window.setTimeout(() => setOpen(true), 2500);
+    return () => window.clearTimeout(t);
   }, [ready, phone, installed]);
   const close = () => {
     setOpen(false);
@@ -230,7 +262,7 @@ export function InstallPrompt() {
   return <InstallSheet open={open} onClose={close} />;
 }
 
-/** A button that opens the sheet. Draws nothing on a computer or once the app is installed. */
+/** A button that opens the sheet. Draws nothing on a computer or once the app is installed. `render` lets the caller style it. */
 export function InstallButton({ render }: { render: (open: () => void) => React.ReactNode }) {
   const { ready, phone, installed } = useInstall();
   const [open, setOpen] = useState(false);

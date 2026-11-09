@@ -16,11 +16,13 @@ import {
   Moon,
   Search,
   Shield,
+  Smartphone,
   Sun,
   UserRound,
   X,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
+import { InstallSheet, useInstall } from "@/components/app/install-app";
 import { logoutAction } from "@/lib/actions/auth";
 import { cn, humanize } from "@/lib/utils";
 import { ICONS, type NavGroup, type NavItem } from "@/components/dashboard/nav-data";
@@ -504,6 +506,8 @@ function Footer({
   useEffect(() => setMounted(true), []);
   const dark = mounted && resolvedTheme === "dark";
 
+  const install = useInstall();
+  const [sheet, setSheet] = useState(false);
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -625,6 +629,20 @@ function Footer({
                     {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
                     {dark ? "Light" : "Dark"}
                   </button>
+                  {/* On a phone that has not put ORA on its home screen: how (one tap on Android). */}
+                  {install.ready && install.phone && !install.installed && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setOpen(false);
+                        setSheet(true);
+                      }}
+                      className={item}
+                    >
+                      <Smartphone className="size-4" /> Get the app
+                    </button>
+                  )}
                   <Link href="/" role="menuitem" onClick={close} className={item}>
                     <Globe className="size-4" /> Main site
                   </Link>
@@ -644,6 +662,8 @@ function Footer({
             document.body,
           )
         : null}
+
+      <InstallSheet open={sheet} onClose={() => setSheet(false)} />
     </div>
   );
 }
