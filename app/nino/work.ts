@@ -1,8 +1,8 @@
 /**
  * Nino's work, as shown on /nino (the same page as on the Vegas Luxury Hotel website). Every line comes from the project's
- * own live site (its title and description) or from Nino — nothing invented. Screenshots in /public/nino are the live home
- * pages, taken 2026-10-05 (Super Drive Oil: its sign-in page, 2026-11-09; Reckless Lab, retaken 2026-11-09 after its redesign;
- * Hao Labs, retaken 2026-11-09 15:04 from the live sign-in page — its new moving 3D scene).
+ * own live site (its title and description) or from Nino — nothing invented. Screenshots in /public/nino are the live pages as
+ * they look now, all retaken 2026-11-09 (owner: "show the new look of every page, not only one"); Reckless Lab keeps its
+ * 2026-11-09 home-page shot because its live page opens on an intro card.
  */
 
 export type Project = {
