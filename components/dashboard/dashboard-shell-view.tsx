@@ -18,6 +18,24 @@ export type { NavGroup, NavItem };
 const dateShort = () =>
   new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Africa/Dar_es_Salaam" }).format(new Date());
 
+/**
+ * Is this a computer-size screen (the same break as Tailwind's `lg`)? `null` until the page has
+ * loaded. The notification bell polls and plays a sound, so exactly ONE bell may exist at a time:
+ * the phone's top bar and the computer's top bar each draw theirs only when they are the one showing
+ * (hiding the other with CSS would still leave it running, and every alert would sound twice).
+ */
+function useIsDesktop() {
+  const [desktop, setDesktop] = useState<boolean | null>(null);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return desktop;
+}
+
 export function DashboardShellView({
   nav,
   user,
@@ -48,6 +66,7 @@ export function DashboardShellView({
   const pathname = usePathname();
   const router = useRouter();
   const acting = useActing();
+  const desktop = useIsDesktop();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(sidebarCollapsed);
   const homeHref = nav[0]?.items[0]?.href ?? "/";
@@ -204,8 +223,8 @@ export function DashboardShellView({
                   </button>
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-0.5">
-                <NotificationBell />
+              <div className="flex min-w-10 shrink-0 items-center justify-end gap-0.5">
+                {desktop === false && <NotificationBell />}
               </div>
             </header>
           </div>
@@ -223,7 +242,7 @@ export function DashboardShellView({
             <Globe className="size-4" />
             Main site
           </Link>
-          <NotificationBell />
+          {desktop === true && <NotificationBell />}
         </header>
 
         {/* While the "Working as" pill floats, leave room at the end of the page so it never

@@ -17,20 +17,21 @@ import { getRepOverview } from "@/lib/services/field";
 import { StatCard } from "@/components/ui/stat-card";
 import { DonutChart } from "@/components/ui/charts";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
+import { ActionPills, type ActionPill } from "@/components/ui/action-pills";
 import { Reveal } from "@/components/ui/reveal";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 /** Large, always-visible quick actions — the rep's daily workflow. */
-const ACTIONS: { href: string; label: string; icon: LucideIcon; tint: string }[] = [
-  { href: "/rep/sell", label: "Record sale", icon: ShoppingCart, tint: "bg-primary/10 text-primary" },
-  { href: "/rep/stock/request", label: "Request stock", icon: PlusCircle, tint: "bg-accent/10 text-accent" },
-  { href: "/rep/customers/new", label: "Register customer", icon: UserPlus, tint: "bg-success/10 text-success" },
-  { href: "/rep/customers", label: "My customers", icon: Contact, tint: "bg-info/10 text-info" },
-  { href: "/rep/stock", label: "My stock", icon: Package, tint: "bg-warning/10 text-warning" },
-  { href: "/rep/collections", label: "Record payment", icon: Receipt, tint: "bg-success/10 text-success" },
-  { href: "/rep/reports", label: "Daily report", icon: MapPin, tint: "bg-primary/10 text-primary" },
+const ACTIONS: ActionPill[] = [
+  { href: "/rep/sell", label: "Record sale", short: "Sale", icon: ShoppingCart, tone: "brand" },
+  { href: "/rep/stock/request", label: "Request stock", short: "Request", icon: PlusCircle, tone: "violet" },
+  { href: "/rep/customers/new", label: "Register customer", short: "Register", icon: UserPlus, tone: "success" },
+  { href: "/rep/customers", label: "My customers", short: "Customers", icon: Contact, tone: "info" },
+  { href: "/rep/stock", label: "My stock", short: "Stock", icon: Package, tone: "warning" },
+  { href: "/rep/collections", label: "Record payment", short: "Payment", icon: Receipt, tone: "success" },
+  { href: "/rep/reports", label: "Daily report", short: "Report", icon: MapPin, tone: "brand" },
 ];
 
 /** Compact TSh (keeps big money readable inside small spaces like the donut centre). */
@@ -91,26 +92,8 @@ export default async function RepOverviewPage() {
         ]}
       />
 
-      {/* Quick actions — always at the top */}
-      <section>
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Quick actions
-        </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-          {ACTIONS.map((a) => (
-            <Link
-              key={a.href + a.label}
-              href={a.href}
-              className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-4 text-center shadow-soft transition-transform hover:-translate-y-0.5 hover:border-primary/40"
-            >
-              <span className={cn("flex size-11 items-center justify-center rounded-xl", a.tint)}>
-                <a.icon className="size-5" />
-              </span>
-              <span className="text-sm font-medium leading-tight">{a.label}</span>
-            </Link>
-          ))}
-        </div>
-      </section>
+      {/* Shortcuts — the small row under the banner */}
+      <ActionPills items={ACTIONS} />
 
       {/* Quick summary — operational counts */}
       <section>

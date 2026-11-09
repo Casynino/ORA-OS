@@ -14,6 +14,7 @@ import type { CategoryOption } from "@/lib/expense-categories";
 import { formatCurrency } from "@/lib/utils";
 import { Modal } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ActionTrigger } from "@/components/ui/action-trigger";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -42,12 +43,18 @@ export function AddExpenseButton({
   label = "Record direct expense",
   variant = "default",
   className = "rounded-full",
+  look = "button",
+  short,
 }: {
   accounts?: SelectableAccount[];
   categories?: CategoryOption[];
   label?: string;
   variant?: BtnVariant;
   className?: string;
+  /** "action" draws it as a shortcut in the dashboard's row (an icon over one word on a phone, a pill on a computer). */
+  look?: "button" | "action";
+  /** The one word under the icon on a phone (look="action"). */
+  short?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -110,10 +117,14 @@ export function AddExpenseButton({
 
   return (
     <>
-      <Button size="sm" variant={variant} className={className} onClick={() => setOpen(true)}>
-        <Receipt className="size-4" />
-        {label}
-      </Button>
+      {look === "action" ? (
+        <ActionTrigger icon={Receipt} label={label} short={short} tone="warning" onClick={() => setOpen(true)} />
+      ) : (
+        <Button size="sm" variant={variant} className={className} onClick={() => setOpen(true)}>
+          <Receipt className="size-4" />
+          {label}
+        </Button>
+      )}
       {open && (
         <Modal
           open
@@ -255,11 +266,17 @@ export function AddCapitalButton({
   label = "Record investment",
   variant = "default",
   className = "rounded-full",
+  look = "button",
+  short,
 }: {
   accounts?: SelectableAccount[];
   label?: string;
   variant?: BtnVariant;
   className?: string;
+  /** "action" draws it as a shortcut in the dashboard's row (an icon over one word on a phone, a pill on a computer). */
+  look?: "button" | "action";
+  /** The one word under the icon on a phone (look="action"). */
+  short?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -294,10 +311,14 @@ export function AddCapitalButton({
 
   return (
     <>
-      <Button size="sm" variant={variant} className={className} onClick={() => setOpen(true)}>
-        <TrendingUp className="size-4" />
-        {label}
-      </Button>
+      {look === "action" ? (
+        <ActionTrigger icon={TrendingUp} label={label} short={short} tone="success" onClick={() => setOpen(true)} />
+      ) : (
+        <Button size="sm" variant={variant} className={className} onClick={() => setOpen(true)}>
+          <TrendingUp className="size-4" />
+          {label}
+        </Button>
+      )}
       {open && (
         <Modal
           open
@@ -485,6 +506,8 @@ export function IssueFundsButton({
   label = "Issue funds to Finance",
   variant = "default",
   className = "rounded-full",
+  look = "button",
+  short,
 }: {
   accounts?: SelectableAccount[];
   /** Operational-Fund categories (presets + custom) for the line-item picker. */
@@ -492,6 +515,10 @@ export function IssueFundsButton({
   label?: string;
   variant?: BtnVariant;
   className?: string;
+  /** "action" draws it as a shortcut in the dashboard's row (an icon over one word on a phone, a pill on a computer). */
+  look?: "button" | "action";
+  /** The one word under the icon on a phone (look="action"). */
+  short?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -534,10 +561,14 @@ export function IssueFundsButton({
 
   return (
     <>
-      <Button size="sm" variant={variant} className={className} onClick={() => setOpen(true)}>
-        <Send className="size-4" />
-        {label}
-      </Button>
+      {look === "action" ? (
+        <ActionTrigger icon={Send} label={label} short={short} tone="violet" onClick={() => setOpen(true)} />
+      ) : (
+        <Button size="sm" variant={variant} className={className} onClick={() => setOpen(true)}>
+          <Send className="size-4" />
+          {label}
+        </Button>
+      )}
       {open && (
         <Modal
           open

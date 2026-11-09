@@ -30,6 +30,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Reveal } from "@/components/ui/reveal";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
+import { ActionPills, type ActionPill } from "@/components/ui/action-pills";
 import { AttentionPanel, type AttentionPanelItem } from "@/components/ui/attention-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { productMeta } from "@/lib/product-meta";
@@ -166,13 +167,13 @@ export default async function PartnerOverviewPage() {
     { id: "returns", group: "money", tone: "info", icon: "return", title: `${plural(pendingReturns, "return", "returns")} under review`, detail: "ORA is reviewing your return", href: "/partner/returns" },
   ].filter((a) => ({ review: pendingApproval, transit: inTransit, pay: open.length, returns: pendingReturns }[a.id] ?? 0) > 0) as AttentionPanelItem[];
 
-  const quickActions = [
-    { label: "Request stock", href: "/partner/request", icon: PlusCircle },
-    { label: "Browse products", href: "/partner/catalogue", icon: Boxes },
-    { label: "My orders", href: "/partner/requests", icon: FileText },
-    { label: "Credit & payments", href: "/partner/credit", icon: CreditCard },
-    { label: "Request a return", href: "/partner/returns", icon: Undo2 },
-    { label: "Contact ORA", href: ORA_CONTACT.emailHref, icon: LifeBuoy },
+  const quickActions: ActionPill[] = [
+    { label: "Request stock", short: "Request", tone: "brand", href: "/partner/request", icon: PlusCircle },
+    { label: "Browse products", short: "Products", tone: "violet", href: "/partner/catalogue", icon: Boxes },
+    { label: "My orders", short: "Orders", tone: "info", href: "/partner/requests", icon: FileText },
+    { label: "Credit & payments", short: "Credit", tone: "warning", href: "/partner/credit", icon: CreditCard },
+    { label: "Request a return", short: "Return", tone: "signal", href: "/partner/returns", icon: Undo2 },
+    { label: "Contact ORA", short: "Contact", tone: "success", href: ORA_CONTACT.emailHref, icon: LifeBuoy },
   ];
 
   const statusVariant =
@@ -209,6 +210,8 @@ export default async function PartnerOverviewPage() {
           </Link>
         </div>
       </Reveal>
+
+      <ActionPills items={quickActions} />
 
       {/* Overview cards */}
       <div className="kpi-grid">
@@ -476,26 +479,6 @@ export default async function PartnerOverviewPage() {
         </Reveal>
       </div>
 
-      {/* Quick actions */}
-      <Reveal>
-        <div>
-          <h2 className="font-display text-xl font-bold tracking-tight">Quick actions</h2>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {quickActions.map((a) => (
-              <Link
-                key={a.label}
-                href={a.href}
-                className="glass-card glow-hover flex flex-col items-center gap-2 rounded-2xl p-5 text-center text-sm font-medium transition-transform hover:-translate-y-0.5"
-              >
-                <span className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-glow">
-                  <a.icon className="size-5" />
-                </span>
-                {a.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-      </Reveal>
     </div>
   );
 }

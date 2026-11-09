@@ -12,7 +12,7 @@ import {
 } from "@/lib/services/intelligence";
 import {
   BusinessHealth,
-  ExecutiveActions,
+  EXEC_ACTIONS,
   OperationsStatus,
   RevenueCollectionOverview,
   InventoryOverview,
@@ -20,6 +20,7 @@ import {
   ProductPerformance,
 } from "@/components/admin/ceo-overview";
 import { AttentionCenter, type AttnItem } from "@/components/admin/attention-center";
+import { ActionPills } from "@/components/ui/action-pills";
 import { RevenueTrends, HumanActivityFeed, CustomerIntelligencePanel } from "@/components/admin/command-sections";
 import { AddExpenseButton, IssueFundsButton, AddCapitalButton } from "@/components/admin/finance-forms";
 import { getSelectableAccounts } from "@/lib/services/accounts";
@@ -107,6 +108,22 @@ export default async function AdminCommandCenter() {
         picture="pink"
       />
 
+      {/* ── 2 · Shortcuts: the money actions open a form, the rest go to a page ── */}
+      <ActionPills
+        leadTiles={3}
+        lead={
+          <>
+            <AddExpenseButton accounts={accounts} categories={categories} label="Record expense" short="Expense" look="action" />
+            <IssueFundsButton accounts={accounts} categories={fundCategories} label="Issue funds" short="Funds" look="action" />
+            <AddCapitalButton accounts={accounts} label="Add capital" short="Capital" look="action" />
+          </>
+        }
+        items={EXEC_ACTIONS}
+      />
+
+      {/* ── 3 · Needs your attention — alerts + finance sign-off, one bounded panel ── */}
+      <AttentionCenter items={attnItems} />
+
       {/* ── 2 · Business health summary ── */}
       <BusinessHealth
         cashAvailable={fin.position.businessCapital}
@@ -114,20 +131,6 @@ export default async function AdminCommandCenter() {
         revenueMonth={d.sales.month.revenue}
         netProfit={fin.window.netProfit}
       />
-
-      {/* ── 3 · Needs your attention — alerts + finance sign-off, one bounded panel ── */}
-      <AttentionCenter items={attnItems} />
-
-      {/* ── 3b · Quick actions (money + navigation) ── */}
-      <section>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick actions</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <AddExpenseButton accounts={accounts} categories={categories} label="Record expense" variant="default" className="rounded-xl" />
-          <IssueFundsButton accounts={accounts} categories={fundCategories} label="Issue funds" variant="accent" className="rounded-xl" />
-          <AddCapitalButton accounts={accounts} label="Add capital" variant="outline" className="rounded-xl" />
-          <ExecutiveActions />
-        </div>
-      </section>
 
       {/* ── 4 · Revenue & collection overview ── */}
       <RevenueCollectionOverview

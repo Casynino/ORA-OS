@@ -1,3 +1,4 @@
+import type { ActionPill } from "@/components/ui/action-pills";
 import Link from "next/link";
 import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
@@ -44,36 +45,19 @@ export function BusinessHealth({
 // The "Needs your attention" command center now lives in its own client
 // component — components/admin/attention-center.tsx (filter + scroll + animation).
 
-// ── 3b · Executive quick links — jump to the pages a CEO acts from. The money
-//        actions (record expense / issue funds / add capital) are rendered as
-//        live modal buttons in the page alongside these. ──────────────────────
+// ── 3b · Executive shortcuts — the pages a CEO acts from, drawn by <ActionPills> under the banner
+//        (the money actions — record expense / issue funds / add capital — are the live dialog
+//        triggers that lead the same row). ─────────────────────────────────────────────────────
 
-const EXEC_ACTIONS: { icon: LucideIcon; label: string; href: string }[] = [
-  { icon: ClipboardList, label: "Approve orders", href: "/admin/requests" },
-  { icon: PackagePlus, label: "Receive stock", href: "/admin/imports" },
-  { icon: Package, label: "Inventory", href: "/admin/inventory" },
-  { icon: FileBarChart, label: "Profit & Loss", href: "/admin/finance/profit" },
-  { icon: Users, label: "Customers", href: "/admin/customers" },
-  { icon: ShieldAlert, label: "Credit risk", href: "/admin/credit" },
-  { icon: ScrollText, label: "General Ledger", href: "/admin/finance/ledger" },
+export const EXEC_ACTIONS: ActionPill[] = [
+  { icon: ClipboardList, label: "Approve orders", short: "Orders", tone: "info", href: "/admin/requests" },
+  { icon: PackagePlus, label: "Receive stock", short: "Stock", tone: "brand", href: "/admin/imports" },
+  { icon: Package, label: "Inventory", tone: "violet", href: "/admin/inventory" },
+  { icon: FileBarChart, label: "Profit & Loss", short: "Profit", tone: "success", href: "/admin/finance/profit" },
+  { icon: Users, label: "Customers", tone: "info", href: "/admin/customers" },
+  { icon: ShieldAlert, label: "Credit risk", short: "Credit", tone: "signal", href: "/admin/credit" },
+  { icon: ScrollText, label: "General Ledger", short: "Ledger", tone: "warning", href: "/admin/finance/ledger" },
 ];
-
-export function ExecutiveActions() {
-  return (
-    <>
-      {EXEC_ACTIONS.map((a) => (
-        <Link
-          key={a.href}
-          href={a.href}
-          className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2 text-sm font-medium shadow-soft transition-colors hover:border-primary/40 hover:bg-muted/40"
-        >
-          <a.icon className="size-4 text-primary" />
-          {a.label}
-        </Link>
-      ))}
-    </>
-  );
-}
 
 // ── 3c · Operations at a glance — the pipeline the CEO oversees ──────────────
 

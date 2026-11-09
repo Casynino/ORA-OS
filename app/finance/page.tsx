@@ -31,6 +31,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { DonutChart } from "@/components/ui/charts";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { Reveal } from "@/components/ui/reveal";
+import { ActionPills } from "@/components/ui/action-pills";
 import { AttentionPanel, type AttentionPanelItem } from "@/components/ui/attention-panel";
 import { cn, formatCurrency, formatNumber, timeAgo } from "@/lib/utils";
 
@@ -151,20 +152,17 @@ export default async function FinanceDashboardPage() {
         ]}
       />
 
-      {/* ── Quick actions ────────────────────────────────────── */}
-      <Reveal>
-        <section>
-          <SectionLabel>Quick actions</SectionLabel>
-          <div className="flex flex-wrap gap-2">
-            <QuickAction icon={ClipboardCheck} label="Confirm payment" href="/finance/payments" />
-            <QuickAction icon={BadgeCheck} label="Review credit sales" href="/finance/sales-approvals" />
-            <QuickAction icon={Landmark} label="Record deposit" href="/finance/cash" />
-            <QuickAction icon={Receipt} label="Operational expense" href="/finance/operational-fund" />
-            <QuickAction icon={UserCheck} label="Review application" href="/finance/applications" />
-            <QuickAction icon={Users} label="View customers" href="/finance/customers" />
-          </div>
-        </section>
-      </Reveal>
+      {/* ── Shortcuts (the small row under the banner) ──────────── */}
+      <ActionPills
+        items={[
+          { icon: ClipboardCheck, label: "Confirm payment", short: "Payments", tone: "info", href: "/finance/payments", badge: pendingPayments },
+          { icon: BadgeCheck, label: "Review credit sales", short: "Credit", tone: "warning", href: "/finance/sales-approvals", badge: pendingCreditSales },
+          { icon: Landmark, label: "Record deposit", short: "Deposit", tone: "success", href: "/finance/cash", badge: pendingRepCollections },
+          { icon: Receipt, label: "Operational expense", short: "Expense", tone: "brand", href: "/finance/operational-fund" },
+          { icon: UserCheck, label: "Review application", short: "Apply", tone: "violet", href: "/finance/applications" },
+          { icon: Users, label: "View customers", short: "Clients", tone: "info", href: "/finance/customers" },
+        ]}
+      />
 
       {/* ── Needs your attention (the small shared panel) ─────── */}
       <AttentionPanel
@@ -316,11 +314,3 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{children}</p>;
 }
 
-function QuickAction({ icon: Icon, label, href }: { icon: LucideIcon; label: string; href: string }) {
-  return (
-    <Link href={href} className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2 text-sm font-medium shadow-soft transition-colors hover:border-primary/40 hover:bg-muted/40">
-      <Icon className="size-4 text-primary" />
-      {label}
-    </Link>
-  );
-}
