@@ -80,8 +80,11 @@ export const metadata: Metadata = {
     "Tanzania",
     "ORA-Pads",
   ],
+  // Absolute links in share tags (the WhatsApp/Instagram preview picture). The live site always uses its real domain:
+  // NEXT_PUBLIC_APP_URL on Vercel still named the old ora-os-eight.vercel.app address, which no longer exists, so the
+  // preview picture 404'd and WhatsApp fell back to the old icon (2026-11-09).
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+    process.env.VERCEL_ENV === "production" ? "https://www.ora.co.tz" : (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   ),
   openGraph: {
     type: "website",
