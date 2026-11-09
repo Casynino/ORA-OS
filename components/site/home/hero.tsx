@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ArrowRight, MapPin } from "lucide-react";
 import { Magnetic, SplitText, EASE } from "@/components/site/motion";
 import { CountUp } from "@/components/ui/count-up";
 import { ImpactPulse } from "@/components/public/impact-live";
@@ -59,14 +60,16 @@ export function Hero({ stats, feed }: { stats: Stat[]; feed: ImpactFeedItem[] })
           </motion.div>
         </AnimatePresence>
         {/* grade: dark on the words' side, night at the foot, a touch of ORA pink up top */}
+        {/* a soft shade along the top of the photo so the header words stay readable over bright pictures */}
+        <div aria-hidden className="absolute inset-x-0 top-0 -z-10 h-44 bg-[linear-gradient(to_bottom,rgb(10_10_11/0.6),rgb(10_10_11/0.25)_55%,transparent)]" />
         <div aria-hidden className="absolute inset-0 -z-10 hidden bg-[linear-gradient(90deg,rgb(10_10_11/0.85)_0%,rgb(10_10_11/0.5)_40%,rgb(10_10_11/0.12)_72%,transparent_100%)] md:block" />
         <div aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(to_top,rgb(10_10_11)_0%,rgb(10_10_11/0.88)_38%,rgb(10_10_11/0.55)_68%,rgb(10_10_11/0.4)_100%)] md:bg-[linear-gradient(to_top,rgb(10_10_11)_0%,rgb(10_10_11/0.55)_24%,transparent_55%)]" />
         
         <div className="mx-auto flex h-full max-w-[1440px] flex-col justify-end px-5 pb-10 pt-[calc(var(--sat)+6rem)] sm:px-8 sm:pb-14">
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.8 }} className="flex items-center gap-3">
-            <span className="s-label text-[rgb(var(--s-pink))]">[ ORA Pads ]</span>
-            <span className="h-px w-10 bg-white/30" />
-            <span className="s-label text-white/75">Tanzania · Period dignity</span>
+            <span className="s-label whitespace-nowrap text-[rgb(var(--s-pink))]">[ ORA Pads ]</span>
+            <span className="h-px w-6 shrink-0 bg-white/30 sm:w-10" />
+            <span className="s-label whitespace-nowrap text-white/75">Tanzania<span className="hidden sm:inline"> · Period dignity</span></span>
           </motion.p>
           <SplitText
             as="h1"
@@ -95,22 +98,30 @@ export function Hero({ stats, feed }: { stats: Stat[]; feed: ImpactFeedItem[] })
                 className="mt-9 flex flex-wrap items-center gap-6"
               >
                 <Magnetic>
-                  <Link href="/products" data-cursor="View" className="s-btn s-btn--bone">Discover the range</Link>
+                  <Link href="/products" data-cursor="View" className="group s-btn s-btn--bone">
+                    Discover the range
+                    <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" strokeWidth={1.75} />
+                  </Link>
                 </Magnetic>
-                <Link href="/find-ora" className="s-link text-white">Find ORA near you</Link>
+                <Link href="/find-ora" className="group inline-flex items-center gap-2 text-white">
+                  <MapPin className="size-4 text-[rgb(var(--s-pink))] transition-transform duration-300 group-hover:-translate-y-0.5" strokeWidth={1.75} />
+                  <span className="s-link">Find ORA near you</span>
+                </Link>
               </motion.div>
             </div>
 
             {/* slide counter: number, place, a bar per picture that fills while it is on */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.1, duration: 0.8 }} className="w-full max-w-[340px] lg:w-[340px]">
-              <div className="flex items-baseline justify-between gap-4">
+              <div className="flex items-end justify-between gap-4">
                 <span className="font-site-display text-3xl font-semibold tabular-nums leading-none tracking-[-0.04em]">
                   0{i + 1}
                   <span className="s-label ml-2 align-middle text-white/55">/ 0{SLIDES.length}</span>
                 </span>
                 <AnimatePresence mode="wait">
-                  <motion.span key={s.place} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.4 }} className="s-label text-right text-white/80">
-                    {s.place}
+                  <motion.span key={s.place} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.4 }} className="flex flex-col items-end gap-1.5 text-right">
+                    {/* event over place, each on its own line, so a long caption never breaks mid-name */}
+                    <span className="s-label whitespace-nowrap text-white/85">{s.place.split(" · ")[0]}</span>
+                    <span className="s-label whitespace-nowrap text-white/50">{s.place.split(" · ")[1]}</span>
                   </motion.span>
                 </AnimatePresence>
               </div>

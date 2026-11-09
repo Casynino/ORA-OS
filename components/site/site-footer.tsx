@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
-import { Logo } from "@/components/brand/logo";
+import { SiteLogo } from "@/components/site/site-logo";
 import { SocialLinks } from "@/components/public/social-links";
 import { Atmosphere } from "@/components/site/motion";
 import { ORA_CONTACT } from "@/lib/constants";
@@ -18,7 +18,7 @@ export function SiteFooter() {
 
       <div className="relative mx-auto grid max-w-[1440px] grid-cols-1 gap-12 px-5 py-16 sm:px-8 md:grid-cols-[1.5fr_1fr_1fr_1.2fr] md:py-20">
         <div>
-          <Logo mark="default" className="h-12" />
+          <SiteLogo />
           <p className="mt-6 max-w-xs text-[15px] leading-relaxed text-white/60">
             Dignity in every cycle. Championing menstrual health, education and period dignity for girls and women across Tanzania.
           </p>

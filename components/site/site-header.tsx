@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpRight, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { Logo } from "@/components/brand/logo";
+import { SiteLogo } from "@/components/site/site-logo";
 import { SocialLinks } from "@/components/public/social-links";
 import { EASE } from "@/components/site/motion";
 import { ORA_CONTACT } from "@/lib/constants";
@@ -67,19 +67,19 @@ export function SiteHeader({ user }: { user?: { name?: string | null; role?: str
         className={cn(
           "fixed inset-x-0 top-0 z-50 pt-[var(--sat)] transition-[background-color,border-color,backdrop-filter] duration-300",
           scrolled && !open ? "border-b border-white/[0.07] bg-[rgb(11_6_18/0.72)] backdrop-blur-xl" : "border-b border-transparent",
-          onPhoto && "s-on-photo",
+          onPhoto && "s-on-photo s-header-photo",
         )}
       >
         <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-6 px-5 sm:h-[72px] sm:px-8">
           <Link href="/" aria-label="ORA-Pads home" className="relative z-[60] shrink-0">
-            <Logo mark={onPhoto ? "light" : "default"} className="h-9 sm:h-10" />
+            <SiteLogo light={onPhoto} priority />
           </Link>
 
-          <nav aria-label="Main" className="hidden items-center gap-8 lg:flex">
+          <nav aria-label="Main" className="hidden items-center gap-9 lg:flex">
             {NAV.map((n) => {
               const active = pathname === n.href || pathname.startsWith(n.href + "/");
               return (
-                <Link key={n.href} href={n.href} className="group relative py-2 text-[13px] font-medium tracking-wide text-white/70 transition-colors hover:text-white">
+                <Link key={n.href} href={n.href} className="group relative py-2 text-[14px] font-medium tracking-wide text-white/75 transition-colors hover:text-white">
                   {n.name}
                   <span
                     className={cn(
@@ -102,16 +102,16 @@ export function SiteHeader({ user }: { user?: { name?: string | null; role?: str
               {mounted && resolvedTheme === "dark" ? <Sun className="size-4" strokeWidth={1.5} /> : <Moon className="size-4" strokeWidth={1.5} />}
             </button>
             {user ? (
-              <Link href={homeFor(user.role)} className="hidden text-[13px] font-medium text-white/75 transition-colors hover:text-white sm:inline">
+              <Link href={homeFor(user.role)} className="hidden text-[14px] font-medium text-white/75 transition-colors hover:text-white sm:inline">
                 My home
               </Link>
             ) : (
-              <Link href="/login" className="hidden text-[13px] font-medium text-white/75 transition-colors hover:text-white sm:inline">
+              <Link href="/login" className="hidden text-[14px] font-medium text-white/75 transition-colors hover:text-white sm:inline">
                 Sign in
               </Link>
             )}
             {/* plain words, no box (owner, 2026-11-09): pink, with an arrow that lifts and a line that draws on hover */}
-            <Link href="/impact" data-cursor="Join" className="group hidden items-center gap-1.5 text-[13px] font-semibold text-[rgb(var(--s-pink))] sm:inline-flex">
+            <Link href="/impact" data-cursor="Join" className="group hidden items-center gap-1.5 text-[14px] font-semibold text-[rgb(var(--s-pink))] sm:inline-flex">
               <span className="relative">
                 Join the movement
                 <span className="absolute -bottom-1 left-0 h-px w-full origin-right scale-x-0 bg-current transition-transform duration-300 group-hover:origin-left group-hover:scale-x-100" />

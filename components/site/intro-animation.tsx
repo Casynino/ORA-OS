@@ -19,7 +19,10 @@ export function IntroAnimation() {
 
   useEffect(() => {
     const root = document.documentElement;
-    if (root.hasAttribute("data-intro-seen") || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    // "?intro" in the address holds the opening on screen (for previewing it); it is never linked anywhere
+    const hold = new URLSearchParams(window.location.search).has("intro");
+    if (hold) root.removeAttribute("data-intro-seen");
+    if (!hold && (root.hasAttribute("data-intro-seen") || window.matchMedia("(prefers-reduced-motion: reduce)").matches)) {
       setDone(true);
       return;
     }
@@ -36,8 +39,8 @@ export function IntroAnimation() {
       root.style.overflow = "";
       setDone(true);
     };
-    const t = window.setTimeout(finish, 3000);
-    const hard = window.setTimeout(finish, 6000); // never trap a visitor behind the curtain
+    const t = hold ? 0 : window.setTimeout(finish, 3000);
+    const hard = hold ? 0 : window.setTimeout(finish, 6000); // never trap a visitor behind the curtain
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(t);
@@ -52,11 +55,35 @@ export function IntroAnimation() {
         <motion.div
           key="intro"
           aria-hidden
-          className="s-intro2 fixed inset-0 z-[90] overflow-hidden bg-[#0a0a0b] text-[#ece8e1]"
+          className="s-intro2 fixed inset-0 z-[90] overflow-hidden bg-[radial-gradient(ellipse_80%_70%_at_50%_45%,#2a0c22_0%,#140812_42%,#0a0a0b_78%)] text-[#ece8e1]"
           exit={{ clipPath: "inset(0% 0% 100% 0%)" }}
           initial={{ clipPath: "inset(0% 0% 0% 0%)" }}
           transition={{ duration: 0.95, ease: [0.76, 0, 0.24, 1] }}
         >
+          {/* specks of light drifting up through the scene */}
+          <div aria-hidden className="pointer-events-none absolute inset-0">
+            {Array.from({ length: 34 }, (_, k) => (
+              <span
+                key={k}
+                className="s-speck absolute rounded-full"
+                style={{
+                  left: `${(k * 37 + 11) % 100}%`,
+                  bottom: `${(k * 53) % 40 - 10}%`,
+                  width: `${2 + (k % 3)}px`,
+                  height: `${2 + (k % 3)}px`,
+                  background: k % 3 === 0 ? "rgb(255 46 151)" : "rgb(242 236 228)",
+                  animationDuration: `${5 + (k % 5)}s`,
+                  animationDelay: `${-((k * 0.7) % 5)}s`,
+                }}
+              />
+            ))}
+          </div>
+
+          {/* fine frame marks in the corners */}
+          {["left-5 top-5 border-l border-t", "right-5 top-5 border-r border-t", "left-5 bottom-5 border-l border-b", "right-5 bottom-5 border-r border-b"].map((c) => (
+            <motion.span key={c} aria-hidden className={`absolute size-6 border-[#ece8e1]/30 sm:size-8 ${c}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3, duration: 1 }} />
+          ))}
+
           {/* the halo */}
           <div className="absolute inset-0 flex items-center justify-center">
             <motion.div
@@ -68,9 +95,33 @@ export function IntroAnimation() {
           </div>
 
           <motion.div className="relative flex h-full flex-col items-center justify-center" exit={{ y: -60, opacity: 0 }} transition={{ duration: 0.6, ease: EASE }}>
+            {/* rings in the shape of the ORA arch draw themselves around the mark, one after another */}
+            <div className="relative flex items-center justify-center [--h:clamp(200px,46vmin,380px)]">
+            <svg aria-hidden viewBox="-100 -100 200 200" className="pointer-events-none absolute left-1/2 top-1/2 max-w-none -translate-x-1/2 -translate-y-1/2" style={{ width: "calc(var(--h) * 2)", height: "calc(var(--h) * 2)", WebkitMaskImage: "linear-gradient(to bottom, #000 52%, transparent 70%)", maskImage: "linear-gradient(to bottom, #000 52%, transparent 70%)" }}>
+              {[0, 1, 2, 3, 4, 5].map((k) => {
+                const w = 50 + k * 17;
+                const h = 92 + k * 17;
+                return (
+                  <motion.rect
+                    key={k}
+                    x={-w / 2}
+                    y={-h / 2}
+                    width={w}
+                    height={h}
+                    rx={w / 2}
+                    fill="none"
+                    stroke={k === 0 ? "rgb(255 46 151)" : "rgb(242 236 228)"}
+                    strokeWidth={k === 0 ? 0.45 : 0.3}
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: k === 0 ? 0.7 : 0.38 - k * 0.055 }}
+                    transition={{ pathLength: { duration: 1.6, ease: EASE, delay: 0.35 + k * 0.13 }, opacity: { duration: 0.4, delay: 0.35 + k * 0.13 } }}
+                  />
+                );
+              })}
+            </svg>
             {/* the mark: rises through a curtain, sharpens, then a pink light sweeps across its lines */}
             <motion.div
-              className="relative aspect-[150/250] h-[46vmin] max-h-[380px] min-h-[200px]"
+              className="relative aspect-[150/250] h-[var(--h)]"
               initial={{ clipPath: "inset(100% 0% 0% 0%)", filter: "blur(14px)", scale: 1.12 }}
               animate={{ clipPath: "inset(0% 0% 0% 0%)", filter: "blur(0px)", scale: 1 }}
               transition={{ duration: 1.3, ease: EASE, delay: 0.15 }}
@@ -89,6 +140,7 @@ export function IntroAnimation() {
                 }}
               />
             </motion.div>
+            </div>
 
             {/* the line, letter by letter */}
             <motion.p

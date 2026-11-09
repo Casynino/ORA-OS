@@ -1029,3 +1029,17 @@ html[data-intro-seen] .s-intro2 { display: none; }
 }
 @keyframes s-sheen { from { background-position: 100% 0; } to { background-position: 0% 0; } }
 @media (prefers-reduced-motion: reduce) { .s-intro-mark { animation: none; } }
+/* opening: specks of light rising */
+.s-speck { opacity: 0; animation: s-speck 6s linear infinite; box-shadow: 0 0 6px currentColor; }
+@keyframes s-speck { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 0.9; } 80% { opacity: 0.6; } 100% { transform: translateY(-75vh); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .s-speck { animation: none; } }
+
+/* Header over a photograph: no bar, no shapes — a soft shadow under the words, icons and logo keeps them readable over
+   bright pictures (owner, 2026-11-09). */
+.ora-site .s-header-photo :is(a, button) { text-shadow: 0 1px 14px rgb(0 0 0 / 0.55), 0 0 2px rgb(0 0 0 / 0.3); }
+.ora-site .s-header-photo svg { filter: drop-shadow(0 1px 6px rgb(0 0 0 / 0.55)); }
+.ora-site .s-header-photo img { filter: brightness(0) invert(1) drop-shadow(0 1px 8px rgb(0 0 0 / 0.5)); }
+.ora-site .s-header-photo button span span { box-shadow: 0 1px 6px rgb(0 0 0 / 0.45); }
+
+/* phones: buttons a touch smaller so nothing feels oversized */
+@media (max-width: 639px) { .s-btn { height: 3rem; padding: 0 1.5rem; letter-spacing: 0.2em; } }
