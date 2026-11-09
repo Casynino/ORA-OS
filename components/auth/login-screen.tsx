@@ -112,14 +112,24 @@ export function LoginScreen({
         </p>
         <p className="mt-1 text-[11px] text-white/40 [@media(max-height:480px)]:hidden">© {new Date().getFullYear()} ORA-Pads · Period dignity for all</p>
 
-        {/* Who made the system — one quiet line to Nino's page and work (only here, on the sign-in page). */}
+        {/* Who made the system — one small pill to Nino's page and work (only here, on the sign-in page), in the same
+            glass as the page's other pills, with ORA's own pink → purple on the monogram (owner, 2026-11-09: "make it
+            nicer", as on the Lab OS). */}
         <Link
           href="/nino"
-          className="group mt-1 inline-flex min-h-10 items-center gap-1 rounded-sm text-xs text-white/55 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          className="group mt-3 inline-flex h-10 items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] pl-1.5 pr-3.5 text-xs text-white/65 backdrop-blur-md transition-colors hover:border-primary/50 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
         >
-          Developed by <span className="font-semibold text-white/80 transition-colors group-hover:text-[#c6f432]">Nino</span>
+          <span
+            className="grid size-7 place-items-center rounded-full bg-gradient-to-br from-primary to-accent text-[11px] font-extrabold text-white shadow-[0_4px_14px_-4px_hsl(var(--primary)/0.7)]"
+            aria-hidden="true"
+          >
+            N
+          </span>
+          <span>
+            Developed by <span className="font-semibold text-white">Nino</span>
+          </span>
           <ArrowUpRight
-            className="size-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none"
+            className="size-3.5 text-white/70 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-white motion-reduce:transition-none"
             aria-hidden="true"
           />
         </Link>

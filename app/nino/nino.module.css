@@ -1,4 +1,5 @@
-/* /nino — Nino's page. Dark by design (the work's screenshots carry the colour); one acid accent. */
+/* /nino — Nino's page. Dark by design (the work's screenshots carry the colour); the accent is ORA's own pink → purple,
+   so the page reached from ORA's sign-in feels like the same house (owner, 2026-11-09, as on the Lab OS). */
 
 .page {
   --ink: #f4f4f1;
@@ -6,12 +7,13 @@
   --faint: rgb(244 244 241 / 0.38);
   --rule: rgb(244 244 241 / 0.1);
   --card: rgb(255 255 255 / 0.03);
-  --accent: #c6f432;
-  --accent-ink: #10130a;
-  background: #0a0a0b;
+  --accent: #ff52bf; /* ORA's primary on dark (hsl 322 100% 66%) — text and icons */
+  --accent-ink: #ffffff;
+  --accent-fill: linear-gradient(120deg, #e8159a, #8b3df0); /* the Log in button's pink → purple — solid pills */
+  background: #0d0a12;
   color: var(--ink);
   color-scheme: dark;
-  font-family: var(--font-nino-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
 /* the small mono labels (eyebrows, addresses) */
 .page :global(.font-mono) {
@@ -25,8 +27,8 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(60rem 36rem at 12% -8%, rgb(198 244 50 / 0.07), transparent 60%),
-    radial-gradient(50rem 30rem at 100% 0%, rgb(120 140 255 / 0.05), transparent 60%);
+    radial-gradient(60rem 36rem at 12% -8%, rgb(230 17 140 / 0.16), transparent 60%),
+    radial-gradient(50rem 30rem at 100% 0%, rgb(139 61 240 / 0.12), transparent 60%);
   z-index: 0;
 }
 .page::after {
@@ -41,9 +43,9 @@
 
 .wordmark {
   font-weight: 900;
-  letter-spacing: -0.075em;
+  letter-spacing: -0.06em;
   line-height: 0.78;
-  font-size: clamp(5rem, 22vw, 11rem);
+  font-size: clamp(4.5rem, 20vw, 11rem); /* Poppins is wider than the original face: keep NINO. inside a phone's gutters */
   margin-left: -0.04em;
 }
 
@@ -58,12 +60,12 @@
 }
 
 .pulse {
-  box-shadow: 0 0 0 0 rgb(198 244 50 / 0.6);
+  box-shadow: 0 0 0 0 rgb(255 82 191 / 0.6);
   animation: pulse 2.2s ease-out infinite;
 }
 @keyframes pulse {
-  70% { box-shadow: 0 0 0 9px rgb(198 244 50 / 0); }
-  100% { box-shadow: 0 0 0 0 rgb(198 244 50 / 0); }
+  70% { box-shadow: 0 0 0 9px rgb(255 82 191 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(255 82 191 / 0); }
 }
 
 /* The screenshot in its browser frame lifts a little and comes into focus on hover. */
@@ -76,11 +78,16 @@
   transform: scale(1.035);
   filter: saturate(1.05);
 }
+/* the solid pills and the main button: ORA's pink → purple */
+.fill {
+  background: var(--accent-fill);
+}
+
 .card {
   transition: border-color 0.3s ease, background-color 0.3s ease, transform 0.5s cubic-bezier(0.2, 0.7, 0.1, 1);
 }
 .card:hover {
-  border-color: rgb(244 244 241 / 0.22);
+  border-color: rgb(255 82 191 / 0.32);
   background-color: rgb(255 255 255 / 0.05);
 }
 .arrow {

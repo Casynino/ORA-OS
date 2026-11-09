@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -20,10 +20,9 @@ export const metadata: Metadata = {
   openGraph: { type: "profile", title: TITLE, description: DESCRIPTION, images: [{ url: "/nino/og.jpg", width: 1200, height: 630, alt: "NINO. — Systems scientist & developer", type: "image/jpeg" }] },
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: ["/nino/og.jpg"] },
 };
-export const viewport: Viewport = { themeColor: "#0a0a0b" };
+export const viewport: Viewport = { themeColor: "#0d0a12" };
 
-// This page keeps its own faces (as on the Vegas site) whatever the rest of ORA uses.
-const sans = Inter({ variable: "--font-nino-sans", subsets: ["latin"] });
+// ORA's own Poppins (from the root layout) carries the page, so it reads as the same house; a mono face for the small labels.
 const mono = Geist_Mono({ variable: "--font-nino-mono", subsets: ["latin"] });
 
 const ICONS: Record<(typeof EXPERTISE)[number]["icon"], LucideIcon> = {
@@ -34,20 +33,21 @@ const wa = (digits: string) => `https://wa.me/${digits}?text=${HELLO}`;
 
 const wrap = "relative z-10 mx-auto w-full max-w-[1320px] px-4 sm:px-8";
 const eyebrow = "font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--faint)]";
-const focus = "outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0b]";
+const focus = "outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0a12]";
 const ext = { target: "_blank", rel: "noopener noreferrer" } as const;
 
 /**
  * DEVELOPED BY NINO (owner, 2026-10-05: "a small button down the website… click it and find a full page with all my
  * projects"; 2026-11-09: the same on ORA's sign-in page, and only there). Copied from the Vegas Luxury Hotel website. Dark,
  * editorial, the work first: every live project with a screenshot of its real home page, then what's coming and the code,
- * what I do, what I build with, and how to reach me.
+ * what I do, what I build with, and how to reach me. Owner, 2026-11-09 (as done on the Lab OS): the inside should carry
+ * the system's own colours, so the accent is ORA's pink → purple and the ground ORA's plum-black, in ORA's Poppins.
  */
 export default function NinoPage() {
   return (
-    <div className={cn(s.page, sans.variable, mono.variable, "relative min-h-svh flex-1 overflow-x-clip antialiased")}>
+    <div className={cn(s.page, mono.variable, "relative min-h-svh flex-1 overflow-x-clip antialiased")}>
       {/* ── Top bar ── */}
-      <header className="sticky top-[var(--sat)] z-30 border-b border-[var(--rule)] bg-[#0a0a0b]/75 backdrop-blur-xl">
+      <header className="sticky top-[var(--sat)] z-30 border-b border-[var(--rule)] bg-[#0d0a12]/75 backdrop-blur-xl">
         <div className={cn(wrap, "flex h-14 items-center justify-between gap-4")}>
           <a href="#top" className={cn("text-lg font-black tracking-[-0.06em]", focus)}>NINO<span className="text-[var(--accent)]">.</span></a>
           <nav aria-label="Page" className="flex items-center gap-1 sm:gap-2">
@@ -55,7 +55,7 @@ export default function NinoPage() {
               <ArrowLeft className="size-3.5" aria-hidden="true" />ORA-Pads
             </Link>
             <a href="#work" className={cn("hidden h-9 items-center rounded-full px-3 text-[13px] text-[var(--muted)] transition-colors hover:text-[var(--ink)] md:inline-flex", focus)}>Work</a>
-            <a href="#contact" className={cn("inline-flex h-9 items-center rounded-full bg-[var(--accent)] px-4 text-[13px] font-semibold text-[var(--accent-ink)] transition hover:brightness-110", focus)}>Work with me</a>
+            <a href="#contact" className={cn(s.fill, "inline-flex h-9 items-center rounded-full px-4 text-[13px] font-semibold text-[var(--accent-ink)] transition hover:brightness-110", focus)}>Work with me</a>
           </nav>
         </div>
       </header>
@@ -76,7 +76,7 @@ export default function NinoPage() {
                 <span className="text-[var(--muted)]"> Then I design the system and build it around that.</span>
               </p>
               <div className="mt-6 flex flex-wrap items-center gap-2.5">
-                <a href="#work" className={cn("inline-flex h-11 items-center gap-2 rounded-full bg-[var(--ink)] px-5 text-sm font-semibold text-[#0a0a0b] transition hover:bg-white", focus)}>
+                <a href="#work" className={cn("inline-flex h-11 items-center gap-2 rounded-full bg-[var(--ink)] px-5 text-sm font-semibold text-[#0d0a12] transition hover:bg-white", focus)}>
                   See the work<ArrowDown className="size-4" aria-hidden="true" />
                 </a>
                 <a href={wa(CONTACT.whatsapp[0].digits)} {...ext} className={cn("inline-flex h-11 items-center gap-2 rounded-full border border-[var(--rule)] px-5 text-sm font-semibold transition-colors hover:border-[var(--muted)]", focus)}>
@@ -157,7 +157,7 @@ export default function NinoPage() {
 
         {/* ── Work with me ── */}
         <section id="contact" aria-labelledby="contact-title" className={cn(wrap, "scroll-mt-20 pb-16 pt-10 sm:pb-24 sm:pt-16")}>
-          <div className="relative overflow-hidden rounded-[2rem] border border-[var(--rule)] bg-[linear-gradient(140deg,rgb(198_244_50/0.10),rgb(255_255_255/0.02)_45%)] p-6 sm:p-12">
+          <div className="relative overflow-hidden rounded-[2rem] border border-[var(--rule)] bg-[linear-gradient(140deg,rgb(230_17_140/0.16),rgb(139_61_240/0.07)_45%,rgb(255_255_255/0.02))] p-6 sm:p-12">
             <p className={eyebrow}>04 — Work with me</p>
             <h2 id="contact-title" className="mt-4 max-w-3xl text-balance text-4xl font-black leading-[0.95] tracking-[-0.045em] sm:text-6xl">
               Have something to build? Let&apos;s talk<span className="text-[var(--accent)]">.</span>
@@ -168,8 +168,8 @@ export default function NinoPage() {
             </p>
             <ul className="mt-9 grid gap-3 md:grid-cols-3">
               <li>
-                <a href={`mailto:${CONTACT.email}?subject=${encodeURIComponent("A project for Nino")}`} className={cn(s.card, "group flex h-full items-center gap-4 rounded-2xl border border-[var(--rule)] bg-[#0a0a0b]/60 p-4 sm:p-5", focus)}>
-                  <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[var(--ink)] text-[#0a0a0b]"><Mail className="size-[18px]" aria-hidden="true" /></span>
+                <a href={`mailto:${CONTACT.email}?subject=${encodeURIComponent("A project for Nino")}`} className={cn(s.card, "group flex h-full items-center gap-4 rounded-2xl border border-[var(--rule)] bg-[#0d0a12]/60 p-4 sm:p-5", focus)}>
+                  <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[var(--ink)] text-[#0d0a12]"><Mail className="size-[18px]" aria-hidden="true" /></span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-xs text-[var(--faint)]">Email</span>
                     <span className="block truncate text-[15px] font-semibold">{CONTACT.email}</span>
@@ -179,7 +179,7 @@ export default function NinoPage() {
               </li>
               {CONTACT.whatsapp.map((w) => (
                 <li key={w.place}>
-                  <a href={wa(w.digits)} {...ext} className={cn(s.card, "group flex h-full items-center gap-4 rounded-2xl border border-[var(--rule)] bg-[#0a0a0b]/60 p-4 sm:p-5", focus)}>
+                  <a href={wa(w.digits)} {...ext} className={cn(s.card, "group flex h-full items-center gap-4 rounded-2xl border border-[var(--rule)] bg-[#0d0a12]/60 p-4 sm:p-5", focus)}>
                     <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[#25D366] text-[#06351b]"><MessageCircle className="size-[18px]" aria-hidden="true" /></span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-xs text-[var(--faint)]">WhatsApp · {w.place}</span>
@@ -242,7 +242,7 @@ function ProjectCard({ p, featured, priority }: { p: Project; featured?: boolean
         </div>
         <div className={cn("flex flex-1 flex-col px-1.5 pb-1.5", featured && "xl:justify-between xl:py-2 xl:pr-3")}>
           <div>
-            {featured && <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-2.5 py-1 text-[11px] font-semibold text-[var(--accent-ink)]"><MapPin className="size-3" aria-hidden="true" />You are here</p>}
+            {featured && <p className={cn(s.fill, "mb-3 inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold text-[var(--accent-ink)]")}><MapPin className="size-3" aria-hidden="true" />You are here</p>}
             <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--faint)]">{p.kind}</p>
             <h3 className={cn("mt-2 flex items-start justify-between gap-3 font-bold tracking-[-0.03em]", featured ? "text-3xl sm:text-4xl" : "text-xl")}>
               {p.name}
@@ -274,7 +274,7 @@ function MoreCard({ p }: { p: Project }) {
         )}
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--faint)]">
-            {soon && <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 font-sans text-[10.5px] font-semibold normal-case tracking-normal text-[var(--accent-ink)]">Launching soon</span>}
+            {soon && <span className={cn(s.fill, "rounded-full px-2 py-0.5 font-sans text-[10.5px] font-semibold normal-case tracking-normal text-[var(--accent-ink)]")}>Launching soon</span>}
             {p.kind}
           </p>
           <h3 className="mt-2 flex items-start justify-between gap-3 text-xl font-bold tracking-[-0.03em]">
