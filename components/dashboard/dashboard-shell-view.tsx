@@ -168,7 +168,7 @@ export function DashboardShellView({
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 animate-fade-in bg-black/50 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 left-0 w-[min(17rem,84vw)] animate-slide-in-left pb-[calc(0.75rem+var(--sab))] pl-3 pt-[calc(0.75rem+var(--sat))]">
+          <div className="absolute inset-y-0 left-0 w-[15.5rem] max-w-[calc(78vw+0.75rem)] animate-slide-in-left pb-[calc(0.75rem+var(--sab))] pl-3 pt-[calc(0.75rem+var(--sat))]">
             <GlassSidebar
               mode="sheet"
               nav={nav}
