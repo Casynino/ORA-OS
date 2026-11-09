@@ -1,14 +1,29 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 const TAG = "Empowering every cycle";
+// Only the packs, no people (owner, 2026-11-09). Twelve packs stream out of the centre towards the viewer and past the
+// edges, so it feels like flying into the ORA world. A golden-angle spread keeps any two from following the same line.
+const PACK_SRC = [
+  { src: "/ora/site/pack-night.webp", w: 1100, h: 716 },
+  { src: "/ora/site/pack-day.webp", w: 1100, h: 817 },
+  { src: "/ora/site/pack-liner.webp", w: 851, h: 895 },
+];
+const PACKS = Array.from({ length: 12 }, (_, k) => {
+  const a = ((k * 137.5 + 20) * Math.PI) / 180;
+  return { ...PACK_SRC[k % 3], dx: Math.cos(a), dy: Math.sin(a), rot: ((k * 47) % 30) - 15, delay: (k * 0.21) % 2.5 };
+});
+const FLIGHT = 2.6;
+// the packs fade out over the mark and its line, so they come out from behind it and never cross the logo or the words
+const PACK_CLEAR = "radial-gradient(ellipse clamp(190px,30vmin,300px) clamp(220px,38vmin,380px) at 50% 48%, transparent 60%, #000 100%)";
 
 /**
  * The opening, once per visit (owner, 2026-11-09: "a very nice animation of the logo — premium, bling"). Always night,
- * whatever the theme: a soft ORA-pink halo grows; the ORA mark rises through a curtain, sharpening from a blur; a pink
+ * whatever the theme: ORA packs stream towards the viewer out of the middle; a soft ORA-pink halo grows; the ORA mark rises through a curtain, sharpening from a blur; a pink
  * light sweeps across its lines; the line "Empowering every cycle" appears letter by letter; a counter runs to 100 with
  * a hairline filling the foot of the screen; then the whole panel lifts away like a curtain onto the hero.
  * Skipped for reduced-motion users and on a second visit in the same session (see SiteIntro).
@@ -84,6 +99,33 @@ export function IntroAnimation() {
             <motion.span key={c} aria-hidden className={`absolute size-6 border-[#ece8e1]/30 sm:size-8 ${c}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3, duration: 1 }} />
           ))}
 
+          {/* the packs: each starts small and far away in the middle, then grows as it rushes out past the edges of the
+              screen, one after another without a break, like entering the ORA world */}
+          <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden" style={{ WebkitMaskImage: PACK_CLEAR, maskImage: PACK_CLEAR }}>
+            {PACKS.map((p, k) => (
+              <div key={k} className="absolute left-1/2 top-[45%]">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{
+                    x: [`${p.dx * 5}vw`, `${p.dx * 66}vw`],
+                    y: [`${p.dy * 5}vh`, `${p.dy * 62}vh`],
+                    scale: [0.1, 1.75],
+                    rotate: [p.rot * 0.25, p.rot],
+                    opacity: [0, 1, 1, 0],
+                  }}
+                  transition={{
+                    default: { duration: FLIGHT, ease: [0.55, 0, 0.9, 0.45], delay: p.delay, repeat: Infinity },
+                    opacity: { duration: FLIGHT, ease: "linear", times: [0, 0.22, 0.82, 1], delay: p.delay, repeat: Infinity },
+                  }}
+                >
+                  <div className="w-[clamp(104px,17vmin,210px)] -translate-x-1/2 -translate-y-1/2">
+                    <Image src={p.src} alt="" width={p.w} height={p.h} sizes="210px" className="h-auto w-full" />
+                  </div>
+                </motion.div>
+              </div>
+            ))}
+          </div>
+
           {/* the halo */}
           <div className="absolute inset-0 flex items-center justify-center">
             <motion.div
@@ -119,7 +161,9 @@ export function IntroAnimation() {
                 );
               })}
             </svg>
-            {/* the mark: rises through a curtain, sharpens, then a pink light sweeps across its lines */}
+            {/* the mark: rises through a curtain, sharpens, then a pink light sweeps across its lines; a soft pink glow
+                around the lines (on a wrapper, so the curtain does not clip it) */}
+            <div className="relative [filter:drop-shadow(0_0_14px_rgb(255_46_151/0.4))_drop-shadow(0_0_1px_rgb(255_240_248/0.45))]">
             <motion.div
               className="relative aspect-[150/250] h-[var(--h)]"
               initial={{ clipPath: "inset(100% 0% 0% 0%)", filter: "blur(14px)", scale: 1.12 }}
@@ -141,10 +185,11 @@ export function IntroAnimation() {
               />
             </motion.div>
             </div>
+            </div>
 
             {/* the line, letter by letter */}
             <motion.p
-              className="mt-9 flex font-site-mono text-[11px] uppercase text-[#ece8e1]/75 sm:text-xs"
+              className="mt-9 flex font-site-mono text-[11px] uppercase text-[#ece8e1]/80 [text-shadow:0_0_14px_rgb(10_4_10),0_0_4px_rgb(10_4_10)] sm:text-xs"
               initial={{ letterSpacing: "0.6em" }}
               animate={{ letterSpacing: "0.32em" }}
               transition={{ duration: 1.6, ease: EASE, delay: 0.9 }}
