@@ -198,7 +198,7 @@ function SignInSheet({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6"
+      className="fixed inset-0 z-50 flex items-end justify-center px-3 pb-[calc(var(--sab,0px)+0.75rem)] sm:items-center sm:p-6"
       style={{ paddingBottom: kb || undefined }}
       onKeyDown={onKeyDown}
     >
@@ -207,7 +207,7 @@ function SignInSheet({ onClose }: { onClose: () => void }) {
         aria-label="Close sign in"
         tabIndex={-1}
         onClick={onClose}
-        className="absolute inset-0 animate-fade-in bg-black/25 backdrop-blur-[6px]"
+        className="absolute inset-0 animate-fade-in bg-black/40"
       />
       <div
         ref={sheet}
@@ -216,24 +216,24 @@ function SignInSheet({ onClose }: { onClose: () => void }) {
         aria-labelledby="signin-title"
         tabIndex={-1}
         style={{ "--kb": `${kb}px` } as React.CSSProperties}
-        className="sheet-max relative w-full max-w-md animate-slide-up overflow-y-auto rounded-t-3xl border border-border bg-card px-6 pb-[max(1.5rem,var(--sab))] pt-3 text-card-foreground shadow-2xl outline-none sm:rounded-3xl sm:pb-6 sm:pt-6"
+        className="sheet-max ora-rise relative w-full max-w-[22rem] overflow-y-auto rounded-2xl border border-white/10 bg-[#1b0d24]/85 px-5 pb-5 pt-4 text-white shadow-[0_12px_32px_rgba(0,0,0,0.4)] outline-none backdrop-blur-xl"
       >
-        <div aria-hidden className="mx-auto mb-4 h-1 w-10 rounded-full bg-border sm:hidden" />
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="absolute right-3 top-2 flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:right-4 sm:top-4"
-        >
-          <X className="size-5" />
-        </button>
+        {/* Matches the small "use it like an app" card: dark plum glass, one-line title, a cross — no big sheet */}
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="signin-title" className="text-[17px] font-medium leading-tight">
+            Sign in
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="-mr-2 grid size-9 shrink-0 place-items-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <X className="size-4" strokeWidth={1.5} />
+          </button>
+        </div>
 
-        <h2 id="signin-title" className="font-display text-2xl font-bold tracking-tight">
-          Welcome back
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">Sign in to your ORA-Pads account.</p>
-
-        <div className="mt-6">
+        <div className="mt-4">
           <LoginForm />
         </div>
       </div>
