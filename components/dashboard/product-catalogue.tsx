@@ -1,11 +1,11 @@
-import { Droplets, Sparkles, Package, Boxes } from "lucide-react";
+import { Droplets, ShowerHead, Package, Boxes } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { humanize } from "@/lib/utils";
 
 const categoryIcon: Record<string, typeof Droplets> = {
   PADS: Droplets,
-  HYGIENE: Sparkles,
+  HYGIENE: ShowerHead,
   ACCESSORY: Package,
   OTHER: Boxes,
 };

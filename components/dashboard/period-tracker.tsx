@@ -7,7 +7,7 @@ import {
   format,
   isBefore,
 } from "date-fns";
-import { CalendarHeart, Droplets, Sparkles, Lock, Trash2 } from "lucide-react";
+import { CalendarHeart, Droplets, RefreshCw, Lock, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -194,7 +194,7 @@ export function PeriodTracker() {
                 </p>
               </div>
               <div className="rounded-xl border border-border p-4">
-                <Sparkles className="size-5 text-primary" />
+                <RefreshCw className="size-5 text-primary" />
                 <p className="mt-2 text-sm font-medium">Cycle length</p>
                 <p className="text-xs text-muted-foreground">
                   {latest.cycleLength} days

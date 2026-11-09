@@ -4,7 +4,7 @@ import {
   BookOpen,
   Megaphone,
   Package,
-  Sparkles,
+  CalendarDays,
 } from "lucide-react";
 import type { ImpactFeedItem } from "@/lib/services/impact";
 import { formatNumber } from "@/lib/utils";
@@ -21,7 +21,7 @@ export const ACTIVITY_TYPES: {
   { key: "EDUCATION_SESSION", label: "Education session", icon: BookOpen },
   { key: "AWARENESS_CAMPAIGN", label: "Awareness campaign", icon: Megaphone },
   { key: "PAD_DISTRIBUTION", label: "Pad distribution", icon: Package },
-  { key: "OTHER", label: "Activity", icon: Sparkles },
+  { key: "OTHER", label: "Activity", icon: CalendarDays },
 ];
 
 export const activityMeta = (key: string) =>

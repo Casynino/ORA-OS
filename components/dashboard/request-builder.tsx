@@ -9,7 +9,7 @@ import {
   Send,
   Trash2,
   Droplets,
-  Sparkles,
+  ShowerHead,
   Package,
   Boxes,
   Info,
@@ -34,7 +34,7 @@ type Product = {
 
 const categoryIcon: Record<string, typeof Droplets> = {
   PADS: Droplets,
-  HYGIENE: Sparkles,
+  HYGIENE: ShowerHead,
   ACCESSORY: Package,
   OTHER: Boxes,
 };

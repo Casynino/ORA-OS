@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { HeartHandshake, Package, Users, ExternalLink, Sparkles } from "lucide-react";
+import { HeartHandshake, Package, Users, ExternalLink, CalendarCheck } from "lucide-react";
 import { requireRole } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/ui/page-header";
@@ -48,7 +48,7 @@ export default async function AdminImpactPage() {
       </PageHeader>
 
       <div className="kpi-grid">
-        <StatCard label="Published activities" value={formatNumber(published.length)} icon={Sparkles} accent="primary" hint={activities.length !== published.length ? `${activities.length - published.length} hidden` : undefined} />
+        <StatCard label="Published activities" value={formatNumber(published.length)} icon={CalendarCheck} accent="primary" hint={activities.length !== published.length ? `${activities.length - published.length} hidden` : undefined} />
         <StatCard label="Pads distributed (activities)" value={formatNumber(pads)} icon={Package} accent="accent" />
         <StatCard label="People reached (activities)" value={formatNumber(people)} icon={Users} accent="success" />
         <StatCard label="Impact stories" value={formatNumber(stories.length)} icon={HeartHandshake} accent="info" />
