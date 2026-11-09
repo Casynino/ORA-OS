@@ -107,6 +107,6 @@ async function deliverWhatsApp(
 export function appBaseUrl(): string {
   return (
     process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    "https://ora-os-eight.vercel.app"
+    "https://www.ora.co.tz"
   );
 }
