@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Download, EllipsisVertical, Menu, Share, Smartphone, SquarePlus, TriangleAlert } from "lucide-react";
-import { Modal } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Download, EllipsisVertical, Menu, Share, Smartphone, SquarePlus, TriangleAlert, X } from "lucide-react";
 import { detectDevice, type Device } from "@/lib/device";
 
 /**
@@ -81,12 +79,12 @@ export function useInstall() {
 
 type StepDef = { text: React.ReactNode; icon?: typeof Share };
 
-/** The steps for this phone and browser. Every browser words them a little differently, so each gets its own. */
+/** The steps for this phone and browser, as short as they can be (owner, 2026-11-09: "small and nice, not big"). */
 function stepsFor(d: Device): StepDef[] {
   const open: StepDef = {
     text: (
       <>
-        Open <b>ORA</b> from your home screen.
+        Open <b>ORA</b> from your home screen
       </>
     ),
   };
@@ -97,11 +95,11 @@ function stepsFor(d: Device): StepDef[] {
         text:
           d.browser === "safari" || d.inApp ? (
             <>
-              Tap <b>Share</b> at the bottom of Safari (on newer iPhones it is under the <b>···</b> button).
+              Tap <b>Share</b> below (newer iPhones: under <b>···</b>)
             </>
           ) : (
             <>
-              Tap <b>Share</b> next to the address at the top.
+              Tap <b>Share</b> by the address bar
             </>
           ),
       },
@@ -109,14 +107,14 @@ function stepsFor(d: Device): StepDef[] {
         icon: SquarePlus,
         text: (
           <>
-            Scroll down and tap <b>Add to Home Screen</b>.
+            Choose <b>Add to Home Screen</b>
           </>
         ),
       },
       {
         text: (
           <>
-            Tap <b>Add</b>, then open <b>ORA</b> from your home screen.
+            Tap <b>Add</b>
           </>
         ),
       },
@@ -125,11 +123,11 @@ function stepsFor(d: Device): StepDef[] {
   switch (d.browser) {
     case "samsung":
       return [
-        { icon: Menu, text: <>Tap the menu at the bottom right.</> },
+        { icon: Menu, text: <>Tap the menu, bottom right</> },
         {
           text: (
             <>
-              Tap <b>Add page to</b>, then <b>Home screen</b> (or <b>Install app</b> if you see it).
+              <b>Add page to</b> → <b>Home screen</b> (or <b>Install app</b>)
             </>
           ),
         },
@@ -137,11 +135,11 @@ function stepsFor(d: Device): StepDef[] {
       ];
     case "huawei":
       return [
-        { icon: Menu, text: <>Open the browser menu (at the bottom, or the three dots at the top right).</> },
+        { icon: Menu, text: <>Open the browser menu</> },
         {
           text: (
             <>
-              Tap <b>Add to home screen</b> (some phones say <b>Add to desktop</b> or hide it under <b>Add to</b>), then confirm.
+              <b>Add to home screen</b> (or <b>Add to desktop</b>)
             </>
           ),
         },
@@ -149,11 +147,11 @@ function stepsFor(d: Device): StepDef[] {
       ];
     case "firefox":
       return [
-        { icon: EllipsisVertical, text: <>Open the browser menu at the top right.</> },
+        { icon: EllipsisVertical, text: <>Open the menu, top right</> },
         {
           text: (
             <>
-              Tap <b>Install</b>, then <b>Add</b>.
+              <b>Install</b> → <b>Add</b>
             </>
           ),
         },
@@ -161,11 +159,11 @@ function stepsFor(d: Device): StepDef[] {
       ];
     default:
       return [
-        { icon: EllipsisVertical, text: <>Open the browser menu (the three dots, top right or bottom).</> },
+        { icon: EllipsisVertical, text: <>Open the browser menu (⋮)</> },
         {
           text: (
             <>
-              Tap <b>Install app</b> or <b>Add to Home screen</b>, then <b>Install</b>.
+              <b>Install app</b> or <b>Add to Home screen</b>
             </>
           ),
         },
@@ -174,71 +172,102 @@ function stepsFor(d: Device): StepDef[] {
   }
 }
 
+/**
+ * A small card at the foot of the screen, close to the browser's own Share/menu button — not a big dialog. One line of
+ * title, three short steps on hairlines (no boxes around them), a small "Got it". On Android with Chrome's own install
+ * offer it is one button. Escape or the cross closes it.
+ */
 export function InstallSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { device, canPrompt, install } = useInstall();
   const browserName = device.os === "ios" ? "Safari" : "Chrome";
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      className="max-w-sm rounded-2xl"
-      title={
-        <span className="flex items-center gap-3 pr-6">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#0b0014] text-white">
-            <Smartphone className="size-5" />
-          </span>
-          <span className="block">
-            <span className="block text-base font-semibold leading-tight">Use it like an app</span>
-            <span className="mt-0.5 block text-[13px] font-normal leading-snug text-muted-foreground">
-              Full screen, no browser bar, its own icon.
-            </span>
-          </span>
-        </span>
-      }
-    >
-      {device.inApp && (
-        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2.5 text-[13px] leading-snug">
-          <TriangleAlert className="mt-px size-4 shrink-0 text-warning" />
-          <span>
-            This page is open inside {device.appName}, which cannot put it on the home screen. Tap the <b>···</b> (or three dots) at the top and
-            choose <b>Open in {browserName}</b> or <b>Open in browser</b>, then do these steps.
-          </span>
-        </div>
-      )}
 
-      {canPrompt && !device.inApp ? (
-        <div className="flex flex-col gap-2">
-          <Button
-            onClick={async () => {
-              if (await install()) onClose();
-            }}
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex justify-center px-3 pb-[calc(var(--sab,0px)+0.75rem)]">
+      <div
+        role="dialog"
+        aria-modal="false"
+        aria-label="Use ORA like an app"
+        className="ora-rise pointer-events-auto w-full max-w-[22rem] rounded-2xl border border-border bg-card p-4 text-left text-card-foreground shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-[15px] font-medium leading-tight">
+              <Smartphone className="size-4 shrink-0 text-primary" strokeWidth={1.5} aria-hidden="true" />
+              Use ORA like an app
+            </p>
+            <p className="mt-1 text-[13px] leading-snug text-muted-foreground">Full screen, its own icon</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="-mr-1 -mt-1 grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <Download className="size-4" />
-            Install the app
-          </Button>
-          <Button variant="outline" onClick={onClose}>
-            Not now
-          </Button>
+            <X className="size-4" strokeWidth={1.5} />
+          </button>
         </div>
-      ) : (
-        <>
-          <ol className="space-y-2">
-            {stepsFor(device).map((st, i) => (
-              <li key={i} className="flex items-center gap-3 rounded-xl bg-muted/60 px-3 py-2.5 text-[13px] leading-snug">
-                <span className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-                  {i + 1}
-                </span>
-                <span className="min-w-0 flex-1">{st.text}</span>
-                {st.icon && <st.icon className="size-4 shrink-0 text-muted-foreground" />}
-              </li>
-            ))}
-          </ol>
-          <Button variant="outline" className="mt-4 w-full" onClick={onClose}>
-            Got it
-          </Button>
-        </>
-      )}
-    </Modal>
+
+        {device.inApp && (
+          <p className="mt-3 flex items-start gap-2 text-[13px] leading-snug">
+            <TriangleAlert className="mt-px size-4 shrink-0 text-warning" strokeWidth={1.5} aria-hidden="true" />
+            <span>
+              Inside {device.appName} this can&apos;t be added. Tap <b>···</b> and choose <b>Open in {browserName}</b> first.
+            </span>
+          </p>
+        )}
+
+        {canPrompt && !device.inApp ? (
+          <div className="mt-4 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                if (await install()) onClose();
+              }}
+              className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-full bg-primary text-[14px] font-medium text-primary-foreground transition-[background-color,transform] duration-150 hover:bg-primary/90 active:scale-[0.97]"
+            >
+              <Download className="size-4" strokeWidth={1.5} aria-hidden="true" />
+              Install
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-10 rounded-full px-4 text-[14px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Not now
+            </button>
+          </div>
+        ) : (
+          <>
+            <ol className="mt-3 divide-y divide-border border-y border-border">
+              {stepsFor(device).map((st, i) => (
+                <li key={i} className="flex min-h-10 items-center gap-3 py-2 text-[13px] leading-snug">
+                  <span className="w-3 shrink-0 text-center text-[12px] font-medium tabular-nums text-primary">{i + 1}</span>
+                  <span className="min-w-0 flex-1">{st.text}</span>
+                  {st.icon && <st.icon className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />}
+                </li>
+              ))}
+            </ol>
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-9 rounded-full px-3 text-[13px] font-medium text-primary transition-colors hover:bg-primary/10"
+              >
+                Got it
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
