@@ -8,7 +8,7 @@ import { ArrowUpRight, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Logo } from "@/components/brand/logo";
 import { SocialLinks } from "@/components/public/social-links";
-import { Magnetic, EASE } from "@/components/site/motion";
+import { EASE } from "@/components/site/motion";
 import { ORA_CONTACT } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -97,7 +97,7 @@ export function SiteHeader({ user }: { user?: { name?: string | null; role?: str
               type="button"
               onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
               aria-label={mounted && resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              className="grid size-10 place-items-center rounded-full border border-white/15 text-white/80 transition-colors hover:border-white/40 hover:text-white"
+              className="grid size-9 place-items-center text-white/70 transition-colors hover:text-white"
             >
               {mounted && resolvedTheme === "dark" ? <Sun className="size-4" strokeWidth={1.5} /> : <Moon className="size-4" strokeWidth={1.5} />}
             </button>
@@ -110,20 +110,20 @@ export function SiteHeader({ user }: { user?: { name?: string | null; role?: str
                 Sign in
               </Link>
             )}
-            <Magnetic className="hidden sm:inline-block">
-              <Link
-                href="/impact"
-                className="inline-flex h-10 items-center gap-2 rounded-[2px] bg-[rgb(var(--s-pink))] px-5 text-[13px] font-semibold text-white shadow-[0_8px_30px_-8px_rgb(255_63_168/0.7)] transition-transform active:scale-[0.97]"
-              >
+            {/* plain words, no box (owner, 2026-11-09): pink, with an arrow that lifts and a line that draws on hover */}
+            <Link href="/impact" data-cursor="Join" className="group hidden items-center gap-1.5 text-[13px] font-semibold text-[rgb(var(--s-pink))] sm:inline-flex">
+              <span className="relative">
                 Join the movement
-              </Link>
-            </Magnetic>
+                <span className="absolute -bottom-1 left-0 h-px w-full origin-right scale-x-0 bg-current transition-transform duration-300 group-hover:origin-left group-hover:scale-x-100" />
+              </span>
+              <ArrowUpRight className="size-3.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" strokeWidth={2} />
+            </Link>
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}
               aria-expanded={open}
               aria-label={open ? "Close menu" : "Open menu"}
-              className="flex h-10 items-center gap-2.5 rounded-full border border-white/15 pl-4 pr-3 text-[12px] font-medium uppercase tracking-[0.18em] text-white lg:hidden"
+              className="flex h-10 items-center gap-2.5 text-[12px] font-medium uppercase tracking-[0.18em] text-white lg:hidden"
             >
               {open ? "Close" : "Menu"}
               <span className="relative block h-2.5 w-4">
