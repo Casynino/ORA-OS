@@ -174,7 +174,7 @@ function stepsFor(d: Device): StepDef[] {
 
 /**
  * A small card at the foot of the screen, close to the browser's own Share/menu button — not a big dialog. It matches
- * the scene behind it (dark plum glass, white text, hairlines), like the Hao Labs one the owner held up (2026-11-09):
+ * the scene behind it (dark plum glass, white text, hairlines), like the ZELab one the owner held up (2026-11-09):
  * a one-line title, three short steps, a cross to close; on an iPhone in Safari a small "Share ↓" points at the
  * Share button in the bottom bar. On Android with Chrome's own install offer it is one button. Escape closes it.
  */

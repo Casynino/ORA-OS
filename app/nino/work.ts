@@ -1,7 +1,7 @@
 /**
  * Nino's work, as shown on /nino (the same page as on the Vegas Luxury Hotel website). Every line comes from the project's own live site (its title and
- * description), its README, or from Nino — nothing invented. This is the newest list (the one on the Super Drive Oil, Hao Labs and Vegas pages): keep them in
- * step. Screenshots in /public/nino are the live pages as they look now, retaken 2026-11-09 (ORA Pads, Hao Labs and Super Drive Oil show their sign-in pages;
+ * description), its README, or from Nino — nothing invented. This is the newest list (the one on the Super Drive Oil, ZELab and Vegas pages): keep them in
+ * step. Screenshots in /public/nino are the live pages as they look now, retaken 2026-11-09 (ORA Pads, ZELab and Super Drive Oil show their sign-in pages;
  * BlueWave Cargo its new sign-in scene); Reckless Lab keeps its home-page shot because its live page opens on an intro card.
  */
 
@@ -85,9 +85,9 @@ export const LIVE: Project[] = [
     tags: ["Company site"],
   },
   {
-    name: "Hao Labs", kind: "Stock, settlement & commission system",
-    line: "Every box that leaves the Lab is on the system — who took it, what came back, what is still owed, and what each rep has earned. We keep Tanzania stocked.",
-    url: "https://hao-stock.vercel.app", domain: "hao-stock.vercel.app", shot: "/nino/haolabs.webp",
+    name: "ZELab", kind: "Stock, settlement & commission system",
+    line: "Every box that leaves ZELab is on the system — who took it, what came back, what is still owed, and what each rep has earned. We keep Tanzania stocked.",
+    url: "https://www.zelab.site", domain: "zelab.site", shot: "/nino/haolabs.webp",
     tags: ["Stock control", "Settlements", "Commission", "Reports"], code: `${GH}/The-Lab`,
   },
   {

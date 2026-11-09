@@ -40,7 +40,7 @@ const ext = { target: "_blank", rel: "noopener noreferrer" } as const;
  * DEVELOPED BY NINO (owner, 2026-10-05: "a small button down the website… click it and find a full page with all my
  * projects"; 2026-11-09: the same on ORA's sign-in page, and only there). Copied from the Vegas Luxury Hotel website. Dark,
  * editorial, the work first: every live project with a screenshot of its real home page, then what's coming and the code,
- * what I do, what I build with, and how to reach me. Owner, 2026-11-09 (as done on the Lab OS): the inside should carry
+ * what I do, what I build with, and how to reach me. Owner, 2026-11-09 (as done on the ZELab OS): the inside should carry
  * the system's own colours, so the accent is ORA's pink → purple and the ground ORA's plum-black, in ORA's Poppins.
  */
 export default function NinoPage() {
