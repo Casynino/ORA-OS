@@ -61,7 +61,11 @@ export function ImpactPulse({
   );
 }
 
-/** "Latest ORA activities" — an alive, softly-rotating stack of real work. */
+/**
+ * "Latest ORA activities" — a softly-rotating list of real work, one hairline row per activity. No cards or icon
+ * tiles: the line, then where, what kind and when in muted text. Rows stay one line each so the list never changes
+ * height while it rotates.
+ */
 export function ImpactActivityFeed({
   initial,
   className,
@@ -81,7 +85,7 @@ export function ImpactActivityFeed({
 
   if (pool.length === 0) {
     return (
-      <p className={cn("rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground", className)}>
+      <p className={cn("border-y border-border py-6 text-[15px] text-muted-foreground", className)}>
         Our next community activities will appear here — the movement never stops.
       </p>
     );
@@ -93,39 +97,44 @@ export function ImpactActivityFeed({
   );
 
   return (
-    <div className={cn("space-y-2.5", className)}>
+    <ul className={cn("relative border-t border-border", className)}>
       <AnimatePresence mode="popLayout" initial={false}>
         {visible.map((a) => {
           const meta = activityMeta(a.type);
           return (
-            <motion.div
+            <motion.li
               key={a.id}
               layout
-              initial={{ opacity: 0, y: -14, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 14, scale: 0.98 }}
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card/60 p-3.5 backdrop-blur"
+              className="flex items-start gap-3 border-b border-border bg-background py-4"
             >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-glow">
-                <meta.icon className="size-4.5" />
-              </span>
+              <MapPin className="mt-0.5 size-4 shrink-0 text-primary" strokeWidth={1.5} aria-hidden="true" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{impactLine(a)}</p>
-                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <MapPin className="size-3" />
-                    {a.location}
-                    {a.region ? `, ${a.region}` : ""}
+                {/* two fixed lines on phones, one on wider screens, so rotating rows never change the list height */}
+                <p className="line-clamp-2 min-h-[2lh] text-[15px] font-medium leading-snug sm:line-clamp-1 sm:min-h-0">
+                  {impactLine(a)}
+                </p>
+                <p className="mt-1 line-clamp-1 text-[13px] text-muted-foreground">
+                  {a.location}
+                  {a.region ? `, ${a.region}` : ""}
+                  <span aria-hidden="true"> · </span>
+                  {meta.label}
+                  <span className="sm:hidden">
+                    <span aria-hidden="true"> · </span>
+                    {timeAgo(new Date(a.at))}
                   </span>
-                  <span>· {meta.label}</span>
-                  <span>· {timeAgo(new Date(a.at))}</span>
                 </p>
               </div>
-            </motion.div>
+              <span className="hidden shrink-0 pt-0.5 text-[13px] tabular-nums text-muted-foreground sm:block">
+                {timeAgo(new Date(a.at))}
+              </span>
+            </motion.li>
           );
         })}
       </AnimatePresence>
-    </div>
+    </ul>
   );
 }

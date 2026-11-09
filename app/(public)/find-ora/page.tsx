@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Store, MapPin, Handshake, Map } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { CoverageMap, type StockistDTO } from "@/components/public/coverage-map";
+import { ArchPhoto } from "@/components/public/arch-photo";
 import { Reveal } from "@/components/ui/reveal";
 import { CountUp } from "@/components/ui/count-up";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Find ORA",
@@ -16,6 +14,11 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+/*
+ * Find ORA (unslop pass, 2026-11-09): the map is the hero — heading, live figures and the search sit beside it on large
+ * screens and above it on phones. Every outlet follows as a hairline directory. The page ends on one flat plum block
+ * with the ORA arch framing packs on a school-event table.
+ */
 export default async function FindOraPage() {
   const [stockists, partners] = await Promise.all([
     prisma.stockist.findMany({
@@ -35,84 +38,75 @@ export default async function FindOraPage() {
   ).size;
 
   const stats = [
-    { label: "Regions covered", value: regions, icon: Map },
-    { label: "Districts reached", value: districts, icon: MapPin },
-    { label: "Active stockists", value: stockists.length, icon: Store },
-    { label: "Distribution partners", value: partners, icon: Handshake },
+    { label: "Regions covered", value: regions },
+    { label: "Districts reached", value: districts },
+    { label: "Active stockists", value: stockists.length },
+    { label: "Distribution partners", value: partners },
   ];
 
+  const intro = (
+    <>
+      <p className="ora-rise text-sm font-medium text-primary">Availability & coverage</p>
+      <h1 className="ora-rise ora-rise-1 mt-4 text-balance font-display text-4xl font-semibold leading-[1.05] tracking-[-0.025em] sm:text-5xl lg:text-6xl">
+        ORA is <span className="text-primary">near you</span>
+      </h1>
+      <p className="ora-rise ora-rise-2 mt-6 max-w-xl text-[17px] leading-relaxed text-muted-foreground">
+        From pharmacies to supermarkets to community points — our network keeps growing across Tanzania. Explore it
+        live.
+      </p>
+
+      {/* Live stats */}
+      <dl className="ora-rise ora-rise-3 mt-10 grid max-w-xl grid-cols-2 gap-x-8 gap-y-6 border-t border-border pt-7 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+        {stats.map((s) => (
+          <div key={s.label} className="flex flex-col-reverse justify-end">
+            <dt className="mt-1.5 text-[13px] leading-snug text-muted-foreground">{s.label}</dt>
+            <dd className="font-display text-3xl font-semibold tabular-nums tracking-[-0.02em]">
+              <CountUp value={s.value} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </>
+  );
+
   return (
-    <div className="relative overflow-hidden">
-      {/* Hero */}
-      <section className="relative pt-16 sm:pt-24">
-        <span className="pointer-events-none absolute left-1/2 top-0 -z-10 size-[40rem] -translate-x-1/2 -translate-y-1/3 rounded-full bg-primary/10 blur-3xl" />
-        <Reveal className="container text-center">
-          <div className="mx-auto flex items-center justify-center gap-2 text-primary">
-            <span className="h-px w-8 bg-primary/50" />
-            <span className="text-xs font-semibold uppercase tracking-[0.2em]">
-              Availability & coverage
-            </span>
-            <span className="h-px w-8 bg-primary/50" />
-          </div>
-          <h1 className="mx-auto mt-4 max-w-2xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
-            ORA is <span className="text-gradient">near you</span>
-          </h1>
-          <p className="mx-auto mt-4 max-w-xl text-muted-foreground sm:text-lg">
-            From pharmacies to supermarkets to community points — our network keeps
-            growing across Tanzania. Explore it live.
-          </p>
-        </Reveal>
-
-        {/* Live stats */}
-        <Reveal delay={0.1} className="container mt-10">
-          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-x-10 gap-y-6 sm:gap-x-14">
-            {stats.map((s) => (
-              <div key={s.label} className="text-center">
-                <div className="text-gradient font-display text-3xl font-extrabold tracking-tight tabular-nums sm:text-4xl">
-                  <CountUp value={s.value} />
-                </div>
-                <div className="mt-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  {s.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Reveal>
+    <>
+      {/* Hero + map experience + outlet directory */}
+      <section className="container pb-20 pt-16 sm:pb-28 sm:pt-20">
+        <CoverageMap stockists={stockists as StockistDTO[]} intro={intro} />
       </section>
 
-      {/* Map experience */}
-      <section className="container py-12 sm:py-16">
+      {/* Become a stockist */}
+      <section className="container pb-20 sm:pb-28">
         <Reveal>
-          <CoverageMap stockists={stockists as StockistDTO[]} />
-        </Reveal>
-      </section>
-
-      {/* Become a stockist CTA */}
-      <section className="container pb-24">
-        <Reveal className="mx-auto max-w-4xl">
-          <div className="glow-hover relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary via-primary/85 to-accent p-9 text-center sm:p-12">
-            <span className="pointer-events-none absolute -right-12 -top-12 size-48 rounded-full bg-white/20 blur-3xl" />
-            <span className="pointer-events-none absolute -bottom-12 -left-12 size-48 rounded-full bg-white/10 blur-3xl" />
-            <h2 className="relative font-display text-2xl font-extrabold tracking-tight text-white sm:text-4xl">
-              Want ORA on your shelves?
-            </h2>
-            <p className="relative mx-auto mt-3 max-w-md text-white/85">
-              Pharmacies, shops, schools and NGOs across Tanzania partner with ORA
-              every month. Join the network.
-            </p>
-            <Link
-              href="/request-access"
-              className={cn(
-                buttonVariants({ size: "lg" }),
-                "relative mt-6 h-12 rounded-full bg-white px-8 text-base text-primary hover:bg-white/90",
-              )}
-            >
-              Become a stockist
-              <ArrowRight className="size-4" />
-            </Link>
+          <div className="grid grid-cols-1 overflow-hidden rounded-2xl bg-[#2a0845] text-white sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
+            <div className="self-center p-8 sm:p-12 lg:p-16">
+              <h2 className="text-balance font-display text-3xl font-semibold tracking-[-0.025em] sm:text-4xl">
+                Want ORA on your shelves?
+              </h2>
+              <p className="mt-4 max-w-md text-[17px] leading-relaxed text-white/75">
+                Pharmacies, shops, schools and NGOs across Tanzania partner with ORA every month. Join the network.
+              </p>
+              <Link
+                href="/request-access"
+                className="mt-8 inline-flex h-12 items-center rounded-full bg-white px-6 text-[15px] font-medium text-[#2a0845] transition-[background-color,transform] duration-150 hover:bg-white/90 active:scale-[0.97]"
+              >
+                Become a stockist
+              </Link>
+            </div>
+            <div className="flex items-end justify-center px-8 sm:justify-start sm:px-0 sm:pr-12 sm:pt-12 lg:pr-16">
+              <ArchPhoto
+                src="/ora/gallery/g2.jpg"
+                alt="A student at an ORA school event beside packs of ORA pads stacked on a table"
+                sizes="(max-width: 640px) 240px, 300px"
+                position="40% 50%"
+                outline
+                className="-mb-4 w-full max-w-[240px] sm:max-w-[300px]"
+              />
+            </div>
           </div>
         </Reveal>
       </section>
-    </div>
+    </>
   );
 }

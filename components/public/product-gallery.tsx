@@ -7,22 +7,15 @@ import { cn } from "@/lib/utils";
 export function ProductGallery({
   images,
   name,
-  accent,
 }: {
   images: string[];
   name: string;
-  accent: string;
 }) {
   const [active, setActive] = useState(0);
 
   return (
     <div>
-      <div
-        className="relative aspect-[4/5] overflow-hidden rounded-3xl ring-1 ring-border"
-        style={{
-          background: `radial-gradient(circle at 50% 30%, ${accent}1f, transparent 70%)`,
-        }}
-      >
+      <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-muted">
         <Image
           src={images[active]}
           alt={name}
@@ -33,18 +26,17 @@ export function ProductGallery({
         />
       </div>
       {images.length > 1 && (
-        <div className="mt-4 flex gap-3">
+        <div className="mt-3 flex gap-3">
           {images.map((src, i) => (
             <button
               key={src}
               type="button"
               onClick={() => setActive(i)}
               aria-label={`View image ${i + 1}`}
+              aria-pressed={i === active}
               className={cn(
-                "relative size-20 overflow-hidden rounded-xl ring-2 transition",
-                i === active
-                  ? "ring-primary"
-                  : "opacity-70 ring-transparent hover:opacity-100",
+                "relative size-16 overflow-hidden rounded-xl bg-muted outline-none ring-offset-2 ring-offset-background transition-[opacity,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-ring sm:size-20",
+                i === active ? "ring-2 ring-primary" : "opacity-60 hover:opacity-100",
               )}
             >
               <Image src={src} alt="" fill sizes="80px" className="object-cover" />

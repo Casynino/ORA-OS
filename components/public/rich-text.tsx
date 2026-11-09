@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
 
 /**
  * Renders a news post body written in "light markdown" — safe by construction
@@ -26,6 +25,8 @@ const ONLY_LINK = /^\[([^\]]+)\]\(([^)\s]+)\)$/;
 const HASHTAG = /^#[A-Za-z0-9_]+$/;
 const IMAGE = /^!\[([^\]]*)\]\(((?:\/(?!\/)|https:\/\/)[^)\s"]+)(?:\s+"(\d{2,5})x(\d{2,5})")?\)$/;
 const STAT = /^\+\+\s*(.+?)\s*\|\s*(.+)$/;
+const BUTTON =
+  "inline-flex h-12 items-center gap-2 rounded-full bg-primary px-6 text-[15px] font-medium text-primary-foreground transition-[background-color,transform] duration-150 hover:bg-primary/90 active:scale-[0.97]";
 
 function isExternal(href: string) {
   return /^https?:\/\//i.test(href);
@@ -102,8 +103,8 @@ export function RichText({ body }: { body: string }) {
           if (list.length === 1) {
             const p = list[0];
             return (
-              <figure key={i} className="my-10 lg:-mx-14">
-                <div className="overflow-hidden rounded-2xl shadow-soft ring-1 ring-border">
+              <figure key={i} className="py-4 lg:-mx-14">
+                <div className="overflow-hidden rounded-2xl bg-muted">
                   <Image
                     src={p.src}
                     alt={p.alt}
@@ -114,7 +115,7 @@ export function RichText({ body }: { body: string }) {
                   />
                 </div>
                 {p.alt && (
-                  <figcaption className="mt-3 px-2 text-center text-sm italic leading-snug text-muted-foreground">
+                  <figcaption className="mt-3 text-sm leading-snug text-muted-foreground">
                     {p.alt}
                   </figcaption>
                 )}
@@ -124,11 +125,11 @@ export function RichText({ body }: { body: string }) {
           return (
             <div
               key={i}
-              className={`my-10 grid gap-3 sm:gap-4 lg:-mx-14 ${list.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+              className={`grid grid-cols-1 gap-3 py-4 sm:gap-4 lg:-mx-14 ${list.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
             >
               {list.map((p, j) => (
                 <figure key={j}>
-                  <div className="relative aspect-[4/3] overflow-hidden rounded-xl shadow-soft ring-1 ring-border">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-muted">
                     <Image
                       src={p.src}
                       alt={p.alt}
@@ -138,7 +139,7 @@ export function RichText({ body }: { body: string }) {
                     />
                   </div>
                   {p.alt && (
-                    <figcaption className="mt-2 px-1 text-xs italic leading-snug text-muted-foreground sm:text-[13px]">
+                    <figcaption className="mt-2 text-[13px] leading-snug text-muted-foreground">
                       {p.alt}
                     </figcaption>
                   )}
@@ -151,49 +152,48 @@ export function RichText({ body }: { body: string }) {
         // ── Pull-quote ─────────────────────────────────────────────────────
         if (lines.every((l) => l.startsWith("> "))) {
           return (
-            <blockquote
-              key={i}
-              className="relative my-10 overflow-hidden rounded-3xl bg-gradient-to-br from-primary/10 via-accent/10 to-primary/5 px-6 py-10 text-center ring-1 ring-primary/15 sm:px-12 lg:-mx-14"
-            >
-              <span aria-hidden className="absolute left-5 top-1 font-display text-8xl leading-none text-primary/20">
-                &ldquo;
-              </span>
-              <p className="relative text-balance font-display text-2xl font-bold leading-snug tracking-tight text-foreground sm:text-3xl">
-                {lines.map((l) => l.slice(2)).join(" ")}
-              </p>
-            </blockquote>
+            <div key={i} className="py-6">
+              <blockquote className="border-l-2 border-primary py-1 pl-6 sm:pl-8">
+                <p className="text-balance font-display text-2xl font-semibold leading-snug tracking-[-0.02em] text-foreground sm:text-3xl">
+                  {lines.map((l) => l.slice(2)).join(" ")}
+                </p>
+              </blockquote>
+            </div>
           );
         }
 
         // ── Highlight numbers ──────────────────────────────────────────────
         if (lines.every((l) => STAT.test(l))) {
           return (
-            <div
-              key={i}
-              className={`my-10 grid gap-3 sm:gap-4 lg:-mx-14 ${lines.length >= 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
-            >
-              {lines.map((l) => {
-                const m = l.match(STAT)!;
-                return (
-                  <div key={l} className="rounded-2xl border border-border bg-card p-6 text-center shadow-soft">
-                    <p className="font-display text-4xl font-extrabold tracking-tight text-gradient">{m[1]}</p>
-                    <p className="mt-2 text-sm leading-snug text-muted-foreground">{m[2]}</p>
-                  </div>
-                );
-              })}
+            <div key={i} className="py-4 lg:-mx-14">
+              <div
+                className={`grid grid-cols-1 divide-y divide-border border-y border-border sm:divide-x sm:divide-y-0 ${lines.length >= 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+              >
+                {lines.map((l) => {
+                  const m = l.match(STAT)!;
+                  return (
+                    <div key={l} className="py-6 sm:px-6 sm:first:pl-0">
+                      <p className="text-balance font-display text-3xl font-semibold leading-tight tracking-[-0.025em] text-primary tabular-nums">
+                        {m[1]}
+                      </p>
+                      <p className="mt-2 text-[15px] leading-snug text-muted-foreground">{m[2]}</p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           );
         }
 
         if (block.startsWith("### ") && lines.length === 1)
           return (
-            <h3 key={i} className="pt-2 font-display text-lg font-semibold tracking-tight text-foreground">
+            <h3 key={i} className="pt-2 font-display text-xl font-semibold tracking-[-0.015em] text-foreground">
               {block.slice(4)}
             </h3>
           );
         if (block.startsWith("## ") && lines.length === 1)
           return (
-            <h2 key={i} className="pt-6 font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            <h2 key={i} className="text-balance pt-6 font-display text-2xl font-semibold leading-tight tracking-[-0.025em] text-foreground sm:text-3xl">
               {block.slice(3)}
             </h2>
           );
@@ -203,7 +203,7 @@ export function RichText({ body }: { body: string }) {
             <ul key={i} className="space-y-3">
               {lines.map((l, j) => (
                 <li key={j} className="flex gap-3">
-                  <span className="mt-2.5 size-1.5 shrink-0 rounded-full bg-accent" />
+                  <span aria-hidden="true" className="mt-3 size-1.5 shrink-0 rounded-full bg-primary" />
                   <span>
                     <Inline text={l.slice(2)} />
                   </span>
@@ -222,13 +222,15 @@ export function RichText({ body }: { body: string }) {
                   href={only[2]}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={buttonVariants({ variant: "accent", size: "lg" })}
+                  className={`group ${BUTTON}`}
                 >
-                  {only[1]} <ArrowRight className="size-4" />
+                  {only[1]}
+                  <ArrowRight className="size-4 transition-transform duration-150 group-hover:translate-x-0.5" strokeWidth={1.5} aria-hidden="true" />
                 </a>
               ) : (
-                <Link href={only[2]} className={buttonVariants({ variant: "accent", size: "lg" })}>
-                  {only[1]} <ArrowRight className="size-4" />
+                <Link href={only[2]} className={`group ${BUTTON}`}>
+                  {only[1]}
+                  <ArrowRight className="size-4 transition-transform duration-150 group-hover:translate-x-0.5" strokeWidth={1.5} aria-hidden="true" />
                 </Link>
               )}
             </div>
