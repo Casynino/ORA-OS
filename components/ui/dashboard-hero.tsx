@@ -102,7 +102,8 @@ export function DashboardHero({
             <span aria-hidden className="hidden h-px w-10 shrink-0 bg-[#ff7fd0]/60 sm:block" />
           </h1>
           <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.32em] text-[#ff7fd0] sm:mt-2 sm:text-[11px]">{role}</p>
-          <p className="mt-1 text-xs text-white/65 sm:mt-1.5 sm:text-sm">{today()}</p>
+          {/* The phone and tablet's top bar already shows today's date, so the banner shows it on a computer only. */}
+          <p className="mt-1.5 hidden text-sm text-white/65 lg:block">{today()}</p>
         </div>
       </section>
 

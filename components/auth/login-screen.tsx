@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Smartphone, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUpRight, Smartphone, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { LoginForm } from "@/components/auth/login-form";
 import { InstallButton } from "@/components/app/install-app";
@@ -111,6 +111,18 @@ export function LoginScreen({
           {formatNumber(pads)}+ pads delivered · {formatNumber(communities)} communities reached
         </p>
         <p className="mt-1 text-[11px] text-white/40 [@media(max-height:480px)]:hidden">© {new Date().getFullYear()} ORA-Pads · Period dignity for all</p>
+
+        {/* Who made the system — one quiet line to Nino's page and work (only here, on the sign-in page). */}
+        <Link
+          href="/nino"
+          className="group mt-1 inline-flex min-h-10 items-center gap-1 rounded-sm text-xs text-white/55 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+        >
+          Developed by <span className="font-semibold text-white/80 transition-colors group-hover:text-[#c6f432]">Nino</span>
+          <ArrowUpRight
+            className="size-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none"
+            aria-hidden="true"
+          />
+        </Link>
       </div>
 
       {open && (
