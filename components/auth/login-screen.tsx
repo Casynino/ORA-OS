@@ -112,18 +112,23 @@ export function LoginScreen({
         </p>
         <p className="mt-1 text-[11px] text-white/40 [@media(max-height:480px)]:hidden">© {new Date().getFullYear()} ORA-Pads · Period dignity for all</p>
 
-        {/* Who made the system — one quiet line to Nino's page and work (only here, on the sign-in page). Plain text, no
-            pill or badge around it (owner, 2026-11-09: "clean, like before"); Nino turns ORA pink on hover. */}
-        <Link
-          href="/nino"
-          className="group mt-1 inline-flex min-h-10 items-center gap-1 rounded-sm text-xs text-white/55 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-        >
-          Developed by <span className="font-semibold text-white/80 transition-colors group-hover:text-primary">Nino</span>
-          <ArrowUpRight
-            className="size-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none"
-            aria-hidden="true"
-          />
-        </Link>
+        {/* Who made the system — one quiet line to Nino's page and work (only here, on the sign-in page): the system's name
+            and "by Nino", worded like the other systems' sign-in pages ("The Distribution Chain by Nino", "Sales Inventory
+            System by Nino", "Sea Freight System by Nino"), plain text with no pill or badge around it (owner, 2026-11-09). */}
+        <p className="mt-1 flex flex-wrap items-center justify-center gap-x-1.5 text-xs text-white/55">
+          <span>Pad Distribution System</span>
+          <Link
+            href="/nino"
+            aria-label="Pad Distribution System by Nino: see his work"
+            className="group inline-flex min-h-10 items-center gap-1 rounded-sm transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          >
+            by <span className="font-semibold text-white/80 transition-colors group-hover:text-primary">Nino</span>
+            <ArrowUpRight
+              className="size-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+          </Link>
+        </p>
       </div>
 
       {/* A phone that has not installed ORA is offered the full-screen app once, right here on arrival
