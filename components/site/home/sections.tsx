@@ -447,12 +447,30 @@ export function OnTheGrid() {
 
 /* ── Closing: the promise over a faint giant ORA ── */
 export function Closing() {
+  const ref = useRef<HTMLElement>(null);
+  const reduce = useReducedMotion();
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const y = useTransform(scrollYProgress, [0, 1], ["-10%", "10%"]);
   return (
-    <section className="relative overflow-hidden border-y border-white/10 bg-[rgb(18_18_20)] py-28 md:py-40">
-      <div className={`${WRAP} relative z-10 text-center`}>
-        <Eyebrow>[ Join the movement ]</Eyebrow>
+    // every girl: a schoolyard of girls at an ORA school day behind the closing line, drifting with the scroll and easing
+    // back from a slow zoom as it comes into view (owner, 2026-11-09: "this place needs a picture behind, not just words")
+    <section ref={ref} className="s-on-photo relative isolate overflow-hidden bg-[rgb(10_10_11)] py-32 md:py-48">
+      <motion.div aria-hidden className="absolute inset-x-0 -inset-y-[12%] -z-10" style={{ y: reduce ? 0 : y }}>
+        <motion.div
+          className="absolute inset-0"
+          initial={reduce ? false : { scale: 1.16 }}
+          whileInView={{ scale: 1 }}
+          viewport={{ once: true, margin: "-10% 0px" }}
+          transition={{ duration: 2.4, ease: EASE }}
+        >
+          <Image src="/ora/site/wide-GTM00145.jpg" alt="" fill sizes="100vw" className="object-cover object-[50%_45%]" />
+        </motion.div>
+      </motion.div>
+      <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_75%_65%_at_50%_50%,rgb(10_10_11/0.84)_0%,rgb(10_10_11/0.62)_62%,rgb(10_10_11/0.74)_100%)]" />
+      <div className={`${WRAP} relative text-center`}>
+        <Eyebrow className="text-white/80">[ Join the movement ]</Eyebrow>
         <SplitText text="Put a pad in every girl's hand." accent={["hand"]} className={`mx-auto mt-6 max-w-5xl ${LG}`} />
-        <p className="mx-auto mt-6 max-w-md text-white/60">Bring ORA to your school or community — agents, distributors, NGOs and schools all welcome.</p>
+        <p className="mx-auto mt-6 max-w-md text-white/80">Bring ORA to your school or community — agents, distributors, NGOs and schools all welcome.</p>
         <div className="mt-10 flex flex-wrap justify-center gap-4">
           <Magnetic strength={0.4}>
             <Link href="/impact" data-cursor="Join" className="s-btn s-btn--pink">Join the movement</Link>
@@ -460,9 +478,6 @@ export function Closing() {
           <Link href="/contact" className="s-btn s-btn--line">Talk to the team</Link>
         </div>
       </div>
-      <span aria-hidden className="pointer-events-none absolute -bottom-[0.18em] left-1/2 -translate-x-1/2 select-none font-site-display text-[34vw] font-bold leading-none tracking-[-0.05em] text-[rgb(26_26_29)]">
-        ORA
-      </span>
     </section>
   );
 }
