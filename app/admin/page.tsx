@@ -104,7 +104,7 @@ export default async function AdminCommandCenter() {
       {/* ── 1 · Welcome banner (no numbers — they live in Business health) ── */}
       <DashboardHero
         name={firstName}
-        role="CEO"
+        role="Director (MD)"
         picture="pink"
       />
 
