@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import { listPublicPosts } from "@/lib/services/news";
-import { Magnetic, Marquee, Parallax, Rise, SectionLabel } from "@/components/site/motion";
+import { Magnetic, Parallax, Rise, SectionLabel } from "@/components/site/motion";
 import { PageHero, SectionHead, btnGhost, btnPrimary } from "@/components/site/page-hero";
 import { ArrowCircle, ClosingBand, MONO, PINK, pad } from "@/components/site/pages/education-news/parts";
 import { StoryIndex } from "@/components/site/pages/education-news/story-index";
@@ -45,14 +45,6 @@ export default async function NewsPage() {
         intro="Stories, milestones and updates from ORA outreach across Tanzania."
       />
 
-      {/* ── The band of words ── */}
-      <div className="relative border-y border-white/[0.08] bg-[rgb(var(--s-pink))] py-4 text-white sm:py-5">
-        <Marquee
-          duration={30}
-          itemClassName="font-site-display text-[clamp(1.1rem,2.4vw,1.8rem)] font-semibold uppercase tracking-[-0.01em] [&>span]:bg-white"
-          items={["Stories", "Milestones", "Updates", "ORA outreach across Tanzania"]}
-        />
-      </div>
 
       {posts.length === 0 ? (
         <section className="relative py-24 sm:py-32">

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { AnimatePresence, motion, useMotionValue, useSpring, useScroll, useTransform, useReducedMotion } from "framer-motion";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
-import { Atmosphere, Magnetic, Marquee, Parallax, Rise, ScrollWords, SectionLabel, SplitText, EASE } from "@/components/site/motion";
+import { Atmosphere, Magnetic, Parallax, Rise, ScrollWords, SectionLabel, SplitText, EASE } from "@/components/site/motion";
 import { CountUp } from "@/components/ui/count-up";
 
 const H2 = "font-site-display font-semibold uppercase leading-[0.95] tracking-[-0.03em] [&_.font-site-serif]:normal-case [&_.font-site-serif]:text-[1.1em]";
@@ -151,36 +151,73 @@ export function Numbers({ stats }: { stats: { label: string; value: number; note
   );
 }
 
-/* ── 05 Two rows of real moments in ORA arches, moving opposite ways ── */
-const PHOTOS_A = ["/ora/event/e40.jpg", "/ora/event/e28.jpg", "/ora/event/e06.jpg", "/ora/event/e08.jpg", "/ora/event/e09.jpg", "/ora/event/e17.jpg", "/ora/event/e30.jpg", "/ora/event/e32.jpg"];
-const PHOTOS_B = ["/ora/event/e02.jpg", "/ora/event/e21.jpg", "/ora/event/e27.jpg", "/ora/event/e16.jpg", "/ora/event/e03.jpg", "/ora/event/e39.jpg", "/ora/event/e11.jpg", "/ora/event/e29.jpg"];
-function Arch({ src, wide }: { src: string; wide?: boolean }) {
+/* ── 05 From the studio to the schoolyard: a curated editorial mosaic (owner, 2026-11-09: the two rows of arches
+   looked like one event repeated — show the campaign, the studio and different school days, displayed beautifully).
+   Each photo opens with a curtain as it comes into view and settles from a slow zoom; hover lifts the caption. ── */
+const MOSAIC: { src: string; alt: string; tag: string; place: string; cls: string; sizes: string }[] = [
+  { src: "/ora/site/g-campaign-fresh.jpg", alt: "ORA campaign: a model holding ORA pads — stay fresh, stay confident", tag: "Campaign", place: "Stay fresh, stay confident", cls: "col-span-2 row-span-4 lg:col-span-5 lg:row-span-6", sizes: "(max-width:1024px) 100vw, 42vw" },
+  { src: "/ora/site/wide-GTM00015.jpg", alt: "Girls laughing together at an ORA school day", tag: "School day", place: "Jangwani", cls: "col-span-2 row-span-2 lg:col-span-7 lg:row-span-3", sizes: "(max-width:1024px) 100vw, 58vw" },
+  { src: "/ora/site/g-juhudi-table.jpg", alt: "ORA pads stacked on the table at International Girls' Day", tag: "Girls' Day 2026", place: "Juhudi Jeshini", cls: "col-span-1 row-span-2 lg:col-span-4 lg:row-span-3", sizes: "(max-width:1024px) 50vw, 33vw" },
+  { src: "/ora/site/shot-day.jpg", alt: "ORA day pads, 290 mm, studio photograph", tag: "Studio", place: "290 mm · day", cls: "col-span-1 row-span-2 lg:col-span-3 lg:row-span-3", sizes: "(max-width:1024px) 50vw, 25vw" },
+  { src: "/ora/site/wide-FLP00062.jpg", alt: "The ORA team cheering beside stacks of pads", tag: "School visit", place: "Zanaki", cls: "col-span-2 row-span-2 lg:col-span-7 lg:row-span-4", sizes: "(max-width:1024px) 100vw, 58vw" },
+  { src: "/ora/site/g-campaign-cloud.jpg", alt: "ORA campaign: two friends holding ORA packs — soft as a cloud", tag: "Campaign", place: "Soft as a cloud", cls: "col-span-1 row-span-3 lg:col-span-5 lg:row-span-6", sizes: "(max-width:1024px) 50vw, 42vw" },
+  { src: "/ora/site/g-zanaki-stage.jpg", alt: "A student speaking on the ORA stage", tag: "On stage", place: "Zanaki", cls: "col-span-1 row-span-3 lg:col-span-4 lg:row-span-4", sizes: "(max-width:1024px) 50vw, 33vw" },
+  { src: "/ora/site/shot-night.jpg", alt: "ORA night pads, 360 mm, studio photograph", tag: "Studio", place: "360 mm · night", cls: "col-span-1 row-span-2 lg:col-span-3 lg:row-span-4", sizes: "(max-width:1024px) 50vw, 25vw" },
+  { src: "/ora/site/g-juhudi-class.jpg", alt: "Girls listening during an ORA education session", tag: "Education", place: "Juhudi Jeshini", cls: "col-span-1 row-span-2 lg:col-span-5 lg:row-span-3", sizes: "(max-width:1024px) 50vw, 42vw" },
+  { src: "/ora/site/g-campaign-mood.jpg", alt: "ORA campaign: for every mood, for every moment", tag: "Campaign", place: "For every mood", cls: "col-span-2 row-span-3 lg:col-span-4 lg:row-span-3", sizes: "(max-width:1024px) 100vw, 33vw" },
+];
+function MosaicTile({ m, i }: { m: (typeof MOSAIC)[number]; i: number }) {
+  const reduce = useReducedMotion();
   return (
-    <div className={`s-arch relative mr-4 shrink-0 bg-white/5 sm:mr-6 ${wide ? "h-[300px] w-[240px] sm:h-[420px] sm:w-[336px]" : "h-[260px] w-[208px] sm:h-[360px] sm:w-[288px]"}`}>
-      <Image src={src} alt="ORA outreach in Tanzania" fill sizes="336px" className="object-cover" />
-    </div>
+    <motion.figure
+      className={`group relative isolate overflow-hidden rounded-[22px] bg-white/[0.04] ${m.cls}`}
+      initial={reduce ? false : { clipPath: "inset(100% 0% 0% 0% round 22px)" }}
+      whileInView={{ clipPath: "inset(0% 0% 0% 0% round 22px)" }}
+      viewport={{ once: true, margin: "-12% 0px" }}
+      transition={{ duration: 1.25, ease: EASE, delay: (i % 3) * 0.08 }}
+    >
+      <motion.div
+        className="absolute inset-0"
+        initial={reduce ? false : { scale: 1.22 }}
+        whileInView={{ scale: 1 }}
+        viewport={{ once: true, margin: "-12% 0px" }}
+        transition={{ duration: 1.8, ease: EASE, delay: (i % 3) * 0.08 }}
+      >
+        <Image src={m.src} alt={m.alt} fill sizes={m.sizes} className="object-cover transition-transform duration-[1.4s] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]" />
+      </motion.div>
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-[rgb(11_6_18/0.7)] via-transparent to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
+      <figcaption className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4 sm:p-5">
+        <span className="translate-y-1 transition-transform duration-500 group-hover:translate-y-0">
+          <span className="block s-label text-[rgb(var(--s-pink))]">{m.tag}</span>
+          <span className="mt-1.5 block text-[13px] font-medium text-white sm:text-[15px]">{m.place}</span>
+        </span>
+        <span className="s-label text-white/60">{String(i + 1).padStart(2, "0")}</span>
+      </figcaption>
+    </motion.figure>
   );
 }
 export function RealLife() {
   return (
-    <section className="relative overflow-hidden py-24 sm:py-32">
+    <section className="relative py-24 sm:py-32">
       <div className="mx-auto max-w-[1440px] px-5 sm:px-8">
-        <SectionLabel index="05" label="ORA in real life" aside="Real girls · real schools" />
+        <SectionLabel index="05" label="ORA in real life" aside="Campaign · studio · school days" />
         <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-end">
-          <SplitText text="Real girls, real schools, real impact" accent={["impact"]} className={`text-[clamp(2.2rem,5.2vw,5rem)] ${H2}`} />
-          <p className="max-w-md text-[17px] leading-relaxed text-white/65">ORA across Tanzania — school days, community visits, the stage, the queue for packs and the laughter after.</p>
+          <SplitText text="From the studio to the schoolyard" accent={["schoolyard"]} className={`text-[clamp(2.2rem,5.2vw,5rem)] ${H2}`} />
+          <p className="max-w-md text-[17px] leading-relaxed text-white/65">
+            The faces of the campaign, the packs in the studio, and the school days where it all happens — Zanaki, Jangwani,
+            Juhudi Jeshini and more across Tanzania.
+          </p>
         </div>
-      </div>
-      <div className="mt-14 space-y-5 sm:space-y-6">
-        <div className="s-marquee-wrap flex overflow-hidden">
-          <div className="s-marquee items-end" style={{ ["--dur" as string]: "70s" }}>
-            {[...PHOTOS_A, ...PHOTOS_A].map((p, i) => <Arch key={i} src={p} wide={i % 3 === 0} />)}
-          </div>
+        <div className="mt-14 grid auto-rows-[92px] grid-flow-dense grid-cols-2 gap-3 sm:auto-rows-[120px] sm:gap-4 lg:grid-cols-12 lg:auto-rows-[96px] lg:gap-5">
+          {MOSAIC.map((m, i) => (
+            <MosaicTile key={m.src} m={m} i={i} />
+          ))}
         </div>
-        <div className="s-marquee-wrap flex overflow-hidden">
-          <div className="s-marquee items-start" data-reverse style={{ ["--dur" as string]: "80s" }}>
-            {[...PHOTOS_B, ...PHOTOS_B].map((p, i) => <Arch key={i} src={p} wide={i % 3 === 1} />)}
-          </div>
+        <div className="mt-10 flex justify-end">
+          <Link href="/impact" className="group inline-flex items-center gap-2 text-[15px] font-medium text-white">
+            See every moment
+            <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" strokeWidth={1.5} />
+          </Link>
         </div>
       </div>
     </section>
@@ -318,18 +355,5 @@ export function Closing() {
         </div>
       </div>
     </section>
-  );
-}
-
-/* the band of words under the hero */
-export function WordBand() {
-  return (
-    <div className="relative border-y border-white/[0.08] bg-[rgb(var(--s-pink))] py-4 text-white sm:py-5">
-      <Marquee
-        duration={30}
-        itemClassName="font-site-display text-[clamp(1.1rem,2.4vw,1.8rem)] font-semibold uppercase tracking-[-0.01em] [&>span]:bg-white"
-        items={["Empowering every cycle", "Period dignity for all", "Night · Day · Liner", "Made in Tanzania", "Protection that fits your flow"]}
-      />
-    </div>
   );
 }

@@ -3,7 +3,7 @@ import { ArrowDown, ArrowRight } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { CoverageMap, type StockistDTO } from "@/components/public/coverage-map";
 import { PageHero, SectionHead, btnGhost, btnPrimary } from "@/components/site/page-hero";
-import { Atmosphere, Marquee, Rise } from "@/components/site/motion";
+import { Atmosphere, Rise } from "@/components/site/motion";
 import { CountUp } from "@/components/ui/count-up";
 import { HeroPacks } from "@/components/site/pages/find-ora/hero-packs";
 import { StockistBand } from "@/components/site/pages/find-ora/stockist-band";
@@ -112,23 +112,6 @@ export default async function FindOraPage() {
         </dl>
       </section>
 
-      {/* Every covered region, running past */}
-      {ticker.length > 0 && (
-        <div className="border-b border-white/10 py-8 sm:py-11">
-          <Marquee
-            duration={Math.max(36, ticker.length * 5)}
-            itemClassName="font-site-display text-[clamp(2.4rem,6.4vw,5.8rem)] font-semibold uppercase leading-none tracking-[-0.035em]"
-            items={ticker.map((r, i) => (
-              <span key={i} className="flex items-start gap-3">
-                <span className={i % 2 ? "s-outline [-webkit-text-stroke-width:1.5px]" : "text-white"}>{r.name}</span>
-                <span className="font-site-mono text-[0.2em] font-normal leading-none tracking-[0.1em] text-white/45 sm:text-[0.16em]">
-                  {String(r.count).padStart(2, "0")}
-                </span>
-              </span>
-            ))}
-          />
-        </div>
-      )}
 
       {/* [01] The live map — and [02] the directory, which shares its search */}
       <section id="map" className="relative isolate scroll-mt-16 pb-24 pt-20 sm:pb-32 sm:pt-28">

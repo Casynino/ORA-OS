@@ -4,7 +4,6 @@ import { ArrowRight, ArrowUpRight, Clock, MapPin, Phone } from "lucide-react";
 import { ContactCards } from "@/components/public/contact-cards";
 import { PageHero, SectionHead, btnGhost, btnPrimary } from "@/components/site/page-hero";
 import { Atmosphere, Parallax, Rise, SectionLabel } from "@/components/site/motion";
-import { WordRun } from "@/components/site/pages/products-contact-tracker/shared";
 import { ORA_CONTACT } from "@/lib/constants";
 
 export const metadata: Metadata = {
@@ -48,7 +47,6 @@ export default function ContactPage() {
         imageAlt="An ORA host speaking to students at a school event day"
       />
 
-      <WordRun words={["Questions", "Partnerships", "Support", "Customer care", "Instagram", "TikTok"]} />
 
       {/* 01 — the ways in */}
       <section className="relative py-24 sm:py-32">

@@ -3,7 +3,6 @@ import { ArrowDown, Lock } from "lucide-react";
 import { PeriodTracker } from "@/components/dashboard/period-tracker";
 import { PageHero, SectionHead, btnPrimary } from "@/components/site/page-hero";
 import { Atmosphere } from "@/components/site/motion";
-import { WordRun } from "@/components/site/pages/products-contact-tracker/shared";
 
 export const metadata: Metadata = {
   title: "Period Tracker",
@@ -35,7 +34,6 @@ export default function TrackerPage() {
         imageAlt="An ORA campaign photo of a young woman holding ORA packs"
       />
 
-      <WordRun words={["Next-period prediction", "Fertile window", "Health tips", "Stays on your device", "No account needed"]} />
 
       <section id="tracker" className="relative isolate scroll-mt-20 overflow-hidden py-20 sm:py-28">
         <Atmosphere variant="c" grid={false} className="opacity-60" />

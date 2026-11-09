@@ -4,7 +4,7 @@ import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { Marquee, Magnetic, Parallax, Rise, SectionLabel } from "@/components/site/motion";
+import { Magnetic, Parallax, Rise, SectionLabel } from "@/components/site/motion";
 import { PageHero, SectionHead, btnGhost, btnPrimary } from "@/components/site/page-hero";
 import { ArrowCircle, ClosingBand, MONO, PINK, ZOOM, pad } from "@/components/site/pages/education-news/parts";
 import { cn, humanize } from "@/lib/utils";
@@ -99,18 +99,6 @@ export default async function EducationPage({
         }
       />
 
-      {/* ── The topics, running ── */}
-      <div className="border-y border-white/[0.08] py-5 sm:py-7">
-        <Marquee
-          duration={36}
-          itemClassName="font-site-display text-[clamp(1.4rem,3.2vw,2.8rem)] font-semibold uppercase tracking-[-0.02em]"
-          items={["Menstrual health", "Hygiene", "Myths vs facts", "Community", "English", "Kiswahili"].map((t, i) => (
-            <span key={t} className={i % 2 ? "s-outline" : "text-white"}>
-              {t}
-            </span>
-          ))}
-        />
-      </div>
 
       {articles.length === 0 ? (
         /* ── Nothing under this topic yet ── */

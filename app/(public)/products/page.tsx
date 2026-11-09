@@ -5,7 +5,7 @@ import { ArrowDown, ArrowRight } from "lucide-react";
 import { products } from "@/lib/products";
 import { PageHero, SectionHead, btnGhost, btnPrimary } from "@/components/site/page-hero";
 import { Atmosphere, Magnetic, Parallax, Rise } from "@/components/site/motion";
-import { ArrowDisc, CtaBand, Drops, WordRun, packFor } from "@/components/site/pages/products-contact-tracker/shared";
+import { ArrowDisc, CtaBand, Drops, packFor } from "@/components/site/pages/products-contact-tracker/shared";
 import { FitIndex, PackLineup } from "@/components/site/pages/products-contact-tracker/stages";
 
 export const metadata: Metadata = {
@@ -47,7 +47,6 @@ export default function ProductsPage() {
 
       <PackLineup />
 
-      <WordRun pink words={["100% air-breathable", "Soft & rash-free", "Secure wings", "Long-lasting freshness", "Night · Day · Liner"]} />
 
       {/* 01 — one chapter per pack */}
       <section id="range" className="relative isolate scroll-mt-20 overflow-hidden pb-10 pt-24 sm:pb-12 sm:pt-32">

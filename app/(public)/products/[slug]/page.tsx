@@ -16,7 +16,7 @@ import { ProductGallery } from "@/components/public/product-gallery";
 import { SectionHead, btnGhost, btnPrimary } from "@/components/site/page-hero";
 import { Atmosphere, Magnetic, Rise, SectionLabel, SplitText } from "@/components/site/motion";
 import { CountUp } from "@/components/ui/count-up";
-import { ArrowDisc, CtaBand, Drops, WordRun, packFor } from "@/components/site/pages/products-contact-tracker/shared";
+import { ArrowDisc, CtaBand, Drops, packFor } from "@/components/site/pages/products-contact-tracker/shared";
 import { ProductStage } from "@/components/site/pages/products-contact-tracker/stages";
 
 export function generateStaticParams() {
@@ -231,7 +231,6 @@ export default async function ProductPage({
         </div>
       </section>
 
-      <WordRun words={whyOra.map((w) => w.title)} />
 
       {/* 03 — why you'll love ORA */}
       <section className="relative py-20 sm:py-28">

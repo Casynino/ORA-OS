@@ -767,6 +767,7 @@ html[data-install-open] .install-hide { opacity: 0; pointer-events: none; }
   color: rgb(var(--s-ink));
   color-scheme: dark;
   overflow-x: clip;
+  position: relative;
 }
 .ora-site ::selection { background: rgb(var(--s-pink)); color: #fff; }
 .font-site-display { font-family: var(--font-site-display), var(--font-sans), sans-serif; }
@@ -818,8 +819,8 @@ html[data-install-open] .install-hide { opacity: 0; pointer-events: none; }
   0%, 100% { transform: translate(0, 0); } 20% { transform: translate(-3%, 2%); } 40% { transform: translate(2%, -3%); }
   60% { transform: translate(-2%, -1%); } 80% { transform: translate(3%, 3%); }
 }
-/* packs float */
-.s-float { animation: s-float var(--dur, 7s) ease-in-out var(--delay, 0s) infinite; will-change: transform; }
+/* packs sit still at their angle (owner, 2026-11-09: no packs moving about) */
+.s-float { transform: rotate(var(--r0, 0deg)); }
 @keyframes s-float {
   0%, 100% { transform: translate3d(0, 0, 0) rotate(var(--r0, 0deg)); }
   50% { transform: translate3d(0, var(--amp, -18px), 0) rotate(var(--r1, 2deg)); }
@@ -871,3 +872,50 @@ html[data-intro-seen] .s-intro { display: none; }
   --warning: 38 95% 62%;
   --destructive: 0 75% 62%;
 }
+
+/* ── The galaxy behind every public page (owner, 2026-11-09: "a galaxy background on every page").
+   Pure CSS, painted once: deep night, ORA pink / violet / blue nebula clouds, a faint milky band, three layers
+   of stars; the stars only twinkle (opacity), nothing travels across the screen. */
+.s-galaxy { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+  background:
+    radial-gradient(ellipse 55% 42% at 12% 8%, rgb(255 63 168 / 0.16), transparent 62%),
+    radial-gradient(ellipse 48% 46% at 88% 22%, rgb(139 92 246 / 0.2), transparent 62%),
+    radial-gradient(ellipse 60% 40% at 70% 92%, rgb(56 189 248 / 0.08), transparent 60%),
+    radial-gradient(ellipse 45% 35% at 22% 78%, rgb(139 92 246 / 0.1), transparent 60%),
+    linear-gradient(155deg, transparent 32%, rgb(255 220 245 / 0.035) 46%, rgb(200 170 255 / 0.03) 52%, transparent 66%),
+    rgb(var(--s-night));
+}
+.s-galaxy i { position: absolute; inset: 0; background-repeat: repeat; }
+.s-galaxy i:nth-child(1) {
+  background-size: 260px 260px;
+  background-image:
+    radial-gradient(1px 1px at 18px 24px, rgb(255 255 255 / 0.85), transparent 60%),
+    radial-gradient(1px 1px at 92px 140px, rgb(255 255 255 / 0.6), transparent 60%),
+    radial-gradient(1px 1px at 170px 60px, rgb(255 230 245 / 0.7), transparent 60%),
+    radial-gradient(1px 1px at 230px 210px, rgb(255 255 255 / 0.5), transparent 60%),
+    radial-gradient(1px 1px at 48px 200px, rgb(220 210 255 / 0.65), transparent 60%),
+    radial-gradient(1px 1px at 132px 248px, rgb(255 255 255 / 0.45), transparent 60%),
+    radial-gradient(1px 1px at 210px 118px, rgb(255 255 255 / 0.55), transparent 60%);
+}
+.s-galaxy i:nth-child(2) {
+  background-size: 430px 430px; opacity: 0.9;
+  background-image:
+    radial-gradient(1.5px 1.5px at 60px 90px, rgb(255 255 255 / 0.9), transparent 60%),
+    radial-gradient(1.5px 1.5px at 300px 40px, rgb(255 200 235 / 0.85), transparent 60%),
+    radial-gradient(1.5px 1.5px at 210px 330px, rgb(210 200 255 / 0.85), transparent 60%),
+    radial-gradient(1.5px 1.5px at 390px 260px, rgb(255 255 255 / 0.8), transparent 60%),
+    radial-gradient(1.5px 1.5px at 120px 400px, rgb(255 255 255 / 0.7), transparent 60%);
+  animation: s-twinkle 5.5s ease-in-out infinite alternate;
+}
+.s-galaxy i:nth-child(3) {
+  background-size: 720px 720px;
+  background-image:
+    radial-gradient(2px 2px at 140px 160px, rgb(255 255 255 / 0.95), transparent 70%),
+    radial-gradient(2.5px 2.5px at 520px 90px, rgb(255 170 220 / 0.9), transparent 70%),
+    radial-gradient(2px 2px at 610px 470px, rgb(200 190 255 / 0.95), transparent 70%),
+    radial-gradient(2.5px 2.5px at 300px 600px, rgb(255 255 255 / 0.85), transparent 70%);
+  filter: drop-shadow(0 0 3px rgb(255 255 255 / 0.6));
+  animation: s-twinkle 7.5s ease-in-out -2s infinite alternate;
+}
+@keyframes s-twinkle { from { opacity: 0.35; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .s-galaxy i { animation: none !important; } }

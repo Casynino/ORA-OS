@@ -9,7 +9,7 @@ import { CountUp } from "@/components/ui/count-up";
 import { PhotoGallery } from "@/components/public/photo-gallery";
 import { ImpactPulse, ImpactActivityFeed } from "@/components/public/impact-live";
 import { PageHero, SectionHead, btnGhost, btnPrimary } from "@/components/site/page-hero";
-import { Atmosphere, Magnetic, Marquee, Parallax, Rise, ScrollWords, SectionLabel, SplitText } from "@/components/site/motion";
+import { Atmosphere, Magnetic, Parallax, Rise, ScrollWords, SectionLabel, SplitText } from "@/components/site/motion";
 import { activityMeta } from "@/lib/impact-meta";
 import { getPublicImpactStats } from "@/lib/stats";
 import { getImpactFeed } from "@/lib/services/impact";
@@ -181,14 +181,6 @@ export default async function ImpactPage() {
         }
       />
 
-      {/* ── The word band ── */}
-      <div className="relative border-y border-white/[0.08] bg-[rgb(var(--s-pink))] py-4 text-white sm:py-5">
-        <Marquee
-          duration={32}
-          itemClassName="font-site-display text-[clamp(1.1rem,2.4vw,1.8rem)] font-semibold uppercase tracking-[-0.01em] [&>span]:bg-white"
-          items={["Dignity", "Confidence", "Opportunity", "School by school", "Community by community", "Empowering every cycle"]}
-        />
-      </div>
 
       {/* ── 01 The figures, huge — the packs floating beside the headline number ── */}
       <section className="relative isolate overflow-hidden py-24 sm:py-32">
@@ -270,16 +262,6 @@ export default async function ImpactPage() {
       {/* ── 03 Community activities: an editorial index — rows fill and slide on hover ── */}
       {activities.length > 0 && (
         <section className="relative pb-4 sm:pb-8">
-          {ticker.length > 0 && (
-            <div className="border-y border-white/10 py-6 sm:py-8">
-              <Marquee
-                duration={60}
-                reverse
-                itemClassName="s-outline font-site-display text-[clamp(2.4rem,6vw,5.6rem)] font-semibold uppercase leading-none tracking-[-0.03em]"
-                items={ticker}
-              />
-            </div>
-          )}
           <div className="mx-auto mt-24 max-w-[1440px] px-5 sm:mt-32 sm:px-8">
             <SectionHead
               index={idx.activities}

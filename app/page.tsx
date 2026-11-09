@@ -5,11 +5,12 @@ import { listPublicPosts } from "@/lib/services/news";
 import { getPublicImpactStats } from "@/lib/stats";
 import { getImpactFeed } from "@/lib/services/impact";
 import { SiteIntro } from "@/components/site/intro";
+import { Galaxy } from "@/components/site/galaxy";
 import { SiteHeader } from "@/components/site/site-header";
 import { SiteFooter } from "@/components/site/site-footer";
 import { Hero } from "@/components/site/home/hero";
 import { RangeStage } from "@/components/site/home/range-stage";
-import { Manifesto, ValuesIndex, CampaignBand, Numbers, RealLife, WaysIn, Feed, Closing, WordBand } from "@/components/site/home/sections";
+import { Manifesto, ValuesIndex, CampaignBand, Numbers, RealLife, WaysIn, Feed, Closing } from "@/components/site/home/sections";
 
 // Always render the public impact figures live from the database (never a
 // build-time snapshot), so impact stats are always current.
@@ -43,15 +44,15 @@ export default async function HomePage() {
     date: n.publishedAt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
     img: n.coverImage ?? "/ora/event/e09.jpg",
   }));
-  const activities = ["/ora/event/e28.jpg", "/ora/event/e06.jpg", "/ora/event/e08.jpg", "/ora/event/e32.jpg"];
+  const activities = ["/ora/site/g-jangwani-laugh.jpg", "/ora/site/g-zanaki-joy.jpg", "/ora/event/e28.jpg", "/ora/site/wide-GTM00027.jpg"];
 
   return (
     <div className={cn("ora-site s-grain min-h-screen", siteFontVars)}>
       <SiteIntro />
+      <Galaxy />
       <SiteHeader user={user ? { name: user.name, role: user.role } : null} />
-      <main>
+      <main className="relative z-[1]">
         <Hero stats={heroStats} feed={feed} />
-        <WordBand />
         <Manifesto />
         <RangeStage />
         <ValuesIndex />
@@ -62,7 +63,9 @@ export default async function HomePage() {
         <Feed news={news} activities={activities} />
         <Closing />
       </main>
-      <SiteFooter />
+      <div className="relative z-[1]">
+        <SiteFooter />
+      </div>
     </div>
   );
 }

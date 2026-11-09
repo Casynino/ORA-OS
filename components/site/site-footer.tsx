@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { SocialLinks } from "@/components/public/social-links";
-import { Marquee, Atmosphere } from "@/components/site/motion";
+import { Atmosphere } from "@/components/site/motion";
 import { ORA_CONTACT } from "@/lib/constants";
 
 const COLS = [
@@ -15,13 +15,6 @@ export function SiteFooter() {
   return (
     <footer className="relative isolate overflow-hidden border-t border-white/[0.07]">
       <Atmosphere variant="b" grid={false} className="opacity-60" />
-      <div className="relative border-b border-white/[0.07] py-5">
-        <Marquee
-          duration={36}
-          itemClassName="font-site-display text-[clamp(1.4rem,3vw,2.2rem)] font-medium uppercase tracking-[-0.01em] text-white/85"
-          items={["Empowering every cycle", "Period dignity for all", "Made in Tanzania", "Protection that fits your flow", "ORA Pads"]}
-        />
-      </div>
 
       <div className="relative mx-auto grid max-w-[1440px] grid-cols-1 gap-12 px-5 py-16 sm:px-8 md:grid-cols-[1.5fr_1fr_1fr_1.2fr] md:py-20">
         <div>
@@ -65,8 +58,8 @@ export function SiteFooter() {
         </div>
       </div>
 
-      {/* the page ends on ORA, very big and outlined */}
-      <div aria-hidden className="relative -mb-[0.18em] select-none text-center font-site-display text-[34vw] font-semibold leading-[0.8] tracking-[-0.04em] s-outline md:text-[30vw]">
+      {/* the page ends on ORA, very big, its letters filled with a real ORA stage photo */}
+      <div aria-hidden className="relative -mb-[0.16em] select-none bg-[url('/ora/site/wide-GTM00063.jpg')] bg-cover bg-[center_35%] bg-clip-text text-center font-site-display text-[34vw] font-bold leading-[0.8] tracking-[-0.04em] text-transparent [-webkit-background-clip:text] [-webkit-text-stroke:1px_rgb(255_255_255/0.12)] md:text-[30vw]">
         ORA
       </div>
       <div className="relative border-t border-white/[0.07]">
