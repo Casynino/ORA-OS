@@ -49,7 +49,7 @@ export function RangeIndex() {
       <div className={WRAP}>
         <Eyebrow className="mb-10">[ 02 — The range · 3 sizes ]</Eyebrow>
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-16">
-          <div className="relative h-[52vh] overflow-hidden rounded-[2px] bg-[rgb(26_26_29)] lg:h-[72vh]">
+          <div className="s-on-photo relative h-[52vh] overflow-hidden rounded-[2px] bg-[rgb(26_26_29)] lg:h-[72vh]">
             <AnimatePresence mode="popLayout">
               <motion.div
                 key={a}
@@ -110,19 +110,34 @@ export function RangeIndex() {
 const DAYS = [
   { src: "/ora/site/wide-GTM00015.jpg", place: "Jangwani", what: "School day", alt: "Girls laughing together at an ORA school day" },
   { src: "/ora/site/wide-FLP00062.jpg", place: "Zanaki", what: "School visit", alt: "The ORA team cheering beside stacks of pads" },
-  { src: "/ora/site/g-juhudi-table.jpg", place: "Juhudi Jeshini", what: "Girls' Day 2026", alt: "ORA pads stacked high at International Girls' Day" },
+  { src: "/ora/site/g-juhudi-class.jpg", place: "Juhudi Jeshini", what: "Girls' Day 2026", alt: "Girls listening during an ORA session at International Girls' Day" },
   { src: "/ora/site/g-zanaki-stage.jpg", place: "Zanaki", what: "On stage", alt: "A student speaking on the ORA stage" },
   { src: "/ora/site/wide-GTM00027.jpg", place: "Jangwani", what: "Assembly", alt: "Girls clapping at an ORA assembly" },
 ];
 function Plate({ d, n, ratio, sizes }: { d: (typeof DAYS)[number]; n: string; ratio: string; sizes: string }) {
+  const ref = useRef<HTMLAnchorElement>(null);
+  const reduce = useReducedMotion();
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const drift = useTransform(scrollYProgress, [0, 1], ["-7%", "7%"]);
   return (
-    <Link href="/impact" data-cursor="Open" className="group block">
-      <div className={`relative w-full overflow-hidden rounded-[2px] bg-[rgb(26_26_29)] ${ratio}`}>
-        <Image src={d.src} alt={d.alt} fill sizes={sizes} className="object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.06]" />
+    <Link ref={ref} href="/impact" data-cursor="Open" className="group block">
+      {/* the frame opens like a curtain as it arrives; the photo inside drifts with the scroll and settles from a zoom */}
+      <motion.div
+        className={`s-on-photo relative w-full overflow-hidden rounded-[2px] bg-[rgb(26_26_29)] ${ratio}`}
+        initial={reduce ? false : { clipPath: "inset(100% 0% 0% 0%)" }}
+        whileInView={{ clipPath: "inset(0% 0% 0% 0%)" }}
+        viewport={{ once: true, margin: "-12% 0px" }}
+        transition={{ duration: 1.25, ease: EASE }}
+      >
+        <motion.div className="absolute inset-x-0 -inset-y-[9%]" style={{ y: reduce ? 0 : drift }}>
+          <motion.div className="absolute inset-0" initial={reduce ? false : { scale: 1.18 }} whileInView={{ scale: 1 }} viewport={{ once: true, margin: "-12% 0px" }} transition={{ duration: 1.8, ease: EASE }}>
+            <Image src={d.src} alt={d.alt} fill sizes={sizes} className="object-cover transition-transform duration-[1.2s] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]" />
+          </motion.div>
+        </motion.div>
         <div className="absolute inset-0 bg-gradient-to-t from-[rgb(10_10_11/0.6)] via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
         <span className="absolute left-4 top-3 font-site-display text-3xl text-white/75 md:text-4xl">{n}</span>
         <span className="absolute bottom-4 left-4 translate-y-2 s-label text-white opacity-0 transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">See the day →</span>
-      </div>
+      </motion.div>
       <div className="mt-4 flex items-baseline justify-between gap-4">
         <h3 className="font-site-display text-base uppercase tracking-tight text-[rgb(var(--s-ink))] transition-colors group-hover:text-[rgb(var(--s-pink))] md:text-lg">{d.place}</h3>
         <span className="s-label">{d.what}</span>
@@ -185,7 +200,7 @@ export function CampaignBand() {
   const y = useTransform(scrollYProgress, [0, 1], ["-12%", "12%"]);
   const reduceY = reduce ? "0%" : "110%";
   return (
-    <section ref={ref} className="relative isolate h-[110svh] min-h-[600px] overflow-hidden">
+    <section ref={ref} className="s-on-photo relative isolate h-[110svh] min-h-[600px] overflow-hidden">
       <motion.div className="absolute inset-x-0 -top-[15%] -z-10 h-[130%]" style={{ y: reduce ? 0 : y }}>
         <Image src="/ora/hero-stage.jpg" alt="An ORA host on stage holding up a pack of ORA pads" fill sizes="100vw" className="object-cover" style={{ objectPosition: "50% 34%" }} />
       </motion.div>
@@ -245,7 +260,7 @@ export function BehindOra() {
           </Parallax>
           <Parallax speed={-0.12} className="mt-10 aspect-[3/4] rounded-[2px] bg-[rgb(26_26_29)]">
             <div className="relative h-full w-full">
-              <Image src="/ora/site/g-juhudi-class.jpg" alt="Girls listening during an ORA education session" fill sizes="30vw" className="object-cover" />
+              <Image src="/ora/site/g-zanaki-joy.jpg" alt="Girls celebrating at an ORA school visit" fill sizes="30vw" className="object-cover" />
             </div>
           </Parallax>
         </div>

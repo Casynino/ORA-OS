@@ -203,7 +203,7 @@ export default async function EducationPage({
                         <Link href={`/education/${a.slug}`} className={cn("group block rounded-[2px]", FOCUS)}>
                           <div
                             className={cn(
-                              "relative overflow-hidden rounded-[2px] bg-white/5",
+                              "s-on-photo relative overflow-hidden rounded-[2px] bg-white/5",
                               alone ? "aspect-[4/3] sm:aspect-[21/9]" : wide ? "aspect-[4/3] lg:aspect-[16/11]" : "aspect-[4/3] lg:aspect-square",
                             )}
                           >

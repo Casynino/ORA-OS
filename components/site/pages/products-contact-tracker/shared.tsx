@@ -74,7 +74,7 @@ export function CtaBand({
   children?: ReactNode;
 }) {
   return (
-    <section className="relative isolate overflow-hidden">
+    <section className="s-on-photo relative isolate overflow-hidden">
       <Parallax speed={0.12} className="absolute inset-0 -z-10">
         <Image src={img} alt="" fill sizes="100vw" className="object-cover" style={{ objectPosition: position }} />
       </Parallax>

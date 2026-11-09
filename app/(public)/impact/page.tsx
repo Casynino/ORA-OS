@@ -490,7 +490,7 @@ export default async function ImpactPage() {
       )}
 
       {/* ── 07 Be part of the change: the closing band over girls laughing ── */}
-      <section className="relative isolate overflow-hidden">
+      <section className="s-on-photo relative isolate overflow-hidden">
         <Parallax speed={0.12} className="absolute inset-0 -z-10">
           <Image src="/ora/site/wide-GTM00015.jpg" alt="" fill sizes="100vw" className="object-cover object-[50%_35%]" />
         </Parallax>

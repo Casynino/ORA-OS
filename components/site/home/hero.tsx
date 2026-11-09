@@ -37,7 +37,7 @@ export function Hero({ stats, feed }: { stats: Stat[]; feed: ImpactFeedItem[] })
 
   return (
     <>
-      <section className="relative isolate h-[100svh] min-h-[620px] overflow-hidden bg-[rgb(var(--s-night))]">
+      <section data-photo-hero className="s-on-photo relative isolate h-[100svh] min-h-[620px] overflow-hidden bg-[rgb(10_10_11)]">
         {/* the pictures */}
         <AnimatePresence initial={false}>
           <motion.div
@@ -95,7 +95,7 @@ export function Hero({ stats, feed }: { stats: Stat[]; feed: ImpactFeedItem[] })
                 className="mt-9 flex flex-wrap items-center gap-6"
               >
                 <Magnetic>
-                  <Link href="/impact" data-cursor="Join" className="s-btn s-btn--bone">Join the movement</Link>
+                  <Link href="/products" data-cursor="View" className="s-btn s-btn--bone">Discover the range</Link>
                 </Magnetic>
                 <Link href="/find-ora" className="s-link text-white">Find ORA near you</Link>
               </motion.div>

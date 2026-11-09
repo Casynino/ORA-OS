@@ -33,7 +33,7 @@ export function PageHero({
 }) {
   const cover = variant === "cover" && image;
   return (
-    <section className={cn("relative isolate overflow-hidden", className)}>
+    <section data-photo-hero={cover ? "" : undefined} className={cn("relative isolate overflow-hidden", cover && "s-on-photo", className)}>
       {cover ? (
         <>
           <Parallax speed={0.1} className="absolute inset-0 -z-10">

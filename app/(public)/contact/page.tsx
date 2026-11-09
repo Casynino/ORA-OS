@@ -98,7 +98,7 @@ export default function ContactPage() {
                 </p>
               </Rise>
             </div>
-            <Rise delay={0.1} className="relative">
+            <Rise delay={0.1} className="s-on-photo relative">
               <Parallax speed={0.1} className="aspect-[4/5] w-full rounded-[2px] border border-white/10 bg-white/5 sm:aspect-[5/4] lg:aspect-auto lg:h-full lg:min-h-[560px]">
                 <Image
                   src="/ora/site/wide-GTM00117.jpg"
@@ -116,7 +116,7 @@ export default function ContactPage() {
       </section>
 
       {/* 03 — the address to write to, huge */}
-      <section className="relative isolate overflow-hidden">
+      <section className="s-on-photo relative isolate overflow-hidden">
         <Parallax speed={0.12} className="absolute inset-0 -z-10">
           <Image src="/ora/site/wide-GTM00015.jpg" alt="" fill sizes="100vw" className="object-cover" />
         </Parallax>

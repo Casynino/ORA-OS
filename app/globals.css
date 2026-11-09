@@ -925,3 +925,107 @@ html[data-intro-seen] .s-intro { display: none; }
 .s-link::after { content: ""; position: absolute; left: 0; bottom: -4px; height: 1px; width: 100%; background: currentColor; transform: scaleX(0); transform-origin: right; transition: transform 0.4s cubic-bezier(0.16,1,0.3,1); }
 .s-link:hover::after { transform: scaleX(1); transform-origin: left; }
 body.s-has-cursor .ora-site, body.s-has-cursor .ora-site a, body.s-has-cursor .ora-site button { cursor: none; }
+
+/* ── Light mode for the public site (owner, 2026-11-09: "where is the light mode — by default light").
+   The site opens light (warm paper, dark ink, a deeper ORA pink); the header switch turns it dark.
+   Text that sits on photographs (.s-on-photo) keeps the dark-mode values in both modes. ── */
+html.light .ora-site {
+  --s-night: 245 242 236;
+  --s-deep: 236 232 223;
+  --s-ink: 26 24 18;
+  --s-pink: 214 18 128;
+  --s-fg: 26 24 18;
+  --s-plate: 226 221 210;
+  --s-faint-word: 228 222 210;
+  --background: 40 30% 95%;
+  --foreground: 45 18% 9%;
+  --card: 0 0% 100%;
+  --card-foreground: 45 18% 9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 45 18% 9%;
+  --primary: 327 84% 46%;
+  --secondary: 40 22% 90%;
+  --secondary-foreground: 45 18% 9%;
+  --muted: 40 22% 90%;
+  --muted-foreground: 40 6% 36%;
+  --border: 40 16% 82%;
+  --input: 40 16% 78%;
+  --ring: 327 84% 46%;
+  color-scheme: light;
+}
+html.light .ora-site .s-on-photo, .ora-site .s-on-photo {
+  --s-night: 10 10 11;
+  --s-ink: 236 232 225;
+  --s-pink: 255 46 151;
+  --s-fg: 255 255 255;
+  color: rgb(236 232 225);
+}
+.ora-site { --s-fg: 255 255 255; --s-plate: 26 26 29; --s-faint-word: 26 26 29; }
+html.light .s-galaxy i { display: none; }
+html.light .ora-site .text-white { color: rgb(var(--s-fg)); }
+html.light .ora-site .text-white\/20 { color: rgb(var(--s-fg) / 0.2); }
+html.light .ora-site .text-white\/25 { color: rgb(var(--s-fg) / 0.25); }
+html.light .ora-site .text-white\/30 { color: rgb(var(--s-fg) / 0.3); }
+html.light .ora-site .text-white\/35 { color: rgb(var(--s-fg) / 0.35); }
+html.light .ora-site .text-white\/40 { color: rgb(var(--s-fg) / 0.4); }
+html.light .ora-site .text-white\/45 { color: rgb(var(--s-fg) / 0.45); }
+html.light .ora-site .text-white\/50 { color: rgb(var(--s-fg) / 0.5); }
+html.light .ora-site .text-white\/55 { color: rgb(var(--s-fg) / 0.55); }
+html.light .ora-site .text-white\/60 { color: rgb(var(--s-fg) / 0.6); }
+html.light .ora-site .text-white\/65 { color: rgb(var(--s-fg) / 0.65); }
+html.light .ora-site .text-white\/70 { color: rgb(var(--s-fg) / 0.7); }
+html.light .ora-site .text-white\/75 { color: rgb(var(--s-fg) / 0.75); }
+html.light .ora-site .text-white\/80 { color: rgb(var(--s-fg) / 0.8); }
+html.light .ora-site .text-white\/85 { color: rgb(var(--s-fg) / 0.85); }
+html.light .ora-site .text-white\/90 { color: rgb(var(--s-fg) / 0.9); }
+html.light .ora-site .border-white\/10 { border-color: rgb(var(--s-fg) / 0.1); }
+html.light .ora-site .border-white\/15 { border-color: rgb(var(--s-fg) / 0.15); }
+html.light .ora-site .border-white\/20 { border-color: rgb(var(--s-fg) / 0.2); }
+html.light .ora-site .border-white\/25 { border-color: rgb(var(--s-fg) / 0.25); }
+html.light .ora-site .border-white\/30 { border-color: rgb(var(--s-fg) / 0.3); }
+html.light .ora-site .border-white\/35 { border-color: rgb(var(--s-fg) / 0.35); }
+html.light .ora-site .border-white\/50 { border-color: rgb(var(--s-fg) / 0.5); }
+html.light .ora-site .border-white\/\[0\.06\] { border-color: rgb(var(--s-fg) / 0.06); }
+html.light .ora-site .border-white\/\[0\.07\] { border-color: rgb(var(--s-fg) / 0.07); }
+html.light .ora-site .border-white\/\[0\.08\] { border-color: rgb(var(--s-fg) / 0.08); }
+html.light .ora-site .border-white\/\[0\.12\] { border-color: rgb(var(--s-fg) / 0.12); }
+html.light .ora-site .bg-white\/5 { background-color: rgb(var(--s-fg) / 0.05); }
+html.light .ora-site .bg-white\/10 { background-color: rgb(var(--s-fg) / 0.1); }
+html.light .ora-site .bg-white\/20 { background-color: rgb(var(--s-fg) / 0.2); }
+html.light .ora-site .bg-white\/30 { background-color: rgb(var(--s-fg) / 0.3); }
+html.light .ora-site .bg-white\/90 { background-color: rgb(var(--s-fg) / 0.9); }
+html.light .ora-site .bg-white\/\[0\.02\] { background-color: rgb(var(--s-fg) / 0.02); }
+html.light .ora-site .bg-white\/\[0\.03\] { background-color: rgb(var(--s-fg) / 0.03); }
+html.light .ora-site .bg-white\/\[0\.035\] { background-color: rgb(var(--s-fg) / 0.035); }
+html.light .ora-site .bg-white\/\[0\.04\] { background-color: rgb(var(--s-fg) / 0.04); }
+html.light .ora-site .bg-white\/\[0\.05\] { background-color: rgb(var(--s-fg) / 0.05); }
+html.light .ora-site .bg-white\/\[0\.06\] { background-color: rgb(var(--s-fg) / 0.06); }
+html.light .ora-site .bg-white\/\[0\.07\] { background-color: rgb(var(--s-fg) / 0.07); }
+html.light .ora-site .divide-white\/10 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(var(--s-fg) / 0.1); }
+html.light .ora-site .ring-white\/10 { --tw-ring-color: rgb(var(--s-fg) / 0.1); }
+html.light .ora-site .hover\:text-white:hover, html.light .ora-site .group:hover .group-hover\:text-white { color: rgb(var(--s-fg)); }
+html.light .ora-site .hover\:border-white\/40:hover { border-color: rgb(var(--s-fg) / 0.4); }
+html.light .ora-site .hover\:border-white\/20:hover { border-color: rgb(var(--s-fg) / 0.2); }
+html.light .ora-site .group:hover .group-hover\:border-white\/50 { border-color: rgb(var(--s-fg) / 0.5); }
+html.light .ora-site .hover\:bg-white\/10:hover { background-color: rgb(var(--s-fg) / 0.1); }
+html.light .ora-site .hover\:bg-white\/\[0\.04\]:hover { background-color: rgb(var(--s-fg) / 0.04); }
+html.light .ora-site .placeholder\:text-white\/35::placeholder { color: rgb(var(--s-fg) / 0.35); }
+html.light .ora-site .bg-white, html.light .ora-site .group:hover .group-hover\:bg-white { background-color: rgb(var(--s-fg)); }
+html.light .ora-site .bg-\[rgb\(18_18_20\)\] { background-color: rgb(var(--s-deep)); }
+html.light .ora-site .bg-\[rgb\(26_26_29\)\] { background-color: rgb(var(--s-plate)); }
+html.light .ora-site .text-\[rgb\(26_26_29\)\] { color: rgb(var(--s-faint-word)); }
+html.light .ora-site .bg-\[rgb\(11_6_18\/0\.72\)\] { background-color: rgb(var(--s-night) / 0.85); }
+/* pink buttons keep white words */
+html.light .ora-site .bg-\[rgb\(var\(--s-pink\)\)\].text-white { color: #fff; }
+
+/* opening curtain v2: the ORA mark in warm white with a pink light sweeping across its lines */
+html[data-intro-seen] .s-intro2 { display: none; }
+.s-intro-mark {
+  background: linear-gradient(105deg, #f2ece4 0%, #f2ece4 38%, #ff9fd0 46%, #ff2e97 50%, #ff9fd0 54%, #f2ece4 62%, #f2ece4 100%);
+  background-size: 320% 100%;
+  background-position: 100% 0;
+  animation: s-sheen 1.6s cubic-bezier(0.45, 0, 0.2, 1) 1.15s forwards;
+  filter: drop-shadow(0 0 18px rgb(255 46 151 / 0.35));
+}
+@keyframes s-sheen { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+@media (prefers-reduced-motion: reduce) { .s-intro-mark { animation: none; } }

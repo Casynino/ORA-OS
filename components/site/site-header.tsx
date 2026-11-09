@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Logo } from "@/components/brand/logo";
 import { SocialLinks } from "@/components/public/social-links";
 import { Magnetic, EASE } from "@/components/site/motion";
@@ -35,6 +36,9 @@ function homeFor(role?: string) {
 export function SiteHeader({ user }: { user?: { name?: string | null; role?: string } | null }) {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [photoTop, setPhotoTop] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const { resolvedTheme, setTheme } = useTheme();
   const pathname = usePathname();
 
   useEffect(() => {
@@ -43,6 +47,12 @@ export function SiteHeader({ user }: { user?: { name?: string | null; role?: str
     window.addEventListener("scroll", on, { passive: true });
     return () => window.removeEventListener("scroll", on);
   }, []);
+  // over a photograph at the top of the page (home hero, cover heroes) the header keeps white words
+  useEffect(() => {
+    setMounted(true);
+    setPhotoTop(Boolean(document.querySelector("main [data-photo-hero]")));
+  }, [pathname]);
+  const onPhoto = photoTop && !scrolled && !open;
   useEffect(() => {
     document.documentElement.style.overflow = open ? "hidden" : "";
     return () => {
@@ -57,11 +67,12 @@ export function SiteHeader({ user }: { user?: { name?: string | null; role?: str
         className={cn(
           "fixed inset-x-0 top-0 z-50 pt-[var(--sat)] transition-[background-color,border-color,backdrop-filter] duration-300",
           scrolled && !open ? "border-b border-white/[0.07] bg-[rgb(11_6_18/0.72)] backdrop-blur-xl" : "border-b border-transparent",
+          onPhoto && "s-on-photo",
         )}
       >
         <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-6 px-5 sm:h-[72px] sm:px-8">
           <Link href="/" aria-label="ORA-Pads home" className="relative z-[60] shrink-0">
-            <Logo mark="light" className="h-9 sm:h-10" />
+            <Logo mark={onPhoto ? "light" : "default"} className="h-9 sm:h-10" />
           </Link>
 
           <nav aria-label="Main" className="hidden items-center gap-8 lg:flex">
@@ -82,6 +93,14 @@ export function SiteHeader({ user }: { user?: { name?: string | null; role?: str
           </nav>
 
           <div className="relative z-[60] flex items-center gap-3 sm:gap-5">
+            <button
+              type="button"
+              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+              aria-label={mounted && resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              className="grid size-10 place-items-center rounded-full border border-white/15 text-white/80 transition-colors hover:border-white/40 hover:text-white"
+            >
+              {mounted && resolvedTheme === "dark" ? <Sun className="size-4" strokeWidth={1.5} /> : <Moon className="size-4" strokeWidth={1.5} />}
+            </button>
             {user ? (
               <Link href={homeFor(user.role)} className="hidden text-[13px] font-medium text-white/75 transition-colors hover:text-white sm:inline">
                 My home

@@ -82,7 +82,7 @@ export default async function NewsArticlePage({
       <ReadingProgress />
 
       {/* ── Title block over the cover photo ─────────────────────────── */}
-      <header className="relative isolate overflow-hidden">
+      <header data-photo-hero={post.coverImage ? "" : undefined} className={post.coverImage ? "s-on-photo relative isolate overflow-hidden" : "relative isolate overflow-hidden"}>
         {post.coverImage ? (
           <>
             <Parallax speed={0.1} className="absolute inset-0 -z-10">
@@ -239,7 +239,7 @@ export default async function NewsArticlePage({
               {more.map((p, i) => (
                 <Rise key={p.slug} delay={i * 0.1} className={cn(i === 1 && "md:mt-24")}>
                   <Link href={`/news/${p.slug}`} className={cn("group block rounded-[2px]", FOCUS)}>
-                    <div className="relative aspect-[4/3] overflow-hidden rounded-[2px] bg-white/5 sm:aspect-[16/11]">
+                    <div className="s-on-photo relative aspect-[4/3] overflow-hidden rounded-[2px] bg-white/5 sm:aspect-[16/11]">
                       <Image src={p.coverImage ?? FALLBACK} alt={p.title} fill sizes="(min-width:768px) 50vw, 100vw" className={ZOOM} />
                       <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-[rgb(11_6_18/0.5)] via-transparent to-transparent" />
                     </div>

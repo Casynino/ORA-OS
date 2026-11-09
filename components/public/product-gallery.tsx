@@ -21,7 +21,7 @@ export function ProductGallery({
 
   return (
     <div>
-      <div className="group relative aspect-[4/5] overflow-hidden rounded-[2px] border border-white/10 bg-white/[0.04]">
+      <div className="s-on-photo group relative aspect-[4/5] overflow-hidden rounded-[2px] border border-white/10 bg-white/[0.04]">
         <AnimatePresence initial={false} mode="popLayout">
           <motion.div
             key={images[active]}
