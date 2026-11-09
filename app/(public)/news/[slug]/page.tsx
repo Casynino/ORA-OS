@@ -32,7 +32,10 @@ export async function generateMetadata({
       description: post.excerpt,
       publishedTime: post.publishedAt.toISOString(),
       url: `/news/${post.slug}`,
-      ...(post.coverImage ? { images: [{ url: post.coverImage, width: 1600, height: 1067, alt: post.title }] } : {}),
+      // an article without its own cover is shared with the ORA share picture
+      images: post.coverImage
+        ? [{ url: post.coverImage, width: 1600, height: 1067, alt: post.title }]
+        : [{ url: "/og/ora-share.jpg", width: 1200, height: 630, alt: "ORA — Protection that fits your flow." }],
     },
     twitter: {
       card: post.coverImage ? "summary_large_image" : "summary",

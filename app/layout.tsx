@@ -53,12 +53,17 @@ export const metadata: Metadata = {
   formatDetection: { telephone: false },
   // Next only writes the standard `mobile-web-app-capable`; older iPhones read Apple's own name.
   other: { "apple-mobile-web-app-capable": "yes" },
+  // The ORA goddess mark on ink (owner, 2026-11-09: the old pink-purple square in the browser tab "not nice"). "?v=2"
+  // makes browsers drop the old cached icon.
   icons: {
     icon: [
-      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/favicon.ico?v=2", sizes: "any" },
+      { url: "/icons/favicon-32.png?v=2", sizes: "32x32", type: "image/png" },
+      { url: "/icons/favicon-48.png?v=2", sizes: "48x48", type: "image/png" },
+      { url: "/icons/icon-192.png?v=2", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png?v=2", sizes: "512x512", type: "image/png" },
     ],
-    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png?v=2", sizes: "180x180", type: "image/png" }],
   },
   title: {
     default: SITE_TAGLINE,
@@ -84,11 +89,15 @@ export const metadata: Metadata = {
     title: SITE_TAGLINE,
     description: SITE_DESCRIPTION,
     locale: "en_US",
+    // the picture WhatsApp, Instagram, Facebook, X and others show when the site is shared: the ORA lockup, "Protection
+    // that fits your flow." and the three packs
+    images: [{ url: "/og/ora-share.jpg", width: 1200, height: 630, alt: "ORA — Protection that fits your flow. Night, Day and Daily Liner packs." }],
   },
   twitter: {
     card: "summary_large_image",
     title: SITE_TAGLINE,
     description: SITE_DESCRIPTION,
+    images: ["/og/ora-share.jpg"],
   },
 };
 
