@@ -72,14 +72,6 @@ export default async function AdminCommandCenter() {
 
   const firstName = meUser?.preferredName || (meUser?.name ?? "there").split(" ")[0];
 
-  // Greeting + date (Tanzania time, EAT)
-  const eatHour = Number(
-    new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Dar_es_Salaam", hour: "2-digit", hour12: false }).format(new Date()),
-  );
-  const greeting = eatHour >= 5 && eatHour < 12 ? "Good morning" : eatHour >= 12 && eatHour < 17 ? "Good afternoon" : "Good evening";
-  const dateLabel = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Africa/Dar_es_Salaam", weekday: "long", month: "long", day: "numeric",
-  }).format(new Date());
 
   // ── "Needs your attention" — one bounded command center merging the CEO's
   //    credit/stock alerts with the finance sign-off pipeline. Priority order:
@@ -110,10 +102,9 @@ export default async function AdminCommandCenter() {
     <div className="space-y-6">
       {/* ── 1 · Welcome banner (no numbers — they live in Business health) ── */}
       <DashboardHero
-        eyebrow={dateLabel}
-        pill="CEO"
-        title={<>{greeting}, {firstName}. 👋</>}
-        subtitle="Here's what's happening across ORA today."
+        name={firstName}
+        role="CEO"
+        picture="pink"
       />
 
       {/* ── 2 · Business health summary ── */}

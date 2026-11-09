@@ -44,14 +44,6 @@ export default async function DeveloperHomePage() {
   const d = m.diag;
 
   const firstName = me.preferredName || (me.name ?? "Developer").split(" ")[0];
-  // Greeting + date (Tanzania time, EAT) — same as the Admin home.
-  const eatHour = Number(
-    new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Dar_es_Salaam", hour: "2-digit", hour12: false }).format(new Date()),
-  );
-  const greeting = eatHour >= 5 && eatHour < 12 ? "Good morning" : eatHour >= 12 && eatHour < 17 ? "Good afternoon" : "Good evening";
-  const dateLabel = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Africa/Dar_es_Salaam", weekday: "long", month: "long", day: "numeric",
-  }).format(new Date());
 
   const missing = d.env.filter((e) => !e.set && e.required).length;
   const messagesBadge = m.messages.wa24.failed > 0 ? String(m.messages.wa24.failed) : null;
@@ -63,10 +55,9 @@ export default async function DeveloperHomePage() {
     <div className="space-y-10">
       <div className="space-y-4">
         <DashboardHero
-          eyebrow={dateLabel}
-          pill="Developer"
-          title={<>{greeting}, {firstName}.</>}
-          subtitle="Your control room for ORA — health, people and everything done, in one place."
+          name={firstName}
+          role="Developer"
+          picture="purple"
         />
 
         {/* The things you do most: four tiles */}

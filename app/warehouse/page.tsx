@@ -178,21 +178,6 @@ export default async function WarehouseOverviewPage() {
     .sort((a, b) => b.time.getTime() - a.time.getTime())
     .slice(0, 8);
 
-  // Greeting based on Tanzania time (EAT, UTC+3).
-  const eatHour = Number(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Africa/Dar_es_Salaam",
-      hour: "2-digit",
-      hour12: false,
-    }).format(new Date()),
-  );
-  const greeting =
-    eatHour >= 5 && eatHour < 12
-      ? "Good morning"
-      : eatHour >= 12 && eatHour < 17
-        ? "Good afternoon"
-        : "Good evening";
-
   const naturalList = (items: string[]) =>
     items.length <= 1
       ? items[0] ?? ""
@@ -217,9 +202,10 @@ export default async function WarehouseOverviewPage() {
   return (
     <div className="space-y-7">
       <DashboardHero
-        eyebrow={`${whName}${me.position ? ` · ${me.position}` : ""}`}
-        title={<>{greeting}, {me.name?.split(" ")[0] ?? "Team"}.</>}
-        subtitle={summary}
+        name={me.name?.split(" ")[0] ?? "Team"}
+        role={`${whName}${me.position ? ` · ${me.position}` : ""}`}
+        picture="purple"
+        note={summary}
       />
 
       {/* Available stock — the first thing the warehouse sees on open. */}

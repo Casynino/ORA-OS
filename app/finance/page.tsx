@@ -116,17 +116,6 @@ export default async function FinanceDashboardPage() {
   }
   const weekMax = Math.max(1, ...days.map((d) => Math.max(d.in, d.out)));
 
-  // Greeting + date (Tanzania time, EAT)
-  const eatHour = Number(
-    new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Dar_es_Salaam", hour: "2-digit", hour12: false }).format(new Date()),
-  );
-  const greeting = eatHour >= 5 && eatHour < 12 ? "Good morning" : eatHour >= 12 && eatHour < 17 ? "Good afternoon" : "Good evening";
-  const dateLabel = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Africa/Dar_es_Salaam",
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  }).format(new Date());
   const firstName = me.name?.split(" ")[0] ?? "Finance";
 
   // Spending composition for the donut (this month, by group).
@@ -151,10 +140,9 @@ export default async function FinanceDashboardPage() {
     <div className="space-y-6">
       {/* ── Hero ─────────────────────────────────────────────── */}
       <DashboardHero
-        eyebrow={dateLabel}
-        pill="Finance"
-        title={<>{greeting}, {firstName} 👋</>}
-        subtitle="Manage payments, track collections, and keep ORA's financial records organized and up to date."
+        name={firstName}
+        role="Finance"
+        picture="purple"
         stats={[
           { label: "Collections today", value: formatCurrency(todayCollections), sub: "customer money in" },
           { label: "Cash awaiting deposit", value: formatCurrency(cashAwaitingDeposit), sub: "in hand — bank it" },

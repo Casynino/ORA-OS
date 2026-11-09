@@ -70,27 +70,15 @@ export default async function RepOverviewPage() {
   ].filter((s) => s.value > 0);
   const cashShare = d.salesMonth > 0 ? Math.round((d.cashSalesMonth / d.salesMonth) * 100) : 0;
 
-  // Greeting + date (Tanzania time, EAT) — matches the Admin/Finance/Warehouse banners.
-  const eatHour = Number(
-    new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Dar_es_Salaam", hour: "2-digit", hour12: false }).format(new Date()),
-  );
-  const greeting = eatHour >= 5 && eatHour < 12 ? "Good morning" : eatHour >= 12 && eatHour < 17 ? "Good afternoon" : "Good evening";
-  const dateLabel = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Africa/Dar_es_Salaam",
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  }).format(new Date());
   const firstName = me.name?.split(" ")[0] ?? "Rep";
 
   return (
     <div className="space-y-6">
       {/* ── Hero — shared premium banner ── */}
       <DashboardHero
-        eyebrow={dateLabel}
-        pill="Sales Rep"
-        title={<>{greeting}, {firstName} 👋</>}
-        subtitle="Record your sales, look after your customers, and stay on top of every shilling you collect."
+        name={firstName}
+        role="Sales Rep"
+        picture="blue"
         stats={[
           { label: "Today so far", value: formatCurrency(d.salesToday), sub: "sales recorded today" },
           { label: "Sales this month", value: formatCurrency(d.salesMonth), sub: "your running total" },

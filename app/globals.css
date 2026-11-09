@@ -633,3 +633,87 @@ html {
     -webkit-touch-callout: none;
   }
 }
+
+/* ───────── Glass sidebar (same panel as Target Express / Super Drive, in ORA's colours) ─────────
+   A tall, very round, frosted panel with a soft light at the top and a pink glow at the bottom; the
+   open page has a bright bar and a pink icon; rows light up softly on hover. Dark purple glass at
+   night, white glass by day. */
+.glass-panel {
+  --glass-line: rgba(255, 255, 255, 0.16);
+  --glass-text-dim: rgba(255, 255, 255, 0.55);
+  --glass-strong: #f6effc;
+  --glass-text: #c9b9de;
+  --glass-soft: #a894c4;
+  --glass-icon: #8b76ad;
+  --glass-accent: #ff6fc8;
+  position: relative;
+  border-radius: 2.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background:
+    radial-gradient(120% 45% at 50% 0%, rgba(255, 255, 255, 0.11), transparent 70%),
+    radial-gradient(120% 50% at 50% 100%, rgba(244, 42, 170, 0.26), rgba(119, 90, 246, 0.07) 55%, transparent 80%),
+    rgba(26, 11, 46, 0.62);
+  -webkit-backdrop-filter: blur(26px) saturate(150%);
+  backdrop-filter: blur(26px) saturate(150%);
+  box-shadow: 0 26px 70px -26px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  color: var(--glass-text);
+}
+html:not(.dark) .glass-panel {
+  --glass-line: rgba(90, 40, 130, 0.18);
+  --glass-text-dim: rgba(28, 11, 46, 0.5);
+  --glass-strong: #1c0b2e;
+  --glass-text: #55456d;
+  --glass-soft: #6f5f88;
+  --glass-icon: #a396b8;
+  --glass-accent: #d6208f;
+  border-color: rgba(255, 255, 255, 0.85);
+  background:
+    radial-gradient(120% 45% at 50% 0%, rgba(255, 255, 255, 0.9), transparent 70%),
+    radial-gradient(120% 50% at 50% 100%, rgba(244, 42, 170, 0.2), rgba(119, 90, 246, 0.06) 55%, transparent 80%),
+    rgba(255, 255, 255, 0.66);
+  box-shadow: 0 26px 70px -30px rgba(60, 20, 90, 0.38), 0 0 0 1px rgba(60, 20, 90, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+/* the phone's drawer lies over a dark backdrop, not the page: thicker glass so it reads clean */
+.glass-panel.glass-drawer { background-color: rgba(26, 11, 46, 0.92); }
+html:not(.dark) .glass-panel.glass-drawer { background-color: rgba(255, 255, 255, 0.94); }
+.glass-panel .g-strong { color: var(--glass-strong); }
+.glass-panel .g-text { color: var(--glass-text); }
+.glass-panel .g-soft { color: var(--glass-soft); }
+.glass-panel .g-icon { color: var(--glass-icon); }
+.glass-panel .g-accent { color: var(--glass-accent); }
+.glass-panel .g-dim { color: var(--glass-text-dim); }
+.glass-panel .g-hover:hover { color: var(--glass-strong); }
+.glass-panel .g-input::placeholder { color: var(--glass-soft); }
+.glass-active { background: transparent; }
+.glass-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 1.15rem;
+  width: 3px;
+  transform: translateY(-50%);
+  border-radius: 3px;
+  background: hsl(var(--primary));
+}
+.glass-row { transition: color 0.15s ease; }
+.glass-field { background: transparent; box-shadow: inset 0 -1px 0 var(--glass-line); }
+.glass-kbd { background: transparent; box-shadow: none; }
+.glass-chip { background: #ffffff; color: #2a1740; }
+html.dark .glass-chip { background: #1d1033; color: #eadcf7; }
+.glass-tree { position: relative; border-left: 1px solid var(--glass-line); }
+.glass-tree > li { position: relative; }
+.glass-tree > li::before {
+  content: "";
+  position: absolute;
+  left: -1.05rem;
+  top: 50%;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-left: 1px solid var(--glass-line);
+  border-bottom: 1px solid var(--glass-line);
+  border-bottom-left-radius: 0.65rem;
+  transform: translateY(-88%);
+  pointer-events: none;
+}
+.glass-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--glass-line), transparent); }

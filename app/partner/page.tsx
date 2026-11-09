@@ -29,6 +29,7 @@ import { BarChart, DonutChart } from "@/components/ui/charts";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Reveal } from "@/components/ui/reveal";
+import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { AttentionPanel, type AttentionPanelItem } from "@/components/ui/attention-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { productMeta } from "@/lib/product-meta";
@@ -179,38 +180,33 @@ export default async function PartnerOverviewPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
+      <DashboardHero name={me.name.split(" ")[0]} role="Partner" picture="pink" />
+
+      {/* Who you are with ORA, and the first thing you do. */}
       <Reveal>
-        <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-primary/15 via-card to-accent/10 p-5 shadow-soft sm:p-8">
-          <div className="pointer-events-none absolute -right-10 -top-10 size-48 rounded-full bg-primary/20 blur-3xl" />
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-sm text-muted-foreground">Welcome back,</p>
-              <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                {me.name.split(" ")[0]} 👋
-              </h1>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="font-medium">{me.organization ?? "Partner"}</span>
-                {me.businessType && <Badge variant="accent">{me.businessType}</Badge>}
-                <Badge variant={statusVariant}>{humanize(me.status)}</Badge>
-                <Badge variant={outstanding > 0 ? "warning" : "success"}>
-                  {outstanding > 0 ? "Credit in use" : "Good standing"}
-                </Badge>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Partner since{" "}
-                {me.createdAt.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
-                {me.region ? ` · ${me.region}` : ""}
-              </p>
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">{me.organization ?? "Partner"}</span>
+              {me.businessType && <Badge variant="accent">{me.businessType}</Badge>}
+              <Badge variant={statusVariant}>{humanize(me.status)}</Badge>
+              <Badge variant={outstanding > 0 ? "warning" : "success"}>
+                {outstanding > 0 ? "Credit in use" : "Good standing"}
+              </Badge>
             </div>
-            <Link
-              href="/partner/request"
-              className={cn(buttonVariants({ size: "lg" }), "w-full shrink-0 rounded-full shadow-glow sm:w-auto")}
-            >
-              <PlusCircle className="size-5" />
-              Request stock
-            </Link>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Partner since{" "}
+              {me.createdAt.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
+              {me.region ? ` · ${me.region}` : ""}
+            </p>
           </div>
+          <Link
+            href="/partner/request"
+            className={cn(buttonVariants({ size: "lg" }), "w-full shrink-0 rounded-full shadow-glow sm:w-auto")}
+          >
+            <PlusCircle className="size-5" />
+            Request stock
+          </Link>
         </div>
       </Reveal>
 
