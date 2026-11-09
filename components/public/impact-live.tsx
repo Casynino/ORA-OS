@@ -62,9 +62,10 @@ export function ImpactPulse({
 }
 
 /**
- * "Latest ORA activities" — a softly-rotating list of real work, one hairline row per activity. No cards or icon
- * tiles: the line, then where, what kind and when in muted text. Rows stay one line each so the list never changes
- * height while it rotates.
+ * "Latest ORA activities" — a softly-rotating list of real work, one hairline row per activity, in the cinematic
+ * site's language: a mono index and "when" column, the line in display type that slides and turns pink on hover,
+ * then where and what kind as a mono label. The newest row carries a live dot. Rows keep a fixed height so the list
+ * never changes size while it rotates.
  */
 export function ImpactActivityFeed({
   initial,
@@ -85,7 +86,7 @@ export function ImpactActivityFeed({
 
   if (pool.length === 0) {
     return (
-      <p className={cn("border-y border-border py-6 text-[15px] text-muted-foreground", className)}>
+      <p className={cn("border-y border-white/10 py-8 text-[17px] text-white/60", className)}>
         Our next community activities will appear here — the movement never stops.
       </p>
     );
@@ -97,40 +98,47 @@ export function ImpactActivityFeed({
   );
 
   return (
-    <ul className={cn("relative border-t border-border", className)}>
+    <ul className={cn("relative border-t border-white/10", className)}>
       <AnimatePresence mode="popLayout" initial={false}>
-        {visible.map((a) => {
+        {visible.map((a, j) => {
           const meta = activityMeta(a.type);
           return (
             <motion.li
               key={a.id}
               layout
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: -14 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="flex items-start gap-3 border-b border-border bg-background py-4"
+              exit={{ opacity: 0, y: 14 }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="group grid grid-cols-[2rem_minmax(0,1fr)] items-start gap-x-4 border-b border-white/10 bg-[rgb(var(--s-night))] py-5 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:gap-x-6 sm:py-6"
             >
-              <MapPin className="mt-0.5 size-4 shrink-0 text-primary" strokeWidth={1.5} aria-hidden="true" />
-              <div className="min-w-0 flex-1">
+              <span className="s-label flex items-center gap-2 pt-1.5 tabular-nums">
+                {j === 0 ? (
+                  <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-[rgb(var(--s-pink))] motion-reduce:animate-none" />
+                ) : (
+                  String(j + 1).padStart(2, "0")
+                )}
+              </span>
+              <div className="min-w-0">
                 {/* two fixed lines on phones, one on wider screens, so rotating rows never change the list height */}
-                <p className="line-clamp-2 min-h-[2lh] text-[15px] font-medium leading-snug sm:line-clamp-1 sm:min-h-0">
+                <p className="line-clamp-2 min-h-[2lh] font-site-display text-[17px] font-medium leading-snug tracking-[-0.015em] text-white transition-[color,transform] duration-300 group-hover:translate-x-1 group-hover:text-[rgb(var(--s-pink))] sm:line-clamp-1 sm:min-h-0 sm:text-xl">
                   {impactLine(a)}
                 </p>
-                <p className="mt-1 line-clamp-1 text-[13px] text-muted-foreground">
-                  {a.location}
-                  {a.region ? `, ${a.region}` : ""}
-                  <span aria-hidden="true"> · </span>
-                  {meta.label}
-                  <span className="sm:hidden">
+                <p className="mt-2.5 flex min-w-0 items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-white/50 font-site-mono">
+                  <MapPin className="size-3.5 shrink-0 text-[rgb(var(--s-pink))]" strokeWidth={1.5} aria-hidden="true" />
+                  <span className="truncate">
+                    {a.location}
+                    {a.region ? `, ${a.region}` : ""}
                     <span aria-hidden="true"> · </span>
-                    {timeAgo(new Date(a.at))}
+                    {meta.label}
+                    <span className="sm:hidden">
+                      <span aria-hidden="true"> · </span>
+                      {timeAgo(new Date(a.at))}
+                    </span>
                   </span>
                 </p>
               </div>
-              <span className="hidden shrink-0 pt-0.5 text-[13px] tabular-nums text-muted-foreground sm:block">
-                {timeAgo(new Date(a.at))}
-              </span>
+              <span className="s-label hidden shrink-0 pt-1.5 tabular-nums sm:block">{timeAgo(new Date(a.at))}</span>
             </motion.li>
           );
         })}

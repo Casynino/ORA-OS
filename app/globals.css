@@ -773,14 +773,16 @@ html[data-install-open] .install-hide { opacity: 0; pointer-events: none; }
 .font-site-serif { font-family: var(--font-site-serif), Georgia, serif; font-weight: 400; }
 .font-site-mono { font-family: var(--font-site-mono), ui-monospace, SFMono-Regular, monospace; }
 
-/* index label: [ 01 ] — THE RANGE */
-.s-label {
-  font-family: var(--font-site-mono), ui-monospace, monospace;
-  font-size: 11px; line-height: 1; letter-spacing: 0.22em; text-transform: uppercase;
-  color: rgb(var(--s-ink) / 0.55);
+/* index label: [ 01 ] — THE RANGE. In the components layer so a Tailwind colour class on the same element wins. */
+@layer components {
+  .s-label {
+    font-family: var(--font-site-mono), ui-monospace, monospace;
+    font-size: 11px; line-height: 1; letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgb(var(--s-ink) / 0.55);
+  }
+  .s-outline { color: transparent; -webkit-text-stroke: 1px rgb(var(--s-ink) / 0.32); }
+  .s-outline-pink { color: transparent; -webkit-text-stroke: 1px rgb(var(--s-pink) / 0.7); }
 }
-.s-outline { color: transparent; -webkit-text-stroke: 1px rgb(var(--s-ink) / 0.32); }
-.s-outline-pink { color: transparent; -webkit-text-stroke: 1px rgb(var(--s-pink) / 0.7); }
 .s-hair { border-color: rgb(var(--s-ink) / 0.1); }
 
 /* living background of a band */

@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { ArrowDown, ArrowRight } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { CoverageMap, type StockistDTO } from "@/components/public/coverage-map";
-import { ArchPhoto } from "@/components/public/arch-photo";
-import { Reveal } from "@/components/ui/reveal";
+import { PageHero, SectionHead, btnGhost, btnPrimary } from "@/components/site/page-hero";
+import { Atmosphere, Marquee, Rise } from "@/components/site/motion";
 import { CountUp } from "@/components/ui/count-up";
+import { HeroPacks } from "@/components/site/pages/find-ora/hero-packs";
+import { StockistBand } from "@/components/site/pages/find-ora/stockist-band";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Find ORA",
@@ -15,10 +18,18 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /*
- * Find ORA (unslop pass, 2026-11-09): the map is the hero — heading, live figures and the search sit beside it on large
- * screens and above it on phones. Every outlet follows as a hairline directory. The page ends on one flat plum block
- * with the ORA arch framing packs on a school-event table.
+ * Find ORA (cinematic pass, 2026-11-09): a chapter of the same night site as the home page. A full-bleed crowd photo
+ * opens it with the packs floating at the right; the live figures follow in huge type, then every covered region runs
+ * past as an outlined ticker. [01] is the live map with its search, filters and a region index; [02] the directory of
+ * every outlet; [03] closes on one ORA-pink band with the arch and the packs.
  */
+const STAT_EDGES = [
+  "pr-5 sm:pr-8",
+  "border-l pl-5 sm:pl-8 lg:pr-8",
+  "border-t pr-5 sm:pr-8 lg:border-l lg:border-t-0 lg:pl-8",
+  "border-l border-t pl-5 sm:pl-8 lg:border-t-0",
+];
+
 export default async function FindOraPage() {
   const [stockists, partners] = await Promise.all([
     prisma.stockist.findMany({
@@ -44,69 +55,103 @@ export default async function FindOraPage() {
     { label: "Distribution partners", value: partners },
   ];
 
-  const intro = (
-    <>
-      <p className="ora-rise text-sm font-medium text-primary">Availability & coverage</p>
-      <h1 className="ora-rise ora-rise-1 mt-4 text-balance font-display text-4xl font-semibold leading-[1.05] tracking-[-0.025em] sm:text-5xl lg:text-6xl">
-        ORA is <span className="text-primary">near you</span>
-      </h1>
-      <p className="ora-rise ora-rise-2 mt-6 max-w-xl text-[17px] leading-relaxed text-muted-foreground">
-        From pharmacies to supermarkets to community points — our network keeps growing across Tanzania. Explore it
-        live.
-      </p>
-
-      {/* Live stats */}
-      <dl className="ora-rise ora-rise-3 mt-10 grid max-w-xl grid-cols-2 gap-x-8 gap-y-6 border-t border-border pt-7 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-        {stats.map((s) => (
-          <div key={s.label} className="flex flex-col-reverse justify-end">
-            <dt className="mt-1.5 text-[13px] leading-snug text-muted-foreground">{s.label}</dt>
-            <dd className="font-display text-3xl font-semibold tabular-nums tracking-[-0.02em]">
-              <CountUp value={s.value} />
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </>
-  );
+  // Covered regions, most outlets first, for the ticker under the figures.
+  const byRegion = new Map<string, { name: string; count: number }>();
+  for (const s of stockists) {
+    const key = s.region.trim().toLowerCase();
+    const r = byRegion.get(key) ?? { name: s.region.trim(), count: 0 };
+    r.count++;
+    byRegion.set(key, r);
+  }
+  const regionList = [...byRegion.values()].sort((a, b) => b.count - a.count);
+  const ticker = regionList.length > 0 && regionList.length < 6 ? [...regionList, ...regionList, ...regionList] : regionList;
 
   return (
     <>
-      {/* Hero + map experience + outlet directory */}
-      <section className="container pb-20 pt-16 sm:pb-28 sm:pt-20">
-        <CoverageMap stockists={stockists as StockistDTO[]} intro={intro} />
+      {/* Opening: the crowd, the promise, the packs */}
+      <div className="relative">
+        <PageHero
+          variant="cover"
+          image="/ora/site/wide-GTM00117.jpg"
+          imageAlt="A crowd of girls gathered outdoors at an ORA event"
+          label="Availability & coverage"
+          title="ORA is near you"
+          accent={["you"]}
+          intro="From pharmacies to supermarkets to community points — our network keeps growing across Tanzania. Explore it live."
+          actions={
+            <>
+              <a href="#map" className={btnPrimary}>
+                Explore the map
+                <ArrowDown className="size-4" strokeWidth={1.75} aria-hidden="true" />
+              </a>
+              <a href="#outlets" className={btnGhost}>
+                See every outlet
+                <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" strokeWidth={1.5} aria-hidden="true" />
+              </a>
+            </>
+          }
+        />
+        <HeroPacks />
+      </div>
+
+      {/* The live figures, big */}
+      <section className="relative border-y border-white/10">
+        <dl className="mx-auto grid max-w-[1440px] grid-cols-2 px-5 sm:px-8 lg:grid-cols-4">
+          {stats.map((s, i) => (
+            <Rise key={s.label} delay={i * 0.08} className={cn("border-white/10 py-8 sm:py-12", STAT_EDGES[i])}>
+              <dt className="s-label !leading-[1.6]">
+                <span className="text-[rgb(var(--s-pink))]">0{i + 1}</span>
+                <span aria-hidden className="mx-2 text-white/25">/</span>
+                {s.label}
+              </dt>
+              <dd className="mt-4 font-site-display text-[clamp(2.9rem,7vw,6.2rem)] font-semibold leading-none tracking-[-0.045em] tabular-nums">
+                <CountUp value={s.value} />
+              </dd>
+            </Rise>
+          ))}
+        </dl>
       </section>
 
-      {/* Become a stockist */}
-      <section className="container pb-20 sm:pb-28">
-        <Reveal>
-          <div className="grid grid-cols-1 overflow-hidden rounded-2xl bg-[#2a0845] text-white sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
-            <div className="self-center p-8 sm:p-12 lg:p-16">
-              <h2 className="text-balance font-display text-3xl font-semibold tracking-[-0.025em] sm:text-4xl">
-                Want ORA on your shelves?
-              </h2>
-              <p className="mt-4 max-w-md text-[17px] leading-relaxed text-white/75">
-                Pharmacies, shops, schools and NGOs across Tanzania partner with ORA every month. Join the network.
-              </p>
-              <Link
-                href="/request-access"
-                className="mt-8 inline-flex h-12 items-center rounded-full bg-white px-6 text-[15px] font-medium text-[#2a0845] transition-[background-color,transform] duration-150 hover:bg-white/90 active:scale-[0.97]"
-              >
-                Become a stockist
-              </Link>
-            </div>
-            <div className="flex items-end justify-center px-8 sm:justify-start sm:px-0 sm:pr-12 sm:pt-12 lg:pr-16">
-              <ArchPhoto
-                src="/ora/gallery/g2.jpg"
-                alt="A student at an ORA school event beside packs of ORA pads stacked on a table"
-                sizes="(max-width: 640px) 240px, 300px"
-                position="40% 50%"
-                outline
-                className="-mb-4 w-full max-w-[240px] sm:max-w-[300px]"
+      {/* Every covered region, running past */}
+      {ticker.length > 0 && (
+        <div className="border-b border-white/10 py-8 sm:py-11">
+          <Marquee
+            duration={Math.max(36, ticker.length * 5)}
+            itemClassName="font-site-display text-[clamp(2.4rem,6.4vw,5.8rem)] font-semibold uppercase leading-none tracking-[-0.035em]"
+            items={ticker.map((r, i) => (
+              <span key={i} className="flex items-start gap-3">
+                <span className={i % 2 ? "s-outline [-webkit-text-stroke-width:1.5px]" : "text-white"}>{r.name}</span>
+                <span className="font-site-mono text-[0.2em] font-normal leading-none tracking-[0.1em] text-white/45 sm:text-[0.16em]">
+                  {String(r.count).padStart(2, "0")}
+                </span>
+              </span>
+            ))}
+          />
+        </div>
+      )}
+
+      {/* [01] The live map — and [02] the directory, which shares its search */}
+      <section id="map" className="relative isolate scroll-mt-16 pb-24 pt-20 sm:pb-32 sm:pt-28">
+        <Atmosphere variant="c" grid={false} className="-z-10 opacity-60" />
+        <div className="relative mx-auto max-w-[1440px] px-5 sm:px-8">
+          <CoverageMap
+            stockists={stockists as StockistDTO[]}
+            intro={
+              <SectionHead
+                index="01"
+                label="Live coverage"
+                aside="Tap a region"
+                title="Tap a region, see every outlet"
+                accent={["outlet"]}
+                note="Search by region, district or store, or pick the kind of place you shop at. The map and the list of outlets below follow along."
               />
-            </div>
-          </div>
-        </Reveal>
+            }
+          />
+        </div>
       </section>
+
+      {/* [03] Become a stockist */}
+      <StockistBand />
     </>
   );
 }

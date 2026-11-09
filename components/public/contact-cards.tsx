@@ -3,7 +3,7 @@ import { TikTokIcon } from "./social-links";
 import { ORA_CONTACT } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
-const iconClass = "size-5 shrink-0 text-muted-foreground transition-colors duration-150 group-hover:text-primary";
+const iconClass = "size-4 shrink-0 text-white/55 transition-colors duration-300 group-hover:text-[rgb(var(--s-pink))]";
 
 const methods = [
   {
@@ -40,31 +40,41 @@ const methods = [
   },
 ];
 
-/** Tappable contact methods — phone (tel:), email (mailto:), socials — as one hairline list. */
+/**
+ * Tappable contact methods — phone (tel:), email (mailto:), socials — as an index of big rows: an outlined number,
+ * the way in large, and an arrow that fills pink and turns while a light slides in behind the row.
+ */
 export function ContactCards({ className }: { className?: string }) {
   return (
-    <ul className={cn("divide-y divide-border border-y border-border", className)}>
-      {methods.map((m) => (
+    <ul className={cn("border-t border-white/10", className)}>
+      {methods.map((m, i) => (
         <li key={m.label}>
           <a
             href={m.href}
             aria-label={m.aria}
             title={m.aria}
             {...(m.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-            className="group flex items-center gap-4 py-5 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="group relative isolate grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 overflow-hidden border-b border-white/10 py-6 outline-none focus-visible:bg-white/[0.04] sm:grid-cols-[120px_minmax(0,1fr)_auto] sm:gap-8 sm:py-9"
           >
-            {m.icon}
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13px] text-muted-foreground">{m.label}</span>
-              <span className="mt-0.5 block truncate text-[17px] font-medium tabular-nums transition-colors duration-150 group-hover:text-primary">
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 -z-10 origin-left scale-x-0 bg-white/[0.035] transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-x-100"
+            />
+            <span aria-hidden="true" className="hidden whitespace-nowrap font-site-display text-[3.4rem] font-semibold leading-none tracking-[-0.05em] s-outline sm:block">
+              0{i + 1}
+            </span>
+            <span className="min-w-0">
+              <span className="flex items-center gap-2.5 s-label">
+                {m.icon}
+                {m.label}
+              </span>
+              <span className="mt-3 block font-site-display text-[clamp(1.25rem,4.4vw,3.4rem)] font-semibold leading-[1.02] tracking-[-0.03em] tabular-nums [overflow-wrap:anywhere] transition-[color,transform] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-2 group-hover:text-[rgb(var(--s-pink))]">
                 {m.value}
               </span>
             </span>
-            <ArrowUpRight
-              className="size-4 shrink-0 text-muted-foreground transition-[transform,color] duration-150 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary"
-              strokeWidth={1.5}
-              aria-hidden="true"
-            />
+            <span className="grid size-11 shrink-0 place-items-center rounded-full border border-white/20 text-white transition-colors duration-300 group-hover:border-[rgb(var(--s-pink))] group-hover:bg-[rgb(var(--s-pink))] sm:size-14">
+              <ArrowUpRight className="size-5 transition-transform duration-300 group-hover:rotate-45" strokeWidth={1.5} aria-hidden="true" />
+            </span>
           </a>
         </li>
       ))}

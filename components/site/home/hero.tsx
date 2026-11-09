@@ -123,7 +123,7 @@ export function Hero({ stats, feed }: { stats: Stat[]; feed: ImpactFeedItem[] })
           </motion.div>
 
           <motion.div style={L0} className="absolute inset-x-[10%] bottom-0 top-[4%]">
-            <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45, duration: 1.3, ease: EASE }} className="relative h-full w-full">
+            <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45, duration: 1.3, ease: EASE }} className="relative h-full w-full [-webkit-mask-image:linear-gradient(to_bottom,#000_68%,transparent_97%),linear-gradient(to_right,transparent_0%,#000_12%)] [-webkit-mask-composite:source-in] [mask-composite:intersect] [mask-image:linear-gradient(to_bottom,#000_68%,transparent_97%),linear-gradient(to_right,transparent_0%,#000_12%)]">
               <Image
                 src="/ora/site/model-hold.webp"
                 alt="A young woman in an ORA polo holding up ORA sanitary pads"
@@ -135,9 +135,9 @@ export function Hero({ stats, feed }: { stats: Stat[]; feed: ImpactFeedItem[] })
             </motion.div>
           </motion.div>
 
-          <Pack style={L1} delay={0.7} src="/ora/site/pack-night.webp" alt="ORA night pads, 360 mm" className="left-[-4%] top-[10%] w-[40%]" float="--dur:7s;--amp:-16px;--r0:-14deg;--r1:-9deg" />
-          <Pack style={L2} delay={0.85} src="/ora/site/pack-day.webp" alt="ORA day pads, 290 mm" className="right-[-6%] top-[38%] w-[38%]" float="--dur:8.5s;--amp:-22px;--r0:12deg;--r1:7deg;--delay:-2s" />
-          <Pack style={L3} delay={1} src="/ora/site/pack-liner.webp" alt="ORA daily liners, 180 mm" className="bottom-[2%] left-[4%] w-[26%]" float="--dur:6.5s;--amp:-12px;--r0:-6deg;--r1:-1deg;--delay:-1s" />
+          <Pack style={L1} delay={0.7} src="/ora/site/pack-night.webp" alt="ORA night pads, 360 mm" className="left-[-6%] top-[50%] w-[36%]" float="--dur:7s;--amp:-16px;--r0:-14deg;--r1:-9deg" />
+          <Pack style={L2} delay={0.85} src="/ora/site/pack-day.webp" alt="ORA day pads, 290 mm" className="right-[-7%] top-[8%] w-[34%]" float="--dur:8.5s;--amp:-22px;--r0:12deg;--r1:7deg;--delay:-2s" />
+          <Pack style={L3} delay={1} src="/ora/site/pack-liner.webp" alt="ORA daily liners, 180 mm" className="bottom-[0%] right-[2%] w-[24%]" float="--dur:6.5s;--amp:-12px;--r0:8deg;--r1:3deg;--delay:-1s" />
         </div>
       </div>
 

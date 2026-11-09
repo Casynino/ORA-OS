@@ -3,7 +3,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import { listPublicPosts } from "@/lib/services/news";
-import { Reveal } from "@/components/ui/reveal";
+import { Magnetic, Marquee, Parallax, Rise, SectionLabel } from "@/components/site/motion";
+import { PageHero, SectionHead, btnGhost, btnPrimary } from "@/components/site/page-hero";
+import { ArrowCircle, ClosingBand, MONO, PINK, pad } from "@/components/site/pages/education-news/parts";
+import { StoryIndex } from "@/components/site/pages/education-news/story-index";
 import { cn, humanize } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -13,10 +16,8 @@ export const metadata: Metadata = {
 };
 
 const FALLBACK = "/ora/event/e09.jpg";
-const IMG_HOVER =
-  "object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03]";
 const FOCUS =
-  "rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background";
+  "outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--s-pink))] focus-visible:ring-offset-4 focus-visible:ring-offset-[rgb(var(--s-night))]";
 
 function fmt(d: Date) {
   return d.toLocaleDateString("en-GB", {
@@ -31,109 +32,142 @@ export default async function NewsPage() {
   const [featured, ...rest] = posts;
 
   return (
-    <div className="container pb-20 pt-16 sm:pb-28 sm:pt-24">
-      <div className="max-w-3xl">
-        <p className="ora-rise text-sm font-medium text-primary">Newsroom</p>
-        <h1 className="ora-rise ora-rise-1 mt-4 text-balance font-display text-4xl font-semibold leading-[1.05] tracking-[-0.025em] sm:text-5xl lg:text-6xl">
-          News &amp; <span className="text-primary">announcements</span>
-        </h1>
-        <p className="ora-rise ora-rise-2 mt-6 max-w-2xl text-[17px] leading-relaxed text-muted-foreground sm:text-lg">
-          Stories, milestones and updates from ORA outreach across Tanzania.
-        </p>
+    <>
+      {/* ── Hero: the crowd outdoors under night light ── */}
+      <PageHero
+        variant="cover"
+        image="/ora/site/wide-GTM00117.jpg"
+        imageAlt="A crowd of girls outdoors at an ORA school visit"
+        label="Newsroom"
+        aside={posts.length > 0 ? `${pad(posts.length)} stories` : undefined}
+        title="News & announcements"
+        accent={["announcements"]}
+        intro="Stories, milestones and updates from ORA outreach across Tanzania."
+      />
+
+      {/* ── The band of words ── */}
+      <div className="relative border-y border-white/[0.08] bg-[rgb(var(--s-pink))] py-4 text-white sm:py-5">
+        <Marquee
+          duration={30}
+          itemClassName="font-site-display text-[clamp(1.1rem,2.4vw,1.8rem)] font-semibold uppercase tracking-[-0.01em] [&>span]:bg-white"
+          items={["Stories", "Milestones", "Updates", "ORA outreach across Tanzania"]}
+        />
       </div>
 
       {posts.length === 0 ? (
-        <div className="mt-14 border-t border-border pt-8">
-          <h2 className="font-display text-xl font-semibold tracking-[-0.015em]">No posts yet</h2>
-          <p className="mt-2 max-w-md text-[15px] leading-relaxed text-muted-foreground">
-            Check back soon — news and announcements are posted here.
-          </p>
-        </div>
+        <section className="relative py-24 sm:py-32">
+          <div className="mx-auto max-w-[1440px] px-5 sm:px-8">
+            <SectionLabel index="01" label="The latest" />
+            <Rise className="mt-12 max-w-2xl">
+              <h2 className="font-site-display text-[clamp(1.8rem,3.6vw,3rem)] font-semibold uppercase leading-[1] tracking-[-0.03em]">No posts yet</h2>
+              <p className="mt-5 max-w-md text-[17px] leading-relaxed text-white/65">
+                Check back soon — news and announcements are posted here.
+              </p>
+            </Rise>
+          </div>
+        </section>
       ) : (
         <>
-          {/* The latest story, large */}
-          <Reveal className="mt-14 sm:mt-20">
-            <Link
-              href={`/news/${featured.slug}`}
-              className={cn(
-                "group grid grid-cols-1 gap-7 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:items-center md:gap-12 lg:gap-16",
-                FOCUS,
-              )}
-            >
-              <div className="relative aspect-[16/11] overflow-hidden rounded-2xl bg-muted">
-                <Image
-                  src={featured.coverImage ?? FALLBACK}
-                  alt={featured.title}
-                  fill
-                  sizes="(min-width:768px) 55vw, 100vw"
-                  className={IMG_HOVER}
-                  priority
-                />
-              </div>
-              <div>
-                <p className="text-sm">
-                  <span className="font-medium text-primary">{humanize(featured.category)}</span>
-                  <span className="text-muted-foreground">
-                    {" · "}
-                    <time dateTime={featured.publishedAt.toISOString()} className="tabular-nums">
-                      {fmt(featured.publishedAt)}
-                    </time>
+          {/* ── 01 The latest story, cinema-sized ── */}
+          <section className="relative py-20 sm:py-28">
+            <div className="mx-auto max-w-[1440px] px-5 sm:px-8">
+              <SectionLabel index="01" label="The latest" aside={humanize(featured.category)} />
+              <Rise className="mt-12">
+                <Link
+                  href={`/news/${featured.slug}`}
+                  className={cn("group relative isolate flex min-h-[600px] flex-col justify-end overflow-hidden rounded-[28px] border border-white/10 sm:min-h-[78svh]", FOCUS)}
+                >
+                  <Parallax speed={0.08} className="absolute inset-0 -z-10">
+                    <Image
+                      src={featured.coverImage ?? FALLBACK}
+                      alt={featured.title}
+                      fill
+                      sizes="(min-width:1440px) 1376px, 100vw"
+                      className="object-cover transition-transform duration-[1.4s] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
+                      priority
+                    />
+                  </Parallax>
+                  <div aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(to_top,rgb(11_6_18/0.97)_0%,rgb(11_6_18/0.86)_40%,rgb(11_6_18/0.35)_80%,rgb(11_6_18/0.2)_100%)]" />
+                  <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-r from-[rgb(11_6_18/0.5)] to-transparent" />
+                  <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_15%_100%,rgb(255_63_168/0.28),transparent_55%)]" />
+                  <span className={cn(MONO, "absolute left-6 top-6 rounded-full bg-[rgb(11_6_18/0.6)] px-3.5 py-2 text-white backdrop-blur-md sm:left-10 sm:top-10 lg:left-14")}>
+                    Latest story
                   </span>
-                </p>
-                <h2 className="mt-4 text-balance font-display text-3xl font-semibold leading-[1.1] tracking-[-0.025em] sm:text-4xl">
-                  {featured.title}
-                </h2>
-                <p className="mt-4 text-[17px] leading-relaxed text-muted-foreground">{featured.excerpt}</p>
-                <span className="mt-6 inline-flex items-center gap-2 text-[15px] font-medium text-primary">
-                  Read more
-                  <ArrowRight className="size-4 transition-transform duration-150 group-hover:translate-x-0.5" strokeWidth={1.5} aria-hidden="true" />
-                </span>
-              </div>
-            </Link>
-          </Reveal>
+                  <div className="grid grid-cols-1 gap-8 p-6 sm:p-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:p-14">
+                    <div className="min-w-0">
+                      <p className={cn(MONO, "text-white/70")}>
+                        <span className={PINK}>{humanize(featured.category)}</span>
+                        {" · "}
+                        <time dateTime={featured.publishedAt.toISOString()} className="tabular-nums">
+                          {fmt(featured.publishedAt)}
+                        </time>
+                      </p>
+                      <h2 className="mt-5 max-w-5xl text-pretty font-site-display text-[clamp(1.6rem,4.2vw,4.2rem)] font-semibold leading-[1.02] tracking-[-0.035em] text-white">
+                        {featured.title}
+                      </h2>
+                      <p className="mt-5 line-clamp-4 max-w-2xl text-[16px] leading-relaxed text-white/75 sm:line-clamp-none sm:text-[17px]">{featured.excerpt}</p>
+                    </div>
+                    <span className="inline-flex items-center gap-4 text-[15px] font-medium text-white">
+                      <ArrowCircle size="lg" />
+                      Read more
+                    </span>
+                  </div>
+                </Link>
+              </Rise>
+            </div>
+          </section>
 
-          {/* Everything else, as a list with hairlines */}
+          {/* ── 02 Everything else, as an index ── */}
           {rest.length > 0 && (
-            <ul className="mt-16 divide-y divide-border border-y border-border sm:mt-20">
-              {rest.map((p, i) => (
-                <li key={p.id}>
-                  <Reveal delay={Math.min(i, 5) * 0.06}>
-                    <Link
-                      href={`/news/${p.slug}`}
-                      className="group grid grid-cols-[auto_minmax(0,1fr)] items-start gap-5 py-6 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:gap-10 sm:py-8"
-                    >
-                      <div className="relative aspect-[4/3] w-24 shrink-0 overflow-hidden rounded-xl bg-muted sm:w-48 lg:w-60">
-                        <Image
-                          src={p.coverImage ?? FALLBACK}
-                          alt={p.title}
-                          fill
-                          sizes="(min-width:1024px) 240px, (min-width:640px) 192px, 96px"
-                          className={IMG_HOVER}
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[13px] text-muted-foreground">
-                          <span className="font-medium text-primary">{humanize(p.category)}</span>
-                          {" · "}
-                          <time dateTime={p.publishedAt.toISOString()} className="tabular-nums">
-                            {fmt(p.publishedAt)}
-                          </time>
-                        </p>
-                        <h3 className="mt-2 text-pretty font-display text-lg font-semibold leading-snug tracking-[-0.015em] transition-colors duration-150 group-hover:text-primary sm:text-2xl">
-                          {p.title}
-                        </h3>
-                        <p className="mt-2 line-clamp-2 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">
-                          {p.excerpt}
-                        </p>
-                      </div>
-                    </Link>
-                  </Reveal>
-                </li>
-              ))}
-            </ul>
+            <section className="relative py-20 sm:py-28">
+              <div className="mx-auto max-w-[1440px] px-5 sm:px-8">
+                <SectionHead
+                  index="02"
+                  label="All stories"
+                  aside={`${pad(rest.length)} more`}
+                  title="More from the newsroom"
+                  accent={["newsroom"]}
+                  note="Every story from ORA outreach, in one place — open one to read it in full."
+                />
+                <div className="mt-14">
+                  <StoryIndex
+                    start={2}
+                    items={rest.map((p) => ({
+                      href: `/news/${p.slug}`,
+                      title: p.title,
+                      excerpt: p.excerpt,
+                      img: p.coverImage ?? FALLBACK,
+                      alt: p.title,
+                      kicker: humanize(p.category),
+                      date: fmt(p.publishedAt),
+                      dateTime: p.publishedAt.toISOString(),
+                    }))}
+                  />
+                </div>
+              </div>
+            </section>
           )}
         </>
       )}
-    </div>
+
+      {/* ── Closing ── */}
+      <ClosingBand
+        label="Be part of the story"
+        title="Be part of the next story"
+        accent={["next"]}
+        image="/ora/site/wide-GTM00145.jpg"
+        body="Your support helps us reach the next school, the next community."
+      >
+        <Magnetic>
+          <Link href="/impact" className={cn(btnPrimary, FOCUS)}>
+            Join the movement
+          </Link>
+        </Magnetic>
+        <Link href="/contact" className={cn(btnGhost, FOCUS)}>
+          Talk to the team
+          <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" strokeWidth={1.5} aria-hidden="true" />
+        </Link>
+      </ClosingBand>
+    </>
   );
 }
