@@ -113,13 +113,13 @@ export function LoginScreen({
         <p className="mt-1 text-[11px] text-white/40 [@media(max-height:480px)]:hidden">© {new Date().getFullYear()} ORA-Pads · Period dignity for all</p>
 
         {/* Who made the system — one quiet line to Nino's page and work (only here, on the sign-in page): the system's name
-            and "by Nino", worded like the other systems' sign-in pages ("The Distribution Chain by Nino", "Sales Inventory
+            ("Pad Distribution Chain", owner's words) and "by Nino", worded like the other systems' sign-in pages ("The Distribution Chain by Nino", "Sales Inventory
             System by Nino", "Sea Freight System by Nino"), plain text with no pill or badge around it (owner, 2026-11-09). */}
         <p className="mt-1 flex flex-wrap items-center justify-center gap-x-1.5 text-xs text-white/55">
-          <span>Pad Distribution System</span>
+          <span>Pad Distribution Chain</span>
           <Link
             href="/nino"
-            aria-label="Pad Distribution System by Nino: see his work"
+            aria-label="Pad Distribution Chain by Nino: see his work"
             className="group inline-flex min-h-10 items-center gap-1 rounded-sm transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
           >
             by <span className="font-semibold text-white/80 transition-colors group-hover:text-primary">Nino</span>
