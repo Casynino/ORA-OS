@@ -27,10 +27,12 @@ export function CampaignMarquee() {
   return (
     <div className="marquee-row overflow-hidden">
       <div className="flex w-max animate-marquee">
+        {/* each photo in the ORA arch (the logo's window): a row of arches, like the stage backdrops */}
         {items.map((src, i) => (
           <div
             key={`${src}-${i}`}
-            className="relative mr-4 size-60 shrink-0 overflow-hidden rounded-2xl shadow-soft ring-1 ring-border sm:size-72"
+            className="relative mr-4 h-[300px] w-[240px] shrink-0 overflow-hidden bg-muted sm:mr-5 sm:h-[360px] sm:w-[288px]"
+            style={{ borderRadius: "50% 50% 14px 14px / 40% 40% 14px 14px" }}
           >
             <Image
               src={src}

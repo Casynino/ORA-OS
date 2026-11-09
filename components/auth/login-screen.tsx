@@ -43,10 +43,8 @@ export function LoginScreen({
             <Image src={s.src} alt="" fill priority={i === 0} sizes="100vw" className="object-cover" />
           </div>
         ))}
-        {/* Brand colour wash + a dark base so text always reads */}
+        {/* A dark plum base so the text always reads (no colour blobs) */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#0b0014]/80 via-[#0b0014]/50 to-[#0b0014]/95" />
-        <div className="absolute -left-24 -top-24 size-[26rem] rounded-full bg-primary/30 blur-[120px]" />
-        <div className="absolute -bottom-32 -right-20 size-[30rem] rounded-full bg-accent/30 blur-[130px]" />
       </div>
 
       {/* ── Content ─────────────────────────────────────────── */}
@@ -54,23 +52,23 @@ export function LoginScreen({
         {/* No browser bar in the home-screen app, so there is always a way back. */}
         <Link
           href="/"
-          className="mr-auto inline-flex h-9 items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3.5 text-[13px] text-white/80 backdrop-blur-sm transition-colors hover:bg-white/10 hover:text-white"
+          className="group mr-auto inline-flex h-10 items-center gap-2 text-[14px] text-white/75 transition-colors hover:text-white"
         >
-          <ArrowLeft className="size-3.5" />
+          <ArrowLeft className="size-4 transition-transform duration-150 group-hover:-translate-x-0.5" strokeWidth={1.5} />
           Back to site
         </Link>
         <Link href="/" aria-label="ORA-Pads home" className="mt-3 sm:mt-6">
           <Logo mark="light" priority className="h-28 sm:h-36 [@media(max-height:560px)]:h-16 [@media(max-height:560px)]:sm:h-16" />
         </Link>
-        <span className="mt-4 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-medium text-white/80 backdrop-blur-sm [@media(max-height:480px)]:hidden">
+        <span className="mt-4 text-[13px] text-white/65 [@media(max-height:480px)]:hidden">
           The ORA Movement · Tanzania
         </span>
 
         <div className="min-h-6 flex-1" />
 
         <div className="w-full max-w-md pb-2">
-          <h1 className="font-display text-[2rem] font-bold leading-[1.1] sm:text-4xl [@media(max-height:480px)]:text-2xl">
-            Put a pad in <span className="text-gradient">every girl&apos;s hand.</span>
+          <h1 className="text-balance font-display text-[2rem] font-semibold leading-[1.1] tracking-[-0.02em] sm:text-4xl [@media(max-height:480px)]:text-2xl">
+            Put a pad in <span className="text-[hsl(322_100%_72%)]">every girl&apos;s hand.</span>
           </h1>
           <p className="mt-3 text-[15px] text-white/80 [@media(max-height:480px)]:hidden">Orders, stock, sales and credit in one place.</p>
 
@@ -79,7 +77,7 @@ export function LoginScreen({
             type="button"
             onClick={() => setOpen(true)}
             aria-haspopup="dialog"
-            className="mx-auto mt-7 [@media(max-height:480px)]:mt-3 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-10 text-base font-semibold text-white shadow-glow ring-1 ring-white/20 transition-transform active:scale-[0.98]"
+            className="mx-auto mt-7 [@media(max-height:480px)]:mt-3 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-primary px-10 text-base font-medium text-white transition-[background-color,transform] duration-150 hover:bg-primary/90 active:scale-[0.97]"
           >
             Log in <ArrowRight className="size-5" />
           </button>

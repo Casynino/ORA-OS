@@ -6,7 +6,6 @@ import { Menu, X, LayoutDashboard } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { buttonVariants } from "@/components/ui/button";
 import { SocialLinks } from "@/components/public/social-links";
-import { cn } from "@/lib/utils";
 
 const nav = [
   { href: "/impact", label: "Impact" },
@@ -32,7 +31,7 @@ export function SiteHeader({
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-[var(--sat)] z-40 border-b border-border/70 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-40 border-b border-border bg-background pt-[var(--sat)]">
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" aria-label="ORA-Pads home">
           <Logo />
@@ -43,7 +42,7 @@ export function SiteHeader({
             <Link
               key={n.href}
               href={n.href}
-              className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="rounded-md px-3 py-2 text-[14px] text-muted-foreground transition-colors hover:text-foreground"
             >
               {n.label}
             </Link>
@@ -56,21 +55,18 @@ export function SiteHeader({
               href={dash(user.role)}
               className={buttonVariants({ size: "sm" })}
             >
-              <LayoutDashboard className="size-4" />
-              My Home
+              <LayoutDashboard className="size-4" strokeWidth={1.5} />
+              My home
             </Link>
           ) : (
             <>
-              <Link
-                href="/login"
-                className={buttonVariants({ variant: "ghost", size: "sm" })}
-              >
+              <Link href="/login" className="px-2 text-[14px] text-muted-foreground transition-colors hover:text-foreground">
                 Sign in
               </Link>
               <Link
                 href="/impact"
-                className={buttonVariants({ size: "sm" })}
-              >Join the Movement</Link>
+                className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-[14px] font-medium text-primary-foreground transition-[background-color,transform] duration-150 hover:bg-primary/90 active:scale-[0.97]"
+              >Join the movement</Link>
             </>
           )}
         </div>
@@ -80,50 +76,50 @@ export function SiteHeader({
           onClick={() => setOpen((v) => !v)}
           aria-label="Toggle menu"
         >
-          {open ? <X className="size-5" /> : <Menu className="size-5" />}
+          {open ? <X className="size-5" strokeWidth={1.5} /> : <Menu className="size-5" strokeWidth={1.5} />}
         </button>
       </div>
 
       {open && (
-        <div className="border-t border-border bg-background md:hidden">
-          <div className="container flex flex-col gap-1 py-3">
+        <div className="ora-rise border-t border-border bg-background md:hidden">
+          <div className="container flex flex-col py-2">
             {nav.map((n) => (
               <Link
                 key={n.href}
                 href={n.href}
                 onClick={() => setOpen(false)}
-                className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="flex h-12 items-center border-b border-border text-[15px] text-foreground/80 transition-colors hover:text-foreground"
               >
                 {n.label}
               </Link>
             ))}
-            <div className="mt-2 flex flex-col gap-2">
+            <div className="mt-4 flex gap-3">
               {user ? (
                 <Link
                   href={dash(user.role)}
-                  className={buttonVariants({ size: "sm" })}
+                  className="flex h-11 flex-1 items-center justify-center rounded-full bg-primary text-[15px] font-medium text-primary-foreground"
                   onClick={() => setOpen(false)}
                 >
-                  Go to my Home
+                  Go to my home
                 </Link>
               ) : (
                 <>
                   <Link
+                    href="/impact"
+                    className="flex h-11 flex-1 items-center justify-center rounded-full bg-primary text-[15px] font-medium text-primary-foreground"
+                    onClick={() => setOpen(false)}
+                  >Join the movement</Link>
+                  <Link
                     href="/login"
-                    className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                    className="flex h-11 flex-1 items-center justify-center rounded-full border border-border text-[15px]"
                     onClick={() => setOpen(false)}
                   >
                     Sign in
                   </Link>
-                  <Link
-                    href="/impact"
-                    className={buttonVariants({ size: "sm" })}
-                    onClick={() => setOpen(false)}
-                  >Join the Movement</Link>
                 </>
               )}
             </div>
-            <div className="mt-3 flex items-center justify-between border-t border-border px-3 pt-3">
+            <div className="mt-5 flex items-center justify-between pb-3">
               <span className="text-sm text-muted-foreground">Follow ORA</span>
               <SocialLinks
                 itemClassName="size-8 bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground"

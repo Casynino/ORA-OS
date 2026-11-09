@@ -1,28 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
-import {
-  Heart,
-  ArrowRight,
-  MapPin,
-  Package,
-  HeartHandshake,
-  Users,
-  ShieldCheck,
-  GraduationCap,
-  CalendarHeart,
-  Phone,
-  Mail,
-  Sparkles,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button";
+import { Heart, ArrowRight, Users, ShieldCheck, GraduationCap, CalendarHeart, Phone, Mail } from "lucide-react";
 import { Reveal } from "@/components/ui/reveal";
 import { CountUp } from "@/components/ui/count-up";
 import { Logo } from "@/components/brand/logo";
 import { LandingHeader } from "@/components/public/landing-header";
 import { ProductShowcase } from "@/components/public/product-showcase";
 import { CampaignMarquee } from "@/components/public/campaign-marquee";
-import { AuroraBackground } from "@/components/public/aurora-background";
+import { ArchPhoto } from "@/components/public/arch-photo";
 import { SocialLinks } from "@/components/public/social-links";
 import { ORA_CONTACT } from "@/lib/constants";
 import { listPublicPosts } from "@/lib/services/news";
@@ -34,269 +19,261 @@ import { ImpactPulse } from "@/components/public/impact-live";
 // build-time snapshot), so impact stats are always current.
 export const dynamic = "force-dynamic";
 
+/*
+ * The public home page (refreshed 2026-11-09 with the unslop pass: owner asked for a fresher, calmer look that no
+ * longer reads as AI-made, without changing too much). Same sections in the same order. The colour lives in the real
+ * photos and the packs; the chrome is quiet — one magenta accent, hairlines, no glass, glows, gradient tiles or pills
+ * around labels. ORA's signature is the arch of its logo, used as the window for the photos that carry the brand.
+ * Motion: one entrance on load (the arch rises, the words follow), a fade-and-rise as sections come into view.
+ */
+
+const PINK = "text-[hsl(322_100%_72%)]"; // ORA magenta, lifted for text on the plum ground
+
 export default async function HomePage() {
   const stats = await getPublicImpactStats();
   const impactFeed = await getImpactFeed();
 
   const heroStats = [
-    { label: "Regions Covered", value: stats.regionsCovered, suffix: "+", icon: MapPin },
-    { label: "Packs Distributed", value: stats.padsDistributed, suffix: "+", icon: Package },
-    { label: "Girls Reached", value: stats.girlsReached, suffix: "+", icon: HeartHandshake },
-    { label: "Communities Supported", value: stats.communities, suffix: "+", icon: Users },
+    { label: "Regions covered", value: stats.regionsCovered },
+    { label: "Packs distributed", value: stats.padsDistributed },
+    { label: "Girls reached", value: stats.girlsReached },
+    { label: "Communities supported", value: stats.communities },
   ];
 
   const features = [
-    { icon: ShieldCheck, title: "Premium Quality", body: "High-quality pads designed for comfort and protection." },
-    { icon: GraduationCap, title: "Education First", body: "Empowering girls with knowledge about their bodies and health." },
-    { icon: Users, title: "Community Impact", body: "Working with schools, communities and partners to create change." },
-    { icon: Heart, title: "Dignity for All", body: "Every girl deserves to live her life with dignity and confidence." },
+    { icon: ShieldCheck, title: "Premium quality", body: "High-quality pads designed for comfort and protection." },
+    { icon: GraduationCap, title: "Education first", body: "Empowering girls with knowledge about their bodies and health." },
+    { icon: Users, title: "Community impact", body: "Working with schools, communities and partners to create change." },
+    { icon: Heart, title: "Dignity for all", body: "Every girl deserves to live her life with dignity and confidence." },
   ];
 
   const newsPosts = await listPublicPosts(3);
   const news = newsPosts.map((n) => ({
     slug: n.slug,
     title: n.title,
-    date: n.publishedAt.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }),
+    date: n.publishedAt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
     img: n.coverImage ?? "/ora/event/e09.jpg",
   }));
   const activities = ["/ora/event/e28.jpg", "/ora/event/e06.jpg", "/ora/event/e08.jpg", "/ora/event/e32.jpg"];
 
   return (
     <>
-      <AuroraBackground />
       <LandingHeader />
 
-      {/* Hero */}
-      <section className="relative min-h-screen overflow-hidden">
-        <div className="absolute inset-0">
-          <Image
-            src="/ora/gallery/g4.jpg"
-            alt="ORA community in Tanzania"
-            fill
-            priority
-            sizes="100vw"
-            className="animate-ken-burns object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0d0016] via-[#0d0016]/85 to-[#0d0016]/30" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0d0016] via-transparent to-[#0d0016]/50" />
-        </div>
-
-        <div className="container relative z-10 flex min-h-screen flex-col justify-center pb-16 pt-28">
-          <Reveal>
-            <h1 className="font-display text-5xl font-extrabold leading-[1.04] text-white sm:text-6xl lg:text-7xl">
-              Empowering
-              <br />
-              <span className="text-gradient">Every Cycle</span>
+      {/* ── Hero: the words on the plum ground, the ORA stage in the arch ── */}
+      <section className="relative overflow-hidden bg-[#0d0016] text-white">
+        <div className="container grid min-h-[100svh] grid-cols-1 content-center gap-x-16 gap-y-12 pb-16 pt-[calc(var(--sat)+7rem)] lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:pb-20 lg:pt-[calc(var(--sat)+8rem)]">
+          <div className="lg:col-start-1 lg:row-start-1 lg:self-end">
+            <p className="ora-rise text-sm text-white/60">ORA Pads · Tanzania</p>
+            <h1 className="ora-rise ora-rise-1 mt-5 text-balance font-display text-[44px] font-semibold leading-[1.02] tracking-[-0.03em] sm:text-6xl lg:text-[76px]">
+              Empowering <span className={PINK}>every cycle</span>
             </h1>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <p className="mt-6 max-w-xl text-lg text-white/75">
-              ORA-Pads is building a world where every girl can manage her period
-              with dignity, confidence and access. Together, we create healthier
-              communities.
+            <p className="ora-rise ora-rise-2 mt-6 max-w-xl text-lg leading-relaxed text-white/70">
+              ORA-Pads is building a world where every girl can manage her period with dignity, confidence and access.
+              Together, we create healthier communities.
             </p>
-          </Reveal>
-          <Reveal delay={0.18}>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/impact" className={cn(buttonVariants({ size: "lg" }), "rounded-full shadow-glow")}>
-                <Heart className="size-5" />
-                Join the Movement
+            <div className="ora-rise ora-rise-3 mt-9 flex flex-wrap items-center gap-x-7 gap-y-4">
+              <Link
+                href="/impact"
+                className="inline-flex h-12 items-center rounded-full bg-primary px-6 text-[15px] font-medium text-primary-foreground transition-[background-color,transform] duration-150 hover:bg-primary/90 active:scale-[0.97]"
+              >
+                Join the movement
               </Link>
-              <Link href="/find-ora" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "rounded-full border-white/25 bg-white/5 text-white hover:bg-white/10")}>
-                Find ORA Near You
-                <ArrowRight className="size-4" />
+              <Link href="/find-ora" className="group inline-flex h-12 items-center gap-2 text-[15px] text-white/80 transition-colors hover:text-white">
+                Find ORA near you
+                <ArrowRight className="size-4 transition-transform duration-150 group-hover:translate-x-0.5" strokeWidth={1.5} aria-hidden="true" />
               </Link>
             </div>
-          </Reveal>
+          </div>
 
-          <Reveal delay={0.26}>
-            <div className="mt-12 grid max-w-4xl grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="mx-auto w-full max-w-[340px] text-white sm:max-w-[420px] lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:max-w-[500px] lg:self-center">
+            <ArchPhoto
+              src="/ora/hero-stage.jpg"
+              alt="An ORA host on stage holding up a pack of ORA pads, with packs stacked beside her"
+              sizes="(max-width: 640px) 340px, (max-width: 1024px) 420px, 500px"
+              position="50% 32%"
+              priority
+              reveal
+              outline
+            />
+          </div>
+
+          <div className="ora-rise ora-rise-4 lg:col-start-1 lg:row-start-2 lg:self-start">
+            <dl className="grid max-w-xl grid-cols-2 gap-x-8 gap-y-6 border-t border-white/10 pt-7 sm:grid-cols-4">
               {heroStats.map((s) => (
-                <div key={s.label} className="glass-card rounded-2xl p-4">
-                  <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white">
-                    <s.icon className="size-4" />
-                  </span>
-                  <div className="mt-3 font-display text-2xl font-bold text-white">
-                    <CountUp value={s.value} suffix={s.suffix ?? ""} />
-                  </div>
-                  <div className="text-xs text-white/60">{s.label}</div>
+                <div key={s.label} className="flex flex-col-reverse">
+                  <dt className="mt-1.5 text-[13px] leading-snug text-white/55">{s.label}</dt>
+                  <dd className="font-display text-3xl font-semibold tabular-nums tracking-[-0.02em]">
+                    <CountUp value={s.value} suffix="+" />
+                  </dd>
                 </div>
               ))}
-            </div>
-          </Reveal>
-          <Reveal delay={0.34}>
-            <ImpactPulse initial={impactFeed} className="mt-5" />
-          </Reveal>
+            </dl>
+            <ImpactPulse initial={impactFeed} className="mt-6" />
+          </div>
         </div>
       </section>
 
-      {/* Why Ora Exists */}
-      <section id="about" className="container py-20 sm:py-28">
-        <div className="grid items-center gap-12 lg:grid-cols-2">
-          <Reveal>
-            <div className="flex items-center gap-2 text-primary">
-              <span className="h-px w-8 bg-primary" />
-              <Heart className="size-4 fill-primary" />
-              <span className="h-px w-8 bg-primary" />
+      {/* ── Why ORA exists ── */}
+      <section id="about" className="container scroll-mt-20 py-24 sm:py-32">
+        <div className="grid grid-cols-1 items-center gap-14 lg:grid-cols-2 lg:gap-20">
+          <Reveal className="order-2 lg:order-1">
+            <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-end gap-4 text-foreground">
+              <ArchPhoto src="/ora/lifestyle-1.jpg" alt="A girl holding a pack of ORA pads" sizes="(max-width: 1024px) 50vw, 26vw" position="50% 25%" outline />
+              <div className="grid gap-4">
+                <div className="relative aspect-square overflow-hidden rounded-2xl">
+                  <Image src="/ora/gallery/g6.jpg" alt="ORA on stage at a school event" fill sizes="(max-width: 1024px) 45vw, 22vw" className="object-cover" />
+                </div>
+                <div className="relative aspect-square overflow-hidden rounded-2xl">
+                  <Image src="/ora/gallery/g5.jpg" alt="Students at an ORA school visit" fill sizes="(max-width: 1024px) 45vw, 22vw" className="object-cover" />
+                </div>
+              </div>
             </div>
-            <h2 className="mt-4 font-display text-4xl font-bold tracking-tight sm:text-5xl">
-              Why Ora Exists
+          </Reveal>
+          <Reveal className="order-1 lg:order-2">
+            <p className="text-sm font-medium text-primary">Why ORA exists</p>
+            <h2 className="mt-3 text-balance font-display text-4xl font-semibold leading-[1.08] tracking-[-0.025em] sm:text-5xl">
+              No girl should miss school because of her period
             </h2>
-            <p className="mt-5 text-lg text-muted-foreground">
-              We believe no girl should miss school, feel unprepared, or lack
-              confidence because of her period. We provide products, education and
-              support that transform lives.
+            <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-muted-foreground">
+              We believe no girl should miss school, feel unprepared, or lack confidence because of her period. We provide
+              products, education and support that transform lives.
             </p>
-            <Link href="/impact" className={cn(buttonVariants(), "mt-7 rounded-full")}>
-              Meet the Movement
-              <ArrowRight className="size-4" />
+            <Link href="/impact" className="group mt-8 inline-flex items-center gap-2 text-[15px] font-medium text-primary">
+              Meet the movement
+              <ArrowRight className="size-4 transition-transform duration-150 group-hover:translate-x-0.5" strokeWidth={1.5} aria-hidden="true" />
             </Link>
           </Reveal>
-          <Reveal delay={0.15}>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="relative col-span-1 row-span-2 aspect-[3/4] overflow-hidden rounded-2xl">
-                <Image src="/ora/lifestyle-1.jpg" alt="An ORA girl" fill sizes="(max-width:1024px) 50vw, 25vw" className="object-cover" />
-              </div>
-              <div className="relative aspect-square overflow-hidden rounded-2xl">
-                <Image src="/ora/gallery/g6.jpg" alt="ORA event" fill sizes="(max-width:1024px) 50vw, 25vw" className="object-cover" />
-              </div>
-              <div className="relative aspect-square overflow-hidden rounded-2xl">
-                <Image src="/ora/gallery/g5.jpg" alt="ORA school visit" fill sizes="(max-width:1024px) 50vw, 25vw" className="object-cover" />
-              </div>
-            </div>
-          </Reveal>
         </div>
       </section>
 
-      {/* Feature cards */}
+      {/* ── What ORA stands for ── */}
       <section className="container pb-8">
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-x-10 gap-y-10 border-t border-border pt-10 sm:grid-cols-2 lg:grid-cols-4">
           {features.map((f, i) => (
-            <Reveal key={f.title} delay={i * 0.08}>
-              <div className="glass-card glow-hover h-full rounded-2xl p-6 text-center">
-                <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-white shadow-glow">
-                  <f.icon className="size-6" />
-                </span>
-                <h3 className="mt-4 font-display text-lg font-bold">{f.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{f.body}</p>
-              </div>
+            <Reveal key={f.title} delay={i * 0.05}>
+              <f.icon className="size-5 text-primary" strokeWidth={1.5} aria-hidden="true" />
+              <h3 className="mt-5 text-lg font-semibold tracking-[-0.01em]">{f.title}</h3>
+              <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">{f.body}</p>
             </Reveal>
           ))}
         </div>
       </section>
 
-      {/* Products */}
-      <div id="products">
+      {/* ── Products ── */}
+      <div id="products" className="scroll-mt-16">
         <ProductShowcase />
       </div>
 
-      {/* Brand campaign reel */}
-      <section className="py-16">
-        <Reveal className="container mx-auto max-w-2xl text-center">
-          <div className="flex items-center justify-center gap-2 text-primary">
-            <span className="h-px w-8 bg-primary" />
-            <Sparkles className="size-4" />
-            <span className="h-px w-8 bg-primary" />
+      {/* ── ORA in real life: the reel of arches on the plum ground ── */}
+      <section className="overflow-hidden bg-[#0d0016] py-20 text-white sm:py-28">
+        <Reveal className="container flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between lg:gap-16">
+          <div>
+            <p className={`text-sm font-medium ${PINK}`}>Across Tanzania</p>
+            <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.025em] sm:text-5xl">ORA in real life</h2>
           </div>
-          <h2 className="mt-4 font-display text-4xl font-bold tracking-tight sm:text-5xl">
-            ORA in real life
-          </h2>
-          <p className="mt-3 text-lg text-muted-foreground">
-            Real girls, real schools, real impact — ORA across Tanzania.
-          </p>
+          <p className="max-w-md text-[17px] leading-relaxed text-white/65">Real girls, real schools, real impact — ORA across Tanzania.</p>
         </Reveal>
-        <div className="mt-10">
+        <div className="mt-12">
           <CampaignMarquee />
         </div>
       </section>
 
-      {/* Action cards */}
-      <section className="container py-8">
+      {/* ── Ways in ── */}
+      <section className="container py-20 sm:py-28">
         <div className="grid gap-5 lg:grid-cols-3">
-          <Reveal>
-            <div className="glow-hover relative h-full overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-primary/40 p-7">
-              <h3 className="font-display text-2xl font-bold text-white">Make an Impact Today</h3>
-              <p className="mt-2 max-w-[18rem] text-sm text-white/85">Every school visit, every education session, every pad delivered — see the change we create together.</p>
-              <Link href="/impact" className={cn(buttonVariants(), "mt-6 rounded-full bg-white text-primary hover:bg-white/90")}>
-                <Heart className="size-4" />
-                See Our Impact
+          <Reveal className="h-full">
+            <div className="flex h-full min-h-[260px] flex-col rounded-2xl bg-primary p-8 text-primary-foreground">
+              <h3 className="font-display text-2xl font-semibold tracking-[-0.02em]">Make an impact today</h3>
+              <p className="mt-3 max-w-[22rem] text-[15px] leading-relaxed text-white/85">
+                Every school visit, every education session, every pad delivered — see the change we create together.
+              </p>
+              <Link href="/impact" className="mt-auto inline-flex h-11 w-fit items-center rounded-full bg-white px-5 text-[15px] font-medium text-primary transition-[background-color,transform] duration-150 hover:bg-white/90 active:scale-[0.97]">
+                See our impact
               </Link>
             </div>
           </Reveal>
-          <Reveal delay={0.1}>
-            <div className="glow-hover relative h-full overflow-hidden rounded-3xl bg-gradient-to-br from-accent to-accent/40 p-7">
-              <h3 className="font-display text-2xl font-bold text-white">Join the Movement</h3>
-              <p className="mt-2 max-w-[18rem] text-sm text-white/85">Bring ORA to your school or community — agents, distributors, NGOs and schools all welcome.</p>
-              <Link href="/login" className={cn(buttonVariants(), "mt-6 rounded-full bg-white text-accent hover:bg-white/90")}>
-                Join Us
-                <ArrowRight className="size-4" />
+          <Reveal delay={0.06} className="h-full">
+            <div className="flex h-full min-h-[260px] flex-col rounded-2xl bg-[#2a0845] p-8 text-white">
+              <h3 className="font-display text-2xl font-semibold tracking-[-0.02em]">Join the movement</h3>
+              <p className="mt-3 max-w-[22rem] text-[15px] leading-relaxed text-white/75">
+                Bring ORA to your school or community — agents, distributors, NGOs and schools all welcome.
+              </p>
+              <Link href="/login" className="mt-auto inline-flex h-11 w-fit items-center gap-2 rounded-full bg-white px-5 text-[15px] font-medium text-[#2a0845] transition-[background-color,transform] duration-150 hover:bg-white/90 active:scale-[0.97]">
+                Join us
               </Link>
             </div>
           </Reveal>
-          <Reveal delay={0.2}>
-            <div className="glow-hover relative h-full overflow-hidden rounded-3xl border border-primary/30 bg-secondary/40 p-7">
-              <div className="absolute -right-6 -top-6 size-24 rounded-full bg-primary/30 blur-2xl" />
-              <span className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-white shadow-glow">
-                <CalendarHeart className="size-6" />
-              </span>
-              <h3 className="mt-4 font-display text-2xl font-bold">Period Tracker</h3>
-              <p className="mt-2 max-w-[18rem] text-sm text-muted-foreground">Track your cycle, get insights and take control of your health.</p>
-              <Link href="/tracker" className={cn(buttonVariants({ variant: "outline" }), "mt-6 rounded-full")}>
-                Track Now
-                <ArrowRight className="size-4" />
+          <Reveal delay={0.12} className="h-full">
+            <div className="flex h-full min-h-[260px] flex-col rounded-2xl border border-border bg-card p-8">
+              <CalendarHeart className="size-5 text-primary" strokeWidth={1.5} aria-hidden="true" />
+              <h3 className="mt-5 font-display text-2xl font-semibold tracking-[-0.02em]">Period tracker</h3>
+              <p className="mt-3 max-w-[22rem] text-[15px] leading-relaxed text-muted-foreground">
+                Track your cycle, get insights and take control of your health.
+              </p>
+              <Link href="/tracker" className="group mt-auto inline-flex h-11 w-fit items-center gap-2 text-[15px] font-medium text-primary">
+                Track now
+                <ArrowRight className="size-4 transition-transform duration-150 group-hover:translate-x-0.5" strokeWidth={1.5} aria-hidden="true" />
               </Link>
             </div>
           </Reveal>
         </div>
       </section>
 
-      {/* News + Activities */}
-      <section className="container py-20">
-        <div className="grid gap-12 lg:grid-cols-2">
-          <Reveal id="news">
-            <h2 className="font-display text-3xl font-bold tracking-tight">Latest News</h2>
-            <p className="mt-2 text-muted-foreground">Stay updated with our latest stories and announcements.</p>
-            <Link href="/news" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
-              View All News <ArrowRight className="size-4" />
-            </Link>
-            <div className="mt-6 space-y-4">
-              {news.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No posts yet — check back soon.
-                </p>
-              )}
-              {news.map((n) => (
-                <Link
-                  key={n.slug}
-                  href={`/news/${n.slug}`}
-                  className="glass-card glow-hover flex items-center gap-4 rounded-2xl p-3 transition hover:-translate-y-0.5"
-                >
-                  <div className="relative size-16 shrink-0 overflow-hidden rounded-xl">
-                    <Image src={n.img} alt={n.title} fill sizes="64px" className="object-cover" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold leading-snug">{n.title}</h4>
-                    <p className="text-xs text-muted-foreground">{n.date}</p>
-                  </div>
-                </Link>
-              ))}
+      {/* ── News + activities ── */}
+      <section className="container pb-24 sm:pb-32">
+        <div className="grid grid-cols-1 gap-16 lg:grid-cols-2 lg:gap-20">
+          <Reveal id="news" className="scroll-mt-20">
+            <div className="flex items-end justify-between gap-6">
+              <div>
+                <h2 className="font-display text-3xl font-semibold tracking-[-0.02em]">Latest news</h2>
+                <p className="mt-2 text-[15px] text-muted-foreground">Stay updated with our latest stories and announcements.</p>
+              </div>
+              <Link href="/news" className="shrink-0 text-[15px] font-medium text-primary underline-offset-4 hover:underline">
+                All news
+              </Link>
             </div>
+            {news.length === 0 ? (
+              <p className="mt-8 border-t border-border pt-6 text-[15px] text-muted-foreground">No posts yet — check back soon.</p>
+            ) : (
+              <ul className="mt-8 divide-y divide-border border-y border-border">
+                {news.map((n) => (
+                  <li key={n.slug}>
+                    <Link href={`/news/${n.slug}`} className="group flex items-center gap-4 py-4">
+                      <div className="relative size-16 shrink-0 overflow-hidden rounded-xl bg-muted">
+                        <Image src={n.img} alt="" fill sizes="64px" className="object-cover" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-medium leading-snug transition-colors group-hover:text-primary">{n.title}</h3>
+                        <p className="mt-1 text-[13px] tabular-nums text-muted-foreground">{n.date}</p>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Reveal>
 
-          <Reveal id="activities" delay={0.1}>
-            <h2 className="font-display text-3xl font-bold tracking-tight">Recent Activities</h2>
-            <p className="mt-2 text-muted-foreground">Moments from our community outreach and empowerment programs.</p>
-            <Link href="/impact" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
-              View All Activities <ArrowRight className="size-4" />
-            </Link>
-            <div className="mt-6 grid grid-cols-2 gap-3">
+          <Reveal id="activities" delay={0.06} className="scroll-mt-20">
+            <div className="flex items-end justify-between gap-6">
+              <div>
+                <h2 className="font-display text-3xl font-semibold tracking-[-0.02em]">Recent activities</h2>
+                <p className="mt-2 text-[15px] text-muted-foreground">Moments from our community outreach and empowerment programs.</p>
+              </div>
+              <Link href="/impact" className="shrink-0 text-[15px] font-medium text-primary underline-offset-4 hover:underline">
+                All activities
+              </Link>
+            </div>
+            <div className="mt-8 grid grid-cols-2 gap-3">
               {activities.map((a) => (
-                <div key={a} className="group relative aspect-[4/3] overflow-hidden rounded-2xl">
-                  <Image src={a} alt="ORA activity" fill sizes="(max-width:1024px) 50vw, 25vw" className="object-cover transition-transform duration-700 group-hover:scale-110" />
+                <div key={a} className="group relative aspect-[4/3] overflow-hidden rounded-2xl bg-muted">
+                  <Image
+                    src={a}
+                    alt="ORA activity"
+                    fill
+                    sizes="(max-width:1024px) 50vw, 25vw"
+                    className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03]"
+                  />
                 </div>
               ))}
             </div>
@@ -304,55 +281,33 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
+      {/* ── Footer ── */}
       <footer className="bg-[#0d0016] text-white">
-        <div className="container grid gap-10 py-14 lg:grid-cols-4">
+        <div className="container grid gap-12 py-16 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
             <Logo mark="light" />
-            <p className="mt-4 max-w-xs text-sm text-white/60">
-              Empowering every cycle. Building healthier communities.
-            </p>
-            <SocialLinks
-              className="mt-5"
-              itemClassName="bg-white/10 text-white/80 hover:bg-primary hover:text-white"
-              iconClassName="size-4"
-            />
+            <p className="mt-5 max-w-xs text-[15px] leading-relaxed text-white/60">Empowering every cycle. Building healthier communities.</p>
+            <SocialLinks className="mt-6" itemClassName="bg-white/[0.06] text-white/75 hover:bg-white/10 hover:text-white" iconClassName="size-4" />
           </div>
 
           <div>
-            <h4 className="font-semibold">Get in touch</h4>
-            <ul className="mt-3 space-y-3 text-sm text-white/60">
+            <h4 className="text-[15px] font-medium">Get in touch</h4>
+            <ul className="mt-4 space-y-4 text-[15px]">
               <li>
-                <a
-                  href={ORA_CONTACT.phoneHref}
-                  aria-label="Call ORA customer care"
-                  className="flex items-start gap-2.5 transition-colors hover:text-primary"
-                >
-                  <Phone className="mt-0.5 size-4 shrink-0 text-primary" />
+                <a href={ORA_CONTACT.phoneHref} aria-label="Call ORA customer care" className="group flex items-start gap-3">
+                  <Phone className="mt-0.5 size-4 shrink-0 text-white/50" strokeWidth={1.5} aria-hidden="true" />
                   <span>
-                    <span className="block text-xs uppercase tracking-wide text-white/40">
-                      Customer Care
-                    </span>
-                    <span className="font-medium text-white">
-                      {ORA_CONTACT.phoneDisplay}
-                    </span>
+                    <span className="block text-[13px] text-white/50">Customer care</span>
+                    <span className="text-white/90 transition-colors group-hover:text-white">{ORA_CONTACT.phoneDisplay}</span>
                   </span>
                 </a>
               </li>
               <li>
-                <a
-                  href={ORA_CONTACT.emailHref}
-                  aria-label="Email ORA"
-                  className="flex items-start gap-2.5 transition-colors hover:text-primary"
-                >
-                  <Mail className="mt-0.5 size-4 shrink-0 text-primary" />
+                <a href={ORA_CONTACT.emailHref} aria-label="Email ORA" className="group flex items-start gap-3">
+                  <Mail className="mt-0.5 size-4 shrink-0 text-white/50" strokeWidth={1.5} aria-hidden="true" />
                   <span>
-                    <span className="block text-xs uppercase tracking-wide text-white/40">
-                      Email
-                    </span>
-                    <span className="font-medium text-white">
-                      {ORA_CONTACT.email}
-                    </span>
+                    <span className="block text-[13px] text-white/50">Email</span>
+                    <span className="text-white/90 transition-colors group-hover:text-white">{ORA_CONTACT.email}</span>
                   </span>
                 </a>
               </li>
@@ -360,27 +315,28 @@ export default async function HomePage() {
           </div>
 
           <div>
-            <h4 className="font-semibold">Quick Links</h4>
-            <ul className="mt-3 space-y-2 text-sm text-white/60">
+            <h4 className="text-[15px] font-medium">Quick links</h4>
+            <ul className="mt-4 space-y-3 text-[15px] text-white/60">
               {[["Home", "/"], ["Impact", "/impact"], ["Products", "#products"], ["Education", "/education"], ["Contact", "/contact"]].map(([l, h]) => (
-                <li key={l}><Link href={h} className="hover:text-primary">{l}</Link></li>
+                <li key={l}><Link href={h} className="transition-colors hover:text-white">{l}</Link></li>
               ))}
             </ul>
           </div>
 
           <div>
-            <h4 className="font-semibold">Get Involved</h4>
-            <ul className="mt-3 space-y-2 text-sm text-white/60">
-              {[["Our Impact", "/impact"], ["Find ORA", "/find-ora"], ["Join Us", "/login"], ["Sign in", "/login"]].map(([l, h]) => (
-                <li key={l}><Link href={h} className="hover:text-primary">{l}</Link></li>
+            <h4 className="text-[15px] font-medium">Get involved</h4>
+            <ul className="mt-4 space-y-3 text-[15px] text-white/60">
+              {[["Our impact", "/impact"], ["Find ORA", "/find-ora"], ["Join us", "/login"], ["Sign in", "/login"]].map(([l, h]) => (
+                <li key={l}><Link href={h} className="transition-colors hover:text-white">{l}</Link></li>
               ))}
             </ul>
           </div>
         </div>
-        <div className="border-t border-white/10">
-          <p className="container py-5 text-center text-xs text-white/50">
-            © {new Date().getFullYear()} ORA-Pads. All rights reserved.
-          </p>
+        <div className="border-t border-white/[0.08]">
+          <div className="container flex flex-col gap-2 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-[13px] text-white/45 sm:flex-row sm:justify-between">
+            <p>© {new Date().getFullYear()} ORA-Pads. All rights reserved.</p>
+            <p>Empowering every cycle · made in Tanzania</p>
+          </div>
         </div>
       </footer>
     </>
