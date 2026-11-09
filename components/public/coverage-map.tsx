@@ -679,12 +679,13 @@ export function CoverageMap({
                       <div key={d.district}>
                         <div className="flex items-center gap-3">
                           <p className="s-label !text-[rgb(var(--s-pink))]">{d.district}</p>
-                          <span aria-hidden className="h-px flex-1 bg-white/[0.07]" />
+                          <span aria-hidden className="h-px flex-1 bg-white/10" />
+                          <span className="s-label tabular-nums">{d.items.length}</span>
                         </div>
-                        <ul className="mt-2 grid grid-cols-1 gap-x-8 sm:grid-cols-2 xl:grid-cols-3">
+                        <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                           {d.items.map((s) => (
-                            <li key={s.id} className="border-t border-white/10 first:border-t-0 sm:[&:nth-child(2)]:border-t-0 xl:[&:nth-child(3)]:border-t-0">
-                              <OutletRow s={s} />
+                            <li key={s.id} className="min-w-0">
+                              <OutletTile s={s} />
                             </li>
                           ))}
                         </ul>
@@ -697,6 +698,71 @@ export function CoverageMap({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * One outlet in the directory, as a tile (owner, 2026-11-09: "make them well arranged and readable"): what kind of place
+ * and how it sells on top, the name, the area, opening hours, then Directions and every phone number on the tile's foot.
+ * Tiles in a row share one height, so the grid lines up.
+ */
+function OutletTile({ s }: { s: StockistDTO }) {
+  const meta = typeMeta(s.type);
+  // addresses are entered as "Area — how it sells" (e.g. "Namanga — rejareja"); show the two parts in their own places
+  const [area, mode] = (s.address ?? "").split(" — ");
+  const phones = (s.phone ?? "").split("/").map((p) => p.trim()).filter(Boolean);
+  return (
+    <div className="group/o flex h-full min-w-0 flex-col rounded-[2px] border border-white/10 bg-white/[0.03] p-5 transition-colors duration-300 hover:border-[rgb(var(--s-pink)/0.55)]">
+      <div className="flex items-center justify-between gap-3">
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-[12px] font-medium uppercase tracking-[0.12em] text-white/60">
+          <meta.icon className="size-3.5 shrink-0" strokeWidth={1.5} aria-hidden="true" />
+          {meta.label}
+        </span>
+        {mode && <span className="shrink-0 text-[12px] font-medium capitalize text-[rgb(var(--s-pink))]">{mode}</span>}
+      </div>
+      <p className="mt-3 text-[17px] font-medium leading-snug text-white transition-colors duration-300 group-hover/o:text-[rgb(var(--s-pink))]">
+        {s.name}
+      </p>
+      {area && <p className="mt-1 break-words text-[14px] leading-snug text-white/70">{area}</p>}
+      {s.products && (
+        <p className="mt-2 text-[13px] leading-snug text-white/80">
+          <span className="text-white/55">Stocked: </span>
+          {s.products}
+        </p>
+      )}
+      {s.hours && (
+        <p className="mt-2 flex items-center gap-1.5 text-[13px] leading-snug text-white/70">
+          <Clock className="size-3.5 shrink-0" strokeWidth={1.5} aria-hidden="true" />
+          <span className="min-w-0">{s.hours}</span>
+        </p>
+      )}
+      <div aria-hidden className="min-h-4 flex-1" />
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-white/10 pt-3">
+        <a
+          href={directionsUrl(s)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group/d inline-flex h-9 items-center gap-1.5 text-[14px] font-medium text-[rgb(var(--s-pink))]"
+        >
+          Directions
+          <ArrowUpRight
+            className="size-4 transition-transform duration-300 group-hover/d:-translate-y-0.5 group-hover/d:translate-x-0.5"
+            strokeWidth={1.75}
+            aria-hidden="true"
+          />
+        </a>
+        {phones.length > 0 && (
+          <span className="flex flex-col items-end">
+            {phones.map((p) => (
+              <a key={p} href={telHref(p)} className="inline-flex min-h-8 items-center gap-1.5 whitespace-nowrap text-[14px] tabular-nums text-white/80 transition-colors hover:text-white">
+                <Phone className="size-3.5 shrink-0 text-white/55" strokeWidth={1.5} aria-hidden="true" />
+                {p}
+              </a>
+            ))}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
