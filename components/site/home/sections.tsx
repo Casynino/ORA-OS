@@ -47,7 +47,7 @@ export function RangeIndex() {
   return (
     <section id="products" className="relative scroll-mt-20 bg-[rgb(18_18_20)] py-24 md:py-36">
       <div className={WRAP}>
-        <Eyebrow className="mb-10">[ 02 — The range · 3 sizes ]</Eyebrow>
+        <Eyebrow className="mb-10">[ 02 — Know your flow · 3 sizes ]</Eyebrow>
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-16">
           <div className="s-on-photo relative h-[52vh] overflow-hidden rounded-[2px] bg-[rgb(26_26_29)] lg:h-[72vh]">
             <AnimatePresence mode="popLayout">
@@ -97,7 +97,7 @@ export function RangeIndex() {
               </li>
             ))}
             <li className="mt-10">
-              <Link href="/products" className="s-btn s-btn--line">See the whole range</Link>
+              <Link href="/products" className="s-btn s-btn--line">Know your flow</Link>
             </li>
           </ul>
         </div>
@@ -217,7 +217,7 @@ export function CampaignBand() {
           </motion.h2>
         </motion.div>
         <Magnetic className="mt-10 w-fit" strength={0.4}>
-          <Link href="/products" data-cursor="Shop" className="s-btn s-btn--pink">Shop the range</Link>
+          <Link href="/products" data-cursor="Shop" className="s-btn s-btn--pink">Choose ORA</Link>
         </Magnetic>
       </div>
     </section>

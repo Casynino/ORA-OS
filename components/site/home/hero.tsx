@@ -69,7 +69,7 @@ export function Hero({ stats, feed }: { stats: Stat[]; feed: ImpactFeedItem[] })
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.8 }} className="flex items-center gap-3">
             <span className="s-label whitespace-nowrap text-[rgb(var(--s-pink))]">[ ORA Pads ]</span>
             <span className="h-px w-6 shrink-0 bg-white/30 sm:w-10" />
-            <span className="s-label whitespace-nowrap text-white/75">Tanzania<span className="hidden sm:inline"> · Period dignity</span></span>
+            <span className="s-label whitespace-nowrap text-white/75"><span className="sm:hidden">Tanzania</span><span className="hidden sm:inline">Protection that fits your flow</span></span>
           </motion.p>
           <SplitText
             as="h1"
@@ -99,7 +99,7 @@ export function Hero({ stats, feed }: { stats: Stat[]; feed: ImpactFeedItem[] })
               >
                 <Magnetic>
                   <Link href="/products" data-cursor="View" className="group s-btn s-btn--bone">
-                    Discover the range
+                    Find your fit
                     <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" strokeWidth={1.75} />
                   </Link>
                 </Magnetic>
