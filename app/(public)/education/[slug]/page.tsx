@@ -45,7 +45,7 @@ export default async function ArticlePage({
       </Link>
 
       {/* Cover hero */}
-      <div className="relative mt-6 aspect-[21/10] overflow-hidden rounded-3xl">
+      <div className="relative mt-6 aspect-[21/10] overflow-hidden rounded-[2px]">
         <Image
           src={cover}
           alt={article.title}
@@ -80,7 +80,7 @@ export default async function ArticlePage({
         ))}
       </div>
 
-      <div className="mt-12 overflow-hidden rounded-2xl border border-border bg-muted/30 p-6 text-center">
+      <div className="mt-12 overflow-hidden rounded-[2px] border border-border bg-muted/30 p-6 text-center">
         <h3 className="font-display text-lg font-semibold">
           Help us share dignity
         </h3>

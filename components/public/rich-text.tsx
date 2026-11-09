@@ -130,7 +130,7 @@ export function RichText({ body }: { body: string }) {
             return (
               <Rise key={i} className="py-6 lg:-mx-14">
                 <figure className="group">
-                  <div className="overflow-hidden rounded-[22px] bg-white/5">
+                  <div className="overflow-hidden rounded-[2px] bg-white/5">
                     <Image
                       src={p.src}
                       alt={p.alt}
@@ -160,7 +160,7 @@ export function RichText({ body }: { body: string }) {
                 return (
                   <Rise key={j} delay={j * 0.08} className={cn(lower && "sm:mt-14")}>
                     <figure className="group">
-                      <div className="relative aspect-[4/3] overflow-hidden rounded-[18px] bg-white/5">
+                      <div className="relative aspect-[4/3] overflow-hidden rounded-[2px] bg-white/5">
                         <Image
                           src={p.src}
                           alt={p.alt}

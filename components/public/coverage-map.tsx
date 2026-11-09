@@ -290,7 +290,7 @@ export function CoverageMap({
                         selectRegion(null);
                       }}
                       className={cn(
-                        "inline-flex h-10 items-center gap-2 rounded-full border px-4 text-[13px] font-medium transition-[background-color,border-color,color,transform] duration-300 active:scale-[0.97]",
+                        "inline-flex h-10 items-center gap-2 rounded-[2px] border px-4 text-[13px] font-medium transition-[background-color,border-color,color,transform] duration-300 active:scale-[0.97]",
                         active
                           ? "border-[rgb(var(--s-pink))] bg-[rgb(var(--s-pink))] text-white shadow-[0_10px_30px_-12px_rgb(255_63_168/0.9)]"
                           : "border-white/15 text-white/70 hover:border-white/40 hover:text-white",
@@ -367,7 +367,7 @@ export function CoverageMap({
         {/* ── The night map ── */}
         <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
           <Rise>
-            <div className="relative isolate -mx-5 aspect-[720/760] overflow-hidden border-y border-white/10 bg-[rgb(var(--s-deep))] sm:mx-0 sm:rounded-[28px] sm:border lg:aspect-auto lg:h-[min(calc(100svh-8rem),820px)]">
+            <div className="relative isolate -mx-5 aspect-[720/760] overflow-hidden border-y border-white/10 bg-[rgb(var(--s-deep))] sm:mx-0 sm:rounded-[2px] sm:border lg:aspect-auto lg:h-[min(calc(100svh-8rem),820px)]">
               <Atmosphere variant="b" className="opacity-60" />
               <svg
                 viewBox={`0 0 ${TZ_VIEW.w} ${TZ_VIEW.h}`}
@@ -590,7 +590,7 @@ export function CoverageMap({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10 }}
                     transition={{ duration: 0.45, ease: EASE }}
-                    className="absolute inset-x-3 bottom-3 z-10 max-h-[58%] overflow-y-auto scrollbar-thin rounded-[22px] border border-white/10 bg-[rgb(var(--s-night)/0.9)] p-4 shadow-[0_24px_60px_-20px_rgb(0_0_0/0.8)] backdrop-blur-xl sm:inset-x-auto sm:bottom-auto sm:right-4 sm:top-4 sm:max-h-[88%] sm:w-80 sm:p-5"
+                    className="absolute inset-x-3 bottom-3 z-10 max-h-[58%] overflow-y-auto scrollbar-thin rounded-[2px] border border-white/10 bg-[rgb(var(--s-night)/0.9)] p-4 shadow-[0_24px_60px_-20px_rgb(0_0_0/0.8)] backdrop-blur-xl sm:inset-x-auto sm:bottom-auto sm:right-4 sm:top-4 sm:max-h-[88%] sm:w-80 sm:p-5"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -719,7 +719,7 @@ function OutletRow({
       className={cn(
         "group/o min-w-0 transition-colors duration-300",
         compact ? "py-3" : "py-5",
-        highlighted && "-mx-2 rounded-xl bg-[rgb(var(--s-pink)/0.12)] px-2",
+        highlighted && "-mx-2 rounded-[2px] bg-[rgb(var(--s-pink)/0.12)] px-2",
       )}
     >
       <p

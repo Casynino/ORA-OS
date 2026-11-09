@@ -58,8 +58,8 @@ export function SiteFooter() {
         </div>
       </div>
 
-      {/* the page ends on ORA, very big, its letters filled with a real ORA stage photo */}
-      <div aria-hidden className="relative -mb-[0.16em] select-none bg-[url('/ora/site/wide-GTM00063.jpg')] bg-cover bg-[center_35%] bg-clip-text text-center font-site-display text-[34vw] font-bold leading-[0.8] tracking-[-0.04em] text-transparent [-webkit-background-clip:text] [-webkit-text-stroke:1px_rgb(255_255_255/0.12)] md:text-[30vw]">
+      {/* the page ends on ORA, very big and faint (like the Reckless closing word) */}
+      <div aria-hidden className="relative -mb-[0.16em] select-none text-center font-site-display text-[34vw] font-bold leading-[0.8] tracking-[-0.05em] text-[rgb(26_26_29)] md:text-[30vw]">
         ORA
       </div>
       <div className="relative border-t border-white/[0.07]">

@@ -99,7 +99,7 @@ export default function ContactPage() {
               </Rise>
             </div>
             <Rise delay={0.1} className="relative">
-              <Parallax speed={0.1} className="aspect-[4/5] w-full rounded-[28px] border border-white/10 bg-white/5 sm:aspect-[5/4] lg:aspect-auto lg:h-full lg:min-h-[560px]">
+              <Parallax speed={0.1} className="aspect-[4/5] w-full rounded-[2px] border border-white/10 bg-white/5 sm:aspect-[5/4] lg:aspect-auto lg:h-full lg:min-h-[560px]">
                 <Image
                   src="/ora/site/wide-GTM00117.jpg"
                   alt="Students gathered outdoors at an ORA school visit"

@@ -4,89 +4,101 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { AnimatePresence, motion, useMotionValue, useSpring, useScroll, useTransform, useReducedMotion } from "framer-motion";
-import { ArrowRight, ArrowUpRight } from "lucide-react";
-import { Atmosphere, Magnetic, Parallax, Rise, ScrollWords, SectionLabel, SplitText, EASE } from "@/components/site/motion";
+import { ArrowUpRight } from "lucide-react";
+import { Magnetic, Parallax, Rise, ScrollWords, SplitText, EASE } from "@/components/site/motion";
 import { CountUp } from "@/components/ui/count-up";
+import { products } from "@/lib/products";
+import { ORA_CONTACT } from "@/lib/constants";
 
-const H2 = "font-site-display font-semibold uppercase leading-[0.95] tracking-[-0.03em] [&_.font-site-serif]:normal-case [&_.font-site-serif]:text-[1.1em]";
+/*
+ * The home page sections, built on the Reckless site's system (owner, 2026-11-09: "take a very good look at Reckless"):
+ * ink ground, bone type, ORA pink as the one accent, mono [ eyebrows ], sharp frames, big photographs, numbered plates,
+ * scroll-lit manifesto, hover-swapped index, magazine spread with parallax, a full-bleed campaign, a cursor-led index,
+ * an Instagram grid and a closing band with a faint giant word.
+ */
 
-/* ── 01 Manifesto: the words light up as they are read; a photo in the arch drifts beside them ── */
+const WRAP = "mx-auto w-full max-w-[1600px] px-[clamp(1.25rem,5vw,5rem)]";
+const XL = "font-site-display font-semibold uppercase leading-[0.92] tracking-[-0.035em] text-[clamp(2.6rem,8vw,7.4rem)] [&_.font-site-serif]:normal-case [&_.font-site-serif]:text-[1.1em]";
+const LG = "font-site-display font-semibold uppercase leading-[0.95] tracking-[-0.03em] text-[clamp(2rem,5.6vw,5rem)] [&_.font-site-serif]:normal-case [&_.font-site-serif]:text-[1.1em]";
+
+function Eyebrow({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <span className={`s-label block ${className}`}>{children}</span>;
+}
+
+/* ── Manifesto: the words light up as they are read ── */
 export function Manifesto() {
   return (
-    <section id="about" className="relative isolate scroll-mt-16 overflow-hidden py-24 sm:py-36">
-      <Atmosphere variant="c" grid={false} className="opacity-70" />
-      <div className="relative mx-auto max-w-[1440px] px-5 sm:px-8">
-        <SectionLabel index="01" label="Why ORA exists" aside="For every girl" />
-        <div className="mt-12 grid grid-cols-1 gap-14 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.65fr)] lg:gap-20">
-          <ScrollWords
-            text="No girl should miss school, feel unprepared, or lack confidence because of her period. We provide products, education and support that transform lives."
-            accent={["school", "confidence", "transform"]}
-            className="font-site-display text-[clamp(1.8rem,3.9vw,3.6rem)] font-medium leading-[1.12] tracking-[-0.02em]"
-          />
-          <Rise className="lg:pt-6">
-            <Parallax speed={0.1} className="s-arch aspect-[4/5] w-full max-w-[380px]">
-              <Image src="/ora/lifestyle-1.jpg" alt="A girl holding a pack of ORA pads" fill sizes="(max-width: 1024px) 80vw, 380px" className="object-cover" />
-            </Parallax>
-            <p className="mt-5 max-w-[380px] text-[15px] leading-relaxed text-white/60">
-              Pads, education and dignity — delivered where they&apos;re needed, community by community, school by school.
-            </p>
-            <Link href="/impact" className="group mt-5 inline-flex items-center gap-2 text-[15px] font-medium text-white">
-              Meet the movement
-              <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" strokeWidth={1.5} />
-            </Link>
-          </Rise>
-        </div>
-      </div>
+    <section id="about" className={`${WRAP} scroll-mt-20 py-28 md:py-40`}>
+      <Eyebrow className="mb-10">[ 01 — Why ORA exists ]</Eyebrow>
+      <ScrollWords
+        text="No girl should miss school, feel unprepared, or lack confidence because of her period. We provide products, education and support that transform lives."
+        accent={["school", "confidence", "transform"]}
+        className="font-site-display text-[clamp(1.9rem,4.6vw,4.4rem)] font-medium leading-[1.08] tracking-[-0.025em]"
+      />
     </section>
   );
 }
 
-/* ── 03 Values as an index: outlined words fill as you point at them, the photo changes beside them ── */
-const VALUES = [
-  { title: "Premium quality", body: "High-quality pads designed for comfort and protection.", img: "/ora/site/wide-GTM00063.jpg" },
-  { title: "Education first", body: "Empowering girls with knowledge about their bodies and health.", img: "/ora/site/wide-GTM00015.jpg" },
-  { title: "Community impact", body: "Working with schools, communities and partners to create change.", img: "/ora/site/wide-GTM00117.jpg" },
-  { title: "Dignity for all", body: "Every girl deserves to live her life with dignity and confidence.", img: "/ora/site/wide-GTM00027.jpg" },
-];
-export function ValuesIndex() {
+/* ── The range: an editorial index — point at a size and its studio photograph swaps in ── */
+const SHOTS: Record<string, string> = { "night-360": "/ora/site/shot-night.jpg", "day-290": "/ora/site/shot-day.jpg", "liner-180": "/ora/site/shot-liner.jpg" };
+export function RangeIndex() {
   const [a, setA] = useState(0);
+  const p = products[a];
   return (
-    <section className="relative py-24 sm:py-32">
-      <div className="mx-auto max-w-[1440px] px-5 sm:px-8">
-        <SectionLabel index="03" label="What we stand for" />
-        <div className="mt-12 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16">
-          <div className="relative hidden h-[62vh] overflow-hidden rounded-[28px] lg:block">
+    <section id="products" className="relative scroll-mt-20 bg-[rgb(18_18_20)] py-24 md:py-36">
+      <div className={WRAP}>
+        <Eyebrow className="mb-10">[ 02 — The range · 3 sizes ]</Eyebrow>
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-16">
+          <div className="relative h-[52vh] overflow-hidden rounded-[2px] bg-[rgb(26_26_29)] lg:h-[72vh]">
             <AnimatePresence mode="popLayout">
               <motion.div
                 key={a}
-                initial={{ opacity: 0, scale: 1.08, filter: "blur(14px)" }}
+                initial={{ opacity: 0, scale: 1.06, filter: "blur(16px)" }}
                 animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, filter: "blur(14px)" }}
-                transition={{ duration: 0.7, ease: EASE }}
+                exit={{ opacity: 0, filter: "blur(16px)" }}
+                transition={{ duration: 0.6, ease: EASE }}
                 className="absolute inset-0"
               >
-                <Image src={VALUES[a].img} alt="" fill sizes="40vw" className="object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[rgb(11_6_18/0.75)] to-transparent" />
+                <Image src={SHOTS[p.slug]} alt={`ORA ${p.use.toLowerCase()} pack, ${p.size} — studio photograph`} fill sizes="(max-width:1024px) 100vw, 45vw" className="object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[rgb(10_10_11/0.55)] to-transparent" />
               </motion.div>
             </AnimatePresence>
-            <span className="absolute bottom-6 left-6 s-label text-white/80">0{a + 1} — {VALUES[a].title}</span>
+            <span className="absolute bottom-5 left-5 s-label text-white/80">
+              {p.size} · {p.padsPerPack} pads · {p.length}
+            </span>
           </div>
           <ul className="flex flex-col justify-center">
-            {VALUES.map((v, i) => (
-              <li key={v.title} onMouseEnter={() => setA(i)} onFocus={() => setA(i)} tabIndex={0} className="group border-b border-white/10 py-6 outline-none first:border-t sm:py-8">
-                <div className="flex items-baseline gap-5">
-                  <span className="s-label text-[rgb(var(--s-pink))]">0{i + 1}</span>
-                  <span
-                    className={`font-site-display text-[clamp(1.9rem,4.6vw,4.4rem)] font-semibold uppercase leading-none tracking-[-0.03em] transition-[color,transform,-webkit-text-stroke-color] duration-300 ${
-                      a === i ? "translate-x-2 text-white" : "text-white lg:text-transparent lg:[-webkit-text-stroke:1px_rgb(247_239_246/0.35)]"
-                    }`}
-                  >
-                    {v.title}
-                  </span>
-                </div>
-                <p className={`mt-3 max-w-md pl-10 text-[15px] leading-relaxed text-white/60 transition-opacity duration-300 lg:pl-12 ${a === i ? "lg:opacity-100" : "lg:opacity-0"}`}>{v.body}</p>
+            {products.map((q, i) => (
+              <li key={q.slug}>
+                <Link
+                  href={`/products/${q.slug}`}
+                  data-cursor="View"
+                  onMouseEnter={() => setA(i)}
+                  onFocus={() => setA(i)}
+                  className="group flex items-center justify-between gap-6 border-b border-white/10 py-7 first:border-t md:py-9"
+                >
+                  <div className="flex items-baseline gap-5">
+                    <span className="font-site-mono text-sm text-[rgb(var(--s-pink))]">{String(i + 1).padStart(2, "0")}</span>
+                    <span>
+                      <span
+                        className={`block font-site-display text-[clamp(2.2rem,5.4vw,4.8rem)] font-semibold uppercase leading-none tracking-[-0.035em] transition-all duration-300 ${
+                          a === i ? "translate-x-2 text-[rgb(var(--s-ink))]" : "text-transparent [-webkit-text-stroke:1px_rgb(107_107_112)]"
+                        }`}
+                      >
+                        {q.size}
+                      </span>
+                      <span className={`mt-3 block font-site-serif text-xl italic transition-opacity duration-300 md:text-2xl ${a === i ? "text-white/80 opacity-100" : "text-white/50 opacity-60 lg:opacity-0"}`}>
+                        {q.use} — {q.tagline}
+                      </span>
+                    </span>
+                  </div>
+                  <span className="font-site-mono text-lg text-[rgb(var(--s-ink))] transition-transform duration-300 group-hover:translate-x-1">→</span>
+                </Link>
               </li>
             ))}
+            <li className="mt-10">
+              <Link href="/products" className="s-btn s-btn--line">See the whole range</Link>
+            </li>
           </ul>
         </div>
       </div>
@@ -94,266 +106,348 @@ export function ValuesIndex() {
   );
 }
 
-/* ── The campaign line over a real ORA stage, the photo drifting ── */
+/* ── Where it happens: an art-directed spread of real school days (numbered plates, parallax, offsets) ── */
+const DAYS = [
+  { src: "/ora/site/wide-GTM00015.jpg", place: "Jangwani", what: "School day", alt: "Girls laughing together at an ORA school day" },
+  { src: "/ora/site/wide-FLP00062.jpg", place: "Zanaki", what: "School visit", alt: "The ORA team cheering beside stacks of pads" },
+  { src: "/ora/site/g-juhudi-table.jpg", place: "Juhudi Jeshini", what: "Girls' Day 2026", alt: "ORA pads stacked high at International Girls' Day" },
+  { src: "/ora/site/g-zanaki-stage.jpg", place: "Zanaki", what: "On stage", alt: "A student speaking on the ORA stage" },
+  { src: "/ora/site/wide-GTM00027.jpg", place: "Jangwani", what: "Assembly", alt: "Girls clapping at an ORA assembly" },
+];
+function Plate({ d, n, ratio, sizes }: { d: (typeof DAYS)[number]; n: string; ratio: string; sizes: string }) {
+  return (
+    <Link href="/impact" data-cursor="Open" className="group block">
+      <div className={`relative w-full overflow-hidden rounded-[2px] bg-[rgb(26_26_29)] ${ratio}`}>
+        <Image src={d.src} alt={d.alt} fill sizes={sizes} className="object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.06]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[rgb(10_10_11/0.6)] via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+        <span className="absolute left-4 top-3 font-site-display text-3xl text-white/75 md:text-4xl">{n}</span>
+        <span className="absolute bottom-4 left-4 translate-y-2 s-label text-white opacity-0 transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">See the day →</span>
+      </div>
+      <div className="mt-4 flex items-baseline justify-between gap-4">
+        <h3 className="font-site-display text-base uppercase tracking-tight text-[rgb(var(--s-ink))] transition-colors group-hover:text-[rgb(var(--s-pink))] md:text-lg">{d.place}</h3>
+        <span className="s-label">{d.what}</span>
+      </div>
+    </Link>
+  );
+}
+export function WhereItHappens() {
+  const [a, b, c, d, e] = DAYS;
+  return (
+    <section className="relative overflow-hidden py-24 md:py-36">
+      <div className={WRAP}>
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <Eyebrow className="mb-6">[ 03 — Where it happens ]</Eyebrow>
+            <SplitText text="In the schoolyard." accent={["schoolyard"]} className={XL} />
+          </div>
+          <Rise className="md:pb-3">
+            <Link href="/impact" className="s-btn s-btn--line">Our impact</Link>
+          </Rise>
+        </div>
+
+        <div className="mt-16 grid grid-cols-12 gap-6 md:mt-24">
+          <Rise className="col-span-12 lg:col-span-7">
+            <Plate d={a} n="01" ratio="aspect-[4/5]" sizes="(max-width:1024px) 100vw, 58vw" />
+          </Rise>
+          <div className="col-span-12 flex flex-col justify-between gap-10 lg:col-span-5 lg:pt-28">
+            <Rise delay={0.1}>
+              <p className="max-w-sm text-lg leading-relaxed text-white/70">
+                School by school, community by community — pads in real hands, honest talk about periods, and girls who
+                walk out of the hall a little taller.
+              </p>
+            </Rise>
+            <Rise delay={0.15}>
+              <Plate d={b} n="02" ratio="aspect-square" sizes="(max-width:1024px) 100vw, 40vw" />
+            </Rise>
+          </div>
+        </div>
+        <div className="mt-6 grid grid-cols-12 items-start gap-6 md:mt-10">
+          <Rise className="col-span-6 lg:col-span-4">
+            <Plate d={c} n="03" ratio="aspect-[3/4]" sizes="(max-width:1024px) 50vw, 33vw" />
+          </Rise>
+          <Rise className="col-span-6 lg:col-span-4 lg:mt-40">
+            <Plate d={d} n="04" ratio="aspect-[3/4]" sizes="(max-width:1024px) 50vw, 33vw" />
+          </Rise>
+          <Rise className="col-span-12 lg:col-span-4 lg:mt-16">
+            <Plate d={e} n="05" ratio="aspect-square" sizes="(max-width:1024px) 100vw, 33vw" />
+          </Rise>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Campaign: full-bleed photograph, one huge statement ── */
 export function CampaignBand() {
   const ref = useRef<HTMLElement>(null);
   const reduce = useReducedMotion();
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
-  const scale = useTransform(scrollYProgress, [0, 1], [1.18, 1]);
+  const y = useTransform(scrollYProgress, [0, 1], ["-12%", "12%"]);
+  const reduceY = reduce ? "0%" : "110%";
   return (
-    <section ref={ref} className="relative isolate flex min-h-[90svh] items-end overflow-hidden">
-      <motion.div className="absolute inset-0 -z-10" style={{ scale: reduce ? 1 : scale }}>
-        <Image src="/ora/site/wide-GTM00063.jpg" alt="An ORA host on stage holding up a pack of ORA pads" fill sizes="100vw" className="object-cover object-[60%_30%]" />
+    <section ref={ref} className="relative isolate h-[110svh] min-h-[600px] overflow-hidden">
+      <motion.div className="absolute inset-x-0 -top-[15%] -z-10 h-[130%]" style={{ y: reduce ? 0 : y }}>
+        <Image src="/ora/hero-stage.jpg" alt="An ORA host on stage holding up a pack of ORA pads" fill sizes="100vw" className="object-cover" style={{ objectPosition: "50% 34%" }} />
       </motion.div>
-      <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-[rgb(11_6_18)] via-[rgb(11_6_18/0.55)] to-[rgb(11_6_18/0.25)]" />
-      <div className="mx-auto w-full max-w-[1440px] px-5 pb-16 sm:px-8 sm:pb-24">
-        <p className="s-label text-white/75">[ Campaign ] — Feel protected</p>
-        <SplitText
-          text="Feel protected. Feel free. With ORA."
-          accent={["free"]}
-          className={`mt-6 max-w-5xl text-[clamp(2.6rem,7vw,7rem)] ${H2}`}
-        />
-        <div className="mt-10 flex flex-wrap items-center gap-3">
-          <Magnetic>
-            <Link href="/products" className="inline-flex h-14 items-center gap-2 rounded-full bg-white px-7 text-[15px] font-semibold text-[rgb(var(--s-night))] transition-transform active:scale-[0.97]">
-              Shop the range
-            </Link>
-          </Magnetic>
-          <Link href="/find-ora" className="group inline-flex h-14 items-center gap-2 rounded-full border border-white/25 px-6 text-[15px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/10">
-            Find a stockist <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" strokeWidth={1.5} />
-          </Link>
+      <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-[#0a0a0b] via-[#0a0a0b]/50 to-[#0a0a0b]/40" />
+      <div className={`${WRAP} flex h-full flex-col justify-end pb-20 md:pb-28`}>
+        <Eyebrow className="mb-4 text-white/75">[ Campaign — Feel protected ]</Eyebrow>
+        {/* the trigger sits on the visible frame, so the line (hidden below it) rises when the band arrives */}
+        <motion.div className="overflow-hidden" initial="hidden" whileInView="show" viewport={{ once: true, margin: "-15% 0px" }}>
+          <motion.h2
+            className={`max-w-5xl ${XL}`}
+            variants={{ hidden: { y: reduceY }, show: { y: "0%", transition: { duration: 1, ease: EASE } } }}
+          >
+            Feel protected. Feel <span className="font-site-serif text-[1.1em] normal-case italic text-[rgb(var(--s-pink))]">free</span>. With ORA.
+          </motion.h2>
+        </motion.div>
+        <Magnetic className="mt-10 w-fit" strength={0.4}>
+          <Link href="/products" data-cursor="Shop" className="s-btn s-btn--pink">Shop the range</Link>
+        </Magnetic>
+      </div>
+    </section>
+  );
+}
+
+/* ── What ORA stands for, beside two offset photographs ── */
+export function BehindOra() {
+  return (
+    <section className={`${WRAP} py-24 md:py-36`}>
+      <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-20">
+        <div>
+          <Eyebrow>[ 04 — What we stand for ]</Eyebrow>
+          <SplitText text="Pads, education and dignity." accent={["dignity"]} className={`mt-4 max-w-xl ${LG}`} />
+          <Rise delay={0.1}>
+            <ul className="mt-10 max-w-lg divide-y divide-white/10 border-y border-white/10">
+              {[
+                ["Premium quality", "High-quality pads designed for comfort and protection."],
+                ["Education first", "Empowering girls with knowledge about their bodies and health."],
+                ["Community impact", "Working with schools, communities and partners to create change."],
+                ["Dignity for all", "Every girl deserves to live her life with dignity and confidence."],
+              ].map(([t, b], i) => (
+                <li key={t} className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-2 py-5">
+                  <span className="font-site-mono text-sm text-[rgb(var(--s-pink))]">0{i + 1}</span>
+                  <span>
+                    <span className="block font-site-display text-lg uppercase tracking-tight">{t}</span>
+                    <span className="mt-1 block text-[15px] leading-relaxed text-white/60">{b}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <Link href="/impact" className="s-btn s-btn--line mt-10">Meet the movement</Link>
+          </Rise>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Parallax speed={0.12} className="aspect-[3/4] rounded-[2px] bg-[rgb(26_26_29)]">
+            <div className="relative h-full w-full">
+              <Image src="/ora/site/g-jangwani-laugh.jpg" alt="Girls laughing at an ORA school day" fill sizes="30vw" className="object-cover" />
+            </div>
+          </Parallax>
+          <Parallax speed={-0.12} className="mt-10 aspect-[3/4] rounded-[2px] bg-[rgb(26_26_29)]">
+            <div className="relative h-full w-full">
+              <Image src="/ora/site/g-juhudi-class.jpg" alt="Girls listening during an ORA education session" fill sizes="30vw" className="object-cover" />
+            </div>
+          </Parallax>
         </div>
       </div>
     </section>
   );
 }
 
-/* ── 04 The figures, big ── */
+/* ── The figures ── */
 export function Numbers({ stats }: { stats: { label: string; value: number; note: string }[] }) {
   return (
-    <section className="relative isolate overflow-hidden py-24 sm:py-32">
-      <Atmosphere variant="b" />
-      <div className="relative mx-auto max-w-[1440px] px-5 sm:px-8">
-        <SectionLabel index="04" label="Impact, live" aside="Updated with every activity" />
-        <div className="mt-14 grid grid-cols-1 sm:grid-cols-2">
-          {stats.map((s, i) => (
-            <Rise key={s.label} delay={(i % 2) * 0.08} className={`border-white/10 py-8 sm:py-10 ${i > 0 ? "border-t" : ""} ${i === 1 ? "sm:border-t-0" : ""} ${i % 2 ? "sm:border-l sm:pl-10" : "sm:pr-10"}`}>
-              <p className="s-label">{s.label}</p>
-              <p className="mt-4 font-site-display text-[clamp(3.4rem,8vw,7.5rem)] font-semibold leading-none tracking-[-0.045em] tabular-nums">
-                <CountUp value={s.value} suffix="+" />
-              </p>
-              <p className="mt-4 max-w-sm text-[15px] text-white/55">{s.note}</p>
-            </Rise>
-          ))}
-        </div>
+    <section className="border-y border-white/10 bg-[rgb(18_18_20)]">
+      <div className={`${WRAP} grid grid-cols-2 lg:grid-cols-4`}>
+        {stats.map((s, i) => (
+          <Rise
+            key={s.label}
+            delay={i * 0.06}
+            className={`py-12 md:py-16 ${i % 2 ? "border-l border-white/10 pl-5 md:pl-8" : "pr-5"} ${i === 2 ? "border-t border-white/10 lg:border-l lg:border-t-0 lg:pl-8" : ""} ${i === 3 ? "border-t border-white/10 lg:border-t-0" : ""}`}
+          >
+            <p className="s-label">{s.label}</p>
+            <p className="mt-4 font-site-display text-[clamp(2rem,3.7vw,3.9rem)] font-semibold leading-none tracking-[-0.045em] tabular-nums">
+              <CountUp value={s.value} suffix="+" />
+            </p>
+            <p className="mt-3 max-w-[16rem] text-[14px] leading-relaxed text-white/50">{s.note}</p>
+          </Rise>
+        ))}
       </div>
     </section>
   );
 }
 
-/* ── 05 From the studio to the schoolyard: a curated editorial mosaic (owner, 2026-11-09: the two rows of arches
-   looked like one event repeated — show the campaign, the studio and different school days, displayed beautifully).
-   Each photo opens with a curtain as it comes into view and settles from a slow zoom; hover lifts the caption. ── */
-const MOSAIC: { src: string; alt: string; tag: string; place: string; cls: string; sizes: string }[] = [
-  { src: "/ora/site/g-campaign-fresh.jpg", alt: "ORA campaign: a model holding ORA pads — stay fresh, stay confident", tag: "Campaign", place: "Stay fresh, stay confident", cls: "col-span-2 row-span-4 lg:col-span-5 lg:row-span-6", sizes: "(max-width:1024px) 100vw, 42vw" },
-  { src: "/ora/site/wide-GTM00015.jpg", alt: "Girls laughing together at an ORA school day", tag: "School day", place: "Jangwani", cls: "col-span-2 row-span-2 lg:col-span-7 lg:row-span-3", sizes: "(max-width:1024px) 100vw, 58vw" },
-  { src: "/ora/site/g-juhudi-table.jpg", alt: "ORA pads stacked on the table at International Girls' Day", tag: "Girls' Day 2026", place: "Juhudi Jeshini", cls: "col-span-1 row-span-2 lg:col-span-4 lg:row-span-3", sizes: "(max-width:1024px) 50vw, 33vw" },
-  { src: "/ora/site/shot-day.jpg", alt: "ORA day pads, 290 mm, studio photograph", tag: "Studio", place: "290 mm · day", cls: "col-span-1 row-span-2 lg:col-span-3 lg:row-span-3", sizes: "(max-width:1024px) 50vw, 25vw" },
-  { src: "/ora/site/wide-FLP00062.jpg", alt: "The ORA team cheering beside stacks of pads", tag: "School visit", place: "Zanaki", cls: "col-span-2 row-span-2 lg:col-span-7 lg:row-span-4", sizes: "(max-width:1024px) 100vw, 58vw" },
-  { src: "/ora/site/g-campaign-cloud.jpg", alt: "ORA campaign: two friends holding ORA packs — soft as a cloud", tag: "Campaign", place: "Soft as a cloud", cls: "col-span-1 row-span-3 lg:col-span-5 lg:row-span-6", sizes: "(max-width:1024px) 50vw, 42vw" },
-  { src: "/ora/site/g-zanaki-stage.jpg", alt: "A student speaking on the ORA stage", tag: "On stage", place: "Zanaki", cls: "col-span-1 row-span-3 lg:col-span-4 lg:row-span-4", sizes: "(max-width:1024px) 50vw, 33vw" },
-  { src: "/ora/site/shot-night.jpg", alt: "ORA night pads, 360 mm, studio photograph", tag: "Studio", place: "360 mm · night", cls: "col-span-1 row-span-2 lg:col-span-3 lg:row-span-4", sizes: "(max-width:1024px) 50vw, 25vw" },
-  { src: "/ora/site/g-juhudi-class.jpg", alt: "Girls listening during an ORA education session", tag: "Education", place: "Juhudi Jeshini", cls: "col-span-1 row-span-2 lg:col-span-5 lg:row-span-3", sizes: "(max-width:1024px) 50vw, 42vw" },
-  { src: "/ora/site/g-campaign-mood.jpg", alt: "ORA campaign: for every mood, for every moment", tag: "Campaign", place: "For every mood", cls: "col-span-2 row-span-3 lg:col-span-4 lg:row-span-3", sizes: "(max-width:1024px) 100vw, 33vw" },
+/* ── Get involved: an index; pointing at a row floats its photograph by the cursor ── */
+const ROWS = [
+  { label: "Our impact", meta: "Stories & live figures", href: "/impact", image: "/ora/site/wide-GTM00027.jpg" },
+  { label: "Find ORA", meta: "Stockists across Tanzania", href: "/find-ora", image: "/ora/site/shot-night.jpg" },
+  { label: "Education hub", meta: "English & Kiswahili", href: "/education", image: "/ora/site/g-juhudi-class.jpg" },
+  { label: "Become an agent", meta: "Schools · NGOs · distributors", href: "/request-access", image: "/ora/site/wide-FLP00062.jpg" },
+  { label: "Track your cycle", meta: "Private, on your phone", href: "/tracker", image: "/ora/site/shot-liner.jpg" },
 ];
-function MosaicTile({ m, i }: { m: (typeof MOSAIC)[number]; i: number }) {
-  const reduce = useReducedMotion();
+export function GetInvolved() {
+  const [active, setActive] = useState<number | null>(null);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const sx = useSpring(x, { stiffness: 120, damping: 18, mass: 0.4 });
+  const sy = useSpring(y, { stiffness: 120, damping: 18, mass: 0.4 });
+  const wrap = useRef<HTMLDivElement>(null);
   return (
-    <motion.figure
-      className={`group relative isolate overflow-hidden rounded-[22px] bg-white/[0.04] ${m.cls}`}
-      initial={reduce ? false : { clipPath: "inset(100% 0% 0% 0% round 22px)" }}
-      whileInView={{ clipPath: "inset(0% 0% 0% 0% round 22px)" }}
-      viewport={{ once: true, margin: "-12% 0px" }}
-      transition={{ duration: 1.25, ease: EASE, delay: (i % 3) * 0.08 }}
-    >
-      <motion.div
-        className="absolute inset-0"
-        initial={reduce ? false : { scale: 1.22 }}
-        whileInView={{ scale: 1 }}
-        viewport={{ once: true, margin: "-12% 0px" }}
-        transition={{ duration: 1.8, ease: EASE, delay: (i % 3) * 0.08 }}
+    <section className={`${WRAP} py-24 md:py-36`}>
+      <Eyebrow className="mb-10">[ 05 — Get involved ]</Eyebrow>
+      <div
+        ref={wrap}
+        onMouseMove={(e) => {
+          const r = wrap.current?.getBoundingClientRect();
+          if (!r) return;
+          x.set(e.clientX - r.left);
+          y.set(e.clientY - r.top);
+        }}
+        className="relative"
       >
-        <Image src={m.src} alt={m.alt} fill sizes={m.sizes} className="object-cover transition-transform duration-[1.4s] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06]" />
-      </motion.div>
-      <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-[rgb(11_6_18/0.7)] via-transparent to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
-      <figcaption className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4 sm:p-5">
-        <span className="translate-y-1 transition-transform duration-500 group-hover:translate-y-0">
-          <span className="block s-label text-[rgb(var(--s-pink))]">{m.tag}</span>
-          <span className="mt-1.5 block text-[13px] font-medium text-white sm:text-[15px]">{m.place}</span>
-        </span>
-        <span className="s-label text-white/60">{String(i + 1).padStart(2, "0")}</span>
-      </figcaption>
-    </motion.figure>
-  );
-}
-export function RealLife() {
-  return (
-    <section className="relative py-24 sm:py-32">
-      <div className="mx-auto max-w-[1440px] px-5 sm:px-8">
-        <SectionLabel index="05" label="ORA in real life" aside="Campaign · studio · school days" />
-        <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-end">
-          <SplitText text="From the studio to the schoolyard" accent={["schoolyard"]} className={`text-[clamp(2.2rem,5.2vw,5rem)] ${H2}`} />
-          <p className="max-w-md text-[17px] leading-relaxed text-white/65">
-            The faces of the campaign, the packs in the studio, and the school days where it all happens — Zanaki, Jangwani,
-            Juhudi Jeshini and more across Tanzania.
-          </p>
-        </div>
-        <div className="mt-14 grid auto-rows-[92px] grid-flow-dense grid-cols-2 gap-3 sm:auto-rows-[120px] sm:gap-4 lg:grid-cols-12 lg:auto-rows-[96px] lg:gap-5">
-          {MOSAIC.map((m, i) => (
-            <MosaicTile key={m.src} m={m} i={i} />
-          ))}
-        </div>
-        <div className="mt-10 flex justify-end">
-          <Link href="/impact" className="group inline-flex items-center gap-2 text-[15px] font-medium text-white">
-            See every moment
-            <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" strokeWidth={1.5} />
+        {ROWS.map((row, i) => (
+          <Link
+            key={row.href}
+            href={row.href}
+            data-cursor="Open"
+            onMouseEnter={() => setActive(i)}
+            onMouseLeave={() => setActive(null)}
+            className="group flex items-center justify-between gap-6 border-t border-white/10 py-6 last:border-b md:py-9"
+          >
+            <span
+              className={`font-site-display text-[clamp(2rem,5.4vw,4.8rem)] font-semibold uppercase leading-none tracking-[-0.035em] transition-all duration-500 ${
+                active === i ? "translate-x-4 text-[rgb(var(--s-pink))]" : "text-[rgb(var(--s-ink))]"
+              } ${active !== null && active !== i ? "opacity-30" : "opacity-100"}`}
+            >
+              {row.label}
+            </span>
+            <span className="s-label hidden text-right sm:block">{row.meta}</span>
           </Link>
-        </div>
+        ))}
+        <AnimatePresence>
+          {active !== null && (
+            <motion.div
+              className="pointer-events-none absolute left-0 top-0 z-20 hidden aspect-[3/4] w-64 overflow-hidden rounded-[2px] md:block"
+              style={{ x: sx, y: sy, translateX: "-50%", translateY: "-50%" }}
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ duration: 0.35, ease: EASE }}
+            >
+              <Image src={ROWS[active].image} alt="" fill sizes="256px" className="object-cover" />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </section>
   );
 }
 
-/* ── 06 Ways in: three tall panels ── */
-const WAYS = [
-  { n: "01", title: "Make an impact", body: "Every school visit, every education session, every pad delivered — see the change we create together.", href: "/impact", cta: "See our impact", img: "/ora/site/wide-GTM00027.jpg" },
-  { n: "02", title: "Join the movement", body: "Bring ORA to your school or community — agents, distributors, NGOs and schools all welcome.", href: "/request-access", cta: "Become an agent", img: "/ora/site/wide-GTM00117.jpg" },
-  { n: "03", title: "Track your cycle", body: "Track your cycle, get insights and take control of your health.", href: "/tracker", cta: "Open the tracker", img: "/ora/site/wide-FLP00062.jpg" },
-];
-export function WaysIn() {
-  return (
-    <section className="relative py-24 sm:py-32">
-      <div className="mx-auto max-w-[1440px] px-5 sm:px-8">
-        <SectionLabel index="06" label="Get involved" />
-        <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
-          {WAYS.map((w, i) => (
-            <Rise key={w.n} delay={i * 0.08}>
-              <Link href={w.href} className="group relative isolate flex h-[480px] flex-col justify-between overflow-hidden rounded-[28px] border border-white/10 p-7 sm:h-[560px]">
-                <Image src={w.img} alt="" fill sizes="(max-width: 768px) 100vw, 33vw" className="-z-10 object-cover opacity-55 transition-[transform,opacity] duration-[1.2s] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105 group-hover:opacity-75" />
-                <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-b from-[rgb(11_6_18/0.2)] via-[rgb(11_6_18/0.35)] to-[rgb(11_6_18/0.92)]" />
-                <div className="flex items-start justify-between">
-                  <span className="font-site-display text-6xl font-semibold leading-none tracking-[-0.05em] s-outline">{w.n}</span>
-                  <span className="grid size-12 place-items-center rounded-full border border-white/25 text-white transition-colors duration-300 group-hover:border-[rgb(var(--s-pink))] group-hover:bg-[rgb(var(--s-pink))]">
-                    <ArrowUpRight className="size-5 transition-transform duration-300 group-hover:rotate-45" strokeWidth={1.5} />
-                  </span>
-                </div>
-                <div>
-                  <h3 className="font-site-display text-3xl font-semibold uppercase leading-none tracking-[-0.03em] sm:text-[2.2rem]">{w.title}</h3>
-                  <p className="mt-4 max-w-xs text-[15px] leading-relaxed text-white/70">{w.body}</p>
-                  <p className="mt-6 s-label text-white">{w.cta} →</p>
-                </div>
-              </Link>
-            </Rise>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ── 07 News as a feed: hover a row and its photo follows the cursor; activities beside it ── */
-type Post = { slug: string; title: string; date: string; img: string; category?: string };
-export function Feed({ news, activities }: { news: Post[]; activities: string[] }) {
+/* ── News as a feed: hover a row and its photo follows the cursor ── */
+type Post = { slug: string; title: string; date: string; img: string };
+export function Feed({ news }: { news: Post[] }) {
   const [hover, setHover] = useState<number | null>(null);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const sx = useSpring(x, { stiffness: 200, damping: 22 });
   const sy = useSpring(y, { stiffness: 200, damping: 22 });
   return (
-    <section id="news" className="relative scroll-mt-16 py-24 sm:py-32">
-      <div className="mx-auto max-w-[1440px] px-5 sm:px-8">
-        <SectionLabel index="07" label="The feed" aside={<Link href="/news" className="hover:text-white">All news →</Link>} />
-        <SplitText text="Latest from the field" accent={["field"]} className={`mt-10 text-[clamp(2.2rem,5.2vw,5rem)] ${H2}`} />
-        <div
-          className="relative mt-12"
-          onMouseMove={(e) => {
-            const r = e.currentTarget.getBoundingClientRect();
-            x.set(e.clientX - r.left);
-            y.set(e.clientY - r.top);
-          }}
-          onMouseLeave={() => setHover(null)}
-        >
-          {news.length === 0 ? (
-            <p className="border-t border-white/10 pt-6 text-white/60">No posts yet — check back soon.</p>
-          ) : (
-            <ul className="border-t border-white/10">
-              {news.map((n, i) => (
-                <li key={n.slug} onMouseEnter={() => setHover(i)}>
-                  <Link href={`/news/${n.slug}`} className="group grid grid-cols-[64px_minmax(0,1fr)] items-center gap-4 border-b border-white/10 py-6 sm:grid-cols-[140px_minmax(0,1fr)_auto] sm:gap-8 sm:py-8">
-                    <span className="relative size-16 overflow-hidden rounded-xl sm:hidden">
-                      <Image src={n.img} alt="" fill sizes="64px" className="object-cover" />
-                    </span>
-                    <span className="s-label hidden sm:block">{n.date}</span>
-                    <span>
-                      <span className="block font-site-display text-xl font-medium leading-tight tracking-[-0.02em] transition-[color,transform] duration-300 group-hover:translate-x-2 group-hover:text-[rgb(var(--s-pink))] sm:text-3xl">{n.title}</span>
-                      <span className="mt-2 block s-label sm:hidden">{n.date}</span>
-                    </span>
-                    <ArrowUpRight className="hidden size-6 text-white/50 transition-[transform,color] duration-300 group-hover:rotate-45 group-hover:text-white sm:block" strokeWidth={1.5} />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          <motion.div aria-hidden className="pointer-events-none absolute left-0 top-0 z-10 hidden h-[220px] w-[300px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl lg:block" style={{ x: sx, y: sy }} animate={{ opacity: hover === null ? 0 : 1, scale: hover === null ? 0.85 : 1 }} transition={{ duration: 0.3 }}>
+    <section id="news" className={`${WRAP} scroll-mt-20 py-24 md:py-32`}>
+      <div className="mb-10 flex items-end justify-between gap-6">
+        <div>
+          <Eyebrow>[ 06 — The newsroom ]</Eyebrow>
+          <h2 className={`mt-3 ${LG}`}>Latest news</h2>
+        </div>
+        <Link href="/news" className="s-link pb-2 text-white/80 hover:text-white">All news</Link>
+      </div>
+      <div
+        className="relative"
+        onMouseMove={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          x.set(e.clientX - r.left);
+          y.set(e.clientY - r.top);
+        }}
+        onMouseLeave={() => setHover(null)}
+      >
+        {news.length === 0 ? (
+          <p className="border-t border-white/10 pt-6 text-white/60">No posts yet — check back soon.</p>
+        ) : (
+          <ul className="border-t border-white/10">
             {news.map((n, i) => (
-              <Image key={n.slug} src={n.img} alt="" fill sizes="300px" className={`object-cover transition-opacity duration-300 ${hover === i ? "opacity-100" : "opacity-0"}`} />
+              <li key={n.slug} onMouseEnter={() => setHover(i)}>
+                <Link href={`/news/${n.slug}`} data-cursor="Read" className="group grid grid-cols-[64px_minmax(0,1fr)] items-center gap-4 border-b border-white/10 py-6 sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:gap-8 sm:py-8">
+                  <span className="relative size-16 overflow-hidden rounded-[2px] sm:hidden">
+                    <Image src={n.img} alt="" fill sizes="64px" className="object-cover" />
+                  </span>
+                  <span className="s-label hidden sm:block">{n.date}</span>
+                  <span>
+                    <span className="block font-site-display text-xl font-medium uppercase leading-tight tracking-[-0.02em] transition-[color,transform] duration-300 group-hover:translate-x-2 group-hover:text-[rgb(var(--s-pink))] sm:text-3xl">{n.title}</span>
+                    <span className="mt-2 block s-label sm:hidden">{n.date}</span>
+                  </span>
+                  <ArrowUpRight className="hidden size-6 text-white/50 transition-[transform,color] duration-300 group-hover:rotate-45 group-hover:text-white sm:block" strokeWidth={1.5} />
+                </Link>
+              </li>
             ))}
-          </motion.div>
-        </div>
-
-        <div id="activities" className="mt-20 scroll-mt-20">
-          <div className="flex items-end justify-between gap-6">
-            <p className="s-label">Recent activities</p>
-            <Link href="/impact" className="s-label hover:text-white">All activities →</Link>
-          </div>
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            {activities.map((a, i) => (
-              <Rise key={a} delay={i * 0.06}>
-                <div className="group relative aspect-[3/4] overflow-hidden rounded-[22px] bg-white/5">
-                  <Image src={a} alt="ORA activity" fill sizes="(max-width:1024px) 50vw, 25vw" className="object-cover transition-transform duration-[1.2s] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105" />
-                </div>
-              </Rise>
-            ))}
-          </div>
-        </div>
+          </ul>
+        )}
+        <motion.div aria-hidden className="pointer-events-none absolute left-0 top-0 z-10 hidden h-[220px] w-[300px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[2px] lg:block" style={{ x: sx, y: sy }} animate={{ opacity: hover === null ? 0 : 1, scale: hover === null ? 0.85 : 1 }} transition={{ duration: 0.3 }}>
+          {news.map((n, i) => (
+            <Image key={n.slug} src={n.img} alt="" fill sizes="300px" className={`object-cover transition-opacity duration-300 ${hover === i ? "opacity-100" : "opacity-0"}`} />
+          ))}
+        </motion.div>
       </div>
     </section>
   );
 }
 
-/* ── Closing: the promise, huge, over a crowd of girls ── */
+/* ── On the grid: ORA's Instagram wall ── */
+const GRID = ["/ora/site/g-campaign-fresh.jpg", "/ora/site/g-zanaki-joy.jpg", "/ora/site/shot-day.jpg", "/ora/site/g-campaign-cloud.jpg", "/ora/site/g-jangwani-laugh.jpg", "/ora/site/shot-liner.jpg"];
+export function OnTheGrid() {
+  return (
+    <section className={`${WRAP} pb-24 md:pb-32`}>
+      <div className="mb-10 flex items-end justify-between gap-6">
+        <div>
+          <Eyebrow>[ 07 — The feed ]</Eyebrow>
+          <h2 className={`mt-3 ${LG}`}>On the grid</h2>
+        </div>
+        <a href={ORA_CONTACT.instagram} target="_blank" rel="noreferrer" className="s-link flex items-center gap-1 pb-2 text-white/80 hover:text-white">
+          @orapads.tz <ArrowUpRight className="size-4" strokeWidth={1.5} />
+        </a>
+      </div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        {GRID.map((src, i) => (
+          <Rise key={src} delay={(i % 6) * 0.05}>
+            <a href={ORA_CONTACT.instagram} target="_blank" rel="noreferrer" data-cursor="Open" className="group relative block aspect-square overflow-hidden rounded-[2px] bg-[rgb(26_26_29)]">
+              <Image src={src} alt="ORA on Instagram" fill sizes="(max-width:768px) 50vw, 16vw" className="object-cover transition-transform duration-700 group-hover:scale-110" />
+              <span className="absolute inset-0 flex items-center justify-center bg-[rgb(10_10_11/0.6)] opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                <ArrowUpRight className="size-6 text-[rgb(var(--s-pink))]" strokeWidth={1.5} />
+              </span>
+            </a>
+          </Rise>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ── Closing: the promise over a faint giant ORA ── */
 export function Closing() {
   return (
-    <section className="relative isolate overflow-hidden">
-      <Parallax speed={0.12} className="absolute inset-0 -z-10">
-        <Image src="/ora/site/wide-GTM00145.jpg" alt="" fill sizes="100vw" className="object-cover" />
-      </Parallax>
-      <div aria-hidden className="absolute inset-0 -z-10 bg-[rgb(11_6_18/0.72)]" />
-      <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_50%_60%,rgb(255_63_168/0.28),transparent_60%)]" />
-      <div className="mx-auto flex min-h-[90svh] max-w-[1440px] flex-col items-center justify-center px-5 py-28 text-center sm:px-8">
-        <p className="s-label text-white/75">[ The promise ]</p>
-        <SplitText text="Put a pad in every girl's hand" accent={["hand"]} className={`mt-8 max-w-5xl text-[clamp(2.6rem,7.4vw,7.6rem)] ${H2}`} />
-        <div className="mt-12 flex flex-wrap justify-center gap-3">
-          <Magnetic>
-            <Link href="/impact" className="inline-flex h-14 items-center rounded-full bg-[rgb(var(--s-pink))] px-8 text-[15px] font-semibold text-white shadow-[0_12px_40px_-10px_rgb(255_63_168/0.8)] transition-transform active:scale-[0.97]">
-              Join the movement
-            </Link>
+    <section className="relative overflow-hidden border-y border-white/10 bg-[rgb(18_18_20)] py-28 md:py-40">
+      <div className={`${WRAP} relative z-10 text-center`}>
+        <Eyebrow>[ Join the movement ]</Eyebrow>
+        <SplitText text="Put a pad in every girl's hand." accent={["hand"]} className={`mx-auto mt-6 max-w-5xl ${LG}`} />
+        <p className="mx-auto mt-6 max-w-md text-white/60">Bring ORA to your school or community — agents, distributors, NGOs and schools all welcome.</p>
+        <div className="mt-10 flex flex-wrap justify-center gap-4">
+          <Magnetic strength={0.4}>
+            <Link href="/impact" data-cursor="Join" className="s-btn s-btn--pink">Join the movement</Link>
           </Magnetic>
-          <Link href="/contact" className="inline-flex h-14 items-center rounded-full border border-white/25 px-7 text-[15px] font-medium text-white transition-colors hover:bg-white/10">
-            Talk to the team
-          </Link>
+          <Link href="/contact" className="s-btn s-btn--line">Talk to the team</Link>
         </div>
       </div>
+      <span aria-hidden className="pointer-events-none absolute -bottom-[0.18em] left-1/2 -translate-x-1/2 select-none font-site-display text-[34vw] font-bold leading-none tracking-[-0.05em] text-[rgb(26_26_29)]">
+        ORA
+      </span>
     </section>
   );
 }

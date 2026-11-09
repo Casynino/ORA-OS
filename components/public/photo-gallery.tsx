@@ -36,7 +36,7 @@ export function PhotoGallery({
             <div
               key={src}
               className={cn(
-                "group relative overflow-hidden rounded-[18px] bg-white/[0.06] sm:rounded-[24px]",
+                "group relative overflow-hidden rounded-[2px] bg-white/[0.06] sm:rounded-[2px]",
                 SHAPES[(row + c) % SHAPES.length],
               )}
             >

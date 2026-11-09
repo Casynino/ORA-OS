@@ -162,7 +162,7 @@ export function FitIndex() {
       </ul>
 
       <div className="relative hidden lg:block">
-        <div className="sticky top-28 h-[540px] overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.02]">
+        <div className="sticky top-28 h-[540px] overflow-hidden rounded-[2px] border border-white/10 bg-white/[0.02]">
           <motion.div
             aria-hidden
             className="absolute left-1/2 top-[42%] size-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[90px]"

@@ -320,7 +320,7 @@ export default async function ImpactPage() {
                         )}
                       </div>
                       {a.images[0] && (
-                        <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[22px] bg-white/[0.05]">
+                        <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[2px] bg-white/[0.05]">
                           <Image
                             src={a.images[0]}
                             alt={a.title}
@@ -370,7 +370,7 @@ export default async function ImpactPage() {
                       </Parallax>
                     </div>
                   ) : (
-                    <Parallax speed={0.1} className="aspect-[4/3] w-full rounded-[28px]">
+                    <Parallax speed={0.1} className="aspect-[4/3] w-full rounded-[2px]">
                       <Image src={s.img} alt={s.title} fill sizes="(max-width:1024px) 100vw, 55vw" className="object-cover" />
                     </Parallax>
                   )}

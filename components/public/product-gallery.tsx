@@ -21,7 +21,7 @@ export function ProductGallery({
 
   return (
     <div>
-      <div className="group relative aspect-[4/5] overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04]">
+      <div className="group relative aspect-[4/5] overflow-hidden rounded-[2px] border border-white/10 bg-white/[0.04]">
         <AnimatePresence initial={false} mode="popLayout">
           <motion.div
             key={images[active]}
@@ -56,7 +56,7 @@ export function ProductGallery({
               aria-label={`View image ${i + 1}`}
               aria-pressed={i === active}
               className={cn(
-                "relative size-16 overflow-hidden rounded-2xl bg-white/5 outline-none ring-offset-2 ring-offset-[rgb(var(--s-night))] transition-[opacity,box-shadow,transform] duration-300 focus-visible:ring-2 focus-visible:ring-[rgb(var(--s-pink))] active:scale-95 sm:size-20",
+                "relative size-16 overflow-hidden rounded-[2px] bg-white/5 outline-none ring-offset-2 ring-offset-[rgb(var(--s-night))] transition-[opacity,box-shadow,transform] duration-300 focus-visible:ring-2 focus-visible:ring-[rgb(var(--s-pink))] active:scale-95 sm:size-20",
                 i === active ? "ring-2 ring-[rgb(var(--s-pink))]" : "opacity-50 hover:opacity-100",
               )}
             >

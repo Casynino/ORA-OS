@@ -95,7 +95,5 @@ export function SectionHead({ index, label, title, accent = [], note, aside }: {
 }
 
 /** Primary and secondary buttons in the site's style. */
-export const btnPrimary =
-  "inline-flex h-14 items-center gap-2 rounded-full bg-[rgb(var(--s-pink))] px-7 text-[15px] font-semibold text-white shadow-[0_12px_40px_-10px_rgb(255_63_168/0.8)] transition-transform active:scale-[0.97]";
-export const btnGhost =
-  "group inline-flex h-14 items-center gap-2 rounded-full border border-white/15 px-6 text-[15px] font-medium text-white/90 transition-colors hover:border-white/35 hover:bg-white/[0.04]";
+export const btnPrimary = "s-btn s-btn--pink";
+export const btnGhost = "group s-btn s-btn--line";

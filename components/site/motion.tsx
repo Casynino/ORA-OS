@@ -210,29 +210,10 @@ export function SectionLabel({ index, label, aside, className }: { index: string
   );
 }
 
-/** The living background of a band: drifting pink/violet light and a fine grid. */
-export function Atmosphere({ variant = "a", grid = true, className }: { variant?: "a" | "b" | "c"; grid?: boolean; className?: string }) {
-  const spots = {
-    a: [
-      { c: "pink", s: "left:-10%;top:-15%;width:55vw;height:55vw" },
-      { c: "violet", s: "right:-15%;top:10%;width:50vw;height:50vw" },
-    ],
-    b: [
-      { c: "violet", s: "left:-12%;bottom:-20%;width:50vw;height:50vw" },
-      { c: "pink", s: "right:-8%;top:-10%;width:40vw;height:40vw" },
-    ],
-    c: [
-      { c: "pink", s: "left:30%;top:20%;width:45vw;height:45vw" },
-      { c: "sky", s: "left:-10%;top:-10%;width:35vw;height:35vw" },
-    ],
-  }[variant];
-  const style = (s: string) => Object.fromEntries(s.split(";").map((kv) => kv.split(":")));
-  return (
-    <div aria-hidden className={cn("s-atmo", className)}>
-      {spots.map((p, i) => (
-        <i key={i} className="s-atmo__glow" data-c={p.c} style={style(p.s)} />
-      ))}
-      {grid && <i className="s-atmo__grid" />}
-    </div>
-  );
+/**
+ * The background of a band. Reckless-style ground (owner, 2026-11-09): no coloured light — every band stays ink and
+ * the photographs carry the colour. Kept as a component so pages that place it keep working.
+ */
+export function Atmosphere(_props: { variant?: "a" | "b" | "c"; grid?: boolean; className?: string }) {
+  return null;
 }

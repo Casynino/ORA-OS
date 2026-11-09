@@ -757,10 +757,10 @@ html[data-install-open] .install-hide { opacity: 0; pointer-events: none; }
    an italic serif accent, mono index labels. Motion stops for reduced-motion users.
    ════════════════════════════════════════════════════════════════════════════════════ */
 .ora-site {
-  --s-night: 11 6 18;        /* #0b0612 */
-  --s-deep: 20 9 31;         /* #14091f */
-  --s-ink: 247 239 246;      /* #f7eff6 */
-  --s-pink: 255 63 168;      /* #ff3fa8  ORA magenta on night */
+  --s-night: 10 10 11;       /* #0a0a0b  ink, like the Reckless site */
+  --s-deep: 18 18 20;        /* #121214  ink-soft */
+  --s-ink: 236 232 225;      /* #ece8e1  bone */
+  --s-pink: 255 46 151;      /* #ff2e97  ORA magenta — the one accent */
   --s-violet: 139 92 246;    /* #8b5cf6 */
   --s-sky: 56 189 248;
   background: rgb(var(--s-night));
@@ -831,7 +831,7 @@ html[data-install-open] .install-hide { opacity: 0; pointer-events: none; }
 .s-marquee-wrap:hover .s-marquee { animation-play-state: paused; }
 @keyframes s-marquee { to { transform: translate3d(-50%, 0, 0); } }
 /* arch window (the ORA logo's shape) */
-.s-arch { border-radius: 999px 999px 18px 18px; overflow: hidden; }
+.s-arch { border-radius: 2px; overflow: hidden; }
 /* scroll cue */
 .s-cue { animation: s-cue 2.2s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
 @keyframes s-cue { 0% { transform: scaleY(0); transform-origin: top; } 45% { transform: scaleY(1); transform-origin: top; } 55% { transform: scaleY(1); transform-origin: bottom; } 100% { transform: scaleY(0); transform-origin: bottom; } }
@@ -851,22 +851,22 @@ html[data-intro-seen] .s-intro { display: none; }
    (bg-background, bg-card, border-border, text-muted-foreground…) sits on ORA's night ground whatever the
    visitor's theme. The staff app keeps its own tokens. */
 .ora-site {
-  --background: 275 50% 5%;
-  --foreground: 315 40% 95%;
-  --card: 276 40% 9%;
-  --card-foreground: 315 40% 95%;
-  --popover: 276 40% 9%;
-  --popover-foreground: 315 40% 95%;
-  --primary: 328 100% 62%;
+  --background: 240 5% 4%;
+  --foreground: 37 20% 90%;
+  --card: 240 5% 8%;
+  --card-foreground: 37 20% 90%;
+  --popover: 240 5% 8%;
+  --popover-foreground: 37 20% 90%;
+  --primary: 329 100% 59%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 276 30% 14%;
-  --secondary-foreground: 315 40% 95%;
+  --secondary: 240 4% 12%;
+  --secondary-foreground: 37 20% 90%;
   --accent: 258 90% 66%;
   --accent-foreground: 0 0% 100%;
-  --muted: 276 30% 13%;
-  --muted-foreground: 300 12% 72%;
-  --border: 282 24% 17%;
-  --input: 282 24% 20%;
+  --muted: 240 4% 11%;
+  --muted-foreground: 240 3% 66%;
+  --border: 240 4% 17%;
+  --input: 240 4% 20%;
   --ring: 328 100% 62%;
   --success: 145 60% 56%;
   --warning: 38 95% 62%;
@@ -876,15 +876,7 @@ html[data-intro-seen] .s-intro { display: none; }
 /* ── The galaxy behind every public page (owner, 2026-11-09: "a galaxy background on every page").
    Pure CSS, painted once: deep night, ORA pink / violet / blue nebula clouds, a faint milky band, three layers
    of stars; the stars only twinkle (opacity), nothing travels across the screen. */
-.s-galaxy { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
-  background:
-    radial-gradient(ellipse 55% 42% at 12% 8%, rgb(255 63 168 / 0.16), transparent 62%),
-    radial-gradient(ellipse 48% 46% at 88% 22%, rgb(139 92 246 / 0.2), transparent 62%),
-    radial-gradient(ellipse 60% 40% at 70% 92%, rgb(56 189 248 / 0.08), transparent 60%),
-    radial-gradient(ellipse 45% 35% at 22% 78%, rgb(139 92 246 / 0.1), transparent 60%),
-    linear-gradient(155deg, transparent 32%, rgb(255 220 245 / 0.035) 46%, rgb(200 170 255 / 0.03) 52%, transparent 66%),
-    rgb(var(--s-night));
-}
+.s-galaxy { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; background: rgb(var(--s-night)); opacity: 0.55; }
 .s-galaxy i { position: absolute; inset: 0; background-repeat: repeat; }
 .s-galaxy i:nth-child(1) {
   background-size: 260px 260px;
@@ -919,3 +911,17 @@ html[data-intro-seen] .s-intro { display: none; }
 }
 @keyframes s-twinkle { from { opacity: 0.35; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .s-galaxy i { animation: none !important; } }
+
+/* Reckless-style buttons: sharp rectangles, small spaced capitals */
+.s-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem; height: 3.25rem; padding: 0 2.25rem;
+  font-family: var(--font-site-mono), ui-monospace, monospace; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.25em; text-transform: uppercase;
+  border-radius: 2px; transition: transform 0.3s cubic-bezier(0.16,1,0.3,1), background-color 0.2s, color 0.2s, border-color 0.2s; }
+.s-btn:hover { transform: scale(1.02); }
+.s-btn--bone { background: rgb(var(--s-ink)); color: rgb(var(--s-night)); }
+.s-btn--pink { background: rgb(var(--s-pink)); color: #fff; }
+.s-btn--line { border: 1px solid rgb(var(--s-ink) / 0.35); color: rgb(var(--s-ink)); }
+.s-btn--line:hover { border-color: rgb(var(--s-ink)); }
+.s-link { position: relative; font-family: var(--font-site-mono), ui-monospace, monospace; font-size: 0.72rem; letter-spacing: 0.25em; text-transform: uppercase; }
+.s-link::after { content: ""; position: absolute; left: 0; bottom: -4px; height: 1px; width: 100%; background: currentColor; transform: scaleX(0); transform-origin: right; transition: transform 0.4s cubic-bezier(0.16,1,0.3,1); }
+.s-link:hover::after { transform: scaleX(1); transform-origin: left; }
+body.s-has-cursor .ora-site, body.s-has-cursor .ora-site a, body.s-has-cursor .ora-site button { cursor: none; }

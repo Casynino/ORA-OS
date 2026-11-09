@@ -67,7 +67,7 @@ export default async function NewsPage() {
               <Rise className="mt-12">
                 <Link
                   href={`/news/${featured.slug}`}
-                  className={cn("group relative isolate flex min-h-[600px] flex-col justify-end overflow-hidden rounded-[28px] border border-white/10 sm:min-h-[78svh]", FOCUS)}
+                  className={cn("group relative isolate flex min-h-[600px] flex-col justify-end overflow-hidden rounded-[2px] border border-white/10 sm:min-h-[78svh]", FOCUS)}
                 >
                   <Parallax speed={0.08} className="absolute inset-0 -z-10">
                     <Image

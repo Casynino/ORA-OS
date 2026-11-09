@@ -204,7 +204,7 @@ export default async function NewsArticlePage({
                       target="_blank"
                       rel="noopener noreferrer"
                       className={cn(
-                        "group inline-flex h-11 items-center gap-1.5 rounded-full border border-white/15 px-4 text-sm font-medium text-white/85 transition-[background-color,border-color,color] duration-200 hover:border-[rgb(var(--s-pink))] hover:bg-[rgb(var(--s-pink))] hover:text-white",
+                        "group inline-flex h-11 items-center gap-1.5 rounded-[2px] border border-white/15 px-4 text-sm font-medium text-white/85 transition-[background-color,border-color,color] duration-200 hover:border-[rgb(var(--s-pink))] hover:bg-[rgb(var(--s-pink))] hover:text-white",
                         FOCUS,
                       )}
                     >
@@ -238,8 +238,8 @@ export default async function NewsArticlePage({
             <div className="mt-12 grid grid-cols-1 gap-x-8 gap-y-14 md:grid-cols-2">
               {more.map((p, i) => (
                 <Rise key={p.slug} delay={i * 0.1} className={cn(i === 1 && "md:mt-24")}>
-                  <Link href={`/news/${p.slug}`} className={cn("group block rounded-[24px]", FOCUS)}>
-                    <div className="relative aspect-[4/3] overflow-hidden rounded-[24px] bg-white/5 sm:aspect-[16/11]">
+                  <Link href={`/news/${p.slug}`} className={cn("group block rounded-[2px]", FOCUS)}>
+                    <div className="relative aspect-[4/3] overflow-hidden rounded-[2px] bg-white/5 sm:aspect-[16/11]">
                       <Image src={p.coverImage ?? FALLBACK} alt={p.title} fill sizes="(min-width:768px) 50vw, 100vw" className={ZOOM} />
                       <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-[rgb(11_6_18/0.5)] via-transparent to-transparent" />
                     </div>

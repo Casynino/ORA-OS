@@ -267,7 +267,7 @@ export default async function ProductPage({
                 <Rise key={p.slug} delay={i * 0.08}>
                   <Link
                     href={`/products/${p.slug}`}
-                    className="group relative isolate flex h-full min-h-[440px] flex-col justify-between overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.02] p-6 outline-none transition-colors duration-300 hover:border-white/20 focus-visible:ring-2 focus-visible:ring-[rgb(var(--s-pink))] sm:min-h-[520px] sm:p-8"
+                    className="group relative isolate flex h-full min-h-[440px] flex-col justify-between overflow-hidden rounded-[2px] border border-white/10 bg-white/[0.02] p-6 outline-none transition-colors duration-300 hover:border-white/20 focus-visible:ring-2 focus-visible:ring-[rgb(var(--s-pink))] sm:min-h-[520px] sm:p-8"
                   >
                     <div
                       aria-hidden

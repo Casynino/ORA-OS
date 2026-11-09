@@ -84,7 +84,7 @@ export default async function EducationPage({
                   href={c.key ? `/education?category=${c.key}` : "/education"}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "inline-flex h-11 items-center rounded-full border px-5 text-[14px] font-medium transition-[background-color,border-color,color] duration-200",
+                    "inline-flex h-11 items-center rounded-[2px] border px-5 text-[14px] font-medium transition-[background-color,border-color,color] duration-200",
                     active
                       ? "border-[rgb(var(--s-pink))] bg-[rgb(var(--s-pink))] text-white shadow-[0_10px_30px_-12px_rgb(255_63_168/0.9)]"
                       : "border-white/15 text-white/70 hover:border-white/40 hover:bg-white/[0.04] hover:text-white",
@@ -131,12 +131,12 @@ export default async function EducationPage({
                 <Link
                   href={`/education/${featured.slug}`}
                   className={cn(
-                    "group grid grid-cols-1 gap-9 rounded-[28px] lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)] lg:items-end lg:gap-16",
+                    "group grid grid-cols-1 gap-9 rounded-[2px] lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)] lg:items-end lg:gap-16",
                     FOCUS,
                   )}
                 >
                   <div className="relative">
-                    <Parallax speed={0.08} className="aspect-[4/3] w-full rounded-[28px] bg-white/5 sm:aspect-[16/10]">
+                    <Parallax speed={0.08} className="aspect-[4/3] w-full rounded-[2px] bg-white/5 sm:aspect-[16/10]">
                       <Image
                         src={educationCover(featured.category, featured.slug)}
                         alt={featured.title}
@@ -200,10 +200,10 @@ export default async function EducationPage({
                           !first && "md:mt-16 lg:mt-24",
                         )}
                       >
-                        <Link href={`/education/${a.slug}`} className={cn("group block rounded-[24px]", FOCUS)}>
+                        <Link href={`/education/${a.slug}`} className={cn("group block rounded-[2px]", FOCUS)}>
                           <div
                             className={cn(
-                              "relative overflow-hidden rounded-[24px] bg-white/5",
+                              "relative overflow-hidden rounded-[2px] bg-white/5",
                               alone ? "aspect-[4/3] sm:aspect-[21/9]" : wide ? "aspect-[4/3] lg:aspect-[16/11]" : "aspect-[4/3] lg:aspect-square",
                             )}
                           >
@@ -265,7 +265,7 @@ export default async function EducationPage({
               return (
                 <Rise key={src} delay={(i % 3) * 0.08}>
                   <div className={cn(low && "translate-y-8", mid ? "sm:translate-y-16" : low && "sm:translate-y-0")}>
-                    <div className="group relative aspect-[19/24] overflow-hidden rounded-[18px] bg-white/5 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.8)] ring-1 ring-white/10 transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-2 hover:rotate-[-1.2deg] sm:rounded-[22px]">
+                    <div className="group relative aspect-[19/24] overflow-hidden rounded-[2px] bg-white/5 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.8)] ring-1 ring-white/10 transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-2 hover:rotate-[-1.2deg] sm:rounded-[2px]">
                       <Image src={src} alt="ORA period tip" fill sizes="(max-width:640px) 50vw, 33vw" className={ZOOM} loading="lazy" />
                     </div>
                     <p className={cn(MONO, "mt-3 text-white/45")}>Tip {pad(i + 1)}</p>

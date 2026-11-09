@@ -94,7 +94,7 @@ export function SiteHeader({ user }: { user?: { name?: string | null; role?: str
             <Magnetic className="hidden sm:inline-block">
               <Link
                 href="/impact"
-                className="inline-flex h-10 items-center gap-2 rounded-full bg-[rgb(var(--s-pink))] px-5 text-[13px] font-semibold text-white shadow-[0_8px_30px_-8px_rgb(255_63_168/0.7)] transition-transform active:scale-[0.97]"
+                className="inline-flex h-10 items-center gap-2 rounded-[2px] bg-[rgb(var(--s-pink))] px-5 text-[13px] font-semibold text-white shadow-[0_8px_30px_-8px_rgb(255_63_168/0.7)] transition-transform active:scale-[0.97]"
               >
                 Join the movement
               </Link>

@@ -73,7 +73,7 @@ export default function ProductsPage() {
                   <Rise className={flip ? "lg:order-2" : undefined}>
                     <Link href={`/products/${p.slug}`} tabIndex={-1} aria-hidden="true" className="group relative block">
                       <div className={`relative w-[78%] ${flip ? "ml-auto" : ""}`}>
-                        <Parallax speed={0.08} className="aspect-[4/5] w-full rounded-[28px] border border-white/10 bg-white/5">
+                        <Parallax speed={0.08} className="aspect-[4/5] w-full rounded-[2px] border border-white/10 bg-white/5">
                           <Image
                             src={p.image}
                             alt={p.name}

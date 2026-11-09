@@ -52,7 +52,7 @@ export function StoryIndex({ items, start = 1 }: { items: Story[]; start?: numbe
                   aria-hidden
                   className="absolute inset-0 -z-10 origin-left scale-x-0 bg-gradient-to-r from-[rgb(var(--s-pink)/0.12)] via-[rgb(var(--s-pink)/0.04)] to-transparent transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-x-100"
                 />
-                <span className="relative aspect-[4/5] w-full overflow-hidden rounded-[14px] bg-white/5 sm:aspect-[4/3] lg:hidden">
+                <span className="relative aspect-[4/5] w-full overflow-hidden rounded-[2px] bg-white/5 sm:aspect-[4/3] lg:hidden">
                   <Image src={s.img} alt={s.alt} fill sizes="(min-width:640px) 132px, 88px" className="object-cover transition-transform duration-[1.2s] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105" />
                 </span>
                 <span aria-hidden className="s-outline hidden font-site-display text-[3.4rem] font-semibold leading-none tracking-[-0.05em] transition-[-webkit-text-stroke-color] duration-300 group-hover:[-webkit-text-stroke-color:rgb(var(--s-pink))] lg:block">
@@ -87,7 +87,7 @@ export function StoryIndex({ items, start = 1 }: { items: Story[]; start?: numbe
         animate={{ opacity: hover === null ? 0 : 1, scale: hover === null ? 0.85 : 1 }}
         transition={{ duration: 0.3 }}
       >
-        <div className="relative -ml-[150px] -mt-[105px] h-[210px] w-[300px] overflow-hidden rounded-[20px] shadow-[0_30px_60px_-20px_rgb(0_0_0/0.7)]">
+        <div className="relative -ml-[150px] -mt-[105px] h-[210px] w-[300px] overflow-hidden rounded-[2px] shadow-[0_30px_60px_-20px_rgb(0_0_0/0.7)]">
           {items.map((s, i) => (
             <Image key={s.href} src={s.img} alt="" fill sizes="300px" className={`object-cover transition-opacity duration-300 ${hover === i ? "opacity-100" : "opacity-0"}`} />
           ))}

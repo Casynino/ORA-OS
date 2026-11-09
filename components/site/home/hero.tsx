@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
 import { Magnetic, SplitText, EASE } from "@/components/site/motion";
 import { CountUp } from "@/components/ui/count-up";
 import { ImpactPulse } from "@/components/public/impact-live";
@@ -60,10 +59,9 @@ export function Hero({ stats, feed }: { stats: Stat[]; feed: ImpactFeedItem[] })
           </motion.div>
         </AnimatePresence>
         {/* grade: dark on the words' side, night at the foot, a touch of ORA pink up top */}
-        <div aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgb(11_6_18/0.88)_0%,rgb(11_6_18/0.62)_38%,rgb(11_6_18/0.12)_72%,rgb(11_6_18/0.05)_100%)]" />
-        <div aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(to_top,rgb(11_6_18)_0%,rgb(11_6_18/0.55)_24%,transparent_55%)]" />
-        <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_70%_55%_at_85%_0%,rgb(255_63_168/0.22),transparent_60%)]" />
-
+        <div aria-hidden className="absolute inset-0 -z-10 hidden bg-[linear-gradient(90deg,rgb(10_10_11/0.85)_0%,rgb(10_10_11/0.5)_40%,rgb(10_10_11/0.12)_72%,transparent_100%)] md:block" />
+        <div aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(to_top,rgb(10_10_11)_0%,rgb(10_10_11/0.88)_38%,rgb(10_10_11/0.55)_68%,rgb(10_10_11/0.4)_100%)] md:bg-[linear-gradient(to_top,rgb(10_10_11)_0%,rgb(10_10_11/0.55)_24%,transparent_55%)]" />
+        
         <div className="mx-auto flex h-full max-w-[1440px] flex-col justify-end px-5 pb-10 pt-[calc(var(--sat)+6rem)] sm:px-8 sm:pb-14">
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.8 }} className="flex items-center gap-3">
             <span className="s-label text-[rgb(var(--s-pink))]">[ ORA Pads ]</span>
@@ -94,23 +92,12 @@ export function Hero({ stats, feed }: { stats: Stat[]; feed: ImpactFeedItem[] })
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.9, duration: 0.9, ease: EASE }}
-                className="mt-8 flex flex-wrap items-center gap-3"
+                className="mt-9 flex flex-wrap items-center gap-6"
               >
                 <Magnetic>
-                  <Link
-                    href="/impact"
-                    className="inline-flex h-14 items-center gap-2 rounded-full bg-[rgb(var(--s-pink))] px-7 text-[15px] font-semibold text-white shadow-[0_12px_40px_-10px_rgb(255_63_168/0.8)] transition-transform active:scale-[0.97]"
-                  >
-                    Join the movement
-                  </Link>
+                  <Link href="/impact" data-cursor="Join" className="s-btn s-btn--bone">Join the movement</Link>
                 </Magnetic>
-                <Link
-                  href="/find-ora"
-                  className="group inline-flex h-14 items-center gap-2 rounded-full border border-white/25 bg-white/[0.06] px-6 text-[15px] font-medium text-white backdrop-blur-md transition-colors hover:bg-white/[0.12]"
-                >
-                  Find ORA near you
-                  <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" strokeWidth={1.5} />
-                </Link>
+                <Link href="/find-ora" className="s-link text-white">Find ORA near you</Link>
               </motion.div>
             </div>
 
