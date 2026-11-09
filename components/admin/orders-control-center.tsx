@@ -204,7 +204,7 @@ function OrderDrawer({ order, onClose }: { order: OrderRow; onClose: () => void 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} aria-hidden />
-      <aside className="relative flex h-full w-full max-w-md flex-col border-l border-border bg-background shadow-2xl">
+      <aside className="relative flex h-full w-full max-w-md flex-col border-l border-border bg-background pt-[var(--sat)] shadow-2xl">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-border p-4">
           <div className="min-w-0">

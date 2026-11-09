@@ -62,7 +62,7 @@ export function NewVersionNotice() {
   if (!stale) return null;
 
   return (
-    <div className="pointer-events-none fixed right-4 top-4 z-[60] flex justify-end print:hidden">
+    <div className="pointer-events-none fixed right-4 top-[calc(1rem+var(--sat))] z-[60] flex justify-end print:hidden">
       <div className="pointer-events-auto flex items-center gap-3 rounded-2xl border border-border bg-card/95 px-4 py-2.5 shadow-soft backdrop-blur">
         <span className="text-sm font-medium">A new update is available.</span>
         <button

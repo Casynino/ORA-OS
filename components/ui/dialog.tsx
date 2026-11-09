@@ -38,7 +38,7 @@ export function Modal({
   if (!mounted || !open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 pt-[max(1rem,var(--sat))]">
       <div
         className="absolute inset-0 animate-fade-in bg-foreground/40 backdrop-blur-sm"
         onClick={onClose}

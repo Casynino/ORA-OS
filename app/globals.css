@@ -554,11 +554,82 @@ table th.text-right,
    and the end of every page can clear it. 0 on desktop and on pages without the bar. */
 .app-shell,
 body.has-app-shell {
-  --app-bar: calc(3.5rem + env(safe-area-inset-bottom));
+  --app-bar: calc(3.5rem + var(--sab));
 }
 @media (min-width: 1024px) {
   .app-shell,
   body.has-app-shell {
     --app-bar: 0px;
+  }
+}
+
+/* Full-height pages. 100dvh follows the phone's address bar as it hides and shows (Chrome,
+   Safari, Samsung Internet); browsers that don't know dvh (older Android / Huawei browsers)
+   use the 100vh line above it instead of ending up with no minimum height at all. */
+.min-h-app {
+  min-height: calc(100vh - var(--sat));
+  min-height: calc(100dvh - var(--sat));
+}
+/* the sign-in scene runs under the clock, so it takes the whole screen */
+.min-h-scene {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+/* The sign-in pop-up never grows taller than what is visible above the keyboard. */
+.sheet-max {
+  max-height: calc(100vh - var(--kb, 0px) - 0.75rem);
+  max-height: calc(100dvh - var(--kb, 0px) - 0.75rem);
+}
+
+/* ───────── Full screen on a phone (same approach as Target Express) ─────────
+   The page runs edge to edge (viewport-fit=cover in app/layout.tsx). The home-screen app
+   runs UNDER the phone's status bar (black-translucent: white clock), so --sat is the room
+   the clock/notch takes. The strip is the status bar's own colour, so the clock stays readable
+   on every page; the sign-in scene runs under the clock itself. All of these are 0 in a normal
+   browser tab, where the browser draws its own bars.
+   Anything pinned to the top uses top-[var(--sat)] (or pads by it); anything pinned to the
+   bottom clears --app-bar / var(--sab). */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+.status-strip {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 100;
+  height: var(--sat);
+  background: #0b0014;
+  pointer-events: none;
+}
+body {
+  /* clear of the clock at the top, and of the notch when a phone is turned sideways */
+  padding: var(--sat) var(--sar) 0 var(--sal);
+}
+body:has([data-login-scene]) {
+  padding-top: 0;
+  background-color: #0b0014;
+}
+body:has([data-login-scene]) .status-strip {
+  display: none;
+}
+@media print {
+  .status-strip { display: none; }
+  body { padding: 0; }
+}
+/* taps act at once (no double-tap zoom), and a long press does not select a button, as in an app */
+html {
+  touch-action: manipulation;
+}
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  nav a {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
 }

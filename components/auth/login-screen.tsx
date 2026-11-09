@@ -3,9 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Smartphone, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { LoginForm } from "@/components/auth/login-form";
+import { InstallButton } from "@/components/app/install-app";
 import { formatNumber } from "@/lib/utils";
 
 // Real ORA outreach photos, cross-fading slowly behind the brand overlay.
@@ -34,9 +35,9 @@ export function LoginScreen({
   const trigger = useRef<HTMLButtonElement>(null);
 
   return (
-    <main className="relative flex min-h-dvh flex-col overflow-hidden bg-[#0b0014] text-white">
+    <main data-login-scene className="relative flex min-h-scene flex-col bg-[#0b0014] text-white">
       {/* ── The scene ───────────────────────────────────────── */}
-      <div aria-hidden className="absolute inset-0">
+      <div aria-hidden className="absolute inset-0 overflow-hidden">
         {SLIDES.map((s, i) => (
           <div key={s.src} className="login-slide absolute inset-0 opacity-0" style={{ animationDelay: `${i * 6}s` }}>
             <Image src={s.src} alt="" fill priority={i === 0} sizes="100vw" className="object-cover" />
@@ -49,28 +50,36 @@ export function LoginScreen({
       </div>
 
       {/* ── Content ─────────────────────────────────────────── */}
-      <div className="relative z-10 flex flex-1 flex-col items-center px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-center">
-        <Link href="/" aria-label="ORA-Pads home" className="mt-2 sm:mt-6">
-          <Logo mark="light" priority className="h-28 sm:h-36" />
+      <div className="relative z-10 flex flex-1 flex-col items-center px-6 pb-[max(1.25rem,var(--sab))] pt-[calc(var(--sat)+1rem)] text-center">
+        {/* No browser bar in the home-screen app, so there is always a way back. */}
+        <Link
+          href="/"
+          className="mr-auto inline-flex h-9 items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3.5 text-[13px] text-white/80 backdrop-blur-sm transition-colors hover:bg-white/10 hover:text-white"
+        >
+          <ArrowLeft className="size-3.5" />
+          Back to site
         </Link>
-        <span className="mt-4 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-medium text-white/80 backdrop-blur-sm">
+        <Link href="/" aria-label="ORA-Pads home" className="mt-3 sm:mt-6">
+          <Logo mark="light" priority className="h-28 sm:h-36 [@media(max-height:560px)]:h-16 [@media(max-height:560px)]:sm:h-16" />
+        </Link>
+        <span className="mt-4 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-medium text-white/80 backdrop-blur-sm [@media(max-height:480px)]:hidden">
           The ORA Movement · Tanzania
         </span>
 
-        <div className="flex-1" />
+        <div className="min-h-6 flex-1" />
 
         <div className="w-full max-w-md pb-2">
-          <h1 className="font-display text-[2rem] font-bold leading-[1.1] sm:text-4xl">
+          <h1 className="font-display text-[2rem] font-bold leading-[1.1] sm:text-4xl [@media(max-height:480px)]:text-2xl">
             Put a pad in <span className="text-gradient">every girl&apos;s hand.</span>
           </h1>
-          <p className="mt-3 text-[15px] text-white/80">Orders, stock, sales and credit in one place.</p>
+          <p className="mt-3 text-[15px] text-white/80 [@media(max-height:480px)]:hidden">Orders, stock, sales and credit in one place.</p>
 
           <button
             ref={trigger}
             type="button"
             onClick={() => setOpen(true)}
             aria-haspopup="dialog"
-            className="mx-auto mt-7 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-10 text-base font-semibold text-white shadow-glow ring-1 ring-white/20 transition-transform active:scale-[0.98]"
+            className="mx-auto mt-7 [@media(max-height:480px)]:mt-3 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-10 text-base font-semibold text-white shadow-glow ring-1 ring-white/20 transition-transform active:scale-[0.98]"
           >
             Log in <ArrowRight className="size-5" />
           </button>
@@ -81,12 +90,27 @@ export function LoginScreen({
               Request access
             </Link>
           </p>
+
+          {/* A browser tab always keeps the browser's bars; the home-screen app is full screen.
+              Only phones that haven't installed it see this. */}
+          <InstallButton
+            render={(openSheet) => (
+              <button
+                type="button"
+                onClick={openSheet}
+                className="mx-auto mt-4 inline-flex items-center gap-1.5 text-[13px] text-white/65 underline-offset-4 transition-colors hover:text-white hover:underline"
+              >
+                <Smartphone className="size-3.5" />
+                Get the full-screen app
+              </button>
+            )}
+          />
         </div>
 
-        <p className="mt-6 text-[11px] text-white/55">
+        <p className="mt-6 text-[11px] text-white/55 [@media(max-height:480px)]:hidden">
           {formatNumber(pads)}+ pads delivered · {formatNumber(communities)} communities reached
         </p>
-        <p className="mt-1 text-[11px] text-white/40">© {new Date().getFullYear()} ORA-Pads · Period dignity for all</p>
+        <p className="mt-1 text-[11px] text-white/40 [@media(max-height:480px)]:hidden">© {new Date().getFullYear()} ORA-Pads · Period dignity for all</p>
       </div>
 
       {open && (
@@ -171,15 +195,15 @@ function SignInSheet({ onClose }: { onClose: () => void }) {
         aria-modal="true"
         aria-labelledby="signin-title"
         tabIndex={-1}
-        style={{ maxHeight: `calc(100dvh - ${kb}px - 0.75rem)` }}
-        className="relative w-full max-w-md animate-slide-up overflow-y-auto rounded-t-3xl border border-border bg-card px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3 text-card-foreground shadow-2xl outline-none sm:rounded-3xl sm:pb-6 sm:pt-6"
+        style={{ "--kb": `${kb}px` } as React.CSSProperties}
+        className="sheet-max relative w-full max-w-md animate-slide-up overflow-y-auto rounded-t-3xl border border-border bg-card px-6 pb-[max(1.5rem,var(--sab))] pt-3 text-card-foreground shadow-2xl outline-none sm:rounded-3xl sm:pb-6 sm:pt-6"
       >
         <div aria-hidden className="mx-auto mb-4 h-1 w-10 rounded-full bg-border sm:hidden" />
         <button
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute right-4 top-3 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:top-4"
+          className="absolute right-3 top-2 flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:right-4 sm:top-4"
         >
           <X className="size-5" />
         </button>

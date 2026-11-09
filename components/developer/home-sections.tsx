@@ -100,7 +100,7 @@ export function JumpBar({ items }: { items: { id: string; label: string; badge?:
   return (
     <nav
       aria-label="Jump to a section"
-      className="sticky top-16 z-20 -mx-1 flex gap-1.5 overflow-x-auto border-b border-border bg-background/90 px-1 py-2.5 backdrop-blur"
+      className="sticky top-[calc(4rem+var(--sat))] z-20 -mx-1 flex gap-1.5 overflow-x-auto border-b border-border bg-background/90 px-1 py-2.5 backdrop-blur"
     >
       {items.map((i) => (
         <a

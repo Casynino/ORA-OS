@@ -57,6 +57,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationBell } from "@/components/app/notification-bell";
 import { ActingBanner, useActing } from "@/components/developer/acting-banner";
+import { InstallPrompt } from "@/components/app/install-app";
 import { logoutAction } from "@/lib/actions/auth";
 import { cn, humanize } from "@/lib/utils";
 
@@ -153,6 +154,29 @@ export function DashboardShell({
   // A tab is lit on its own page and on pages inside it (Home only on itself).
   const tabActive = (href: string) => pathname === href || (href !== homeHref && pathname.startsWith(href + "/"));
   const menuActive = hasTabs && !tabs.some((t) => tabActive(t.href));
+
+  // While someone is typing, the phone keyboard needs the room: tuck the bar away (Android
+  // browsers shrink the page for the keyboard and would otherwise leave the bar sitting on
+  // top of the field). It slides back when the field loses focus.
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    if (!hasTabs) return;
+    const FIELD =
+      'input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=reset]):not([type=range]):not([type=file]):not([type=color]), textarea, select, [contenteditable=""], [contenteditable="true"]';
+    const isField = (el: EventTarget | null) => el instanceof HTMLElement && el.matches(FIELD);
+    const onIn = (e: FocusEvent) => {
+      if (isField(e.target)) setTyping(true);
+    };
+    const onOut = () => {
+      setTimeout(() => setTyping(isField(document.activeElement)), 80);
+    };
+    document.addEventListener("focusin", onIn);
+    document.addEventListener("focusout", onOut);
+    return () => {
+      document.removeEventListener("focusin", onIn);
+      document.removeEventListener("focusout", onOut);
+    };
+  }, [hasTabs]);
 
   // Tell the page-level pieces outside the shell (toasts) that the bottom bar is there.
   useEffect(() => {
@@ -352,7 +376,7 @@ export function DashboardShell({
   );
 
   return (
-    <div className={cn("min-h-dvh bg-gradient-to-b from-secondary/40 via-background to-background", hasTabs && "app-shell")}>
+    <div className={cn("min-h-app bg-gradient-to-b from-secondary/40 via-background to-background", hasTabs && "app-shell")}>
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-border bg-card/60 backdrop-blur-xl lg:flex">
         <div className="flex h-16 items-center border-b border-border px-5">
@@ -378,7 +402,7 @@ export function DashboardShell({
             className="absolute inset-0 animate-fade-in bg-foreground/40 backdrop-blur-sm"
             onClick={() => setOpen(false)}
           />
-          <aside className="absolute inset-y-0 left-0 flex w-[min(18rem,82vw)] animate-slide-in-left flex-col bg-card shadow-xl">
+          <aside className="absolute inset-y-0 left-0 flex w-[min(18rem,82vw)] animate-slide-in-left flex-col bg-card pb-[var(--sab)] pt-[var(--sat)] shadow-xl">
             <div className="flex h-16 items-center justify-between border-b border-border px-5">
               <Logo />
               <button
@@ -401,7 +425,7 @@ export function DashboardShell({
       <div className="lg:pl-64">
         {/* A Developer working as someone gets a small floating pill (Stop lives there). */}
         {acting && <ActingBanner state={acting} />}
-        <header className="sticky top-0 z-30 flex h-[calc(4rem+env(safe-area-inset-top))] items-center justify-between border-b border-border bg-background/80 px-4 pt-[env(safe-area-inset-top)] backdrop-blur lg:px-8">
+        <header className="sticky top-[var(--sat)] z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur max-[319px]:px-3 lg:px-8">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setOpen(true)}
@@ -421,7 +445,7 @@ export function DashboardShell({
               href="/"
               aria-label="Back to main site"
               title="Back to main site"
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground max-[299px]:hidden"
             >
               <Home className="size-4" />
               <span className="hidden sm:inline">Main site</span>
@@ -526,11 +550,18 @@ export function DashboardShell({
         </main>
       </div>
 
+      {/* On a phone that hasn't installed ORA, offer the full-screen app once (after sign-in). */}
+      <InstallPrompt />
+
       {/* Phone app bar: the department's main pages + Menu (the full menu). */}
       {hasTabs && (
         <nav
           aria-label="Main"
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden print:hidden"
+          aria-hidden={typing || undefined}
+          className={cn(
+            "fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 pb-[var(--sab)] backdrop-blur transition-transform duration-200 lg:hidden print:hidden",
+            typing && "pointer-events-none translate-y-full",
+          )}
         >
           <ul className="grid h-14" style={{ gridTemplateColumns: `repeat(${tabs.length + 1}, minmax(0, 1fr))` }}>
             {tabs.map((t) => {
@@ -542,7 +573,7 @@ export function DashboardShell({
                     href={t.href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "relative flex h-full flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium transition-colors",
+                      "relative flex h-full flex-col items-center justify-center gap-0.5 px-0.5 text-[10px] font-medium transition-colors max-[319px]:text-[9px] min-[360px]:px-1 min-[360px]:text-[11px]",
                       active ? "text-primary" : "text-muted-foreground active:text-foreground",
                     )}
                   >
@@ -559,7 +590,7 @@ export function DashboardShell({
                 onClick={() => setOpen(true)}
                 aria-label="Open menu"
                 className={cn(
-                  "relative flex h-full w-full flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium transition-colors",
+                  "relative flex h-full w-full flex-col items-center justify-center gap-0.5 px-0.5 text-[10px] font-medium transition-colors max-[319px]:text-[9px] min-[360px]:px-1 min-[360px]:text-[11px]",
                   menuActive ? "text-primary" : "text-muted-foreground active:text-foreground",
                 )}
               >

@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
 import { NewVersionNotice } from "@/components/app/new-version-notice";
+import { RegisterServiceWorker } from "@/components/app/register-sw";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -11,6 +12,13 @@ const poppins = Poppins({
   variable: "--font-sans",
   display: "swap",
 });
+
+// iPhone screens (points wide, high, pixel ratio) with a launch picture in public/splash: the
+// home-screen app opens on ORA's dark ground and logo instead of a white flash.
+const SPLASH = [
+  [440, 956, 3], [430, 932, 3], [428, 926, 3], [420, 912, 3], [414, 896, 3], [414, 896, 2], [414, 736, 3],
+  [402, 874, 3], [393, 852, 3], [390, 844, 3], [375, 812, 3], [375, 667, 2], [320, 568, 2],
+] as const;
 
 const SITE_NAME = "ORA-Pads";
 const SITE_TAGLINE = "ORA-Pads — Empowering Every Cycle";
@@ -24,12 +32,24 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: "#0b0014",
+  // The app draws its own light and dark, so Samsung Internet, Huawei's browser and Chrome's
+  // "darken websites" leave its colours alone.
+  colorScheme: "light dark",
 };
 
 export const metadata: Metadata = {
   applicationName: SITE_NAME,
   // Added to a phone's home screen, ORA opens full screen like an app.
-  appleWebApp: { capable: true, title: "ORA", statusBarStyle: "default" },
+  appleWebApp: {
+    capable: true,
+    title: "ORA",
+    // Runs under the status bar (full screen); the strip in globals.css keeps the clock readable.
+    statusBarStyle: "black-translucent",
+    startupImage: SPLASH.map(([w, h, r]) => ({
+      url: `/splash/${w}x${h}@${r}.png`,
+      media: `screen and (device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${r}) and (orientation: portrait)`,
+    })),
+  },
   formatDetection: { telephone: false },
   // Next only writes the standard `mobile-web-app-capable`; older iPhones read Apple's own name.
   other: { "apple-mobile-web-app-capable": "yes" },
@@ -80,6 +100,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${poppins.variable} font-sans antialiased`}>
+        <div aria-hidden className="status-strip" />
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
@@ -88,6 +109,7 @@ export default function RootLayout({
           {children}
           <Toaster />
           <NewVersionNotice />
+          <RegisterServiceWorker />
         </ThemeProvider>
       </body>
     </html>
