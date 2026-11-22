@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/rbac";
 import {
   getInboxFor,
+  getInboxVersion,
   markNotificationRead,
   markAllNotificationsRead,
 } from "@/lib/services/notifications";
@@ -17,10 +18,20 @@ const NO_STORE = {
   "CDN-Cache-Control": "no-store",
 };
 
-export async function GET() {
+export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE });
+  }
+  // The bell sends the token of the inbox it already holds (?v=…). If nothing moved, answer with a
+  // few bytes instead of the whole inbox: every open page polls this every 12 s. Without ?v (or if
+  // the token can't be computed) the full inbox goes out exactly as before.
+  const have = new URL(req.url).searchParams.get("v");
+  if (have) {
+    const now = await getInboxVersion({ id: user.id, role: user.role });
+    if (now !== null && now === have) {
+      return NextResponse.json({ unchanged: true, v: now }, { headers: NO_STORE });
+    }
   }
   const inbox = await getInboxFor({ id: user.id, role: user.role });
   return NextResponse.json(inbox, { headers: NO_STORE });

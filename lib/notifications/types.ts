@@ -21,3 +21,6 @@ export type NotifPulse = {
   unread: number; // unread count for the badge
   v: string; // cheap change token
 };
+
+// What GET /api/notifications?v=<token> answers when the inbox hasn't moved since <token>.
+export type NotifUnchanged = { unchanged: true; v: string };

@@ -22,7 +22,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { cn, timeAgo } from "@/lib/utils";
 import { playSound, unlockAudio, useAudioReady } from "@/components/app/notification-sound";
-import type { NotifDTO, NotifPulse } from "@/lib/notifications/types";
+import type { NotifDTO, NotifPulse, NotifUnchanged } from "@/lib/notifications/types";
 
 const POLL_MS = 12_000; // how often we ask "anything new?"
 const LS_KEY = "ora.notif.v1";
@@ -75,6 +75,7 @@ export function NotificationBell() {
   const [online, setOnline] = useState(true);
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
   const seen = useRef<Set<string> | null>(null);
+  const haveV = useRef<string | null>(null); // change token of the inbox on screen; sent with each poll
   const chimedOnLoad = useRef(false);
   const ringTimers = useRef<number[]>([]);
   const settingsRef = useRef(settings);
@@ -131,12 +132,18 @@ export function NotificationBell() {
       // notification matters. Sound is naturally suppressed while hidden (the
       // audio context is suspended), so a hidden tab alerts via the OS popup only.
       try {
-        const res = await fetch("/api/notifications", { cache: "no-store" });
+        // Send the token of what we already hold: if nothing moved the server answers with a few bytes
+        // (the full inbox costs database data transfer on every 12 s poll of every open page).
+        const q = haveV.current ? `?v=${encodeURIComponent(haveV.current)}` : "";
+        const res = await fetch(`/api/notifications${q}`, { cache: "no-store" });
         if (res.status === 401) return; // signed out / no session — stay quiet
         if (!res.ok) throw new Error(String(res.status));
-        const data = (await res.json()) as NotifPulse;
+        const body = (await res.json()) as NotifPulse | NotifUnchanged;
         if (stop) return;
         setOnline(true);
+        if ("unchanged" in body) return; // same inbox as the one on screen
+        const data = body;
+        haveV.current = data.v;
         setItems(data.items);
         setWaiting(data.waitingIds);
         setUnread(data.unread);

@@ -38,6 +38,33 @@ function toDTO(n: {
   };
 }
 
+// The change token the bell sends back: newest notification id : unread count : waiting ACTION
+// count (capped at 200, the size of the waiting list). getInboxFor and getInboxVersion MUST build
+// it the same way, or an unchanged inbox would look changed and be downloaded again.
+const WAITING_CAP = 200;
+const NEWEST_FIRST = [{ createdAt: "desc" }, { id: "desc" }] as const; // id breaks same-millisecond ties
+const inboxToken = (newestId: string | undefined, unread: number, waiting: number) =>
+  `${newestId ?? "0"}:${unread}:${Math.min(waiting, WAITING_CAP)}`;
+
+/**
+ * Just the change token: three tiny queries (one id, two counts) instead of the 40-row inbox.
+ * The bell sends its token on every 12 s poll and downloads the full inbox only when it moved,
+ * which keeps the database's data transfer (billed per GB) small. null = couldn't tell, so send the full inbox.
+ */
+export async function getInboxVersion(user: { id: string; role: Role }): Promise<string | null> {
+  const where = audienceWhere(user.id, user.role);
+  try {
+    const [newest, unread, waiting] = await Promise.all([
+      prisma.notification.findFirst({ where, orderBy: [...NEWEST_FIRST], select: { id: true } }),
+      prisma.notification.count({ where: { ...where, readAt: null } }),
+      prisma.notification.count({ where: { ...where, category: "ACTION", resolvedAt: null } }),
+    ]);
+    return inboxToken(newest?.id, unread, waiting);
+  } catch {
+    return null;
+  }
+}
+
 /** Everything the bell needs in one poll. Degrades to empty if the table is missing. */
 export async function getInboxFor(user: { id: string; role: Role }): Promise<NotifPulse> {
   const where = audienceWhere(user.id, user.role);
@@ -45,7 +72,7 @@ export async function getInboxFor(user: { id: string; role: Role }): Promise<Not
     const [items, unread, waiting] = await Promise.all([
       prisma.notification.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: [...NEWEST_FIRST],
         take: 40,
         select: {
           id: true, category: true, type: true, title: true, body: true,
@@ -57,12 +84,12 @@ export async function getInboxFor(user: { id: string; role: Role }): Promise<Not
       prisma.notification.findMany({
         where: { ...where, category: "ACTION", resolvedAt: null },
         select: { id: true },
-        take: 200,
+        take: WAITING_CAP,
       }),
     ]);
     const dtos = items.map(toDTO);
     const waitingIds = waiting.map((w) => w.id);
-    return { items: dtos, waitingIds, unread, v: `${dtos[0]?.id ?? "0"}:${unread}:${waitingIds.length}` };
+    return { items: dtos, waitingIds, unread, v: inboxToken(dtos[0]?.id, unread, waitingIds.length) };
   } catch (e) {
     console.error("[getInboxFor]", e instanceof Error ? e.message : e);
     return { items: [], waitingIds: [], unread: 0, v: "0:0:0" };
