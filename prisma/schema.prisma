@@ -217,6 +217,7 @@ model User {
   creditEvents          PartnerCreditEvent[]     @relation("PartnerCreditEvents")
   attachmentsUploaded   Attachment[]             @relation("AttachmentUploader")
   notifications         Notification[]           @relation("UserNotifications")
+  pushSubscriptions     PushSubscription[]       @relation("UserPushSubscriptions")
 
   @@index([role])
   @@index([status])
@@ -1759,6 +1760,25 @@ model Notification {
   @@index([role, resolvedAt, createdAt])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+/// A phone or computer that agreed to get ORA alerts as pop-ups (Web Push), so the bell no longer has to
+/// ask the database "anything new?" every few seconds. One row per browser/device; the same device that
+/// signs in as someone else just moves to that person. Rows are removed when the device unsubscribes or
+/// the push service says the address is gone. Optional: if this table is missing, alerts still work (the bell
+/// falls back to a slow check) — see lib/notifications/push.ts.
+model PushSubscription {
+  id         String    @id @default(cuid())
+  user       User      @relation("UserPushSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  endpoint   String    @unique // the push service's address for this device
+  p256dh     String // the device's public key (the message is encrypted to it)
+  auth       String // the device's secret (also part of the encryption)
+  userAgent  String? // which browser/phone, to tell devices apart in support
+  createdAt  DateTime  @default(now())
+  lastPushAt DateTime? // last pop-up the push service accepted for this device
+
+  @@index([userId])
 }
 
 /// Technical events for the Developer console: unhandled server errors and failed

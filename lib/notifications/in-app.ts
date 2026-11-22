@@ -1,6 +1,8 @@
 import "server-only";
+import { after } from "next/server";
 import { prisma } from "@/lib/db";
 import { workingAsContext } from "@/lib/developer/context";
+import { sendPushToAudience } from "@/lib/notifications/push";
 import type { Role, NotificationCategory } from "@prisma/client";
 
 /**
@@ -62,6 +64,24 @@ export async function notifyInApp(input: NotifyInput): Promise<void> {
     for (const role of dedupeRoles(input.toRoles)) rows.push({ ...base, userId: null, role });
     if (rows.length === 0) return;
     await prisma.notification.createMany({ data: rows });
+    // The same alert as a phone / desktop pop-up for devices that turned it on (so nothing has to keep asking the
+    // database). After the response when we are inside a request, so it never slows the action; never throws.
+    const popup = () =>
+      sendPushToAudience({
+        toUserId: input.toUserId,
+        toRoles: input.toRoles,
+        title: input.title,
+        body: base.body,
+        url: input.actionUrl,
+        // An ACTION about the same thing replaces its earlier pop-up instead of stacking.
+        tag: input.entityType && input.entityId ? `${input.entityType}:${input.entityId}` : undefined,
+        urgent: base.category === "ACTION",
+      });
+    try {
+      after(popup);
+    } catch {
+      void popup(); // outside a request (script / test): send right away
+    }
   } catch (e) {
     console.error("[notifyInApp]", input.type, e instanceof Error ? e.message : e);
   }

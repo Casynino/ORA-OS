@@ -1,6 +1,7 @@
 // ORA service worker. It stores NOTHING on the phone (no pages, no business data) and changes no request except one thing:
 // when a page cannot load because the phone has no signal, it shows a short "No internet" page instead of the browser's error.
 // Its other job is to make the app installable on every phone browser: Chrome only offers its one-tap Install button to sites with a service worker.
+// Third job: show ORA's alerts as pop-ups (Web Push) on devices that turned them on — it only displays the message the server sent; it keeps nothing.
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
@@ -15,5 +16,65 @@ self.addEventListener("fetch", (event) => {
   if (event.request.mode !== "navigate") return; // pictures, data and form posts go straight to the network, untouched
   event.respondWith(
     fetch(event.request).catch(() => new Response(OFFLINE, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } })),
+  );
+});
+
+// ── Alerts as pop-ups (Web Push) ────────────────────────────────────────────────────────────────────────────────────────
+// The server sends { title, body, url, tag } only when an alert is created. Any open ORA page is told ("ora-notify") so its
+// bell refreshes and rings straight away instead of waiting to ask.
+// Safari / iPhone require every push to show a pop-up. Other browsers do not when an ORA page is open and in front (the bell
+// already rings and shows a toast there), so we skip the duplicate.
+const IS_SAFARI = /Safari\//.test(self.navigator.userAgent) && !/Chrome|Chromium|CriOS|Edg\/|OPR\//.test(self.navigator.userAgent);
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(
+    (async () => {
+      const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      wins.forEach((w) => w.postMessage({ type: "ora-notify" }));
+      const inFront = wins.some((w) => w.visibilityState === "visible" && w.focused);
+      if (inFront && !IS_SAFARI) return;
+      await self.registration.showNotification(data.title || "ORA", {
+        body: data.body || "",
+        tag: data.tag || undefined,
+        renotify: !!data.tag,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        data: { url: typeof data.url === "string" ? data.url : "/" },
+      });
+    })(),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    (async () => {
+      let target = new URL("/", self.location.origin).href;
+      try {
+        const u = new URL((event.notification.data && event.notification.data.url) || "/", self.location.origin);
+        if (u.origin === self.location.origin) target = u.href; // never open anything outside ORA
+      } catch (e) {
+        /* keep the home page */
+      }
+      const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const w of wins) {
+        if (new URL(w.url).origin === self.location.origin && "focus" in w) {
+          try {
+            await w.focus();
+            if ("navigate" in w) await w.navigate(target);
+            return;
+          } catch (e) {
+            /* fall through and open a new window */
+          }
+        }
+      }
+      await self.clients.openWindow(target);
+    })(),
   );
 });

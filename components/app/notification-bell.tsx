@@ -22,9 +22,16 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { cn, timeAgo } from "@/lib/utils";
 import { playSound, unlockAudio, useAudioReady } from "@/components/app/notification-sound";
+import { usePushAlerts } from "@/components/app/use-push-alerts";
 import type { NotifDTO, NotifPulse, NotifUnchanged } from "@/lib/notifications/types";
 
-const POLL_MS = 12_000; // how often we ask "anything new?"
+// A device that turned pop-up alerts on (push) gets each alert the moment it is created, so its page only refreshes when
+// told (service worker message), when it comes back to the front, and on a rare safety check while visible.
+// A device WITHOUT push behaves exactly as before: it asks every 12 s, hidden tabs too (that is how it learns of an alert
+// to show as an OS notification). The question is now a few bytes (change token), so that no longer costs the database
+// its data allowance; push devices additionally stop asking altogether so the database can sleep.
+const POLL_MS = 12_000; // no push on this device: how often the page asks "anything new?"
+const PUSH_SAFETY_MS = 5 * 60_000; // push is on: a visible page double-checks this rarely, in case a pop-up was lost
 const LS_KEY = "ora.notif.v1";
 
 type Settings = { enabled: boolean; volume: number };
@@ -76,6 +83,11 @@ export function NotificationBell() {
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
   const seen = useRef<Set<string> | null>(null);
   const haveV = useRef<string | null>(null); // change token of the inbox on screen; sent with each poll
+  const push = usePushAlerts();
+  const pushOn = useRef(false); // this device gets pop-ups: the page can check much less often
+  useEffect(() => {
+    pushOn.current = push.state === "on";
+  }, [push.state]);
   const chimedOnLoad = useRef(false);
   const ringTimers = useRef<number[]>([]);
   const settingsRef = useRef(settings);
@@ -128,9 +140,6 @@ export function NotificationBell() {
   useEffect(() => {
     let stop = false;
     const tick = async () => {
-      // Poll even when the tab is hidden — that's exactly when a background OS
-      // notification matters. Sound is naturally suppressed while hidden (the
-      // audio context is suspended), so a hidden tab alerts via the OS popup only.
       try {
         // Send the token of what we already hold: if nothing moved the server answers with a few bytes
         // (the full inbox costs database data transfer on every 12 s poll of every open page).
@@ -158,7 +167,8 @@ export function NotificationBell() {
         // A new notification arrived → ring twice (now + 5s later), then done.
         ringTwice();
         for (const a of arrived.slice(0, 3)) toast({ title: a.title, description: a.body });
-        if (document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
+        // With push on, the service worker already showed the OS pop-up: don't show a second one from the page.
+        if (!pushOn.current && document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
           try {
             new Notification(arrived[0].title, { body: arrived.map((a) => a.body).join("\n"), tag: "ora-notif" });
           } catch {
@@ -170,18 +180,35 @@ export function NotificationBell() {
       }
     };
     void tick();
-    const t = setInterval(tick, POLL_MS);
+    // Push on: only a visible page double-checks, rarely; a hidden page does nothing until it is brought back or the
+    // service worker says a pop-up just arrived. No push: every 12 s as before, hidden or not.
+    let timer: number | undefined;
+    const loop = () => {
+      timer = window.setTimeout(
+        async () => {
+          if (!pushOn.current || document.visibilityState === "visible") await tick();
+          if (!stop) loop();
+        },
+        pushOn.current ? PUSH_SAFETY_MS : POLL_MS,
+      );
+    };
+    loop();
     const onShow = () => {
       if (document.visibilityState === "visible") void tick();
     };
+    const onWorker = (e: MessageEvent) => {
+      if (e.data && e.data.type === "ora-notify") void tick(); // push arrived: refresh the bell and ring now
+    };
     document.addEventListener("visibilitychange", onShow);
     window.addEventListener("focus", onShow);
+    navigator.serviceWorker?.addEventListener("message", onWorker);
     return () => {
       stop = true;
-      clearInterval(t);
+      window.clearTimeout(timer);
       clearRingTimers();
       document.removeEventListener("visibilitychange", onShow);
       window.removeEventListener("focus", onShow);
+      navigator.serviceWorker?.removeEventListener("message", onWorker);
     };
   }, [ringTwice, clearRingTimers]);
 
@@ -223,7 +250,8 @@ export function NotificationBell() {
       // so alerts can reach the user when the tab is in the background.
       if (typeof Notification !== "undefined" && Notification.permission === "default") {
         try {
-          void Notification.requestPermission();
+          // Once the person answers, finish turning on pop-up alerts for this device (no second tap).
+          void Notification.requestPermission().then(() => push.refresh());
         } catch {
           /* ignore */
         }
@@ -313,6 +341,46 @@ export function NotificationBell() {
                 {soundOn ? <Volume2 className="size-4" /> : <BellOff className="size-4" />}
               </button>
             </div>
+
+            {push.state === "off" && (
+              <button
+                type="button"
+                disabled={push.busy}
+                onClick={() => void push.enable()}
+                className="flex w-full items-start gap-2 border-b border-border/60 bg-primary/5 px-3.5 py-2.5 text-left text-xs transition-colors hover:bg-primary/10 disabled:opacity-60"
+              >
+                <BellRing className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                <span>
+                  <span className="block font-semibold text-foreground">Turn on phone &amp; desktop alerts</span>
+                  <span className="block text-muted-foreground">
+                    {push.error ?? "A pop-up the moment something needs you, even when ORA is closed."}
+                  </span>
+                </span>
+              </button>
+            )}
+            {push.state === "on" && (
+              <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3.5 py-2 text-xs text-muted-foreground">
+                <span>Pop-up alerts are on for this device.</span>
+                <button
+                  type="button"
+                  disabled={push.busy}
+                  onClick={() => void push.disable()}
+                  className="shrink-0 font-medium underline-offset-2 hover:text-foreground hover:underline disabled:opacity-60"
+                >
+                  Turn off
+                </button>
+              </div>
+            )}
+            {push.state === "blocked" && (
+              <p className="border-b border-border/60 px-3.5 py-2 text-xs text-muted-foreground">
+                Pop-up alerts are blocked in this browser. Allow notifications for ora.co.tz in the browser&rsquo;s site settings, then reopen this panel.
+              </p>
+            )}
+            {push.state === "ios-install" && (
+              <p className="border-b border-border/60 px-3.5 py-2 text-xs text-muted-foreground">
+                On iPhone: tap Share, then Add to Home Screen, and open ORA from there to turn on pop-up alerts.
+              </p>
+            )}
 
             {items.some((i) => !i.read) && (
               <button
